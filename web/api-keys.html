@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Keys - Ollama Proxy</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-brand">
+            <h1>🤖 Ollama Proxy</h1>
+        </div>
+        
+        <div class="nav-menu">
+            <a href="/chat.html" class="nav-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/>
+                </svg>
+                Chat
+            </a>
+            <a href="/dashboard.html" class="nav-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="3" y="3" width="7" height="7" stroke-width="2"/>
+                    <rect x="14" y="3" width="7" height="7" stroke-width="2"/>
+                    <rect x="14" y="14" width="7" height="7" stroke-width="2"/>
+                    <rect x="3" y="14" width="7" height="7" stroke-width="2"/>
+                </svg>
+                Dashboard
+            </a>
+        </div>
+
+        <div class="nav-user">
+            <div class="user-dropdown">
+                <button class="user-button" id="user-button">
+                    <div class="user-avatar">U</div>
+                    <span id="nav-user-name">Loading...</span>
+                </button>
+                <div class="dropdown-menu" id="user-dropdown">
+                    <a href="/profile.html" class="dropdown-item">Profile Settings</a>
+                    <a href="/usage.html" class="dropdown-item">Usage & Billing</a>
+                    <hr class="dropdown-divider">
+                    <button class="dropdown-item" id="nav-logout-btn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>API Keys</h1>
+                    <p class="page-description">Manage your API keys for accessing the proxy</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+                    <button class="btn btn-primary" id="create-key-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="margin-right: 8px;">
+                            <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Create API Key
+                    </button>
+                </div>
+            </header>
+
+            <!-- Error/Success Messages -->
+            <div id="apikey-message" class="error-message" style="display: none;"></div>
+            <div id="apikey-success" class="success-message" style="display: none;"></div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="personal" id="personal-tab">
+                    Personal Keys
+                </button>
+                <button class="tab-btn" data-tab="tenant" id="tenant-tab">
+                    Organization Keys
+                </button>
+            </div>
+
+            <!-- Personal Keys Tab Content -->
+            <div class="tab-content active" id="personal-content">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Key</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="personal-keys-list">
+                            <tr>
+                                <td colspan="6" class="table-empty">Loading API keys...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tenant Keys Tab Content -->
+            <div class="tab-content" id="tenant-content">
+                <!-- Tenant Selector -->
+                <div class="form-group" style="max-width: 400px; margin-bottom: 24px;">
+                    <label for="tenant-selector">Select Organization</label>
+                    <select id="tenant-selector" class="form-control">
+                        <option value="">-- Select Organization --</option>
+                    </select>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Key</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenant-keys-list">
+                            <tr>
+                                <td colspan="6" class="table-empty">Select an organization to view API keys</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create API Key Modal -->
+    <div class="modal" id="create-key-modal" style="display: none;">
+        <div class="modal-overlay" id="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create API Key</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-key-form">
+                    <div class="form-group">
+                        <label for="key-type">Key Type *</label>
+                        <select id="key-type" class="form-control" required>
+                            <option value="personal">Personal Key</option>
+                            <option value="tenant">Organization Key</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="tenant-select-group" style="display: none;">
+                        <label for="key-tenant">Organization *</label>
+                        <select id="key-tenant" class="form-control">
+                            <option value="">-- Select Organization --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="key-name">Key Name *</label>
+                        <input 
+                            type="text" 
+                            id="key-name" 
+                            placeholder="Production Server"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="key-description">Description</label>
+                        <textarea 
+                            id="key-description" 
+                            rows="3"
+                            placeholder="Brief description of where this key will be used"
+                        ></textarea>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Rate Limits</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="key-rpm">Requests per Minute</label>
+                                <input 
+                                    type="number" 
+                                    id="key-rpm" 
+                                    placeholder="60"
+                                    min="1"
+                                    max="10000"
+                                >
+                            </div>
+                            <div class="form-group">
+                                <label for="key-rph">Requests per Hour</label>
+                                <input 
+                                    type="number" 
+                                    id="key-rph" 
+                                    placeholder="1000"
+                                    min="1"
+                                    max="100000"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Model Access</h3>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="key-all-models" checked>
+                                Allow access to all models
+                            </label>
+                        </div>
+                        <div class="form-group" id="models-list-group" style="display: none;">
+                            <label>Select Models</label>
+                            <div id="models-checkboxes" class="checkbox-group">
+                                <p class="text-secondary">Loading models...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-create-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submit-create-btn">Create Key</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Created Success Modal -->
+    <div class="modal" id="key-created-modal" style="display: none;">
+        <div class="modal-overlay" id="created-modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✅ API Key Created</h2>
+                <button class="modal-close" id="created-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" style="margin-bottom: 16px;">
+                    <strong>⚠️ Important:</strong> Copy this API key now. You won't be able to see it again!
+                </div>
+
+                <div class="form-group">
+                    <label>API Key</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input 
+                            type="text" 
+                            id="created-key-value" 
+                            readonly
+                            style="flex: 1; font-family: monospace;"
+                        >
+                        <button class="btn btn-secondary" id="copy-key-btn">
+                            📋 Copy
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Key Name</label>
+                    <div id="created-key-name" style="color: var(--text-primary);"></div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="close-created-modal-btn">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- Auth Guard MUST be loaded FIRST to protect the page -->
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/apikeys.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenants - Ollama Proxy</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-brand">
+            <h1>🤖 Ollama Proxy</h1>
+        </div>
+        
+        <div class="nav-menu">
+            <a href="/chat.html" class="nav-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/>
+                </svg>
+                Chat
+            </a>
+            <a href="/dashboard.html" class="nav-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="3" y="3" width="7" height="7" stroke-width="2"/>
+                    <rect x="14" y="3" width="7" height="7" stroke-width="2"/>
+                    <rect x="14" y="14" width="7" height="7" stroke-width="2"/>
+                    <rect x="3" y="14" width="7" height="7" stroke-width="2"/>
+                </svg>
+                Dashboard
+            </a>
+        </div>
+
+        <div class="nav-user">
+            <div class="user-dropdown">
+                <button class="user-button" id="user-button">
+                    <div class="user-avatar">U</div>
+                    <span id="nav-user-name">Loading...</span>
+                </button>
+                <div class="dropdown-menu" id="user-dropdown">
+                    <a href="/profile.html" class="dropdown-item">Profile Settings</a>
+                    <a href="/usage.html" class="dropdown-item">Usage & Billing</a>
+                    <hr class="dropdown-divider">
+                    <button class="dropdown-item" id="nav-logout-btn">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>Organizations</h1>
+                    <p class="page-description">Manage your teams and workspaces</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+                    <button class="btn btn-primary" id="create-tenant-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="margin-right: 8px;">
+                            <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Create Organization
+                    </button>
+                </div>
+            </header>
+
+            <!-- Error/Success Messages -->
+            <div id="tenant-message" class="error-message" style="display: none;"></div>
+            <div id="tenant-success" class="success-message" style="display: none;"></div>
+
+            <!-- Tenants Grid -->
+            <div id="tenants-grid" class="tenants-grid">
+                <div class="tenant-card loading">Loading tenants...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create Tenant Modal -->
+    <div class="modal" id="create-tenant-modal" style="display: none;">
+        <div class="modal-overlay" id="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Organization</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-tenant-form">
+                    <div class="form-group">
+                        <label for="tenant-name">Organization Name *</label>
+                        <input 
+                            type="text" 
+                            id="tenant-name" 
+                            placeholder="My Organization"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tenant-slug">URL Slug (optional)</label>
+                        <input 
+                            type="text" 
+                            id="tenant-slug" 
+                            placeholder="my-organization"
+                            pattern="[a-z0-9\-]+"
+                            title="Only lowercase letters, numbers, and hyphens"
+                        >
+                        <small>Used in URLs, auto-generated if empty</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tenant-description">Description</label>
+                        <textarea 
+                            id="tenant-description" 
+                            rows="3"
+                            placeholder="Brief description of this organization"
+                        ></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-create-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submit-create-btn">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tenant Detail Modal -->
+    <div class="modal" id="tenant-detail-modal" style="display: none;">
+        <div class="modal-overlay" id="detail-modal-overlay"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="detail-tenant-name">Tenant Details</h2>
+                <button class="modal-close" id="detail-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Tenant Info -->
+                <div class="form-section">
+                    <h3>Organization Info</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Name</label>
+                            <div id="detail-name"></div>
+                        </div>
+                        <div class="info-item">
+                            <label>Slug</label>
+                            <div id="detail-slug"></div>
+                        </div>
+                        <div class="info-item">
+                            <label>Type</label>
+                            <div id="detail-type"></div>
+                        </div>
+                        <div class="info-item">
+                            <label>Status</label>
+                            <div id="detail-status"></div>
+                        </div>
+                        <div class="info-item">
+                            <label>Created</label>
+                            <div id="detail-created"></div>
+                        </div>
+                        <div class="info-item">
+                            <label>Your Role</label>
+                            <div id="detail-role"></div>
+                        </div>
+                    </div>
+                    <div class="info-item" style="margin-top: 16px;">
+                        <label>Description</label>
+                        <div id="detail-description" style="color: var(--text-secondary);"></div>
+                    </div>
+                </div>
+
+                <!-- Members -->
+                <div class="form-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3>Members</h3>
+                        <button class="btn btn-secondary btn-sm" id="add-member-btn">Add Member</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Role</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="members-list">
+                                <tr>
+                                    <td colspan="4" class="table-empty">Loading members...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="form-actions" style="border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <button class="btn btn-secondary" id="close-detail-btn">Close</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" id="edit-tenant-btn">Edit</button>
+                        <button class="btn btn-secondary" id="delete-tenant-btn" style="color: var(--error-color); border-color: var(--error-color);">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- Auth Guard MUST be loaded FIRST to protect the page -->
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/tenants.js"></script>
+</body>
+</html>
+

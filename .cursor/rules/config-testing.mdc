@@ -1,0 +1,328 @@
+---
+globs: ollama-openai-proxy/internal/config/*.go,*_test.go,configs/*.yaml
+---
+
+# Configuration & Testing Guidelines
+
+## 🔧 Configuration Management Patterns
+
+### Configuration Structure (Viper + Struct Tags)
+```go
+// Use mapstructure tags for Viper compatibility
+type ServerConfig struct {
+    Host           string        `mapstructure:"host" validate:"required"`
+    Port           int           `mapstructure:"port" validate:"min=1,max=65535"`
+    ReadTimeout    time.Duration `mapstructure:"read_timeout"`
+    WriteTimeout   time.Duration `mapstructure:"write_timeout"`
+}
+
+// Validation using go-playground/validator
+func (c *Config) Validate() error {
+    validate := validator.New()
+    return validate.Struct(c)
+}
+```
+
+### Environment Variable Handling
+```go
+// Use PROXY_ prefix for all environment variables
+// Example: PROXY_SERVER_PORT=8080 maps to server.port
+func setupViper() *viper.Viper {
+    v := viper.New()
+    
+    v.SetEnvPrefix("PROXY")
+    v.AutomaticEnv()
+    v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+    
+    // Development vs Production config
+    env := os.Getenv("GO_ENV")
+    if env == "" {
+        env = "development"
+    }
+    
+    v.SetConfigName(env)
+    v.SetConfigType("yaml")
+    v.AddConfigPath("./configs")
+    v.AddConfigPath("/app/configs")
+    
+    return v
+}
+```
+
+### Configuration Validation & Defaults
+```go
+func setDefaults(v *viper.Viper) {
+    // Server defaults
+    v.SetDefault("server.host", "0.0.0.0")
+    v.SetDefault("server.port", 8080)
+    v.SetDefault("server.read_timeout", "30s")
+    
+    // Ollama defaults
+    v.SetDefault("ollama.url", "http://localhost:11434")
+    v.SetDefault("ollama.timeout", "30s")
+    v.SetDefault("ollama.retry_attempts", 3)
+    
+    // Security defaults (conservative)
+    v.SetDefault("auth.enabled", true) // Secure by default
+    v.SetDefault("auth.rate_limiting.enabled", true)
+    v.SetDefault("auth.rate_limiting.default_requests_per_minute", 30)
+}
+```
+
+## 🧪 Testing Patterns (100% Coverage Goal)
+
+### Test Organization
+```go
+// Follow Go testing conventions
+// TestFunctionName_Scenario_ExpectedBehavior
+
+func TestConfigLoad_ValidFile_ReturnsConfig(t *testing.T) {
+    // Arrange
+    configPath := "testdata/valid.yaml"
+    
+    // Act
+    config, err := Load(configPath)
+    
+    // Assert
+    assert.NoError(t, err)
+    assert.Equal(t, 8080, config.Server.Port)
+    assert.Equal(t, "info", config.Logging.Level)
+}
+
+func TestConfigLoad_InvalidFile_ReturnsError(t *testing.T) {
+    configPath := "testdata/invalid.yaml"
+    
+    config, err := Load(configPath)
+    
+    assert.Error(t, err)
+    assert.Nil(t, config)
+    assert.Contains(t, err.Error(), "validation failed")
+}
+```
+
+### Table-Driven Tests
+```go
+func TestConfigValidation(t *testing.T) {
+    tests := []struct {
+        name      string
+        config    Config
+        wantError bool
+        errorMsg  string
+    }{
+        {
+            name: "valid config",
+            config: Config{
+                Server: ServerConfig{Port: 8080},
+                Ollama: OllamaConfig{URL: "http://localhost:11434"},
+            },
+            wantError: false,
+        },
+        {
+            name: "invalid port",
+            config: Config{
+                Server: ServerConfig{Port: 0},
+            },
+            wantError: true,
+            errorMsg:  "invalid server port",
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            err := tt.config.Validate()
+            
+            if tt.wantError {
+                assert.Error(t, err)
+                if tt.errorMsg != "" {
+                    assert.Contains(t, err.Error(), tt.errorMsg)
+                }
+            } else {
+                assert.NoError(t, err)
+            }
+        })
+    }
+}
+```
+
+### HTTP Handler Testing
+```go
+func TestChatCompletionHandler(t *testing.T) {
+    // Setup test server
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
+    
+    // Mock dependencies
+    mockClient := &MockOllamaClient{}
+    handler := &ChatHandler{client: mockClient}
+    
+    router.POST("/v1/chat/completions", handler.HandleChatCompletion)
+    
+    t.Run("successful request", func(t *testing.T) {
+        // Arrange
+        mockClient.On("ChatCompletion", mock.Anything, mock.Anything).
+            Return(&OllamaChatResponse{
+                Message: OllamaMessage{Content: "Hello!"},
+            }, nil)
+            
+        req := ChatCompletionRequest{
+            Model:    "llama2",
+            Messages: []ChatMessage{{Role: "user", Content: "Hi"}},
+        }
+        
+        body, _ := json.Marshal(req)
+        
+        // Act
+        w := httptest.NewRecorder()
+        r := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewBuffer(body))
+        r.Header.Set("Content-Type", "application/json")
+        
+        router.ServeHTTP(w, r)
+        
+        // Assert
+        assert.Equal(t, 200, w.Code)
+        
+        var resp ChatCompletionResponse
+        err := json.Unmarshal(w.Body.Bytes(), &resp)
+        assert.NoError(t, err)
+        assert.Equal(t, "Hello!", resp.Choices[0].Message.Content)
+        
+        mockClient.AssertExpectations(t)
+    })
+}
+```
+
+### Mock Patterns
+```go
+// Use testify/mock for clean mocking
+type MockOllamaClient struct {
+    mock.Mock
+}
+
+func (m *MockOllamaClient) ChatCompletion(ctx context.Context, req OllamaChatRequest) (*OllamaChatResponse, error) {
+    args := m.Called(ctx, req)
+    return args.Get(0).(*OllamaChatResponse), args.Error(1)
+}
+
+func (m *MockOllamaClient) ListModels(ctx context.Context) ([]Model, error) {
+    args := m.Called(ctx)
+    return args.Get(0).([]Model), args.Error(1)
+}
+
+// Factory for creating mock clients with common behaviors
+func NewMockOllamaClient(t *testing.T) *MockOllamaClient {
+    mock := &MockOllamaClient{}
+    
+    // Common successful responses
+    mock.On("ListModels", mock.Anything).Return([]Model{
+        {ID: "llama2", Object: "model"},
+    }, nil)
+    
+    return mock
+}
+```
+
+### Integration Testing
+```go
+func TestServerIntegration(t *testing.T) {
+    // Skip integration tests in short mode
+    if testing.Short() {
+        t.Skip("Skipping integration test in short mode")
+    }
+    
+    // Setup test server with real dependencies
+    config := &Config{
+        Server: ServerConfig{Host: "localhost", Port: 0}, // Random port
+        Ollama: OllamaConfig{URL: "http://localhost:11434"},
+    }
+    
+    server := NewServer(config)
+    
+    // Start server in goroutine
+    go func() {
+        server.Start()
+    }()
+    
+    // Wait for server to be ready
+    waitForServer(t, server.Addr())
+    
+    defer server.Shutdown()
+    
+    // Run integration tests
+    t.Run("health check", func(t *testing.T) {
+        resp, err := http.Get(fmt.Sprintf("http://%s/health", server.Addr()))
+        assert.NoError(t, err)
+        assert.Equal(t, 200, resp.StatusCode)
+    })
+}
+```
+
+### Benchmark Tests
+```go
+func BenchmarkChatCompletionHandler(b *testing.B) {
+    // Setup
+    gin.SetMode(gin.TestMode)
+    router := gin.New()
+    
+    mockClient := &MockOllamaClient{}
+    mockClient.On("ChatCompletion", mock.Anything, mock.Anything).
+        Return(&OllamaChatResponse{
+            Message: OllamaMessage{Content: "Response"},
+        }, nil)
+    
+    handler := &ChatHandler{client: mockClient}
+    router.POST("/v1/chat/completions", handler.HandleChatCompletion)
+    
+    reqBody, _ := json.Marshal(ChatCompletionRequest{
+        Model:    "llama2",
+        Messages: []ChatMessage{{Role: "user", Content: "Hello"}},
+    })
+    
+    // Benchmark
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        w := httptest.NewRecorder()
+        r := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewBuffer(reqBody))
+        r.Header.Set("Content-Type", "application/json")
+        
+        router.ServeHTTP(w, r)
+    }
+}
+```
+
+### Test Utilities
+```go
+// Helper functions for testing
+func createTestConfig(overrides ...func(*Config)) *Config {
+    config := &Config{
+        Server: ServerConfig{Host: "localhost", Port: 8080},
+        Ollama: OllamaConfig{URL: "http://localhost:11434"},
+    }
+    
+    for _, override := range overrides {
+        override(config)
+    }
+    
+    return config
+}
+
+func withTestLogger() *logrus.Logger {
+    logger := logrus.New()
+    logger.SetLevel(logrus.DebugLevel)
+    logger.SetOutput(io.Discard) // Silent in tests
+    return logger
+}
+```
+
+### Coverage Requirements
+```bash
+# Achieve 100% coverage goal
+go test -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out | grep total
+go tool cover -html=coverage.out -o coverage.html
+
+# Coverage requirements per package:
+# - internal/config: 100%
+# - internal/api: 95%+
+# - internal/auth: 100% (security critical)
+# - cmd/*: 80%+ (main functions harder to test)
+```

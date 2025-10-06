@@ -1,0 +1,222 @@
+# Production Configuration для Ollama-OpenAI Proxy
+# Скопируйте в production.yaml и настройте под вашу среду
+
+server:
+  port: 8080
+  host: "0.0.0.0"
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  max_header_bytes: 1048576  # 1MB
+  
+  # TLS настройки (рекомендуется для production)
+  tls:
+    enabled: false
+    cert_file: "/etc/ssl/certs/proxy.crt"
+    key_file: "/etc/ssl/private/proxy.key"
+    auto_cert: false  # Автоматические сертификаты от Let's Encrypt
+    
+  # CORS настройки
+  cors:
+    enabled: true
+    allowed_origins: 
+      - "https://your-frontend.com"
+      - "https://api.your-domain.com"
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["Authorization", "Content-Type", "X-API-Key"]
+    max_age: 3600
+
+ollama:
+  url: "http://ollama:11434"  # Docker service name
+  timeout: "60s"
+  retry_attempts: 5
+  retry_delay: "2s"
+  connection_pool_size: 50
+  keep_alive: true
+  
+  # Мониторинг состояния Ollama
+  health_check:
+    enabled: true
+    interval: "30s"
+    timeout: "10s"
+    
+  # Circuit breaker настройки
+  circuit_breaker:
+    enabled: true
+    max_failures: 5
+    reset_timeout: "30s"
+
+auth:
+  enabled: true
+  storage_type: "sqlite"  # json или sqlite
+  storage_path: "/data/proxy.db"
+  
+  # Админский ключ (ОБЯЗАТЕЛЬНО измените!)
+  admin_key: "CHANGE_ME_ADMIN_KEY_123"
+  
+  # Rate limiting
+  rate_limiting:
+    enabled: true
+    default_requests_per_minute: 30
+    default_requests_per_hour: 500
+    
+    # Distributed rate limiting с Redis
+    redis:
+      enabled: false
+      url: "redis://redis:6379"
+      key_prefix: "ollama_proxy:"
+      
+  # JWT settings для внутренних токенов
+  jwt:
+    secret: "CHANGE_ME_JWT_SECRET_KEY_456"
+    expiry: "24h"
+
+# 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
+database:
+  # Database type: sqlite or postgresql
+  # Для production рекомендуется PostgreSQL для лучшей масштабируемости
+  type: "postgresql"  # или "sqlite" для простых случаев
+  
+  # SQLite Configuration (для небольших deployments)
+  sqlite:
+    path: "/data/proxy.db"
+    journal_mode: "WAL"      # Write-Ahead Logging для лучшей concurrency
+    busy_timeout: 5000        # ms - ожидание при locked БД
+    cache_size: 20000         # KB - размер кеша SQLite (20MB для prod)
+  
+  # PostgreSQL Configuration (рекомендуется для production)
+  postgresql:
+    host: "postgres"          # Docker service name или IP
+    port: 5432
+    user: "proxy"
+    password: "CHANGE_ME_DB_PASSWORD"  # ОБЯЗАТЕЛЬНО измените!
+    database: "ollama_proxy"
+    sslmode: "require"        # require для production
+    max_open_conns: 100       # Максимум открытых подключений
+    max_idle_conns: 10        # Максимум idle подключений
+    conn_max_lifetime: "30m"  # Время жизни подключения
+
+logging:
+  level: "info"
+  format: "json"
+  output: "file"
+  file_path: "/app/logs/proxy.log"
+  max_size: 100    # MB
+  max_backups: 10
+  max_age: 90      # days
+  compress: true
+  
+  # Structured logging fields
+  structured_fields:
+    service: "ollama-openai-proxy"
+    version: "1.0.0"
+    environment: "production"
+
+models:
+  # Маппинг имен моделей
+  mapping:
+    "gpt-3.5-turbo": "llama2:7b"
+    "gpt-3.5-turbo-16k": "llama2:13b"
+    "gpt-4": "llama2:70b"
+    "gpt-4-32k": "llama2:70b"
+    "text-embedding-ada-002": "nomic-embed-text"
+    "text-embedding-3-small": "mxbai-embed-large"
+    "text-embedding-3-large": "nomic-embed-text:latest"
+  
+  # Алиасы для удобства
+  aliases:
+    "llama": "llama2:7b"
+    "codellama": "codellama:13b"
+    "mistral": "mistral:7b"
+    "vicuna": "vicuna:13b"
+  
+  # Модели, которые не показывать в /v1/models
+  hidden:
+    - "test-model"
+    - "debug-model"
+    - "internal-model"
+  
+  # Кеширование списка моделей
+  cache:
+    enabled: true
+    ttl: "15m"
+    refresh_interval: "5m"
+
+metrics:
+  enabled: true
+  prometheus_path: "/metrics"
+  
+  # Внутренние метрики
+  collection:
+    enabled: true
+    buffer_size: 5000
+    flush_interval: "30s"
+    
+  # Экспорт в внешние системы
+  export:
+    prometheus:
+      enabled: true
+      push_gateway: "http://prometheus-pushgateway:9091"
+      job_name: "ollama-proxy"
+      push_interval: "30s"
+
+security:
+  # API Key validation
+  api_key_header: "Authorization"  # или X-API-Key
+  api_key_format: "Bearer"         # Bearer или API-Key
+  
+  # Request limiting
+  max_request_size: "10MB"
+  max_response_size: "100MB"
+  
+  # IP filtering
+  ip_whitelist: []  # Пустой = все разрешены
+  ip_blacklist: []
+  
+  # Request sanitization
+  sanitize_logs: true  # Скрывать API ключи в логах
+  
+  # Headers to remove from requests/responses
+  remove_headers:
+    - "X-Real-IP"
+    - "X-Forwarded-For"
+
+monitoring:
+  # Health check endpoint
+  health_check:
+    enabled: true
+    path: "/health"
+    detailed: false  # Детальная информация о состоянии
+    
+  # Liveness probe
+  liveness_probe:
+    enabled: true
+    path: "/healthz"
+    
+  # Readiness probe  
+  readiness_probe:
+    enabled: true
+    path: "/ready"
+
+performance:
+  # Connection pooling
+  connection_pool:
+    max_idle_conns: 100
+    max_idle_conns_per_host: 10
+    idle_conn_timeout: "90s"
+    
+  # Request caching
+  cache:
+    enabled: false  # Осторожно с кешированием LLM ответов
+    ttl: "5m"
+    max_size: "100MB"
+    
+  # Response compression
+  compression:
+    enabled: true
+    level: 6  # 1-9, где 9 = максимальное сжатие
+    min_size: 1024  # Минимальный размер для сжатия
+
+# Environment specific overrides
+# Переменные окружения имеют приоритет над файлом конфигурации
+# Пример: SERVER_PORT=8080, OLLAMA_URL=http://localhost:11434

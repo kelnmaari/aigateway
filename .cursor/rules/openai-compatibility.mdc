@@ -1,0 +1,199 @@
+---
+globs: ollama-openai-proxy/internal/api/**/*.go,ollama-openai-proxy/internal/converter/*.go
+---
+
+# OpenAI API Compatibility Guidelines
+
+## 🎯 API Endpoint Requirements
+
+### Core Endpoints Implementation
+- **`/v1/chat/completions`** - Primary chat endpoint with streaming support
+- **`/v1/models`** - Model listing with proper OpenAI format
+- **`/v1/embeddings`** - Text embeddings (post-MVP)
+- **`/v1/completions`** - Legacy completions (post-MVP)
+
+### Request/Response Format Compliance
+
+#### Chat Completions Request
+```go
+type ChatCompletionRequest struct {
+    Model            string                 `json:"model" binding:"required"`
+    Messages         []ChatMessage         `json:"messages" binding:"required"`
+    MaxTokens        *int                  `json:"max_tokens,omitempty"`
+    Temperature      *float64              `json:"temperature,omitempty"`
+    TopP             *float64              `json:"top_p,omitempty"`
+    N                *int                  `json:"n,omitempty"`
+    Stream           *bool                 `json:"stream,omitempty"`
+    Stop             interface{}           `json:"stop,omitempty"` // string or []string
+    PresencePenalty  *float64              `json:"presence_penalty,omitempty"`
+    FrequencyPenalty *float64              `json:"frequency_penalty,omitempty"`
+    LogitBias        map[string]float64    `json:"logit_bias,omitempty"`
+    User             *string               `json:"user,omitempty"`
+}
+```
+
+#### Chat Completions Response
+```go
+type ChatCompletionResponse struct {
+    ID      string                   `json:"id"`
+    Object  string                   `json:"object"`
+    Created int64                    `json:"created"`
+    Model   string                   `json:"model"`
+    Choices []ChatCompletionChoice   `json:"choices"`
+    Usage   ChatCompletionUsage      `json:"usage"`
+}
+
+type ChatCompletionChoice struct {
+    Index        int                `json:"index"`
+    Message      ChatMessage        `json:"message,omitempty"`
+    Delta        *ChatMessage       `json:"delta,omitempty"` // For streaming
+    FinishReason *string            `json:"finish_reason"`
+}
+```
+
+#### Model Listing Response
+```go
+type ModelsResponse struct {
+    Object string  `json:"object"`
+    Data   []Model `json:"data"`
+}
+
+type Model struct {
+    ID         string      `json:"id"`
+    Object     string      `json:"object"`
+    OwnedBy    string      `json:"owned_by"`
+    Permission []ModelPerm `json:"permission"`
+}
+```
+
+### Error Format Compatibility
+```go
+type OpenAIError struct {
+    Error struct {
+        Message string      `json:"message"`
+        Type    string      `json:"type"`
+        Param   interface{} `json:"param,omitempty"`
+        Code    interface{} `json:"code,omitempty"`
+    } `json:"error"`
+}
+
+// Common error types to match OpenAI
+const (
+    ErrorTypeInvalidRequest     = "invalid_request_error"
+    ErrorTypeAuthentication     = "authentication_error"
+    ErrorTypePermission        = "permission_error"
+    ErrorTypeNotFound          = "not_found_error"
+    ErrorTypeRateLimit         = "rate_limit_exceeded"
+    ErrorTypeQuotaExceeded     = "quota_exceeded"
+    ErrorTypeServerError       = "server_error"
+    ErrorTypeEngineOverloaded  = "engine_overloaded"
+)
+```
+
+## 🔄 Request/Response Conversion
+
+### OpenAI → Ollama Conversion
+```go
+func ConvertChatRequest(openaiReq ChatCompletionRequest) OllamaChatRequest {
+    return OllamaChatRequest{
+        Model:  mapModelName(openaiReq.Model),
+        Messages: convertMessages(openaiReq.Messages),
+        Stream: openaiReq.Stream != nil && *openaiReq.Stream,
+        Options: OllamaOptions{
+            Temperature: openaiReq.Temperature,
+            TopP:       openaiReq.TopP,
+            Stop:       convertStop(openaiReq.Stop),
+        },
+    }
+}
+```
+
+### Ollama → OpenAI Response Conversion
+```go
+func ConvertChatResponse(ollamaResp OllamaChatResponse, model string) ChatCompletionResponse {
+    return ChatCompletionResponse{
+        ID:      generateChatID(),
+        Object:  "chat.completion",
+        Created: time.Now().Unix(),
+        Model:   model,
+        Choices: []ChatCompletionChoice{
+            {
+                Index: 0,
+                Message: ChatMessage{
+                    Role:    "assistant",
+                    Content: ollamaResp.Message.Content,
+                },
+                FinishReason: convertFinishReason(ollamaResp.Done),
+            },
+        },
+        Usage: calculateUsage(ollamaResp),
+    }
+}
+```
+
+## 📡 Streaming Implementation
+
+### Server-Sent Events (SSE) Format
+```go
+func (h *ChatHandler) streamResponse(w http.ResponseWriter, req ChatCompletionRequest) {
+    w.Header().Set("Content-Type", "text/event-stream")
+    w.Header().Set("Cache-Control", "no-cache")
+    w.Header().Set("Connection", "keep-alive")
+    
+    flusher, ok := w.(http.Flusher)
+    if !ok {
+        http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+        return
+    }
+    
+    for chunk := range streamChannel {
+        data := ChatCompletionResponse{
+            ID:      req.ID,
+            Object:  "chat.completion.chunk",
+            Created: time.Now().Unix(),
+            Model:   req.Model,
+            Choices: []ChatCompletionChoice{
+                {
+                    Index: 0,
+                    Delta: &ChatMessage{Content: chunk.Content},
+                },
+            },
+        }
+        
+        fmt.Fprintf(w, "data: %s\n\n", toJSON(data))
+        flusher.Flush()
+    }
+    
+    fmt.Fprintf(w, "data: [DONE]\n\n")
+}
+```
+
+## 🔑 Authentication Header Handling
+```go
+// Support both Authorization and X-API-Key headers
+func extractAPIKey(r *http.Request) string {
+    // Check Authorization: Bearer <token>
+    auth := r.Header.Get("Authorization")
+    if strings.HasPrefix(auth, "Bearer ") {
+        return strings.TrimPrefix(auth, "Bearer ")
+    }
+    
+    // Check X-API-Key header  
+    return r.Header.Get("X-API-Key")
+}
+```
+
+## 📊 Usage Tracking (OpenAI Compatible)
+```go
+type ChatCompletionUsage struct {
+    PromptTokens     int `json:"prompt_tokens"`
+    CompletionTokens int `json:"completion_tokens"`
+    TotalTokens      int `json:"total_tokens"`
+}
+
+// Estimate tokens for compatibility (Ollama doesn't provide exact counts)
+func estimateTokenCount(text string) int {
+    // Rough estimation: ~4 characters per token for English
+    return len(text) / 4
+}
+```

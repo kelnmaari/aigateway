@@ -1,0 +1,137 @@
+---
+globs: *.go
+---
+
+# Go 1.25 Modern Development Patterns
+
+## 🚀 Go 1.25 Features & Best Practices
+
+### Enhanced Generics Usage
+```go
+// Use type constraints for better code reusability
+type Converter[T, U any] interface {
+    Convert(T) (U, error)
+}
+
+// Leverage generics for API response types
+type APIResponse[T any] struct {
+    Data   T      `json:"data"`
+    Error  *Error `json:"error,omitempty"`
+    Meta   Meta   `json:"meta"`
+}
+```
+
+### WaitGroup Best Practices (Go 1.25 Enhanced)
+```go
+// Use new WaitGroup patterns with error handling
+func processRequests(ctx context.Context, requests []Request) error {
+    var wg sync.WaitGroup
+    errChan := make(chan error, len(requests))
+    
+    for _, req := range requests {
+        wg.Add(1) // Call Add(1) before goroutine
+        go func(r Request) {
+            defer wg.Done()
+            if err := processRequest(ctx, r); err != nil {
+                errChan <- err
+            }
+        }(req)
+    }
+    
+    wg.Wait()
+    close(errChan)
+    
+    // Collect errors
+    var errs []error
+    for err := range errChan {
+        errs = append(errs, err)
+    }
+    return errors.Join(errs...) // Go 1.20+ feature
+}
+```
+
+### Context Patterns
+```go
+// Always use context.Context for cancellation and timeouts
+func (c *OllamaClient) ChatCompletion(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+    defer cancel()
+    
+    // Implementation with proper context handling
+    return c.makeRequest(ctx, req)
+}
+```
+
+### Error Handling Patterns
+```go
+// Use wrapped errors with context
+func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
+    if err := s.processRequest(r); err != nil {
+        s.logger.WithError(err).Error("request processing failed")
+        http.Error(w, fmt.Sprintf("internal error: %v", err), 500)
+        return
+    }
+}
+
+// Custom error types for better error handling
+type ValidationError struct {
+    Field   string
+    Message string
+}
+
+func (e ValidationError) Error() string {
+    return fmt.Sprintf("validation failed for %s: %s", e.Field, e.Message)
+}
+```
+
+### Testing Patterns
+```go
+func TestWithTestableClock(t *testing.T) {
+    // Use testable time for deterministic tests
+    clock := &testClock{now: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+    
+    tests := []struct {
+        name string
+        input string
+        want  string
+    }{
+        {"case1", "input1", "output1"},
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := functionUnderTest(tt.input, clock)
+            assert.Equal(t, tt.want, result)
+        })
+    }
+}
+```
+
+## 🔧 Linting & Quality (Go 1.25 Enhanced)
+
+### Use Enhanced Vet Analyzers
+```bash
+# Go 1.25 includes new analyzers
+go vet -waitgroup -hostport ./...
+
+# WaitGroup analyzer catches incorrect usage
+# HostPort analyzer catches IPv6 issues with fmt.Sprintf
+```
+
+### Code Organization
+- **Internal packages** for implementation details
+- **pkg packages** for reusable components  
+- **cmd packages** for entry points only
+- **Single responsibility** per package
+
+### Performance Considerations
+- Use **connection pooling** for HTTP clients
+- Implement **circuit breakers** for external dependencies
+- Add **request timeout contexts** everywhere
+- Use **structured logging** with consistent fields
+
+### Security Patterns
+- **Never log sensitive data** (API keys, tokens)
+- **Validate all inputs** at API boundaries  
+- **Use secure random** for API key generation
+- **Implement rate limiting** at multiple levels

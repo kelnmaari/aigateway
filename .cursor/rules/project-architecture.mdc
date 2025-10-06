@@ -1,0 +1,61 @@
+---
+alwaysApply: true
+---
+
+# Ollama-OpenAI Proxy Project Architecture
+
+This is the main **Ollama-OpenAI Proxy** project - a Go 1.25 application that provides OpenAI-compatible API for local Ollama models.
+
+## 🏗️ Project Structure
+
+### Entry Points
+- [cmd/server/main.go](mdc:cmd/server/main.go) - HTTP server with OpenAI API endpoints
+- [cmd/tui/main.go](mdc:cmd/tui/main.go) - Terminal UI for monitoring and management
+
+### Core Configuration  
+- [internal/config/config.go](mdc:internal/config/config.go) - Complete configuration system
+- [configs/dev.yaml](mdc:configs/dev.yaml) - Development configuration
+- [configs/production.yaml.example](mdc:configs/production.yaml.example) - Production template
+
+### Architecture Layers
+```
+Client Apps (OpenAI API) → Proxy Server → Ollama Server
+                            ↓
+                    [API Keys & Auth] → [Models & Metrics]
+                            ↓
+                    [Terminal UI (TUI)]
+```
+
+## 🎯 Key Principles
+
+### Go 1.25 Features
+- Utilize **enhanced generics** where appropriate
+- Use **improved WaitGroups** with proper error handling  
+- Leverage **new vet analyzers** (`-waitgroup`, `-hostport`)
+- Apply **memory leak detection** capabilities
+
+### OpenAI Compatibility 
+- **Exact API format** matching for `/v1/chat/completions`, `/v1/models`
+- **Request/Response conversion** between OpenAI ↔ Ollama formats
+- **Streaming support** for real-time responses
+- **Error format consistency** with OpenAI standards
+
+### Security First
+- **API Key Management** with model-based access control
+- **Rate Limiting** per API key with configurable limits
+- **Audit Logging** for all authentication events
+- **Secure storage** with bcrypt/argon2 hashing
+
+### 100% Test Coverage
+- Every component must have **comprehensive unit tests**
+- **Integration tests** with mock Ollama server
+- **Edge cases coverage** for all error scenarios
+- **Performance benchmarks** for critical paths
+
+## 📋 Development Guidelines
+
+1. **Follow architecture patterns** defined in [Architecture.MD](mdc:Architecture.MD)
+2. **Reference BACKLOG tasks** for detailed implementation specs
+3. **Update Plan.md** task statuses as work progresses
+4. **Maintain MVP.MD** criteria for release readiness
+5. **Use Makefile commands** for consistent development workflow

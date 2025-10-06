@@ -1,4 +1,0 @@
-ollama run devstral:latest
-/set parameter num_ctx 65536
-/save devstral-64k
-/bye

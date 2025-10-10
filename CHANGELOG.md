@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2025-10-10
+
+### Fixed
+
+- **Logs Stream File Selection**: Исправлена работа real-time логов
+  - SSE stream теперь принимает параметр `?file=filename`
+  - Автоматический выбор текущего лог-файла при загрузке
+  - Frontend передает выбранный файл в realtime stream
+
+### Changed
+
+- **Backend (`internal/api/handlers/logs.go`)**:
+  - `StreamLogs`: добавлен query параметр `file` (default: proxy.log)
+  - Directory traversal protection для имени файла
+  - Детальное логирование ошибок с именем файла
+
+- **Frontend (`web/js/logs.js`)**:
+  - Real-time URL: `?token=xxx&file=yyy`
+  - Auto-select текущего файла уже работал, теперь передается в stream
+
+### Technical
+
+- Problem: hardcoded "proxy.log" в stream
+- Solution: query param `?file=` + auto-select current
+
 ## [1.5.4] - 2025-10-10
 
 ### Fixed

@@ -207,7 +207,7 @@ func (h *LogsHandler) GetLogFile(c *gin.Context) {
 }
 
 // StreamLogs предоставляет real-time stream логов через SSE
-// GET /api/admin/logs/stream
+// GET /api/admin/logs/stream?file=proxy.log
 func (h *LogsHandler) StreamLogs(c *gin.Context) {
 	h.logger.Debug("Starting log stream")
 
@@ -217,14 +217,24 @@ func (h *LogsHandler) StreamLogs(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 
+	// Получаем имя файла из query параметра (по умолчанию proxy.log)
+	filename := c.DefaultQuery("file", "proxy.log")
+
+	// Защита от directory traversal
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		h.logger.WithField("filename", filename).Warn("Attempted directory traversal in log stream request")
+		c.SSEvent("error", gin.H{"message": "Invalid filename"})
+		return
+	}
+
 	// Текущий лог файл
-	logFile := filepath.Join(h.logsDir, "proxy.log")
+	logFile := filepath.Join(h.logsDir, filename)
 
 	// Открываем файл
 	file, err := os.Open(logFile)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to open log file for streaming")
-		c.SSEvent("error", gin.H{"message": "Failed to open log file"})
+		h.logger.WithError(err).WithField("file", logFile).Error("Failed to open log file for streaming")
+		c.SSEvent("error", gin.H{"message": fmt.Sprintf("Failed to open log file: %s", filename)})
 		return
 	}
 	defer file.Close()

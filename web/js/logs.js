@@ -258,8 +258,8 @@ class LogsViewer {
             return;
         }
 
-        // Добавляем токен как query параметр (SSE не поддерживает custom headers)
-        const url = `${api.baseURL}/api/admin/logs/stream?token=${encodeURIComponent(token)}`;
+        // Добавляем токен и имя файла как query параметры (SSE не поддерживает custom headers)
+        const url = `${api.baseURL}/api/admin/logs/stream?token=${encodeURIComponent(token)}&file=${encodeURIComponent(this.currentFile)}`;
         this.eventSource = new EventSource(url);
 
         this.eventSource.addEventListener('log', (e) => {

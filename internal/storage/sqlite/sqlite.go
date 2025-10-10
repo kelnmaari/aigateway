@@ -329,6 +329,11 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_5_4",
 			SQL:     s.getChangelogV154Migration(),
 		},
+		{
+			Version: 10,
+			Name:    "add_changelog_v1_5_5",
+			SQL:     s.getChangelogV155Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -957,6 +962,31 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 ### Technical
 - Problem: JWTAuth блокировал SSE
 - Solution: endpoint вне group');
+	`
+}
+
+// getChangelogV155Migration добавляет версию 1.5.5 (инкрементальная миграция v10)
+func (s *SQLiteDB) getChangelogV155Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.5 (Migration v10)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.5', '2025-10-10', '## [1.5.5] - 2025-10-10
+
+### Fixed
+- **Logs Stream File Selection**: Real-time логи
+  - SSE stream параметр ?file=filename
+  - Auto-select текущего лог-файла
+
+### Changed
+- Backend: StreamLogs query param file
+- Frontend: передача файла в stream
+
+### Technical
+- Problem: hardcoded "proxy.log"
+- Solution: query param + auto-select');
 	`
 }
 

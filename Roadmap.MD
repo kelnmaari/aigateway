@@ -1,9 +1,9 @@
 # 🗺️ Roadmap: Ollama-OpenAI Proxy
 
-> **Текущая версия:** 1.3.0 ✅  
-> **План развития:** Version 1.4.0 - 1.6.0+  
-> **Статус:** Active Development (Version 1.3.0 Complete!)  
-> **Последнее обновление:** 2025-10-06
+> **Текущая версия:** 1.5.5 ✅  
+> **План развития:** Version 1.5.0 - 1.7.0+  
+> **Статус:** Active Development (Version 1.5.5 Complete!)  
+> **Последнее обновление:** 2025-10-10
 
 ---
 
@@ -225,39 +225,54 @@
 
 ---
 
-## 🔧 Version 1.5.0 - Operations & Maintenance
+## 🔧 Version 1.5.0 - Operations & Maintenance **[IN PROGRESS]**
 
 **Фокус:** Операционная готовность и устранение багов  
 **Приоритет:** MEDIUM  
 **Оценка времени:** 11-16 часов  
-**Версионирование:** 1 фича = 1 patch (1.5.1, 1.5.2, ...)
+**Версионирование:** 1 фича = 1 patch (1.5.1, 1.5.2, ...)  
+**Статус:** 🚀 В разработке (1/5 задач завершено)
 
 ### Задачи
 
-- [ ] **BUG-01** Fix Admin Logs Display → [BACKLOG/BUG-01_fix_admin_logs.md](BACKLOG/BUG-01_fix_admin_logs.md) → **v1.5.1**
-  - **CRITICAL**: Исправить отображение "[object Object]" в System Logs
-  - Правильная сериализация объектов логов в строки
-  - Форматирование JSON логов для читаемости
-  - Файлы: web/js/admin.js
-  - **Оценка:** 2-3 часа
+- [x] **Enhanced Logs System** → **v1.5.1-v1.5.5** ✅ **COMPLETED!**
+  - ✅ **v1.5.1** - Enhanced Logs System (основная реализация)
+    - Отдельная вкладка "Logs" в admin панели
+    - Просмотр лог-файлов, скачивание
+    - Фильтрация по уровням (DEBUG/INFO/WARN/ERROR)
+    - Real-time streaming через SSE
+  - ✅ **v1.5.2** - SSE Authentication Fix
+    - SSEAuthMiddleware для query token auth
+    - Endpoint вне admin group (обход JWTAuth)
+  - ✅ **v1.5.3** - Enhanced Log Parsing
+    - Парсинг logrus формат (key=value)
+    - VS Code-style syntax highlighting
+    - Timestamp форматирование (HH:MM:SS.mmm)
+  - ✅ **v1.5.4** - SSE Stream Auth Fix
+    - Middleware chain исправлен
+    - SSE endpoint отдельная регистрация
+  - ✅ **v1.5.5** - Logs Stream File Selection
+    - Query param ?file=filename
+    - Auto-select текущего лог-файла
+  - **Выполнено:** 100% (заменяет BUG-01)
 
-- [ ] **TODO-03** Password Change Implementation → [BACKLOG/TODO-03_password_change.md](BACKLOG/TODO-03_password_change.md) → **v1.5.2**
+- [ ] **TODO-03** Password Change Implementation → **v1.5.6**
   - Реализовать backend для смены пароля (UI уже есть)
   - Валидация текущего пароля
   - Файл: internal/api/handlers/auth.go
   - **Оценка:** 3-4 часа
 
-- [ ] **TODO-04** Tenant Membership Check → [BACKLOG/TODO-04_tenant_membership.md](BACKLOG/TODO-04_tenant_membership.md) → **v1.5.3**
+- [ ] **TODO-04** Tenant Membership Check → **v1.5.7**
   - Проверка прав доступа к tenant ресурсам
   - Файл: internal/api/handlers/usage.go
   - **Оценка:** 2-3 часа
 
-- [ ] **TODO-05** Error Type Checking → [BACKLOG/TODO-05_error_type_check.md](BACKLOG/TODO-05_error_type_check.md) → **v1.5.4**
+- [ ] **TODO-05** Error Type Checking → **v1.5.8**
   - Улучшить обработку типов ошибок
   - Файл: internal/api/handlers/admin.go
   - **Оценка:** 1-2 часа
 
-- [ ] **OPS-01** Backup & Restore → [BACKLOG/OPS-01_backup_restore.md](BACKLOG/OPS-01_backup_restore.md) → **v1.5.5**
+- [ ] **OPS-01** Backup & Restore → [BACKLOG/OPS-01_backup_restore.md](BACKLOG/OPS-01_backup_restore.md) → **v1.5.9**
   - Автоматический backup database и конфигурации
   - Restore procedures
   - Scheduled backups
@@ -452,13 +467,18 @@
 
 **Последовательность реализации:**
 
-1. **BUG-01** Fix Admin Logs Display → **v1.5.1** (CRITICAL баг, 2-3ч)
-2. **TODO-03** Password Change → **v1.5.2** (backend для UI, 3-4ч)
-3. **TODO-04** Tenant Membership Check → **v1.5.3** (проверка прав, 2-3ч)
-4. **TODO-05** Error Type Checking → **v1.5.4** (улучшение ошибок, 1-2ч)
-5. **OPS-01** Backup & Restore → **v1.5.5** (автобекап, 3-4ч)
+1. ✅ **Enhanced Logs System** → **v1.5.1-v1.5.5** (COMPLETED!)
+   - v1.5.1: Enhanced Logs System (основная реализация)
+   - v1.5.2: SSE Authentication Fix
+   - v1.5.3: Enhanced Log Parsing
+   - v1.5.4: SSE Stream Auth Fix
+   - v1.5.5: Logs Stream File Selection
+2. **TODO-03** Password Change → **v1.5.6** (backend для UI, 3-4ч)
+3. **TODO-04** Tenant Membership Check → **v1.5.7** (проверка прав, 2-3ч)
+4. **TODO-05** Error Type Checking → **v1.5.8** (улучшение ошибок, 1-2ч)
+5. **OPS-01** Backup & Restore → **v1.5.9** (автобекап, 3-4ч)
 
-**Итого:** ~11-16 часов работы
+**Итого:** ~11-16 часов работы (1/5 завершено)
 
 **Фокус:** Исправление багов, завершение TODO из кода, операционная готовность
 

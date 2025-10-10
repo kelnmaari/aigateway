@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -287,9 +288,6 @@ func (r *Router) setupConfigRoutes() {
 
 	// Публичный эндпоинт для списка моделей (для WebUI/TUI)
 	r.engine.GET("/api/models", r.modelsHandler.List)
-
-	// Эндпоинт для логов (для WebUI)
-	r.engine.GET("/api/logs", r.logsHandler.GetLogs)
 }
 
 // setupMetricsHistoryRoutes настраивает эндпоинты для historical metrics (Phase 12.1)
@@ -657,10 +655,24 @@ func (r *Router) setupAdminRoutes() {
 	// Config viewer
 	admin.GET("/config", r.configHandler.GetConfig)
 
-	// Logs viewer
-	admin.GET("/logs", r.logsHandler.GetLogs)
+	// Logs viewer (v1.5.1 - Enhanced Logs System)
+	if r.logsHandler != nil {
+		r.logger.Info("Admin routes: Registering Logs Management endpoints")
+		admin.GET("/logs", r.logsHandler.ListLogFiles)                       // Список всех лог-файлов
+		admin.GET("/logs/:filename", r.logsHandler.GetLogFile)               // Содержимое файла
+		admin.GET("/logs/:filename/download", r.logsHandler.DownloadLogFile) // Скачать файл
+	}
 
 	r.logger.Info("Admin routes configured successfully")
+
+	// SSE stream вне admin group (SSE не поддерживает Authorization header)
+	// Используем отдельный middleware который читает token из query параметра
+	if r.logsHandler != nil && r.jwtManager != nil && r.db != nil {
+		sseAuth := middleware.SSEAuthMiddleware(r.jwtManager, r.logger)
+		requireAdmin := middleware.RequireAdmin(r.db, r.logger)
+		r.engine.GET("/api/admin/logs/stream", sseAuth, requireAdmin, r.logsHandler.StreamLogs)
+		r.logger.Info("SSE logs stream registered with query token auth")
+	}
 }
 
 // setupAPIKeyManagement настраивает API Key Management компоненты
@@ -705,7 +717,21 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)
 	r.completionsHandler = handlers.NewCompletionsHandler(cfg, logger, ollamaClient)
 	r.configHandler = handlers.NewConfigHandler(cfg, logger) // Для TUI configuration viewer
-	r.logsHandler = handlers.NewLogsHandler(cfg, logger)     // Для просмотра логов
+
+	// Logs handler (v1.5.1) - извлекаем директорию из Logging.FilePath
+	logsDir := "./logs" // По умолчанию
+	if cfg.Logging.FilePath != "" {
+		// Извлекаем директорию из пути к файлу
+		lastSlash := strings.LastIndex(cfg.Logging.FilePath, "/")
+		lastBackslash := strings.LastIndex(cfg.Logging.FilePath, "\\")
+		if lastBackslash > lastSlash {
+			lastSlash = lastBackslash
+		}
+		if lastSlash > 0 {
+			logsDir = cfg.Logging.FilePath[:lastSlash]
+		}
+	}
+	r.logsHandler = handlers.NewLogsHandler(logsDir, logger)
 
 	// System and User Authentication handlers (Version 1.3.0+)
 	if r.bootstrapService != nil {

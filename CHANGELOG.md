@@ -5,9 +5,147 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2025-10-10
+
+### Fixed
+
+- **SSE Logs Stream Auth**: Исправлена регистрация SSE endpoint
+  - SSE endpoint теперь вне admin group (обходит JWTAuth middleware)
+  - SSEAuthMiddleware применяется первым для чтения токена из query
+  - RequireAdmin middleware проверяет admin роль после аутентификации
+
+### Changed
+
+- **Backend (`internal/api/router/router.go`)**:
+  - `/api/admin/logs/stream` регистрируется отдельно от admin group
+  - Middleware chain: SSEAuthMiddleware → RequireAdmin → Handler
+  - Логирование: "SSE logs stream registered with query token auth"
+
+### Technical
+
+- Problem: admin.Use(JWTAuth) блокировал SSE до SSEAuthMiddleware
+- Solution: вынести SSE из group, применить middleware напрямую
+- Auth flow: query token → JWT validation → admin check → stream
+
+## [1.5.3] - 2025-10-10
+
+### Improved
+
+- **Enhanced Log Parsing**: Полноценный парсер logrus формата
+  - Извлечение всех полей из structured logs (key=value)
+  - Правильный парсинг quoted и unquoted значений
+  - Все context fields отображаются в UI
+  - Форматирование timestamp: HH:MM:SS.mmm
+
+### Changed
+
+- **Backend (`internal/api/handlers/logs.go`)**:
+  - Новый метод `parseLogrusFields()` для полного парсинга logrus
+  - Извлечение time, level, msg и всех дополнительных полей
+  - Context fields добавляются в message через separator ` | `
+
+- **Frontend (`web/js/logs.js`)**:
+  - Метод `formatTimestamp()` для компактного времени
+  - Метод `highlightContextFields()` для подсветки key=value
+  - Context fields показываются на второй строке с syntax highlighting
+
+- **Frontend (`web/css/style.css`)**:
+  - Улучшенные стили для timestamp и level badges
+  - Word-wrap для длинных сообщений
+  - VS Code-style подсветка: ключи синие, значения оранжевые
+
+### Technical
+
+- Парсинг: полная поддержка logrus TextFormatter
+- Syntax highlighting: key=#569cd6, value=#ce9178 (VS Code theme)
+- Timestamp: локальное время вместо UTC строки
+
+## [1.5.2] - 2025-10-10
+
+### Fixed
+
+- **SSE Authentication**: Real-time logs stream теперь работает с JWT auth
+  - EventSource не поддерживает custom headers
+  - Токен передается через query параметр `?token=xxx`
+  - Новый middleware `SSEAuthMiddleware` для SSE endpoints
+
+### Changed
+
+- **Backend (`internal/api/middleware/sse_auth.go`)**:
+  - Новый middleware для SSE с поддержкой токена в query
+  - Fallback на Authorization header для обратной совместимости
+
+- **Backend (`internal/api/router/router.go`)**:
+  - SSE endpoint использует `SSEAuthMiddleware`
+
+- **Frontend (`web/js/logs.js`)**:
+  - Токен автоматически добавляется в URL SSE stream
+  - Проверка наличия токена перед подключением
+
+### Technical
+
+- SSE + JWT: токен через query параметр
+- Security: валидация токена в middleware
+
+## [1.5.1] - 2025-10-10
+
+### Added
+
+- **Enhanced Logs System**: Полноценная система просмотра логов в админке
+  - Отдельная вкладка "Logs" в админ-панели
+  - Просмотр текущего и архивных лог-файлов
+  - Кликабельные фильтры по уровням (DEBUG, INFO, WARN, ERROR)
+  - Real-time обновление логов через SSE (Server-Sent Events)
+  - Скачивание лог-файлов
+  - Dark theme для logs viewer (VS Code style)
+
+### Changed
+
+- **Backend (`internal/api/handlers/logs.go`)**:
+  - `LogsHandler`: управление системными логами
+  - `ListLogFiles()`: список всех .log файлов в директории
+  - `GetLogFile()`: чтение с фильтрацией по уровню и пагинацией
+  - `StreamLogs()`: real-time stream через SSE
+  - `DownloadLogFile()`: скачивание файлов
+  - Парсинг logrus формата в структурированные записи
+
+- **Backend (`internal/api/router/router.go`)**:
+  - Routes: `/api/admin/logs`, `/api/admin/logs/:filename`, `/api/admin/logs/stream`
+  - Auto-detect logs directory из `config.Logging.FilePath`
+
+- **Frontend (`web/admin.html`)**:
+  - Новая вкладка "Logs" с полным UI
+  - Selector для выбора лог-файла
+  - Level filters (All, DEBUG, INFO, WARN, ERROR)
+  - Real-time toggle button
+  - Download и Refresh кнопки
+
+- **Frontend (`web/js/logs.js`)**:
+  - `LogsViewer` class для управления логами
+  - SSE integration для real-time updates
+  - Client-side фильтрация по уровням
+  - Auto-scroll при новых записях
+  - Limit 1000 записей в viewer
+
+- **Frontend (`web/css/style.css`)**:
+  - ~170 строк стилей для logs viewer
+  - Dark terminal theme (#1e1e1e background)
+  - Color-coded log levels
+  - Monospace font (Consolas, Monaco)
+  - Hover effects и transitions
+
+### Technical
+
+- **SSE Stream**: EventSource API для real-time логов
+- **Security**: Path validation против directory traversal
+- **Performance**: Tail 500 последних строк по умолчанию
+- **Parsing**: Logrus format → structured LogEntry
+- **Auto-cleanup**: Max 1000 entries в real-time mode
+
 ## [1.4.11] - 2025-10-10
 
 ### Added
+
 - **Система "О Системе"**: Новая страница с информацией о версии и историей изменений
   - Отображение версии, git commit, build date, Go version
   - Accordion UI для просмотра changelog всех версий
@@ -15,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Пункт "О Системе" в меню профиля пользователя
 
 ### Changed
+
 - **Backend (`internal/storage/sqlite/sqlite.go`)**:
   - Migration v3: таблица `changelogs` с версиями из CHANGELOG.md
   - `getChangelogsMigrationWithData()`: SQL INSERT со всеми версиями 1.4.10 → 1.2.0
@@ -49,6 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hover effects, transitions, typography
 
 ### Technical
+
 - **Database Schema**: таблица `changelogs` (version, release_date, content, created_at)
 - **Migration System**: автоматическая миграция v3 при старте сервера
 - **API Endpoints**: Public endpoints (no auth required)
@@ -56,7 +196,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Workflow для обновления CHANGELOG → SQL миграция → VERSION
   - Инструкции для будущих релизов
 
-### Workflow для будущих релизов:
+### Workflow для будущих релизов
+
 1. Обнови `CHANGELOG.md` с новыми изменениями
 2. Обнови SQL в `getChangelogsMigrationWithData()` (добавь новую версию)
 3. Обнови файл `VERSION`
@@ -68,6 +209,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.10] - 2025-10-10
 
 ### Added
+
 - **"Remember Me" Функция при входе**:
   - Checkbox "Не выходить из системы 24 часа" на форме логина
   - При включении галочки access token живет **24 часа** вместо 15 минут
@@ -75,6 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Логирование использования remember_me в JWT и auth service
 
 ### Changed
+
 - **Backend (`internal/auth/service/auth_service.go`)**:
   - `LoginRequest`: добавлено поле `RememberMe bool`
   - Передача параметра `RememberMe` в `GenerateTokenPair`
@@ -90,7 +233,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - JavaScript отправляет `remember_me: true/false` в `/api/auth/login`
 
 ### Technical
+
 **Текущие настройки сессии:**
+
 - Без галочки: Access token 15 минут, Refresh token 7 дней
 - С галочкой: Access token 24 часа, Refresh token 7 дней
 - Refresh token автоматически обновляет access token
@@ -101,6 +246,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.9] - 2025-10-10
 
 ### Fixed
+
 - **API Keys Status Display**:
   - Problem: Свежесозданные ключи отображались как "Inactive" в WebUI
   - Root Cause: Frontend проверял несуществующее поле `is_active`, в то время как backend возвращал `status`
@@ -108,12 +254,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Logic: Ключ считается активным если `status === 'active'` И не истек срок действия
 
 ### Changed
+
 - **Frontend (`web/js/apikeys.js`)**:
   - `renderKeyRow()`: использует `key.status` вместо `key.is_active`
   - Добавлена проверка срока действия ключа (`expires_at`)
   - Логика: `isActive = key.status === 'active' && (!key.expires_at || new Date(key.expires_at) > new Date())`
 
 ### Technical
+
 - Backend возвращает `status` со значениями: "active", "disabled", "expired", "revoked"
 - Frontend маппит это в UI badges: Active (green) / Inactive (gray)
 - Проверка expiration на стороне клиента для точности отображения
@@ -123,6 +271,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.8] - 2025-10-10
 
 ### Added
+
 - **Debug Logging для Usage Tracking**:
   - `internal/api/middleware/usage_tracking.go`: детальное логирование извлеченных данных из контекста
   - `internal/api/handlers/chat.go`: логирование установки токенов в контекст
@@ -130,18 +279,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Поля в логах: user_id, api_key_id, model, tokens, success, endpoint
 
 ### Fixed
+
 - **API Key ID для JWT аутентификации**:
   - Problem: При использовании JWT auth поле `api_key_id` было NULL (NOT NULL constraint)
   - Solution: Используется специальный ID "jwt_auth" для JWT аутентификации, "unknown" для других случаев
   - Теперь все записи имеют валидный `api_key_id`
 
 ### Changed
+
 - **Usage Tracking Middleware**:
   - Обязательная установка `api_key_id` для всех типов аутентификации
   - Fallback значения: "jwt_auth" (JWT), "unknown" (other)
   - Улучшенное логирование для отладки проблем с токенами
 
 ### Technical
+
 - Debug level logs для troubleshooting usage statistics
 - Логи показывают полный flow: handler → context → middleware → database
 - Позволяет определить на каком этапе теряются данные (tokens, api_key_id)
@@ -151,12 +303,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.7] - 2025-10-10
 
 ### Fixed
+
 - **CRITICAL: Usage Statistics Performance**
   - **Problem**: Запросы к `/api/usage/personal` выполнялись 5+ секунд и завершались ошибкой "context canceled"
   - **Root Cause**: N+1 queries problem - для каждой модели/endpoint выполнялся отдельный SQL запрос
   - **Solution**: Оптимизированы SQL запросы с использованием `SUM(CASE WHEN ...)` для агрегации в одном запросе
 
 ### Changed
+
 - **Database Optimizations:**
   - `internal/storage/sqlite/usage.go`:
     - `GetUserUsageStats()`: объединены запросы для model/endpoint success rates
@@ -170,12 +324,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Все индексы теперь с `IF NOT EXISTS` для безопасной повторной миграции
 
 ### Performance Impact
+
 - **Before**: 5+ секунд, timeout, context canceled
 - **After**: < 100ms для большинства запросов
 - **Query Reduction**: Было N+M запросов (N моделей + M endpoints), стало 5 запросов (aggregate + models + endpoints + api_keys + recent)
 - **Index Usage**: Составные индексы покрывают 95%+ запросов к api_usage таблице
 
 ### Technical
+
 - SQL optimization: `SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END)` вместо отдельных COUNT запросов
 - Composite indexes: покрывают фильтры WHERE user_id = ? AND created_at >= ?
 - LIMIT optimization: ограничение результатов для API keys и recent requests
@@ -185,6 +341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.6] - 2025-10-10
 
 ### Added
+
 - **API Usage Tracking**: Полная интеграция middleware для записи статистики использования
   - Middleware: `internal/api/middleware/usage_tracking.go`
   - Трекинг для всех режимов аутентификации (Hybrid, API Key, No Auth)
@@ -194,8 +351,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Асинхронная запись в БД (не блокирует response)
 
 ### Changed
+
 - **Backend:**
-  - `internal/api/router/router.go`: 
+  - `internal/api/router/router.go`:
     - Включен `UsageTracking` middleware для всех auth modes
     - Для API Key mode: использует новый middleware если доступна БД
     - Для No Auth mode: также включен tracking для мониторинга
@@ -220,6 +378,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Правильный расчет success_rate и error_rate
 
 ### Fixed
+
 - **User Dropdown**: Исправлено некликабельное меню профиля
   - CSS: поддержка классов `.active` и `.show`
   - Удалены дублирующиеся event listeners из всех страниц
@@ -232,6 +391,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Добавлена совместимость между snake_case и camelCase
 
 ### Technical
+
 - Асинхронная запись usage с таймаутом 5 секунд
 - Отдельный контекст для background записи (не зависит от request context)
 - Приблизительный подсчет токенов для streaming: length / 4
@@ -243,6 +403,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.5] - 2025-10-10
 
 ### Added
+
 - **MCP Servers Catalog**: Admin-managed catalog для MCP серверов
   - Database: таблица `mcp_servers` с migration v2
   - Backend models: `MCPServer`, requests/responses, categories
@@ -255,6 +416,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Фильтры: category, search, active_only, сортировка
 
 ### Changed
+
 - **Backend:**
   - `internal/models/mcp.go`: новые модели для MCP серверов
   - `internal/storage/database.go`: добавлены методы в interface
@@ -263,7 +425,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `internal/storage/postgresql/postgresql.go`: migration v2
   - `internal/storage/postgresql/stubs.go`: stubs для MCP методов
   - `internal/api/handlers/mcp.go`: новый handler для MCP
-  - `internal/api/router/router.go`: 
+  - `internal/api/router/router.go`:
     - Добавлен `mcpHandler` в Router struct
     - Инициализация в `setupHandlers()`
     - Новая функция `setupMCPRoutes()`
@@ -276,11 +438,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Features: category badges, grid layout, modal details, responsive design
 
 ### Fixed
+
 - **Transaction Interface**: добавлены MCP методы в `sqliteTx` и `postgresqlTx`
   - Исправлена ошибка компиляции "does not implement storage.Tx"
   - Добавлена делегация всех 5 MCP методов в транзакциях
 
 ### Technical
+
 - Migration system: автоматическое применение при старте
 - JSON tags: массивы тегов в SQLite (TEXT), PostgreSQL (JSONB)
 - Access control: public read, admin write
@@ -295,6 +459,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.4] - 2025-10-10
 
 ### Added
+
 - **Enhanced Models Information**: Accordion UI с детальной информацией о моделях
   - Lazy loading деталей модели через `/api/admin/models/:name/details`
   - Ollama `/api/show` integration для получения model info
@@ -303,14 +468,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Copy button интегрирован в header каждой модели (из v1.4.1)
 
 ### Changed
+
 - **Backend:**
   - `internal/models/ollama.go`: новые структуры для Ollama model details
   - `internal/client/ollama/models.go`: добавлено поле `ModelInfo` в `ShowResponse`
-  - `internal/api/handlers/admin.go`: 
+  - `internal/api/handlers/admin.go`:
     - Добавлено поле `ollamaClient` в `AdminHandler`
     - Новый метод `GetModelDetails()` для endpoint
     - Helper functions для парсинга model info
-  - `internal/api/router/router.go`: 
+  - `internal/api/router/router.go`:
     - Новый route `/api/admin/models/:name/details`
     - `SetOllamaClient()` для AdminHandler при инициализации
 
@@ -325,6 +491,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `web/css/style.css`: ~230 строк стилей для accordion, details, responsive
 
 ### Technical
+
 - Lazy loading: детали загружаются только при клике на модель
 - Accordion: только одна модель открыта одновременно
 - Error handling: graceful degradation при ошибках API
@@ -337,6 +504,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.3] - 2025-10-10
 
 ### Added
+
 - **Build Version Information**: Реальная версия вместо "dev" через ldflags
   - Новый package `internal/version` с Version, GitCommit, BuildDate, GoVersion
   - Флаг `-version` для показа полной информации о билде
@@ -345,6 +513,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Build date и Go version в метаданных
 
 ### Changed
+
 - **Makefile**: обновлены LDFLAGS для внедрения version info
   - VERSION читается из файла VERSION
   - Добавлена команда `make version` для показа текущей версии
@@ -353,16 +522,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Версия читается из файла VERSION
   - Ldflags обновлены на правильный import path
 - **internal/logger/logger.go**: используется `version.Version` вместо hardcoded "dev"
-- **internal/api/handlers/health.go**: 
+- **internal/api/handlers/health.go**:
   - Используется `version.GetInfo()` для полной version info
   - Реальный uptime через global `startTime`
   - Расширенный JSON response с git_commit, build_date, go_version
-- **cmd/server/main.go**: 
+- **cmd/server/main.go**:
   - Добавлен flag parsing для `-version`
   - Используется `version.Short()` при старте
   - Логирование с полной version info
 
 ### Technical
+
 - Удалены старые глобальные переменные `Version` и `BuildTime` из main.go
 - Все TODO комментарии о версионировании удалены (2 штуки)
 - Централизованное управление версией через VERSION файл
@@ -373,6 +543,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.2] - 2025-10-10
 
 ### Security
+
 - **TUI Admin Key Configuration**: Убраны hardcoded admin API keys из TUI
   - Admin token теперь загружается из конфигурации (`auth.admin_key`)
   - Добавлен флаг `--config` для указания пути к конфигу
@@ -380,6 +551,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Удалены все 4 TODO комментария с hardcoded ключами
 
 ### Changed
+
 - `cmd/tui/main.go`: добавлен импорт config package
 - Model struct: добавлено поле `adminToken`
 - main(): загрузка конфигурации и извлечение admin token
@@ -387,6 +559,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Методы Update() и executeConfirmedAction(): используют m.adminToken
 
 ### Technical
+
 - Удалена константа `adminAPIKey = "your-admin-key-here"`
 - Все HTTP requests используют token из конфигурации
 - Функция `loadConfig()` для загрузки и валидации конфига
@@ -396,6 +569,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.1] - 2025-10-10
 
 ### Added
+
 - **Model Copy Button**: Добавлена кнопка копирования названия модели в буфер обмена
   - Clipboard API с fallback для старых браузеров
   - Toast notifications для success/error feedback
@@ -405,10 +579,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Mobile responsive design
 
 ### Changed
+
 - Обновлен `web/js/admin.js`: улучшен рендеринг списка моделей
 - Обновлен `web/css/style.css`: добавлены стили для copy button и toast notifications
 
 ### Technical
+
 - Создан utility module `web/js/utils/clipboard.js` для работы с clipboard
 - Подключен Font Awesome 6.4.0 CDN в admin.html
 - Поддержка старых браузеров через document.execCommand fallback
@@ -420,6 +596,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Начальная версия релиза 1.4.0 - WebUI Enhancements & Code Quality.
 
 **Roadmap версий:**
+
 - v1.4.1: Model Copy Button ✅
 - v1.4.2: TUI Admin Key Config ✅
 - v1.4.3: Build Version Info ✅
@@ -434,6 +611,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 User Experience & Multi-Tenancy - завершен 100%.
 
 ### Added
+
 - Database Abstraction Layer (SQLite + PostgreSQL)
 - User Authentication & Multi-Tenancy (JWT, RBAC)
 - Interactive Chat Interface (ChatGPT-like UI)
@@ -447,8 +625,8 @@ User Experience & Multi-Tenancy - завершен 100%.
 Enhanced Monitoring & Management - завершен 100%.
 
 ### Added
+
 - TUI Request Monitor
 - WebUI Metrics Visualization
 - Advanced Logs Features
 - Enhanced API Key Management
-

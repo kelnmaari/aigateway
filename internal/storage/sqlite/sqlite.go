@@ -309,6 +309,26 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "populate_all_changelogs",
 			SQL:     s.getPopulateAllChangelogsMigration(),
 		},
+		{
+			Version: 6,
+			Name:    "add_changelog_v1_5_1",
+			SQL:     s.getChangelogV151Migration(),
+		},
+		{
+			Version: 7,
+			Name:    "add_changelog_v1_5_2",
+			SQL:     s.getChangelogV152Migration(),
+		},
+		{
+			Version: 8,
+			Name:    "add_changelog_v1_5_3",
+			SQL:     s.getChangelogV153Migration(),
+		},
+		{
+			Version: 9,
+			Name:    "add_changelog_v1_5_4",
+			SQL:     s.getChangelogV154Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -830,6 +850,113 @@ Enhanced Monitoring & Management
 - TUI Request Monitor
 - WebUI Metrics
 - Advanced Logs');
+	`
+}
+
+// getChangelogV151Migration добавляет версию 1.5.1 (инкрементальная миграция v6)
+func (s *SQLiteDB) getChangelogV151Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.1 (Migration v6)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.1', '2025-10-10', '## [1.5.1] - 2025-10-10
+
+### Added
+- **Enhanced Logs System**: Полноценная система просмотра логов в админке
+  - Отдельная вкладка "Logs" в админ-панели
+  - Просмотр текущего и архивных лог-файлов
+  - Кликабельные фильтры по уровням (DEBUG, INFO, WARN, ERROR)
+  - Real-time обновление логов через SSE (Server-Sent Events)
+  - Скачивание лог-файлов
+  - Dark theme для logs viewer (VS Code style)
+
+### Changed
+- **Backend**: LogsHandler с SSE stream, фильтрацией, пагинацией
+- **Frontend**: Logs tab, real-time updates, level filters
+- **UI**: Dark terminal theme, monospace font
+
+### Technical
+- SSE Stream через EventSource API
+- Security: path validation
+- Performance: tail 500 строк');
+	`
+}
+
+// getChangelogV152Migration добавляет версию 1.5.2 (инкрементальная миграция v7)
+func (s *SQLiteDB) getChangelogV152Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.2 (Migration v7)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.2', '2025-10-10', '## [1.5.2] - 2025-10-10
+
+### Fixed
+- **SSE Authentication**: Real-time logs работает с JWT
+  - Токен через query параметр (EventSource не поддерживает headers)
+  - SSEAuthMiddleware для SSE endpoints
+
+### Changed
+- Backend: sse_auth.go middleware
+- Frontend: токен в URL stream
+
+### Technical
+- SSE + JWT через query параметр');
+	`
+}
+
+// getChangelogV153Migration добавляет версию 1.5.3 (инкрементальная миграция v8)
+func (s *SQLiteDB) getChangelogV153Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.3 (Migration v8)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.3', '2025-10-10', '## [1.5.3] - 2025-10-10
+
+### Improved
+- **Enhanced Log Parsing**: Полноценный парсер logrus
+  - Извлечение всех полей (key=value)
+  - Timestamp: HH:MM:SS.mmm формат
+  - Context fields в UI
+
+### Changed
+- Backend: parseLogrusFields() метод
+- Frontend: syntax highlighting для key=value
+- CSS: VS Code-style colors
+
+### Technical
+- Парсинг: quoted и unquoted values
+- Highlighting: #569cd6 / #ce9178');
+	`
+}
+
+// getChangelogV154Migration добавляет версию 1.5.4 (инкрементальная миграция v9)
+func (s *SQLiteDB) getChangelogV154Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.4 (Migration v9)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.4', '2025-10-10', '## [1.5.4] - 2025-10-10
+
+### Fixed
+- **SSE Logs Stream Auth**: Endpoint вне admin group
+  - SSEAuthMiddleware читает token из query
+  - RequireAdmin после аутентификации
+
+### Changed
+- Router: SSE endpoint отдельная регистрация
+- Middleware chain: SSEAuth → RequireAdmin
+
+### Technical
+- Problem: JWTAuth блокировал SSE
+- Solution: endpoint вне group');
 	`
 }
 

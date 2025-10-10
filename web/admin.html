@@ -25,6 +25,7 @@
             <button class="tab-btn" data-tab="users">Users</button>
             <button class="tab-btn" data-tab="apikeys">API Keys</button>
             <button class="tab-btn" data-tab="mcp">MCP Servers</button>
+            <button class="tab-btn" data-tab="logs">Logs</button>
             <button class="tab-btn" data-tab="system">System</button>
         </div>
 
@@ -187,6 +188,54 @@
                             <tr><td colspan="6" class="table-empty">Loading...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Logs Tab (v1.5.1) -->
+            <div id="logs-tab" class="tab-pane">
+                <div class="section">
+                    <div class="logs-header">
+                        <h2>📋 System Logs</h2>
+                        <div class="logs-controls">
+                            <select id="log-file-selector" class="form-select">
+                                <option value="">Select log file...</option>
+                            </select>
+                            <button class="btn btn-secondary" id="download-log-btn" disabled>
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <button class="btn btn-secondary" id="refresh-logs-btn">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="btn btn-primary" id="realtime-toggle-btn">
+                                <i class="fas fa-play"></i> Real-time
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Level Filters -->
+                    <div class="logs-filters">
+                        <span class="filter-label">Filter by level:</span>
+                        <button class="filter-btn active" data-level="">All</button>
+                        <button class="filter-btn" data-level="debug">
+                            <i class="fas fa-bug"></i> DEBUG
+                        </button>
+                        <button class="filter-btn" data-level="info">
+                            <i class="fas fa-info-circle"></i> INFO
+                        </button>
+                        <button class="filter-btn" data-level="warn">
+                            <i class="fas fa-exclamation-triangle"></i> WARN
+                        </button>
+                        <button class="filter-btn" data-level="error">
+                            <i class="fas fa-times-circle"></i> ERROR
+                        </button>
+                    </div>
+
+                    <!-- Logs Viewer -->
+                    <div class="logs-container" id="logs-container">
+                        <div class="logs-info">
+                            <p>Select a log file to view</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -452,6 +501,7 @@
     <script src="/js/api.js"></script>
     <script src="/js/components/navbar.js"></script>
     <script src="/js/utils/clipboard.js"></script>
+    <script src="/js/logs.js"></script>
     <script src="/js/admin.js"></script>
 </body>
 </html>

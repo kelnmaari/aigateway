@@ -157,3 +157,39 @@ func (db *PostgreSQLDB) ListConversationMessages(ctx context.Context, conversati
 func (db *PostgreSQLDB) RevokeAPIKey(ctx context.Context, id, reason string) error {
 	return fmt.Errorf("RevokeAPIKey not implemented yet")
 }
+
+// ========================================
+// MCP Server Methods (Stubs - v1.4.5)
+// ========================================
+
+func (db *PostgreSQLDB) CreateMCPServer(ctx context.Context, server *models.MCPServer) error {
+	return fmt.Errorf("CreateMCPServer not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetMCPServer(ctx context.Context, id string) (*models.MCPServer, error) {
+	return nil, fmt.Errorf("GetMCPServer not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) UpdateMCPServer(ctx context.Context, server *models.MCPServer) error {
+	return fmt.Errorf("UpdateMCPServer not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) DeleteMCPServer(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteMCPServer not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) ListMCPServers(ctx context.Context, req models.MCPServerListRequest) (*models.MCPServerListResponse, error) {
+	return nil, fmt.Errorf("ListMCPServers not implemented for PostgreSQL yet")
+}
+
+// ========================================
+// Changelog Methods (Stubs - v1.4.11)
+// ========================================
+
+func (db *PostgreSQLDB) GetChangelog(ctx context.Context, version string) (*models.Changelog, error) {
+	return nil, fmt.Errorf("GetChangelog not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) ListChangelogs(ctx context.Context) ([]*models.Changelog, error) {
+	return nil, fmt.Errorf("ListChangelogs not implemented for PostgreSQL yet")
+}

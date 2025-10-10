@@ -180,6 +180,11 @@ func (h *StreamingChatHandler) processStreamingResponse(
 				writer.WriteString(doneEvent)
 				flusher.Flush()
 
+				// Устанавливаем токены в контекст для usage tracking
+				c.Set("completion_tokens", totalTokens)
+				c.Set("total_tokens", totalTokens)
+				// prompt_tokens для streaming определить сложно, оставляем 0
+
 				metrics.Finalize(true, nil)
 				return
 			}
@@ -233,11 +238,24 @@ func (h *StreamingChatHandler) processStreamingResponse(
 			writer.WriteString(errorEvent)
 			flusher.Flush()
 
+			// Устанавливаем частичные токены в контекст (для usage tracking ошибок)
+			if totalTokens > 0 {
+				c.Set("completion_tokens", totalTokens)
+				c.Set("total_tokens", totalTokens)
+			}
+
 			metrics.Finalize(false, err)
 			return
 
 		case <-c.Request.Context().Done():
 			h.logger.WithField("request_id", requestID).Info("Client disconnected during streaming")
+
+			// Устанавливаем частичные токены в контекст
+			if totalTokens > 0 {
+				c.Set("completion_tokens", totalTokens)
+				c.Set("total_tokens", totalTokens)
+			}
+
 			metrics.Finalize(false, fmt.Errorf("client disconnected"))
 			return
 		}

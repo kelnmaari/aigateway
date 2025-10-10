@@ -54,10 +54,16 @@ func NewManager(cfg Config) (*Manager, error) {
 }
 
 // GenerateTokenPair генерирует пару access и refresh токенов
-func (m *Manager) GenerateTokenPair(userID, username, email string, tenantIDs []string) (*TokenPair, error) {
+func (m *Manager) GenerateTokenPair(userID, username, email string, tenantIDs []string, rememberMe ...bool) (*TokenPair, error) {
 	// Generate access token
 	now := time.Now()
-	expiresAt := now.Add(m.accessTokenDuration)
+
+	// Если rememberMe = true, увеличиваем access token до 24 часов
+	accessDuration := m.accessTokenDuration
+	if len(rememberMe) > 0 && rememberMe[0] {
+		accessDuration = 24 * time.Hour
+	}
+	expiresAt := now.Add(accessDuration)
 
 	claims := &Claims{
 		UserID:    userID,
@@ -97,9 +103,11 @@ func (m *Manager) GenerateTokenPair(userID, username, email string, tenantIDs []
 	}
 
 	m.logger.WithFields(logrus.Fields{
-		"user_id":    userID,
-		"username":   username,
-		"expires_at": expiresAt,
+		"user_id":     userID,
+		"username":    username,
+		"expires_at":  expiresAt,
+		"remember_me": len(rememberMe) > 0 && rememberMe[0],
+		"duration":    accessDuration.String(),
 	}).Debug("Generated token pair")
 
 	return &TokenPair{

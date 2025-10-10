@@ -181,9 +181,10 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Regis
 
 // LoginRequest запрос на вход
 type LoginRequest struct {
-	Username string `json:"username"` // username или email
-	Email    string `json:"email"`    // альтернативный способ входа
-	Password string `json:"password" binding:"required"`
+	Username   string `json:"username"` // username или email
+	Email      string `json:"email"`    // альтернативный способ входа
+	Password   string `json:"password" binding:"required"`
+	RememberMe bool   `json:"remember_me"` // "Не выходить из системы 24 часа"
 }
 
 // LoginResponse ответ на вход
@@ -289,12 +290,13 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 		tenantIDs[i] = t.ID
 	}
 
-	// Generate JWT tokens
+	// Generate JWT tokens (with rememberMe support)
 	tokenPair, err := s.jwtManager.GenerateTokenPair(
 		user.ID,
 		user.Username,
 		user.Email,
 		tenantIDs,
+		req.RememberMe, // "Не выходить из системы 24 часа"
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
@@ -311,8 +313,9 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 	}
 
 	s.logger.WithFields(logrus.Fields{
-		"user_id":  user.ID,
-		"username": user.Username,
+		"user_id":     user.ID,
+		"username":    user.Username,
+		"remember_me": req.RememberMe,
 	}).Info("User logged in successfully")
 
 	// Remove sensitive data

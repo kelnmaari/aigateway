@@ -1,16 +1,21 @@
-# Makefile для Ollama-OpenAI Proxy v1.3.0
+# Makefile для Ollama-OpenAI Proxy v1.4.3
 # Cross-platform build automation
 
-.PHONY: help build build-all build-linux build-windows package clean test lint run install
+.PHONY: help build build-all build-linux build-windows package clean test lint run install version
 
 # Variables
-VERSION ?= 1.3.0
-BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+VERSION := $(shell cat VERSION 2>/dev/null || echo "dev")
+BUILD_DATE := $(shell date -u +"%Y-%m-%d_%H:%M:%S")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GO_VERSION := $(shell go version | awk '{print $$3}')
 OUTPUT_DIR := dist
 
-# Go build flags
-LDFLAGS := -w -s -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)
+# Go build flags with version information
+LDFLAGS := -w -s \
+	-X 'ollama-openai-proxy/internal/version.Version=$(VERSION)' \
+	-X 'ollama-openai-proxy/internal/version.GitCommit=$(GIT_COMMIT)' \
+	-X 'ollama-openai-proxy/internal/version.BuildDate=$(BUILD_DATE)'
+
 BUILD_TAGS := sqlite_fts5 sqlite_json1
 
 # Default target
@@ -25,6 +30,13 @@ help:
 	@echo "Commands:"
 	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
 	@echo ""
+
+## version: Показать информацию о версии
+version:
+	@echo "Version:    $(VERSION)"
+	@echo "Git Commit: $(GIT_COMMIT)"
+	@echo "Build Date: $(BUILD_DATE)"
+	@echo "Go Version: $(GO_VERSION)"
 
 ## build: Сборка для текущей платформы
 build:

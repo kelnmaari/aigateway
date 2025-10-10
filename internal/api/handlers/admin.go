@@ -18,10 +18,11 @@ import (
 
 // AdminHandler обрабатывает административные эндпоинты
 type AdminHandler struct {
-	config     *config.Config
-	logger     *logrus.Logger
-	keyManager *apikey.Manager  // Legacy JSON storage (deprecated)
-	db         storage.Database // Database for API keys (Version 1.3.0+)
+	config       *config.Config
+	logger       *logrus.Logger
+	keyManager   *apikey.Manager  // Legacy JSON storage (deprecated)
+	db           storage.Database // Database for API keys (Version 1.3.0+)
+	ollamaClient OllamaClientInterface
 }
 
 // NewAdminHandler создает новый admin handler
@@ -43,6 +44,11 @@ func NewAdminHandlerWithoutKeys(cfg *config.Config, logger *logrus.Logger, db st
 		keyManager: nil, // Будет возвращать "not implemented" ошибки (legacy)
 		db:         db,  // Database для API ключей (Version 1.3.0+)
 	}
+}
+
+// SetOllamaClient устанавливает Ollama client для AdminHandler
+func (h *AdminHandler) SetOllamaClient(client OllamaClientInterface) {
+	h.ollamaClient = client
 }
 
 // ListAPIKeys обрабатывает GET /admin/api-keys
@@ -775,6 +781,83 @@ func (h *AdminHandler) UpdateAPIKeyPermissions(c *gin.Context) {
 	})
 }
 
+// GetModelDetails обрабатывает GET /api/admin/models/:name/details
+// Возвращает расширенную информацию о модели из Ollama
+func (h *AdminHandler) GetModelDetails(c *gin.Context) {
+	modelName := c.Param("name")
+	if modelName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"message": "Model name is required",
+				"type":    "invalid_request_error",
+				"code":    "model_name_required",
+			},
+		})
+		return
+	}
+
+	if h.ollamaClient == nil {
+		h.logger.Error("Ollama client not available")
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": gin.H{
+				"message": "Ollama client not configured",
+				"type":    "service_unavailable",
+				"code":    "ollama_unavailable",
+			},
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	// Получаем детали модели из Ollama
+	ollamaResp, err := h.ollamaClient.ShowModel(ctx, modelName)
+	if err != nil {
+		h.logger.WithError(err).WithField("model", modelName).Error("Failed to get model details from Ollama")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"message": "Failed to retrieve model details",
+				"type":    "api_error",
+				"code":    "ollama_error",
+				"details": err.Error(),
+			},
+		})
+		return
+	}
+
+	// Преобразуем Ollama response в наш формат
+	response := models.ModelDetailsResponse{
+		Name:       modelName,
+		License:    ollamaResp.License,
+		Template:   ollamaResp.Template,
+		Modelfile:  ollamaResp.Modelfile,
+		Parameters: parseModelParameters(ollamaResp.Parameters),
+	}
+
+	// Добавляем детали если есть
+	if ollamaResp.Details != nil {
+		response.Format = ollamaResp.Details.Format
+		response.Family = ollamaResp.Details.Family
+		response.ParameterSize = ollamaResp.Details.ParameterSize
+		response.Quantization = ollamaResp.Details.QuantizationLevel
+	}
+
+	// Добавляем информацию о модели если есть
+	if ollamaResp.ModelInfo != nil {
+		info := ollamaResp.ModelInfo
+		response.Architecture = getStringValue(info, "general.architecture")
+		response.ContextLength = getIntValue(info, "llama.context_length")
+		response.EmbeddingSize = getIntValue(info, "llama.embedding_length")
+		response.Layers = getIntValue(info, "llama.block_count")
+		response.Heads = getIntValue(info, "llama.attention.head_count")
+		response.VocabSize = getIntValue(info, "tokenizer.ggml.vocab_size")
+	}
+
+	h.logger.WithField("model", modelName).Info("Model details retrieved successfully")
+	c.JSON(http.StatusOK, response)
+}
+
 // Helper functions
 
 // parseIntQuery парсит integer query параметр с default значением
@@ -791,4 +874,105 @@ func parseIntQuery(c *gin.Context, key string, defaultValue int) int {
 func isNotFoundError(err error) bool {
 	// TODO: Реализовать проверку типа ошибки
 	return false
+}
+
+// parseModelParameters парсит строку параметров модели в map
+func parseModelParameters(paramsStr string) map[string]interface{} {
+	params := make(map[string]interface{})
+	if paramsStr == "" {
+		return params
+	}
+
+	// Простой парсинг строки параметров (формат: key value)
+	lines := splitLines(paramsStr)
+	for _, line := range lines {
+		line = trimSpace(line)
+		if line == "" {
+			continue
+		}
+		
+		// Разбиваем на key и value по первому пробелу
+		parts := splitFirst(line, " ")
+		if len(parts) == 2 {
+			key := trimSpace(parts[0])
+			value := trimSpace(parts[1])
+			params[key] = value
+		}
+	}
+	
+	return params
+}
+
+// getStringValue извлекает строковое значение из map
+func getStringValue(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if strVal, ok := val.(string); ok {
+			return strVal
+		}
+	}
+	return ""
+}
+
+// getIntValue извлекает числовое значение из map
+func getIntValue(m map[string]interface{}, key string) int {
+	if val, ok := m[key]; ok {
+		switch v := val.(type) {
+		case int:
+			return v
+		case int64:
+			return int(v)
+		case float64:
+			return int(v)
+		}
+	}
+	return 0
+}
+
+// splitLines разбивает строку на линии
+func splitLines(s string) []string {
+	result := []string{}
+	current := ""
+	for _, ch := range s {
+		if ch == '\n' {
+			result = append(result, current)
+			current = ""
+		} else if ch != '\r' {
+			current += string(ch)
+		}
+	}
+	if current != "" {
+		result = append(result, current)
+	}
+	return result
+}
+
+// splitFirst разбивает строку на две части по первому вхождению разделителя
+func splitFirst(s, sep string) []string {
+	idx := -1
+	for i := 0; i < len(s); i++ {
+		if s[i:i+len(sep)] == sep {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return []string{s}
+	}
+	return []string{s[:idx], s[idx+len(sep):]}
+}
+
+// trimSpace удаляет пробелы с начала и конца строки
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+	
+	for start < end && (s[start] == ' ' || s[start] == '\t') {
+		start++
+	}
+	
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
+		end--
+	}
+	
+	return s[start:end]
 }

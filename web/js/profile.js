@@ -106,26 +106,8 @@ class ProfileManager {
 
     // Setup event listeners
     setupEventListeners() {
-        // User dropdown toggle
-        const userButton = document.getElementById('user-button');
-        const dropdown = document.getElementById('user-dropdown');
-        
-        if (userButton && dropdown) {
-            userButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dropdown.classList.toggle('active');
-            });
-            
-            document.addEventListener('click', () => {
-                dropdown.classList.remove('active');
-            });
-        }
-
-        // Logout button
-        const logoutBtn = document.getElementById('nav-logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
-        }
+        // User dropdown and logout are now handled by navbar.js component
+        // No need for duplicate event listeners here
 
         // Profile form
         document.getElementById('profile-form').addEventListener('submit', (e) => {

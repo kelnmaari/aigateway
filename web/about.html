@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>О Системе - Ollama Proxy</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <!-- Top Navigation будет вставлен через navbar.js -->
+
+    <div class="container" style="max-width: 1200px; margin: 80px auto 40px; padding: 0 20px;">
+        <h1 style="margin-bottom: 30px;">О Системе</h1>
+
+        <!-- System Info Card -->
+        <div class="card" style="margin-bottom: 30px;">
+            <div class="card-header">
+                <h2>Информация о версии</h2>
+            </div>
+            <div class="card-body">
+                <div id="system-info-loading" class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Загрузка информации...</p>
+                </div>
+                <div id="system-info-content" style="display: none;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                        <div>
+                            <strong>Версия:</strong>
+                            <p id="version-number" style="margin: 5px 0; font-size: 1.1em; color: var(--primary-color);"></p>
+                        </div>
+                        <div>
+                            <strong>Git Commit:</strong>
+                            <p id="git-commit" style="margin: 5px 0; font-family: monospace; color: var(--text-secondary);"></p>
+                        </div>
+                        <div>
+                            <strong>Дата сборки:</strong>
+                            <p id="build-date" style="margin: 5px 0;"></p>
+                        </div>
+                        <div>
+                            <strong>Go версия:</strong>
+                            <p id="go-version" style="margin: 5px 0; font-family: monospace;"></p>
+                        </div>
+                    </div>
+                </div>
+                <div id="system-info-error" class="error-state" style="display: none;">
+                    <p>Не удалось загрузить информацию о системе</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Changelog Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>История изменений</h2>
+            </div>
+            <div class="card-body">
+                <div id="changelog-loading" class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Загрузка changelog...</p>
+                </div>
+                <div id="changelog-content" style="display: none;">
+                    <div id="changelog-accordion">
+                        <!-- Changelog items will be inserted here -->
+                    </div>
+                </div>
+                <div id="changelog-error" class="error-state" style="display: none;">
+                    <p>Не удалось загрузить историю изменений</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/about.js"></script>
+</body>
+</html>
+

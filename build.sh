@@ -1,6 +1,6 @@
 #!/bin/bash
 # Cross-compilation build script для Linux и Windows
-# Ollama-OpenAI Proxy v1.3.0
+# Ollama-OpenAI Proxy v1.4.3
 
 set -e
 
@@ -11,8 +11,8 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 # Build configuration
-VERSION="${VERSION:-1.3.0}"
-BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+BUILD_DATE=$(date -u +"%Y-%m-%d_%H:%M:%S")
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 OUTPUT_DIR="dist"
 
@@ -55,11 +55,11 @@ build_platform() {
     export GOARCH=$arch
     export CGO_ENABLED=0  # Disable CGO for cross-compilation
     
-    # Build flags
+    # Build flags with version information
     local ldflags="-w -s"
-    ldflags="$ldflags -X main.Version=$VERSION"
-    ldflags="$ldflags -X main.BuildTime=$BUILD_TIME"
-    ldflags="$ldflags -X main.GitCommit=$GIT_COMMIT"
+    ldflags="$ldflags -X 'ollama-openai-proxy/internal/version.Version=$VERSION'"
+    ldflags="$ldflags -X 'ollama-openai-proxy/internal/version.GitCommit=$GIT_COMMIT'"
+    ldflags="$ldflags -X 'ollama-openai-proxy/internal/version.BuildDate=$BUILD_DATE'"
     
     # Build tags for SQLite
     local tags="sqlite_fts5 sqlite_json1"

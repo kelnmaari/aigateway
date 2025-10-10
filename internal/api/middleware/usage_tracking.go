@@ -44,6 +44,24 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 		statusCode := c.Writer.Status()
 		success := statusCode >= 200 && statusCode < 400
 
+		// Извлекаем токены из контекста (устанавливаются handler'ами)
+		promptTokens := extractIntFromContext(c, "prompt_tokens")
+		completionTokens := extractIntFromContext(c, "completion_tokens")
+		totalTokens := extractIntFromContext(c, "total_tokens")
+
+		// DEBUG: Логируем извлеченные данные
+		logger.WithFields(logrus.Fields{
+			"endpoint":          c.Request.URL.Path,
+			"user_id":           userID,
+			"api_key_id":        apiKeyID,
+			"model":             model,
+			"prompt_tokens":     promptTokens,
+			"completion_tokens": completionTokens,
+			"total_tokens":      totalTokens,
+			"status_code":       statusCode,
+			"success":           success,
+		}).Debug("Usage tracking: extracted data from context")
+
 		// Создаем запись usage
 		usage := &models.APIUsage{
 			ID:       uuid.New().String(),
@@ -55,10 +73,10 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 			Success:      success,
 			ErrorMessage: extractErrorMessage(c),
 
-			// Токены (пока заглушки, потом можно расширить)
-			PromptTokens:     0,
-			CompletionTokens: 0,
-			TotalTokens:      0,
+			// Токены из контекста (устанавливаются handler'ами после получения ответа)
+			PromptTokens:     promptTokens,
+			CompletionTokens: completionTokens,
+			TotalTokens:      totalTokens,
 
 			DurationMS: duration,
 			CreatedAt:  startTime,
@@ -81,9 +99,20 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 				}
 			}
 		}
+
+		// API Key ID (обязательное поле)
 		if apiKeyID != nil {
 			usage.APIKeyID = apiKeyID.(string)
+		} else {
+			// Если нет API key (JWT auth), используем специальный ID
+			authType, _ := c.Get("auth_type")
+			if authType == "jwt" {
+				usage.APIKeyID = "jwt_auth"
+			} else {
+				usage.APIKeyID = "unknown"
+			}
 		}
+
 		if tenantID != nil {
 			// tenant_id тоже может быть string или *string
 			switch v := tenantID.(type) {
@@ -173,4 +202,14 @@ func extractMetadata(c *gin.Context) map[string]interface{} {
 	}
 
 	return metadata
+}
+
+// extractIntFromContext извлекает int значение из контекста
+func extractIntFromContext(c *gin.Context, key string) int {
+	if value, exists := c.Get(key); exists {
+		if intVal, ok := value.(int); ok {
+			return intVal
+		}
+	}
+	return 0
 }

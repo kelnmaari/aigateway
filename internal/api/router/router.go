@@ -65,6 +65,8 @@ type Router struct {
 	logsHandler           *handlers.LogsHandler           // Handler для логов
 	metricsHistoryHandler *handlers.MetricsHistoryHandler // Handler для historical metrics
 	requestsHandler       *handlers.RequestsHandler       // Handler для request monitoring (TUI-04)
+	mcpHandler            *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
+	changelogHandler      *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -253,6 +255,7 @@ func (r *Router) setupRoutes() {
 	r.setupWebUIRoutes()          // WebUI static files (Version 1.3.0+)
 	r.setupOpenAIRoutes()
 	r.setupAdminRoutes()
+	r.setupMCPRoutes() // MCP Servers Catalog (v1.4.5)
 }
 
 // setupHealthRoutes настраивает эндпоинты проверки здоровья
@@ -341,6 +344,13 @@ func (r *Router) setupSystemRoutes() {
 	{
 		system.GET("/init-status", r.systemHandler.GetInitStatus)
 		system.POST("/bootstrap", r.systemHandler.Bootstrap)
+
+		// Changelog endpoints (v1.4.11)
+		if r.changelogHandler != nil {
+			system.GET("/info", r.changelogHandler.GetSystemInfo)
+			system.GET("/changelogs", r.changelogHandler.GetChangelogs)
+			system.GET("/changelogs/:version", r.changelogHandler.GetChangelog)
+		}
 	}
 
 	r.logger.Info("System API endpoints configured")
@@ -471,6 +481,8 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/tenants.html", "./web/tenants.html")
 	r.engine.StaticFile("/api-keys.html", "./web/api-keys.html")
 	r.engine.StaticFile("/usage.html", "./web/usage.html")
+	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
+	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
 	r.engine.StaticFile("/admin.html", "./web/admin.html") // Admin Panel (Version 1.3.0)
 
 	// Serve CSS and JS directories
@@ -515,13 +527,28 @@ func (r *Router) setupOpenAIRoutes() {
 		if r.rateLimiter != nil {
 			v1.Use(r.rateLimiter.RateLimitMiddleware())
 		}
-		v1.Use(r.authenticator.RecordUsageMiddleware())
+
+		// Usage tracking для аналитики (Version 1.4.6+)
+		if r.db != nil {
+			v1.Use(middleware.UsageTracking(r.db, r.logger))
+			r.logger.Info("Usage tracking enabled for /v1 endpoints (API Key mode)")
+		} else {
+			// Fallback на старый метод если нет DB
+			v1.Use(r.authenticator.RecordUsageMiddleware())
+		}
 
 		v1.GET("/models", r.authenticator.PermissionMiddleware("models"), r.modelsHandler.List)
 		v1.POST("/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.chatHandler.Completion)
 	} else {
 		// Открытые эндпоинты (MVP mode без аутентификации)
 		r.logger.Info("Using NO authentication for /v1 endpoints (MVP mode)")
+
+		// Usage tracking даже без auth для мониторинга (Version 1.4.6+)
+		if r.db != nil {
+			v1.Use(middleware.UsageTracking(r.db, r.logger))
+			r.logger.Info("Usage tracking enabled for /v1 endpoints (No auth mode)")
+		}
+
 		v1.GET("/models", r.modelsHandler.List)
 		v1.POST("/chat/completions", r.chatHandler.Completion)
 	}
@@ -600,6 +627,9 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/keys/:id", r.adminHandler.GetAPIKey)
 		admin.PUT("/keys/:id", r.adminHandler.UpdateAPIKey)
 		admin.DELETE("/keys/:id", r.adminHandler.DeleteAPIKey)
+
+		// Models management (v1.4.4)
+		admin.GET("/models/:name/details", r.adminHandler.GetModelDetails)
 	}
 
 	// System endpoints
@@ -667,6 +697,8 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 
 // setupHandlers инициализирует все handlers
 func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollamaClient *ollama.ClientWithCircuitBreaker) {
+	logger.WithField("db_is_nil", r.db == nil).Info("DEBUG: setupHandlers called")
+
 	r.healthHandler = handlers.NewHealthHandler(cfg, logger, ollamaClient)
 	r.modelsHandler = handlers.NewModelsHandler(cfg, logger, ollamaClient)
 	r.chatHandler = handlers.NewChatHandler(cfg, logger, ollamaClient)
@@ -704,7 +736,30 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		// БД всегда передается, даже если keyManager отсутствует
 		r.adminHandler = handlers.NewAdminHandlerWithoutKeys(cfg, logger, r.db)
 	}
+
+	// Set Ollama client for admin handler (v1.4.4)
+	if r.adminHandler != nil && r.ollamaClient != nil {
+		r.adminHandler.SetOllamaClient(r.ollamaClient)
+		logger.Info("Ollama client set for AdminHandler")
+	}
+
 	logger.Info("DEBUG: AdminHandler created successfully")
+
+	// MCP Handler (v1.4.5)
+	if r.db != nil {
+		r.mcpHandler = handlers.NewMCPHandler(r.db, logger)
+		logger.Info("MCP handler initialized")
+	} else {
+		logger.Warn("MCP handler NOT initialized: database is nil")
+	}
+
+	// Changelog Handler (v1.4.11)
+	if r.db != nil {
+		r.changelogHandler = handlers.NewChangelogHandler(r.db, logger)
+		logger.Info("Changelog handler initialized")
+	} else {
+		logger.Warn("Changelog handler NOT initialized: database is nil")
+	}
 
 	// Metrics Storage (Phase 12.1)
 	r.metricsStorage = metrics.NewMetricsStorage(metrics.DefaultStorageConfig(), logger)
@@ -771,4 +826,48 @@ func (r *Router) Shutdown(ctx context.Context) error {
 
 	r.logger.Info("All router components stopped")
 	return nil
+}
+
+// setupMCPRoutes настраивает MCP servers catalog endpoints (v1.4.5)
+func (r *Router) setupMCPRoutes() {
+	if r.mcpHandler == nil {
+		r.logger.Warn("MCP handler not initialized, skipping MCP routes")
+		return
+	}
+
+	r.logger.Info("Setting up MCP routes")
+
+	// Public routes (no auth required)
+	publicMCP := r.engine.Group("/api/mcp")
+	{
+		publicMCP.GET("/servers", r.mcpHandler.ListMCPServers)
+		publicMCP.GET("/servers/:id", r.mcpHandler.GetMCPServer)
+		publicMCP.GET("/categories", r.mcpHandler.GetMCPCategories)
+	}
+
+	// Admin routes (requires admin auth)
+	adminMCP := r.engine.Group("/api/admin/mcp")
+
+	// Use JWT authentication for admin routes if available
+	if r.jwtManager != nil && r.db != nil {
+		r.logger.Info("MCP admin routes: Using JWT authentication with admin role check")
+		adminMCP.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		adminMCP.Use(middleware.RequireAdmin(r.db, r.logger))
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		// Fallback to API Key auth (legacy mode)
+		r.logger.Info("MCP admin routes: Using API Key authentication (legacy)")
+		adminMCP.Use(middleware.APIKeyDBAuth(r.config, r.db, r.logger))
+	} else {
+		r.logger.Warn("MCP admin routes: No authentication configured!")
+	}
+
+	{
+		adminMCP.GET("/servers", r.mcpHandler.ListMCPServers)   // Admin can see ALL servers (including inactive)
+		adminMCP.GET("/servers/:id", r.mcpHandler.GetMCPServer) // Get single server details
+		adminMCP.POST("/servers", r.mcpHandler.CreateMCPServer)
+		adminMCP.PUT("/servers/:id", r.mcpHandler.UpdateMCPServer)
+		adminMCP.DELETE("/servers/:id", r.mcpHandler.DeleteMCPServer)
+	}
+
+	r.logger.Info("MCP routes configured successfully")
 }

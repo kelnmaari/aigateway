@@ -56,6 +56,7 @@ type UsageStats struct {
 	SuccessfulRequests int64   `json:"successful_requests"`
 	FailedRequests     int64   `json:"failed_requests"`
 	SuccessRate        float64 `json:"success_rate"` // Процент успешных запросов
+	ErrorRate          float64 `json:"error_rate"`   // Процент ошибок (для фронтенда)
 
 	// Токены
 	TotalTokens      int64 `json:"total_tokens"`
@@ -63,15 +64,23 @@ type UsageStats struct {
 	CompletionTokens int64 `json:"completion_tokens"`
 
 	// Производительность
+	AvgDuration   int64   `json:"avg_duration"` // Средняя длительность в ms (для фронтенда)
 	AvgDurationMS float64 `json:"avg_duration_ms"`
 	MinDurationMS int64   `json:"min_duration_ms"`
 	MaxDurationMS int64   `json:"max_duration_ms"`
 
-	// По моделям
+	// По моделям (для фронтенда - массив)
+	Models     []*ModelUsageStats          `json:"models"`
 	ModelUsage map[string]*ModelUsageStats `json:"model_usage"`
 
 	// По эндпоинтам
 	EndpointUsage map[string]*EndpointUsageStats `json:"endpoint_usage"`
+
+	// По API ключам (для фронтенда)
+	APIKeys []*APIKeyUsageStats `json:"api_keys"`
+
+	// Последние запросы (для фронтенда)
+	RecentRequests []*RecentRequest `json:"recent_requests"`
 
 	// По дням (для графиков)
 	DailyUsage []*DailyUsageStats `json:"daily_usage"`
@@ -80,8 +89,11 @@ type UsageStats struct {
 // ModelUsageStats представляет статистику по модели
 type ModelUsageStats struct {
 	Model         string  `json:"model"`
+	Requests      int64   `json:"requests"` // Для фронтенда
 	RequestCount  int64   `json:"request_count"`
+	Tokens        int64   `json:"tokens"` // Для фронтенда
 	TotalTokens   int64   `json:"total_tokens"`
+	AvgDuration   int64   `json:"avg_duration"` // Для фронтенда (ms)
 	AvgDurationMS float64 `json:"avg_duration_ms"`
 	SuccessRate   float64 `json:"success_rate"`
 }
@@ -102,6 +114,24 @@ type DailyUsageStats struct {
 	TotalTokens   int64   `json:"total_tokens"`
 	AvgDurationMS float64 `json:"avg_duration_ms"`
 	SuccessRate   float64 `json:"success_rate"`
+}
+
+// APIKeyUsageStats представляет статистику по API ключу
+type APIKeyUsageStats struct {
+	KeyID    string    `json:"key_id"`
+	Requests int64     `json:"requests"`
+	Tokens   int64     `json:"tokens"`
+	LastUsed time.Time `json:"last_used"`
+}
+
+// RecentRequest представляет недавний запрос
+type RecentRequest struct {
+	Timestamp time.Time `json:"timestamp"`
+	Model     string    `json:"model"`
+	KeyID     string    `json:"key_id"`
+	Tokens    int       `json:"tokens"`
+	Duration  int64     `json:"duration"` // ms
+	Success   bool      `json:"success"`
 }
 
 // UsageFilters представляет фильтры для запросов статистики

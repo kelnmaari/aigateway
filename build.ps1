@@ -1,15 +1,24 @@
 # Cross-compilation build script для Windows
-# Ollama-OpenAI Proxy v1.3.0
+# Ollama-OpenAI Proxy v1.4.3
 
 param(
     [Parameter(Position=0)]
     [string]$Command = "all",
     
-    [string]$Version = "1.3.0"
+    [string]$Version = ""
 )
 
 # Build configuration
-$BuildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+if ([string]::IsNullOrEmpty($Version)) {
+    if (Test-Path "VERSION") {
+        $Version = Get-Content "VERSION" -Raw
+        $Version = $Version.Trim()
+    } else {
+        $Version = "dev"
+    }
+}
+
+$BuildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd_HH:mm:ss")
 try {
     $GitCommit = (git rev-parse --short HEAD 2>$null)
     if (-not $GitCommit) { $GitCommit = "unknown" }
@@ -58,11 +67,11 @@ function Build-Platform {
     $env:GOARCH = $Arch
     $env:CGO_ENABLED = "0"  # Disable CGO for cross-compilation
     
-    # Build flags
+    # Build flags with version information
     $ldflags = "-w -s"
-    $ldflags += " -X main.Version=$Version"
-    $ldflags += " -X main.BuildTime=$BuildTime"
-    $ldflags += " -X main.GitCommit=$GitCommit"
+    $ldflags += " -X 'ollama-openai-proxy/internal/version.Version=$Version'"
+    $ldflags += " -X 'ollama-openai-proxy/internal/version.GitCommit=$GitCommit'"
+    $ldflags += " -X 'ollama-openai-proxy/internal/version.BuildDate=$BuildDate'"
     
     # Build tags for SQLite
     $tags = "sqlite_fts5,sqlite_json1"

@@ -175,13 +175,14 @@ type ShowRequest struct {
 
 // ShowResponse представляет ответ от /api/show
 type ShowResponse struct {
-	License    string    `json:"license,omitempty"`
-	Modelfile  string    `json:"modelfile,omitempty"`
-	Parameters string    `json:"parameters,omitempty"`
-	Template   string    `json:"template,omitempty"`
-	System     string    `json:"system,omitempty"`
-	Details    Details   `json:"details,omitempty"`
-	ModifiedAt time.Time `json:"modified_at"`
+	License    string                 `json:"license,omitempty"`
+	Modelfile  string                 `json:"modelfile,omitempty"`
+	Parameters string                 `json:"parameters,omitempty"`
+	Template   string                 `json:"template,omitempty"`
+	System     string                 `json:"system,omitempty"`
+	Details    *Details               `json:"details,omitempty"`
+	ModelInfo  map[string]interface{} `json:"modelinfo,omitempty"`
+	ModifiedAt time.Time              `json:"modified_at"`
 }
 
 // PullRequest представляет запрос для /api/pull (загрузка модели)

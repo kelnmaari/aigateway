@@ -138,7 +138,18 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 		return
 	}
 
-	// 4. Возвращаем ответ
+	// 4. Устанавливаем токены в контекст для usage tracking
+	c.Set("prompt_tokens", response.Usage.PromptTokens)
+	c.Set("completion_tokens", response.Usage.CompletionTokens)
+	c.Set("total_tokens", response.Usage.TotalTokens)
+
+	h.logger.WithFields(logrus.Fields{
+		"prompt_tokens":     response.Usage.PromptTokens,
+		"completion_tokens": response.Usage.CompletionTokens,
+		"total_tokens":      response.Usage.TotalTokens,
+	}).Debug("Tokens set in context for usage tracking")
+
+	// 5. Возвращаем ответ
 	h.logger.WithFields(logrus.Fields{
 		"request_id":        requestID,
 		"response_id":       response.ID,

@@ -41,6 +41,18 @@
                     >
                 </div>
 
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                    <input 
+                        type="checkbox" 
+                        id="remember-me" 
+                        name="remember_me"
+                        style="width: auto; margin: 0;"
+                    >
+                    <label for="remember-me" style="margin: 0; cursor: pointer;">
+                        Не выходить из системы 24 часа
+                    </label>
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-block" id="login-btn">
                     Sign In
                 </button>
@@ -87,6 +99,7 @@
             try {
                 const identifier = document.getElementById('identifier').value;
                 const password = document.getElementById('password').value;
+                const rememberMe = document.getElementById('remember-me').checked;
                 
                 // Send as username (backend expects username or email field)
                 const response = await fetch('/api/auth/login', {
@@ -94,7 +107,11 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ username: identifier, password })
+                    body: JSON.stringify({ 
+                        username: identifier, 
+                        password: password,
+                        remember_me: rememberMe
+                    })
                 });
                 
                 const data = await response.json();

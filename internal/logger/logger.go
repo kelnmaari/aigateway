@@ -10,6 +10,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"ollama-openai-proxy/internal/config"
+	"ollama-openai-proxy/internal/version"
 )
 
 // Setup настраивает логгер согласно конфигурации
@@ -63,7 +64,7 @@ func Setup(cfg *config.Config) *logrus.Logger {
 	// Добавляем базовые поля для всех логов
 	logger = logger.WithFields(logrus.Fields{
 		"service": "ollama-openai-proxy",
-		"version": "dev", // TODO: Получать из build информации
+		"version": version.Version,
 	}).Logger
 
 	return logger

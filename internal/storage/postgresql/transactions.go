@@ -231,3 +231,39 @@ func (tx *postgresqlTx) GetUserUsageStats(ctx context.Context, userID string, pe
 func (tx *postgresqlTx) GetTenantUsageStats(ctx context.Context, tenantID string, period time.Duration) (*models.UsageStats, error) {
 	return tx.db.GetTenantUsageStats(ctx, tenantID, period)
 }
+
+// ========================================
+// MCP Servers Methods (Delegation - v1.4.5)
+// ========================================
+
+func (tx *postgresqlTx) CreateMCPServer(ctx context.Context, server *models.MCPServer) error {
+	return tx.db.CreateMCPServer(ctx, server)
+}
+
+func (tx *postgresqlTx) GetMCPServer(ctx context.Context, id string) (*models.MCPServer, error) {
+	return tx.db.GetMCPServer(ctx, id)
+}
+
+func (tx *postgresqlTx) UpdateMCPServer(ctx context.Context, server *models.MCPServer) error {
+	return tx.db.UpdateMCPServer(ctx, server)
+}
+
+func (tx *postgresqlTx) DeleteMCPServer(ctx context.Context, id string) error {
+	return tx.db.DeleteMCPServer(ctx, id)
+}
+
+func (tx *postgresqlTx) ListMCPServers(ctx context.Context, req models.MCPServerListRequest) (*models.MCPServerListResponse, error) {
+	return tx.db.ListMCPServers(ctx, req)
+}
+
+// ========================================
+// Changelog Methods (Delegation) (v1.4.11)
+// ========================================
+
+func (tx *postgresqlTx) GetChangelog(ctx context.Context, version string) (*models.Changelog, error) {
+	return tx.db.GetChangelog(ctx, version)
+}
+
+func (tx *postgresqlTx) ListChangelogs(ctx context.Context) ([]*models.Changelog, error) {
+	return tx.db.ListChangelogs(ctx)
+}

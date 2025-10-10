@@ -1,0 +1,172 @@
+---
+alwaysApply: true
+---
+
+# Changelog Migration Rule
+
+## ВАЖНО: При каждом новом релизе
+
+### 1. Обновление CHANGELOG.md
+- Всегда обновляй `CHANGELOG.md` при добавлении новых изменений
+- Следуй формату [Keep a Changelog](https://keepachangelog.com/):
+  - `## [VERSION] - YYYY-MM-DD`
+  - Секции: Added, Changed, Fixed, Security, Technical, Removed
+
+### 2. Обновление SQL миграции
+**ОБЯЗАТЕЛЬНО**: После изменения CHANGELOG.md нужно обновить SQL миграцию с данными changelog.
+
+#### Где находится:
+- Файл: `internal/storage/sqlite/sqlite.go`
+- Функция: `getChangelogsMigrationWithData()`
+- Миграция: v3 (или следующая версия)
+
+#### Что делать:
+1. Найди функцию `getChangelogsMigrationWithData()`
+2. Добавь новую запись `INSERT OR REPLACE` для новой версии
+3. Формат SQL:
+```sql
+('VERSION', 'YYYY-MM-DD', 'MARKDOWN_CONTENT'),
+```
+
+#### Пример добавления новой версии 1.4.11:
+```sql
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.4.11', '2025-10-10', '## [1.4.11] - 2025-10-10
+
+### Added
+- **Новая функция**: Описание
+
+### Changed
+- Изменения
+
+### Technical
+- Технические детали'),
+
+-- Предыдущие версии...
+('1.4.10', '2025-10-10', '...');
+```
+
+### 3. PostgreSQL миграция (опционально)
+Если используется PostgreSQL, обнови также:
+- `internal/storage/postgresql/migrations.go` (если есть)
+
+### 4. Версия приложения
+- Обнови файл `VERSION` с новым номером версии
+- Система автоматически внедрит это в билд через `ldflags`
+
+### 5. Проверка
+После обновления миграции:
+```bash
+# Пересоздай БД чтобы применилась миграция
+rm data/proxy.db
+# Запусти сервер - миграция применится автоматически
+go run cmd/server/main.go -config configs/dev.yaml
+```
+
+## Workflow последовательность:
+1. ✅ Добавляешь изменения в `CHANGELOG.md`
+2. ✅ Обновляешь SQL в `getChangelogsMigrationWithData()`
+3. ✅ Обновляешь `VERSION` файл
+4. ✅ Коммитишь все 3 файла вместе
+5. ✅ Система автоматически:
+   - Применит миграцию при старте
+   - Данные из CHANGELOG будут доступны через API
+   - WebUI отобразит историю изменений в "О Системе"
+
+## КРИТИЧНО: Не забывай SQL миграцию!
+Без обновления SQL миграции:
+- ❌ Новая версия не появится в WebUI
+- ❌ API `/api/system/changelogs` вернет старые данные
+- ❌ Пользователи не увидят последние изменения
+
+## Автоматизация (будущее)
+В будущем можно создать скрипт для автоматической генерации SQL из CHANGELOG.md:
+- `scripts/generate-changelog-migration.sh`
+- Парсит CHANGELOG.md
+- Генерирует SQL INSERT
+- Обновляет файл миграции
+
+# Changelog Migration Rule
+
+## ВАЖНО: При каждом новом релизе
+
+### 1. Обновление CHANGELOG.md
+- Всегда обновляй `CHANGELOG.md` при добавлении новых изменений
+- Следуй формату [Keep a Changelog](https://keepachangelog.com/):
+  - `## [VERSION] - YYYY-MM-DD`
+  - Секции: Added, Changed, Fixed, Security, Technical, Removed
+
+### 2. Обновление SQL миграции
+**ОБЯЗАТЕЛЬНО**: После изменения CHANGELOG.md нужно обновить SQL миграцию с данными changelog.
+
+#### Где находится:
+- Файл: `internal/storage/sqlite/sqlite.go`
+- Функция: `getChangelogsMigrationWithData()`
+- Миграция: v3 (или следующая версия)
+
+#### Что делать:
+1. Найди функцию `getChangelogsMigrationWithData()`
+2. Добавь новую запись `INSERT OR REPLACE` для новой версии
+3. Формат SQL:
+```sql
+('VERSION', 'YYYY-MM-DD', 'MARKDOWN_CONTENT'),
+```
+
+#### Пример добавления новой версии 1.4.11:
+```sql
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.4.11', '2025-10-10', '## [1.4.11] - 2025-10-10
+
+### Added
+- **Новая функция**: Описание
+
+### Changed
+- Изменения
+
+### Technical
+- Технические детали'),
+
+-- Предыдущие версии...
+('1.4.10', '2025-10-10', '...');
+```
+
+### 3. PostgreSQL миграция (опционально)
+Если используется PostgreSQL, обнови также:
+- `internal/storage/postgresql/migrations.go` (если есть)
+
+### 4. Версия приложения
+- Обнови файл `VERSION` с новым номером версии
+- Система автоматически внедрит это в билд через `ldflags`
+
+### 5. Проверка
+После обновления миграции:
+```bash
+# Пересоздай БД чтобы применилась миграция
+rm data/proxy.db
+# Запусти сервер - миграция применится автоматически
+go run cmd/server/main.go -config configs/dev.yaml
+```
+
+## Workflow последовательность:
+1. ✅ Добавляешь изменения в `CHANGELOG.md`
+2. ✅ Обновляешь SQL в `getChangelogsMigrationWithData()`
+3. ✅ Обновляешь `VERSION` файл
+4. ✅ Коммитишь все 3 файла вместе
+5. ✅ Система автоматически:
+   - Применит миграцию при старте
+   - Данные из CHANGELOG будут доступны через API
+   - WebUI отобразит историю изменений в "О Системе"
+
+## КРИТИЧНО: Не забывай SQL миграцию!
+Без обновления SQL миграции:
+- ❌ Новая версия не появится в WebUI
+- ❌ API `/api/system/changelogs` вернет старые данные
+- ❌ Пользователи не увидят последние изменения
+
+## Автоматизация (будущее)
+В будущем можно создать скрипт для автоматической генерации SQL из CHANGELOG.md:
+- `scripts/generate-changelog-migration.sh`
+- Парсит CHANGELOG.md
+- Генерирует SQL INSERT
+- Обновляет файл миграции
+

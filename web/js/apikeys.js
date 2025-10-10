@@ -206,7 +206,10 @@ class APIKeysManager {
     renderKeyRow(key, type) {
         const maskedKey = this.maskKey(key.key_hash || key.key);
         const lastUsed = key.last_used_at ? this.formatDate(key.last_used_at) : 'Never';
-        const statusBadge = key.is_active 
+        
+        // Check status field (backend returns "active", "disabled", "expired", "revoked")
+        const isActive = key.status === 'active' && (!key.expires_at || new Date(key.expires_at) > new Date());
+        const statusBadge = isActive 
             ? '<span class="badge badge-success">Active</span>'
             : '<span class="badge badge-secondary">Inactive</span>';
 
@@ -246,26 +249,8 @@ class APIKeysManager {
 
     // Setup event listeners
     setupEventListeners() {
-        // User dropdown
-        const userButton = document.getElementById('user-button');
-        const userDropdown = document.getElementById('user-dropdown');
-        
-        if (userButton && userDropdown) {
-            userButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userDropdown.classList.toggle('active');
-            });
-
-            document.addEventListener('click', () => {
-                userDropdown.classList.remove('active');
-            });
-        }
-
-        // Logout
-        const logoutBtn = document.getElementById('nav-logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
-        }
+        // User dropdown and logout are now handled by navbar.js component
+        // No need for duplicate event listeners here
 
         // Tabs
         const tabBtns = document.querySelectorAll('.tab-btn');

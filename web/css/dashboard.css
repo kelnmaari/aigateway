@@ -197,9 +197,11 @@
     box-shadow: var(--shadow);
     display: none;
     overflow: hidden;
+    z-index: 1000;
 }
 
-.dropdown-menu.active {
+.dropdown-menu.active,
+.dropdown-menu.show {
     display: block;
 }
 

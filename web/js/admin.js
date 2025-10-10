@@ -5,6 +5,7 @@ class AdminPanel {
         this.users = [];
         this.apiKeys = [];
         this.models = [];
+        this.mcpServers = [];
         this.init();
     }
 
@@ -20,9 +21,7 @@ class AdminPanel {
                 return;
             }
             
-            // Update nav
-            document.getElementById('nav-user-name').textContent = user.full_name || user.username;
-            document.getElementById('nav-user-avatar').textContent = (user.full_name || user.username).charAt(0).toUpperCase();
+            // Navbar component handles user display now
         } catch (error) {
             console.error('Failed to verify admin status:', error);
             window.location.href = '/login.html';
@@ -44,8 +43,7 @@ class AdminPanel {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
-        // Logout
-        document.getElementById('logout-btn').addEventListener('click', () => api.logout());
+        // Navbar component handles logout now
 
         // Create User button
         document.getElementById('create-user-btn').addEventListener('click', () => this.showCreateUserModal());
@@ -75,6 +73,20 @@ class AdminPanel {
         document.getElementById('reset-password-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.handleResetPassword(e.target);
+        });
+
+        // MCP Server button
+        document.getElementById('create-mcp-btn').addEventListener('click', () => this.showCreateMCPModal());
+
+        // MCP Server form
+        document.getElementById('mcp-server-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleMCPServerSubmit(e.target);
+        });
+
+        // MCP Category filter
+        document.getElementById('mcp-category-filter').addEventListener('change', (e) => {
+            this.filterMCPServers(e.target.value);
         });
 
         // Modal close buttons
@@ -114,6 +126,9 @@ class AdminPanel {
                 break;
             case 'apikeys':
                 await this.loadAPIKeys();
+                break;
+            case 'mcp':
+                await this.loadMCPServers();
                 break;
             case 'system':
                 await this.loadSystem();
@@ -339,29 +354,234 @@ class AdminPanel {
             const response = await api.request(`${api.baseURL}/api/admin/logs?limit=50`);
             if (response.ok) {
                 const data = await response.json();
-                document.getElementById('logs-display').textContent = data.logs || 'No logs available';
+                const logsDisplay = document.getElementById('logs-display');
+                
+                if (!data.logs || data.logs.length === 0) {
+                    logsDisplay.textContent = 'No logs available';
+                    return;
+                }
+
+                // Format logs properly
+                const formattedLogs = data.logs.map(log => {
+                    if (typeof log === 'string') {
+                        return log;
+                    }
+                    
+                    // If log is an object, format it nicely
+                    const timestamp = log.timestamp || log.time || new Date().toISOString();
+                    const level = (log.level || 'INFO').toUpperCase().padEnd(5);
+                    const message = log.message || log.msg || JSON.stringify(log);
+                    const fields = Object.entries(log)
+                        .filter(([key]) => !['timestamp', 'time', 'level', 'message', 'msg'].includes(key))
+                        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+                        .join(' ');
+                    
+                    return `[${timestamp}] ${level} ${message}${fields ? ' | ' + fields : ''}`;
+                }).join('\n');
+
+                logsDisplay.textContent = formattedLogs;
             }
         } catch (error) {
             console.error('Failed to load logs:', error);
-            document.getElementById('logs-display').textContent = 'Failed to load logs';
+            document.getElementById('logs-display').textContent = 'Failed to load logs: ' + error.message;
         }
     }
 
     renderModels() {
-        const tbody = document.getElementById('models-table');
+        const container = document.getElementById('models-accordion');
         
         if (this.models.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="table-empty">No models found</td></tr>';
+            container.innerHTML = '<div class="loading-placeholder">No models found</div>';
             return;
         }
 
-        tbody.innerHTML = this.models.map(model => `
-            <tr>
-                <td><code>${this.escapeHtml(model.id || model.name)}</code></td>
-                <td>${this.formatSize(model.size)}</td>
-                <td>${this.formatDate(model.modified_at || model.created)}</td>
-            </tr>
-        `).join('');
+        container.innerHTML = this.models.map(model => {
+            const modelName = model.id || model.name;
+            const modelId = this.sanitizeId(modelName);
+            
+            return `
+                <div class="accordion-item" data-model="${this.escapeHtml(modelName)}">
+                    <div class="accordion-header" onclick="adminPanel.toggleAccordion('${modelId}')">
+                        <div class="accordion-header-content">
+                            <div class="model-item">
+                                <code class="model-name">${this.escapeHtml(modelName)}</code>
+                                <button 
+                                    class="copy-model-btn"
+                                    onclick="event.stopPropagation(); copyModelName('${this.escapeHtml(modelName)}')"
+                                    aria-label="Copy model name"
+                                    title="Copy model name">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="model-meta">
+                                <span class="model-size">${this.formatSize(model.size)}</span>
+                                <span class="model-modified">${this.formatDate(model.modified_at || model.created)}</span>
+                            </div>
+                        </div>
+                        <div class="accordion-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M6 9l6 6 6-6" stroke-width="2"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="accordion-body" id="accordion-${modelId}">
+                        <div class="loading-details">Click to load details...</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async toggleAccordion(modelId) {
+        const body = document.getElementById(`accordion-${modelId}`);
+        const item = body.closest('.accordion-item');
+        const modelName = item.dataset.model;
+        
+        // Закрыть если уже открыт
+        if (item.classList.contains('active')) {
+            item.classList.remove('active');
+            return;
+        }
+
+        // Закрыть все другие
+        document.querySelectorAll('.accordion-item.active').forEach(el => {
+            if (el !== item) el.classList.remove('active');
+        });
+
+        // Открыть текущий
+        item.classList.add('active');
+
+        // Загрузить детали если еще не загружены
+        if (body.querySelector('.loading-details')) {
+            body.innerHTML = '<div class="loading-details"><i class="fas fa-spinner fa-spin"></i> Loading details...</div>';
+            await this.loadModelDetails(modelName, body);
+        }
+    }
+
+    async loadModelDetails(modelName, container) {
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/models/${encodeURIComponent(modelName)}/details`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load model details');
+            }
+
+            const details = await response.json();
+            container.innerHTML = this.renderModelDetails(details);
+        } catch (error) {
+            console.error('Failed to load model details:', error);
+            container.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle"></i>
+                    Failed to load model details: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    renderModelDetails(details) {
+        const sections = [];
+
+        // Basic Information
+        const basicInfo = [];
+        if (details.family) basicInfo.push(['Family', details.family]);
+        if (details.format) basicInfo.push(['Format', details.format]);
+        if (details.parameter_size) basicInfo.push(['Parameters', details.parameter_size]);
+        if (details.quantization) basicInfo.push(['Quantization', details.quantization]);
+        if (details.architecture) basicInfo.push(['Architecture', details.architecture]);
+
+        if (basicInfo.length > 0) {
+            sections.push(`
+                <div class="details-section">
+                    <h4>📋 Basic Information</h4>
+                    <div class="details-grid">
+                        ${basicInfo.map(([label, value]) => `
+                            <div class="detail-item">
+                                <span class="detail-label">${label}:</span>
+                                <span class="detail-value">${this.escapeHtml(value)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // Model Specifications
+        const specs = [];
+        if (details.context_length) specs.push(['Context Length', details.context_length.toLocaleString()]);
+        if (details.embedding_size) specs.push(['Embedding Size', details.embedding_size.toLocaleString()]);
+        if (details.layers) specs.push(['Layers', details.layers.toLocaleString()]);
+        if (details.attention_heads) specs.push(['Attention Heads', details.attention_heads.toLocaleString()]);
+        if (details.vocab_size) specs.push(['Vocabulary Size', details.vocab_size.toLocaleString()]);
+
+        if (specs.length > 0) {
+            sections.push(`
+                <div class="details-section">
+                    <h4>⚙️ Model Specifications</h4>
+                    <div class="details-grid">
+                        ${specs.map(([label, value]) => `
+                            <div class="detail-item">
+                                <span class="detail-label">${label}:</span>
+                                <span class="detail-value">${value}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // Template
+        if (details.template) {
+            sections.push(`
+                <div class="details-section">
+                    <h4>📝 Prompt Template</h4>
+                    <pre class="code-block">${this.escapeHtml(details.template)}</pre>
+                </div>
+            `);
+        }
+
+        // Modelfile
+        if (details.modelfile) {
+            sections.push(`
+                <div class="details-section">
+                    <h4>📄 Modelfile</h4>
+                    <pre class="code-block">${this.escapeHtml(details.modelfile)}</pre>
+                </div>
+            `);
+        }
+
+        // License
+        if (details.license) {
+            sections.push(`
+                <div class="details-section">
+                    <h4>📜 License</h4>
+                    <pre class="code-block">${this.escapeHtml(details.license)}</pre>
+                </div>
+            `);
+        }
+
+        // Parameters
+        if (details.parameters && Object.keys(details.parameters).length > 0) {
+            sections.push(`
+                <div class="details-section">
+                    <h4>🔧 Parameters</h4>
+                    <div class="details-grid">
+                        ${Object.entries(details.parameters).map(([key, value]) => `
+                            <div class="detail-item">
+                                <span class="detail-label">${this.escapeHtml(key)}:</span>
+                                <span class="detail-value">${this.escapeHtml(String(value))}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        return sections.join('') || '<div class="no-details">No additional details available</div>';
+    }
+
+    sanitizeId(str) {
+        return str.replace(/[^a-zA-Z0-9-_]/g, '-');
     }
 
     // User Management
@@ -634,6 +854,201 @@ class AdminPanel {
 
     closeModals() {
         document.querySelectorAll('.modal').forEach(modal => modal.classList.remove('show'));
+    }
+
+    // ==================== MCP Servers Management ====================
+
+    async loadMCPServers() {
+        try {
+            // Admin sees ALL servers, including inactive ones
+            const response = await api.request(`${api.baseURL}/api/admin/mcp/servers?active_only=false`);
+            if (!response.ok) throw new Error('Failed to load MCP servers');
+            
+            const data = await response.json();
+            this.mcpServers = data.servers || [];
+            
+            // Load categories for filter
+            await this.loadMCPCategories();
+            
+            this.renderMCPServers();
+        } catch (error) {
+            console.error('Failed to load MCP servers:', error);
+            document.getElementById('mcp-servers-table').innerHTML = 
+                `<tr><td colspan="6" class="table-empty error">Failed to load MCP servers: ${error.message}</td></tr>`;
+        }
+    }
+
+    async loadMCPCategories() {
+        try {
+            const response = await api.request(`${api.baseURL}/api/mcp/categories`);
+            if (!response.ok) throw new Error('Failed to load categories');
+            
+            const data = await response.json();
+            const select = document.getElementById('mcp-category-filter');
+            
+            select.innerHTML = '<option value="">All Categories</option>';
+            data.categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load categories:', error);
+        }
+    }
+
+    renderMCPServers(servers = this.mcpServers) {
+        const tbody = document.getElementById('mcp-servers-table');
+        
+        if (servers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No MCP servers found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = servers.map(server => {
+            const tags = Array.isArray(server.tags) ? server.tags : [];
+            const tagsHtml = tags.length > 0 
+                ? tags.slice(0, 3).map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join(' ')
+                : '<span class="text-muted">—</span>';
+            
+            const statusBadge = server.is_active 
+                ? '<span class="badge badge-success">Active</span>'
+                : '<span class="badge badge-secondary">Inactive</span>';
+
+            const categoryBadge = `<span class="category-badge category-${server.category}">${server.category}</span>`;
+
+            return `
+                <tr>
+                    <td><strong>${this.escapeHtml(server.name)}</strong></td>
+                    <td>${categoryBadge}</td>
+                    <td class="description-cell">${this.escapeHtml(server.description || '')}</td>
+                    <td class="tags-cell">${tagsHtml}</td>
+                    <td>${statusBadge}</td>
+                    <td class="actions-cell">
+                        <button class="btn-icon" onclick="adminPanel.editMCPServer('${server.id}')" title="Edit">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-width="2"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-width="2"/>
+                            </svg>
+                        </button>
+                        <button class="btn-icon btn-danger" onclick="adminPanel.deleteMCPServer('${server.id}')" title="Delete">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-width="2"/>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    filterMCPServers(category) {
+        if (!category) {
+            this.renderMCPServers();
+            return;
+        }
+        
+        const filtered = this.mcpServers.filter(server => server.category === category);
+        this.renderMCPServers(filtered);
+    }
+
+    showCreateMCPModal() {
+        document.getElementById('mcp-modal-title').textContent = 'Add MCP Server';
+        document.getElementById('mcp-submit-btn').textContent = 'Create Server';
+        document.getElementById('mcp-server-form').reset();
+        document.getElementById('mcp-server-id').value = '';
+        document.getElementById('mcp-active').checked = true;
+        document.getElementById('mcp-server-modal').classList.add('show');
+    }
+
+    async editMCPServer(serverId) {
+        const server = this.mcpServers.find(s => s.id === serverId);
+        if (!server) return;
+
+        document.getElementById('mcp-modal-title').textContent = 'Edit MCP Server';
+        document.getElementById('mcp-submit-btn').textContent = 'Update Server';
+        document.getElementById('mcp-server-id').value = server.id;
+        document.getElementById('mcp-name').value = server.name;
+        document.getElementById('mcp-category').value = server.category;
+        document.getElementById('mcp-description').value = server.description || '';
+        document.getElementById('mcp-installation').value = server.installation_guide || '';
+        document.getElementById('mcp-website').value = server.website_url || '';
+        document.getElementById('mcp-github').value = server.github_url || '';
+        document.getElementById('mcp-tags').value = Array.isArray(server.tags) ? server.tags.join(', ') : '';
+        document.getElementById('mcp-active').checked = server.is_active;
+        
+        document.getElementById('mcp-server-modal').classList.add('show');
+    }
+
+    async handleMCPServerSubmit(form) {
+        const serverId = document.getElementById('mcp-server-id').value;
+        const isEdit = !!serverId;
+
+        const tags = document.getElementById('mcp-tags').value
+            .split(',')
+            .map(t => t.trim())
+            .filter(t => t);
+
+        const data = {
+            name: document.getElementById('mcp-name').value,
+            category: document.getElementById('mcp-category').value,
+            description: document.getElementById('mcp-description').value,
+            installation_guide: document.getElementById('mcp-installation').value,
+            website_url: document.getElementById('mcp-website').value || undefined,
+            github_url: document.getElementById('mcp-github').value || undefined,
+            tags: tags.length > 0 ? tags : undefined,
+            is_active: document.getElementById('mcp-active').checked
+        };
+
+        try {
+            const url = isEdit 
+                ? `${api.baseURL}/api/admin/mcp/servers/${serverId}`
+                : `${api.baseURL}/api/admin/mcp/servers`;
+            
+            const response = await api.request(url, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to save MCP server');
+            }
+
+            this.closeModals();
+            await this.loadMCPServers();
+            
+            alert(`MCP server ${isEdit ? 'updated' : 'created'} successfully!`);
+        } catch (error) {
+            console.error('Failed to save MCP server:', error);
+            alert(`Failed to save MCP server: ${error.message}`);
+        }
+    }
+
+    async deleteMCPServer(serverId) {
+        const server = this.mcpServers.find(s => s.id === serverId);
+        if (!server) return;
+
+        if (!confirm(`Are you sure you want to delete "${server.name}"?`)) return;
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/mcp/servers/${serverId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to delete MCP server');
+            }
+
+            await this.loadMCPServers();
+            alert('MCP server deleted successfully!');
+        } catch (error) {
+            console.error('Failed to delete MCP server:', error);
+            alert(`Failed to delete MCP server: ${error.message}`);
+        }
     }
 
     // Utility methods

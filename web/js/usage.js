@@ -249,26 +249,8 @@ class UsageManager {
 
     // Setup event listeners
     setupEventListeners() {
-        // User dropdown
-        const userButton = document.getElementById('user-button');
-        const userDropdown = document.getElementById('user-dropdown');
-        
-        if (userButton && userDropdown) {
-            userButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userDropdown.classList.toggle('active');
-            });
-
-            document.addEventListener('click', () => {
-                userDropdown.classList.remove('active');
-            });
-        }
-
-        // Logout
-        const logoutBtn = document.getElementById('nav-logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
-        }
+        // User dropdown and logout are now handled by navbar.js component
+        // No need for duplicate event listeners here
 
         // Time period selector
         const timePeriodSelect = document.getElementById('time-period');

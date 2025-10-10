@@ -10,7 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"ollama-openai-proxy/internal/config"
+	"ollama-openai-proxy/internal/version"
 )
+
+var startTime = time.Now() // Application start time for uptime calculation
 
 // HealthHandler обрабатывает health check эндпоинты
 type HealthHandler struct {
@@ -30,12 +33,17 @@ func NewHealthHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient Ol
 
 // Health обрабатывает GET /health
 func (h *HealthHandler) Health(c *gin.Context) {
+	versionInfo := version.GetInfo()
+
 	response := gin.H{
-		"status":    "ok",
-		"service":   "ollama-openai-proxy",
-		"version":   "dev", // TODO: Получать из build информации
-		"timestamp": time.Now().Unix(),
-		"uptime":    time.Since(time.Now().Add(-5 * time.Minute)).String(), // TODO: Реальный uptime
+		"status":     "ok",
+		"service":    "ollama-openai-proxy",
+		"version":    versionInfo.Version,
+		"git_commit": versionInfo.GitCommit,
+		"build_date": versionInfo.BuildDate,
+		"go_version": versionInfo.GoVersion,
+		"timestamp":  time.Now().Unix(),
+		"uptime":     time.Since(startTime).String(),
 	}
 
 	h.logger.Debug("Health check requested")

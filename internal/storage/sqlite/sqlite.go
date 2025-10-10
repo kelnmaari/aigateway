@@ -289,6 +289,26 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "initial_schema",
 			SQL:     s.getInitialSchemaMigration(),
 		},
+		{
+			Version: 2,
+			Name:    "add_mcp_servers_table",
+			SQL:     s.getMCPServersMigration(),
+		},
+		{
+			Version: 3,
+			Name:    "add_changelogs_with_data",
+			SQL:     s.getChangelogsMigrationWithData(),
+		},
+		{
+			Version: 4,
+			Name:    "add_changelog_v1_4_11",
+			SQL:     s.getChangelogV1411Migration(),
+		},
+		{
+			Version: 5,
+			Name:    "populate_all_changelogs",
+			SQL:     s.getPopulateAllChangelogsMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -503,12 +523,313 @@ CREATE TABLE IF NOT EXISTS api_usage (
 	FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_api_usage_user_id ON api_usage(user_id);
-CREATE INDEX idx_api_usage_tenant_id ON api_usage(tenant_id);
-CREATE INDEX idx_api_usage_api_key_id ON api_usage(api_key_id);
-CREATE INDEX idx_api_usage_created_at ON api_usage(created_at DESC);
-CREATE INDEX idx_api_usage_endpoint ON api_usage(endpoint);
-CREATE INDEX idx_api_usage_model ON api_usage(model);
+CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_tenant_id ON api_usage(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_api_key_id ON api_usage(api_key_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage(endpoint);
+CREATE INDEX IF NOT EXISTS idx_api_usage_model ON api_usage(model);
+
+-- Composite indexes for better query performance (v1.4.6+)
+CREATE INDEX IF NOT EXISTS idx_api_usage_user_created ON api_usage(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_usage_tenant_created ON api_usage(tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL;
+	`
+}
+
+// getMCPServersMigration возвращает SQL для создания таблицы mcp_servers (v1.4.5)
+func (s *SQLiteDB) getMCPServersMigration() string {
+	return `
+-- ========================================
+-- MCP Servers Table (WEBUI-07: v1.4.5)
+-- ========================================
+CREATE TABLE IF NOT EXISTS mcp_servers (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	description TEXT NOT NULL,
+	category TEXT NOT NULL,
+	installation_guide TEXT NOT NULL,
+	website_url TEXT,
+	github_url TEXT,
+	tags TEXT, -- JSON array stored as TEXT
+	is_active BOOLEAN NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mcp_servers_category ON mcp_servers(category);
+CREATE INDEX idx_mcp_servers_is_active ON mcp_servers(is_active);
+CREATE INDEX idx_mcp_servers_created_at ON mcp_servers(created_at DESC);
+	`
+}
+
+// getChangelogsMigrationWithData возвращает SQL для создания таблицы changelogs с данными из CHANGELOG.md (v1.4.10+)
+func (s *SQLiteDB) getChangelogsMigrationWithData() string {
+	return `
+-- ========================================
+-- Changelogs Table (System Info: v1.4.11+)
+-- ========================================
+CREATE TABLE IF NOT EXISTS changelogs (
+	version TEXT PRIMARY KEY,
+	release_date DATE NOT NULL,
+	content TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_changelogs_release_date ON changelogs(release_date DESC);
+
+-- ========================================
+-- Initial Changelog Data from CHANGELOG.md
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.4.10', '2025-10-10', '## [1.4.10] - 2025-10-10
+
+### Added
+- **"Remember Me" Функция при входе**:
+  - Checkbox "Не выходить из системы 24 часа" на форме логина
+  - При включении галочки access token живет **24 часа** вместо 15 минут
+  - Refresh token продолжает работать 7 дней как и раньше
+  - Логирование использования remember_me в JWT и auth service
+
+### Changed
+- **Backend**: LoginRequest, GenerateTokenPair, JWT логирование
+- **Frontend**: Добавлен checkbox на форму входа
+
+### Technical
+- Без галочки: Access token 15 минут, Refresh token 7 дней
+- С галочкой: Access token 24 часа, Refresh token 7 дней
+- Фактическая длительность сессии: до 7 дней'),
+
+('1.4.9', '2025-10-10', '## [1.4.9] - 2025-10-10
+
+### Fixed
+- **API Keys Status Display**:
+  - Problem: Свежесозданные ключи отображались как "Inactive"
+  - Solution: Frontend использует поле status из API response
+  - Ключ активен если status === ''active'' И не истек срок'),
+
+('1.4.8', '2025-10-10', '## [1.4.8] - 2025-10-10
+
+### Added
+- **Debug Logging для Usage Tracking**
+- Логирование user_id, api_key_id, model, tokens, success
+
+### Fixed
+- **API Key ID для JWT аутентификации**: используется "jwt_auth" ID'),
+
+('1.4.7', '2025-10-10', '## [1.4.7] - 2025-10-10
+
+### Fixed
+- **CRITICAL: Usage Statistics Performance**
+  - Problem: Запросы 5+ секунд, context canceled
+  - Solution: Оптимизированы SQL с SUM(CASE WHEN ...)
+  - Performance: < 100ms для большинства запросов'),
+
+('1.4.6', '2025-10-10', '## [1.4.6] - 2025-10-10
+
+### Added
+- **API Usage Tracking**: Полная интеграция middleware
+- Автоматическая запись в api_usage таблицу
+- Сбор метрик: user_id, model, tokens, duration'),
+
+('1.4.5', '2025-10-10', '## [1.4.5] - 2025-10-10
+
+### Added
+- **MCP Servers Catalog**: Admin-managed catalog
+- Database: таблица mcp_servers
+- Frontend: web/mcp.html с публичной страницей'),
+
+('1.4.4', '2025-10-10', '## [1.4.4] - 2025-10-10
+
+### Added
+- **Enhanced Models Information**: Accordion UI
+- Lazy loading через /api/admin/models/:name/details
+- Секции: Basic Info, Specifications, Template, Modelfile'),
+
+('1.4.3', '2025-10-10', '## [1.4.3] - 2025-10-10
+
+### Added
+- **Build Version Information**: Реальная версия через ldflags
+- Флаг -version для показа информации о билде
+- VERSION файл как единственный источник версии'),
+
+('1.4.2', '2025-10-10', '## [1.4.2] - 2025-10-10
+
+### Security
+- **TUI Admin Key Configuration**: Убраны hardcoded keys
+- Admin token загружается из конфигурации
+- Добавлен флаг --config для указания пути'),
+
+('1.4.1', '2025-10-10', '## [1.4.1] - 2025-10-10
+
+### Added
+- **Model Copy Button**: Кнопка копирования модели
+- Clipboard API с fallback
+- Toast notifications для feedback'),
+
+('1.4.0', '2025-10-08', '## [1.4.0] - 2025-10-08
+
+WebUI Enhancements & Code Quality - Base Release
+
+Включает: Model Copy, TUI Admin Config, Build Version, Enhanced Models, MCP Catalog'),
+
+('1.3.0', '2025-10-06', '## [1.3.0] - 2025-10-06
+
+User Experience & Multi-Tenancy
+
+### Added
+- Database Abstraction Layer (SQLite + PostgreSQL)
+- User Authentication & Multi-Tenancy (JWT, RBAC)
+- Interactive Chat Interface
+- User Dashboard
+- Cross-platform Build System'),
+
+('1.2.0', '2025-10-01', '## [1.2.0] - 2025-10-01
+
+Enhanced Monitoring & Management
+
+### Added
+- TUI Request Monitor
+- WebUI Metrics Visualization
+- Advanced Logs Features
+- Enhanced API Key Management');
+	`
+}
+
+// getChangelogV1411Migration добавляет только версию 1.4.11 (инкрементальная миграция v4)
+func (s *SQLiteDB) getChangelogV1411Migration() string {
+	return `
+-- ========================================
+-- Fix Changelog Table Structure (Migration v4)
+-- ========================================
+
+-- Удаляем старую таблицу если она была с неправильной структурой
+DROP TABLE IF EXISTS changelogs;
+
+-- Создаем таблицу с правильной структурой
+CREATE TABLE changelogs (
+	version TEXT PRIMARY KEY,
+	release_date DATE NOT NULL,
+	content TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_changelogs_release_date ON changelogs(release_date DESC);
+
+-- Добавляем только версию 1.4.11
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.4.11', '2025-10-10', '## [1.4.11] - 2025-10-10
+
+### Added
+- **Система "О Системе"**: Новая страница
+  - Отображение версии, git commit, build date
+  - Accordion UI для changelog всех версий
+  - Пункт "О Системе" в меню профиля
+
+### Changed
+- **Backend**: Migration, changelog handler, API endpoints
+- **Frontend**: about.html, navbar, accordion UI
+
+### Technical
+- Database: таблица changelogs
+- API: /api/system/info, /api/system/changelogs');
+	`
+}
+
+// getPopulateAllChangelogsMigration добавляет все версии changelog (миграция v5)
+func (s *SQLiteDB) getPopulateAllChangelogsMigration() string {
+	return `
+-- ========================================
+-- Populate All Changelogs (Migration v5)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.4.10', '2025-10-10', '## [1.4.10] - 2025-10-10
+
+### Added
+- **"Remember Me"**: Checkbox 24 часа на форме входа
+- Access token: 15m → 24h при включенной галочке
+
+### Changed
+- Backend: LoginRequest, GenerateTokenPair
+- Frontend: Checkbox на login.html'),
+
+('1.4.9', '2025-10-10', '## [1.4.9] - 2025-10-10
+
+### Fixed
+- **API Keys Status**: Ключи отображались Inactive
+- Frontend использует status из API'),
+
+('1.4.8', '2025-10-10', '## [1.4.8] - 2025-10-10
+
+### Added
+- **Debug Logging**: Usage Tracking
+
+### Fixed
+- API Key ID для JWT: "jwt_auth"'),
+
+('1.4.7', '2025-10-10', '## [1.4.7] - 2025-10-10
+
+### Fixed
+- **CRITICAL**: Usage Statistics Performance
+- SQL оптимизация: < 100ms'),
+
+('1.4.6', '2025-10-10', '## [1.4.6] - 2025-10-10
+
+### Added
+- **API Usage Tracking**: middleware
+- Запись в api_usage таблицу'),
+
+('1.4.5', '2025-10-10', '## [1.4.5] - 2025-10-10
+
+### Added
+- **MCP Catalog**: Admin-managed
+- Frontend: mcp.html'),
+
+('1.4.4', '2025-10-10', '## [1.4.4] - 2025-10-10
+
+### Added
+- **Enhanced Models**: Accordion UI
+- Lazy loading деталей'),
+
+('1.4.3', '2025-10-10', '## [1.4.3] - 2025-10-10
+
+### Added
+- **Build Version**: ldflags
+- VERSION файл'),
+
+('1.4.2', '2025-10-10', '## [1.4.2] - 2025-10-10
+
+### Security
+- TUI Admin Key от конфигурации'),
+
+('1.4.1', '2025-10-10', '## [1.4.1] - 2025-10-10
+
+### Added
+- Model Copy Button
+- Clipboard API'),
+
+('1.4.0', '2025-10-08', '## [1.4.0] - 2025-10-08
+
+WebUI Enhancements & Code Quality'),
+
+('1.3.0', '2025-10-06', '## [1.3.0] - 2025-10-06
+
+User Experience & Multi-Tenancy
+
+### Added
+- Database Layer (SQLite + PostgreSQL)
+- JWT Authentication & RBAC
+- Chat Interface'),
+
+('1.2.0', '2025-10-01', '## [1.2.0] - 2025-10-01
+
+Enhanced Monitoring & Management
+
+### Added
+- TUI Request Monitor
+- WebUI Metrics
+- Advanced Logs');
 	`
 }
 

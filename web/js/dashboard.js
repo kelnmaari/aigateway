@@ -52,11 +52,7 @@ class Dashboard {
         try {
             this.user = await api.getCurrentUser();
             
-            // Update user name in nav
-            const navUserName = document.getElementById('nav-user-name');
-            if (navUserName) {
-                navUserName.textContent = this.user.full_name || this.user.username;
-            }
+            // Navbar handles user info display now via navbar.js component
 
             // Update user avatar
             const avatars = document.querySelectorAll('.user-avatar');
@@ -293,27 +289,8 @@ class Dashboard {
 
     // Setup event listeners
     setupEventListeners() {
-        // User dropdown toggle
-        const userButton = document.getElementById('user-button');
-        const dropdown = document.getElementById('user-dropdown');
-        
-        if (userButton && dropdown) {
-            userButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dropdown.classList.toggle('active');
-            });
-            
-            // Close dropdown when clicking outside
-            document.addEventListener('click', () => {
-                dropdown.classList.remove('active');
-            });
-        }
-
-        // Logout button
-        const logoutBtn = document.getElementById('nav-logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
-        }
+        // Navbar component (navbar.js) handles user dropdown and logout now
+        // No need for duplicate event listeners here
     }
 
     // Logout

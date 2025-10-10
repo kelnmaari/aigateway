@@ -3,9 +3,11 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -17,26 +19,43 @@ import (
 	"ollama-openai-proxy/internal/logger"
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/storage"
-)
-
-var (
-	// Version информация о версии (устанавливается при сборке)
-	Version   = "dev"
-	BuildTime = "unknown"
+	"ollama-openai-proxy/internal/version"
 )
 
 func main() {
-	fmt.Printf("🚀 Ollama-OpenAI Proxy Server v%s (built %s)\n", Version, BuildTime)
+	// Парсинг флагов
+	showVersion := flag.Bool("version", false, "Show version information and exit")
+	configPath := flag.String("config", "", "Path to configuration file (default: auto-detect)")
+	flag.Parse()
+
+	// Показываем версию и выходим если запрошено
+	if *showVersion {
+		versionInfo := version.GetInfo()
+		fmt.Printf("%s\n", versionInfo.String())
+		os.Exit(0)
+	}
+
+	fmt.Printf("🚀 Ollama-OpenAI Proxy Server v%s\n", version.Short())
 
 	// Инициализация конфигурации
-	cfg, err := config.Load("")
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("❌ Не удалось загрузить конфигурацию: %v", err)
 	}
 
+	// Логируем источник конфигурации
+	if *configPath != "" {
+		fmt.Printf("📋 Configuration loaded from: %s\n", *configPath)
+	} else {
+		fmt.Printf("📋 Configuration auto-detected\n")
+	}
+
 	// Настройка логирования
 	appLogger := logger.Setup(cfg)
-	appLogger.WithField("version", Version).Info("Starting Ollama-OpenAI Proxy Server")
+	appLogger.WithField("version", version.Version).
+		WithField("git_commit", version.GitCommit).
+		WithField("build_date", version.BuildDate).
+		Info("Starting Ollama-OpenAI Proxy Server")
 
 	// Инициализация Prometheus метрик (если включено)
 	if cfg.Metrics.Enabled {
@@ -88,19 +107,14 @@ func main() {
 
 	// Создание роутера
 	var appRouter *router.Router
-	if db != nil && jwtManager != nil {
-		// Роутер с user authentication support
-		appRouter, err = router.NewWithOptions(router.NewOptions{
-			Config:     cfg,
-			Logger:     appLogger,
-			Version:    Version,
-			Database:   db,
-			JWTManager: jwtManager,
-		})
-	} else {
-		// Роутер без user authentication (backward compatibility)
-		appRouter, err = router.New(cfg, appLogger, Version)
-	}
+	// Всегда используем NewWithOptions для передачи database (необходим для MCP и других фич)
+	appRouter, err = router.NewWithOptions(router.NewOptions{
+		Config:     cfg,
+		Logger:     appLogger,
+		Version:    version.Version,
+		Database:   db,         // Может быть nil для legacy mode
+		JWTManager: jwtManager, // Может быть nil для legacy mode
+	})
 
 	if err != nil {
 		log.Fatalf("❌ Не удалось создать роутер: %v", err)

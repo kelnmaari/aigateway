@@ -212,6 +212,35 @@ type Database interface {
 
 	// GetTenantUsageStats возвращает статистику tenant за период
 	GetTenantUsageStats(ctx context.Context, tenantID string, period time.Duration) (*models.UsageStats, error)
+
+	// ========================================
+	// MCP Servers (WEBUI-07: v1.4.5)
+	// ========================================
+
+	// CreateMCPServer создает новую запись MCP сервера
+	CreateMCPServer(ctx context.Context, server *models.MCPServer) error
+
+	// GetMCPServer получает MCP сервер по ID
+	GetMCPServer(ctx context.Context, id string) (*models.MCPServer, error)
+
+	// UpdateMCPServer обновляет MCP сервер
+	UpdateMCPServer(ctx context.Context, server *models.MCPServer) error
+
+	// DeleteMCPServer удаляет MCP сервер
+	DeleteMCPServer(ctx context.Context, id string) error
+
+	// ListMCPServers возвращает список MCP серверов с фильтрацией
+	ListMCPServers(ctx context.Context, req models.MCPServerListRequest) (*models.MCPServerListResponse, error)
+
+	// ========================================
+	// Changelog Methods (v1.4.11+)
+	// ========================================
+
+	// GetChangelog возвращает changelog для конкретной версии
+	GetChangelog(ctx context.Context, version string) (*models.Changelog, error)
+
+	// ListChangelogs возвращает список всех changelog записей
+	ListChangelogs(ctx context.Context) ([]*models.Changelog, error)
 }
 
 // Tx представляет транзакцию БД

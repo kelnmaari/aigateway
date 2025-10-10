@@ -5,17 +5,21 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"ollama-openai-proxy/internal/config"
 )
 
 var (
@@ -229,6 +233,7 @@ type Model struct {
 	metrics      *MetricsSnapshot // Prometheus метрики
 	config       ServerConfig     // Конфигурация сервера
 	serverURL    string
+	adminToken   string // Admin API token from config
 	lastUpdate   time.Time
 	errorMessage string
 
@@ -304,11 +309,30 @@ var (
 func main() {
 	fmt.Printf("🖥️  Ollama-OpenAI Proxy TUI v%s (built %s)\n", Version, BuildTime)
 
+	// Parse command line flags
+	configPath := flag.String("config", "configs/dev.yaml", "Path to configuration file")
+	flag.Parse()
+
+	// Load configuration
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		log.Fatalf("❌ Failed to load config: %v", err)
+	}
+
+	// Validate admin key
+	if cfg.Auth.AdminKey == "" {
+		log.Fatalf("❌ Admin key not configured in auth.admin_key")
+	}
+
+	// Build server URL
+	serverURL := fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+
 	// Создание TUI приложения
 	m := Model{
 		currentView: dashboardView,
-		serverURL:   "http://localhost:8080", // По умолчанию
-		metrics:     NewMetricsSnapshot(),    // Инициализируем метрики
+		serverURL:   serverURL,
+		adminToken:  cfg.Auth.AdminKey,    // Load from config
+		metrics:     NewMetricsSnapshot(), // Инициализируем метрики
 		requestsState: RequestsState{
 			page:          1,
 			perPage:       20, // 20 запросов на странице для TUI
@@ -324,6 +348,27 @@ func main() {
 	if _, err := p.Run(); err != nil {
 		log.Fatalf("❌ Ошибка запуска TUI: %v", err)
 	}
+}
+
+// loadConfig loads configuration from file
+func loadConfig(configPath string) (*config.Config, error) {
+	// Check if file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// Try absolute path
+		absPath, _ := filepath.Abs(configPath)
+		if _, err := os.Stat(absPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("config file not found: %s (also tried: %s)", configPath, absPath)
+		}
+		configPath = absPath
+	}
+
+	// Load config
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config from %s: %w", configPath, err)
+	}
+
+	return cfg, nil
 }
 
 // Init инициализирует модель
@@ -1795,7 +1840,7 @@ func (m Model) handleCreateKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		// Отправляем запрос на создание
 		m.creatingKey = false
-		return m, createAPIKeyCmd(m.serverURL, m.createForm)
+		return m, createAPIKeyCmd(m.serverURL, m.adminToken, m.createForm)
 
 	case "backspace":
 		// Удаление символа
@@ -1951,7 +1996,7 @@ func fetchRequestsCmd(serverURL string, state RequestsState) tea.Cmd {
 }
 
 // createAPIKeyCmd отправляет запрос на создание API ключа
-func createAPIKeyCmd(serverURL string, form CreateKeyForm) tea.Cmd {
+func createAPIKeyCmd(serverURL string, adminToken string, form CreateKeyForm) tea.Cmd {
 	return func() tea.Msg {
 		client := &http.Client{
 			Timeout: 5 * time.Second,
@@ -1981,14 +2026,14 @@ func createAPIKeyCmd(serverURL string, form CreateKeyForm) tea.Cmd {
 			return errMsg(fmt.Errorf("ошибка формирования запроса: %v", err))
 		}
 
-		// Отправляем запрос (используем admin ключ из env или конфига)
+		// Отправляем запрос (используем admin ключ из конфига)
 		req, err := http.NewRequest("POST", serverURL+"/admin/api-keys", bytes.NewBuffer(bodyBytes))
 		if err != nil {
 			return errMsg(fmt.Errorf("ошибка создания запроса: %v", err))
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer sk-admin-dev-key-12345") // TODO: Получать из конфига
+		req.Header.Set("Authorization", "Bearer "+adminToken)
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -2262,7 +2307,7 @@ func (m Model) saveEditedKey() tea.Cmd {
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+adminAPIKey) // TODO: Получать из конфигурации
+		req.Header.Set("Authorization", "Bearer "+m.adminToken)
 
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
@@ -2319,7 +2364,7 @@ func (m Model) executeConfirmedAction() tea.Cmd {
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+adminAPIKey) // TODO: Получать из конфигурации
+		req.Header.Set("Authorization", "Bearer "+m.adminToken)
 
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
@@ -2348,8 +2393,7 @@ func (m Model) executeConfirmedAction() tea.Cmd {
 	}
 }
 
-// TODO: Добавить константу adminAPIKey или получать из config
-const adminAPIKey = "your-admin-key-here" // Временное решение
+// Admin token теперь загружается из конфигурации и передается через Model.adminToken
 
 // renderEditKeyForm отрисовывает форму редактирования API ключа (AUTH-04)
 func (m Model) renderEditKeyForm() string {

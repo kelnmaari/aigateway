@@ -271,6 +271,11 @@ func (p *PostgreSQLDB) getMigrations() []migration {
 			Name:    "initial_schema",
 			SQL:     p.getInitialSchemaMigration(),
 		},
+		{
+			Version: 2,
+			Name:    "add_mcp_servers_table",
+			SQL:     p.getMCPServersMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -497,6 +502,33 @@ CREATE INDEX IF NOT EXISTS idx_api_usage_api_key_id ON api_usage(api_key_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage(endpoint);
 CREATE INDEX IF NOT EXISTS idx_api_usage_model ON api_usage(model);
+	`
+}
+
+// getMCPServersMigration возвращает SQL для создания таблицы mcp_servers (v1.4.5)
+func (p *PostgreSQLDB) getMCPServersMigration() string {
+	return `
+-- ========================================
+-- MCP Servers Table (WEBUI-07: v1.4.5)
+-- ========================================
+CREATE TABLE IF NOT EXISTS mcp_servers (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL,
+	description TEXT NOT NULL,
+	category TEXT NOT NULL,
+	installation_guide TEXT NOT NULL,
+	website_url TEXT,
+	github_url TEXT,
+	tags JSONB, -- PostgreSQL JSONB для эффективного хранения массивов
+	is_active BOOLEAN NOT NULL DEFAULT true,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_category ON mcp_servers(category);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_is_active ON mcp_servers(is_active);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_created_at ON mcp_servers(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_tags ON mcp_servers USING GIN (tags);
 	`
 }
 

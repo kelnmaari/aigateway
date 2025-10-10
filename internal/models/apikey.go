@@ -116,6 +116,9 @@ type APIKeyPublic struct {
 	ID            string                 `json:"id"`
 	Name          string                 `json:"name"`
 	Description   string                 `json:"description,omitempty"`
+	UserID        *string                `json:"user_id,omitempty"`   // Owner user ID (Version 1.3.0+)
+	TenantID      *string                `json:"tenant_id,omitempty"` // Tenant ID (Version 1.3.0+)
+	Scope         APIKeyScope            `json:"scope,omitempty"`     // personal or tenant (Version 1.3.0+)
 	Models        []string               `json:"models"`
 	Permissions   []string               `json:"permissions"`
 	RateLimits    RateLimits             `json:"rate_limits"`
@@ -128,6 +131,10 @@ type APIKeyPublic struct {
 	RevokedReason string                 `json:"revoked_reason,omitempty"`
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 	Usage         APIKeyUsage            `json:"usage"`
+
+	// Enriched fields for admin display (not stored in DB)
+	OwnerUsername string `json:"owner_username,omitempty"` // Username of owner (Version 1.3.0+)
+	TenantName    string `json:"tenant_name,omitempty"`    // Name of tenant/organization (Version 1.3.0+)
 }
 
 // UpdateAPIKeyRequest представляет запрос на обновление API ключа

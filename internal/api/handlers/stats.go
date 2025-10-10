@@ -13,6 +13,7 @@ import (
 	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/models"
+	"ollama-openai-proxy/internal/storage"
 )
 
 // GlobalStats хранит глобальную статистику приложения
@@ -103,19 +104,21 @@ type StatsHandler struct {
 	config         *config.Config
 	logger         *logrus.Logger
 	ollamaClient   OllamaClientInterface
-	keyManager     APIKeyManager // Опционально, может быть nil
+	keyManager     APIKeyManager    // Legacy JSON storage (deprecated)
+	db             storage.Database // Database for API keys (Version 1.3.0+)
 	stats          *Stats
 	version        string                  // Версия сервера
 	metricsStorage MetricsStorageInterface // Для latency данных
 }
 
 // NewStatsHandler создает новый stats handler
-func NewStatsHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient OllamaClientInterface, keyMgr APIKeyManager, version string, metricsStorage MetricsStorageInterface) *StatsHandler {
+func NewStatsHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient OllamaClientInterface, keyMgr APIKeyManager, version string, metricsStorage MetricsStorageInterface, db storage.Database) *StatsHandler {
 	return &StatsHandler{
 		config:         cfg,
 		logger:         logger,
 		ollamaClient:   ollamaClient,
 		keyManager:     keyMgr,
+		db:             db,
 		stats:          GlobalStats,
 		version:        version,
 		metricsStorage: metricsStorage,
@@ -145,15 +148,37 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 		}
 	}
 
-	// Получаем информацию об API ключах если key manager доступен
+	// Получаем информацию об API ключах из БД (Version 1.3.0+) или legacy JSON storage
 	apiKeysInfo := gin.H{
 		"enabled": h.config.Auth.Enabled,
 		"count":   0,
 		"keys":    []gin.H{},
 	}
 
-	if h.keyManager != nil {
-		// Получаем список всех ключей
+	// Приоритет: Database → Legacy JSON storage
+	if h.db != nil {
+		// Используем БД (Version 1.3.0+)
+		dbKeys, err := h.db.ListAPIKeys(ctx)
+		if err == nil && dbKeys != nil {
+			apiKeysInfo["count"] = len(dbKeys)
+
+			// Формируем упрощенный список для TUI
+			var keysList []gin.H
+			for _, key := range dbKeys {
+				keysList = append(keysList, gin.H{
+					"id":          key.ID,
+					"name":        key.Name,
+					"status":      key.Status,
+					"permissions": key.Permissions,
+					"models":      key.Models,
+					"created_at":  key.CreatedAt.Format("2006-01-02 15:04"),
+					"last_used":   formatLastUsed(key.LastUsedAt),
+				})
+			}
+			apiKeysInfo["keys"] = keysList
+		}
+	} else if h.keyManager != nil {
+		// Fallback на legacy JSON storage
 		req := models.ListAPIKeysRequest{
 			Limit:  100,
 			Offset: 0,

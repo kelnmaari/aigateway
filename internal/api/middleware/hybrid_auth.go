@@ -9,13 +9,14 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"ollama-openai-proxy/internal/auth/jwt"
+	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/storage"
 )
 
 // HybridAuth creates middleware that accepts EITHER JWT tokens OR API Keys
 // Priority: JWT token (Bearer) → API Key (x-api-key or Bearer with API key format)
-// Version 1.3.0+: Uses database-backed API keys
-func HybridAuth(jwtManager *jwt.Manager, db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
+// Version 1.3.0+: Uses database-backed API keys + bootstrap admin key from config
+func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Try JWT first (Bearer token in Authorization header)
 		authHeader := c.GetHeader("Authorization")
@@ -43,7 +44,7 @@ func HybridAuth(jwtManager *jwt.Manager, db storage.Database, logger *logrus.Log
 			logger.WithError(err).Debug("JWT validation failed, trying as API key")
 
 			// Try to authenticate as API key from database
-			apiKeyDBAuth := APIKeyDBAuth(db, logger)
+			apiKeyDBAuth := APIKeyDBAuth(cfg, db, logger)
 			apiKeyDBAuth(c)
 			if !c.IsAborted() {
 				// API key authentication succeeded
@@ -59,7 +60,7 @@ func HybridAuth(jwtManager *jwt.Manager, db storage.Database, logger *logrus.Log
 		apiKey := c.GetHeader("x-api-key")
 		if apiKey != "" {
 			// Authenticate using database-backed API keys
-			apiKeyDBAuth := APIKeyDBAuth(db, logger)
+			apiKeyDBAuth := APIKeyDBAuth(cfg, db, logger)
 			apiKeyDBAuth(c)
 			if !c.IsAborted() {
 				c.Next()

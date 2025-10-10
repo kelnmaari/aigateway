@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -242,11 +243,15 @@ func Load(configPath string) (*Config, error) {
 	if configPath != "" {
 		viper.SetConfigFile(configPath)
 	} else {
-		viper.SetConfigName("dev")
+		// Auto-discover config file: try config.yaml (production) or dev.yaml (development)
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("./configs")
 		viper.AddConfigPath("../configs")
+		viper.AddConfigPath("/opt/ollama-openai-proxy/configs")
 		viper.AddConfigPath("/app/configs")
+
+		// Try config.yaml first (production), fallback to dev.yaml (development)
+		viper.SetConfigName("config")
 	}
 
 	// Настройка переменных окружения
@@ -257,11 +262,32 @@ func Load(configPath string) (*Config, error) {
 	setDefaults(viper)
 
 	// Чтение конфигурации
+	if configPath != "" {
+		fmt.Printf("🔍 Attempting to read config from: %s\n", configPath)
+	} else {
+		fmt.Printf("🔍 Auto-discovering config file (config.yaml or dev.yaml)...\n")
+	}
+
 	err := viper.ReadInConfig()
 	if err != nil {
-		// Логируем предупреждение, но продолжаем с defaults
-		fmt.Printf("⚠️ Config file not found or error reading config: %v\n", err)
-		fmt.Println("🔧 Using default configuration values")
+		// If config.yaml not found and we're auto-discovering, try dev.yaml
+		if configPath == "" {
+			viper.SetConfigName("dev")
+			err = viper.ReadInConfig()
+		}
+
+		if err != nil {
+			// Логируем предупреждение, но продолжаем с defaults
+			fmt.Printf("⚠️  Config file not found or error reading config: %v\n", err)
+			fmt.Printf("🔧 Using default configuration values\n")
+			if configPath != "" {
+				fmt.Printf("   Expected config path: %s\n", configPath)
+			}
+		} else {
+			fmt.Printf("✅ Config file successfully read: %s\n", viper.ConfigFileUsed())
+		}
+	} else {
+		fmt.Printf("✅ Config file successfully read: %s\n", viper.ConfigFileUsed())
 	}
 
 	// Unmarshaling в структуру Config
@@ -269,6 +295,29 @@ func Load(configPath string) (*Config, error) {
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+
+	// Debug: показать источник конфигурации для server.host
+	fmt.Println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("📊 SERVER CONFIGURATION DEBUG INFO:")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	if envHost := os.Getenv("PROXY_SERVER_HOST"); envHost != "" {
+		fmt.Printf("⚠️  SERVER HOST OVERRIDDEN by environment variable:\n")
+		fmt.Printf("   PROXY_SERVER_HOST = %s\n", envHost)
+		fmt.Printf("   (This overrides config file!)\n")
+	} else if viper.ConfigFileUsed() != "" {
+		fmt.Printf("✅ Configuration loaded from file:\n")
+		fmt.Printf("   File: %s\n", viper.ConfigFileUsed())
+		fmt.Printf("   server.host from config: %s\n", viper.GetString("server.host"))
+		fmt.Printf("   Actual config.Server.Host: %s\n", config.Server.Host)
+	} else {
+		fmt.Printf("⚠️  Using DEFAULT configuration:\n")
+		fmt.Printf("   No config file loaded!\n")
+		fmt.Printf("   Default server.host: %s\n", config.Server.Host)
+	}
+
+	fmt.Printf("\n🚀 Server will bind to: %s:%d\n", config.Server.Host, config.Server.Port)
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
 	// Валидация конфигурации
 	if err := config.Validate(); err != nil {

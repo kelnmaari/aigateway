@@ -180,110 +180,115 @@
 
 ---
 
-## 🔧 Version 1.4.0 - Scalability & Reliability
+## 🎨 Version 1.4.0 - WebUI Enhancements & Code Quality
 
-**Фокус:** Подготовка к масштабированию и повышение надежности  
+**Фокус:** Улучшение WebUI интерфейса и устранение технического долга  
 **Приоритет:** MEDIUM  
-**Оценка времени:** 12-15 часов  
-**Статус:** 🎯 Текущая
+**Оценка времени:** 18-24 часа  
+**Статус:** 🎯 Текущая  
+**Версионирование:** 1 фича = 1 patch (1.4.1, 1.4.2, ...)
 
 ### Задачи
 
-- [ ] **SCALE-01** Redis Rate Limiting → [BACKLOG/SCALE-01_redis_rate_limiting.md](BACKLOG/SCALE-01_redis_rate_limiting.md)
-  - Redis backend для distributed rate limiting
-  - Multi-instance support
-  - Shared state management
-  - Fallback to in-memory если Redis недоступен
+- [ ] **WEBUI-06** Model Name Copy Button → [BACKLOG/WEBUI-06_model_copy_button.md](BACKLOG/WEBUI-06_model_copy_button.md) → **v1.4.1**
+  - Кнопка копирования названия модели в буфер обмена
+  - Clipboard API интеграция
+  - Toast/tooltip подтверждение
+  - **Оценка:** 1-2 часа
+
+- [ ] **TODO-01** TUI Admin API Key Configuration → [BACKLOG/TODO-01_tui_admin_key_config.md](BACKLOG/TODO-01_tui_admin_key_config.md) → **v1.4.2**
+  - Убрать hardcoded admin keys из TUI
+  - Загружать admin key из конфигурации
+  - Файлы: cmd/tui/main.go (4 комментария)
+  - **Оценка:** 2 часа
+
+- [ ] **TODO-02** Build Version Information → [BACKLOG/TODO-02_build_version_info.md](BACKLOG/TODO-02_build_version_info.md) → **v1.4.3**
+  - Реальная версия вместо "dev"
+  - Добавить ldflags в build скрипты
+  - Файлы: internal/logger/logger.go, internal/api/handlers/health.go
+  - **Оценка:** 1-2 часа
+
+- [ ] **WEBUI-05** Enhanced Models Information → [BACKLOG/WEBUI-05_enhanced_models_info.md](BACKLOG/WEBUI-05_enhanced_models_info.md) → **v1.4.4**
+  - Расширенная информация о моделях в админке (System → Models)
+  - Список моделей с раскрывающимися параметрами (accordion)
+  - Показ всех параметров: size, family, format, parameters, etc.
+  - API endpoints для детальной информации
   - **Оценка:** 8-10 часов
 
-- [ ] **SCALE-04** Model Fallback Strategy → [BACKLOG/SCALE-04_model_fallback.md](BACKLOG/SCALE-04_model_fallback.md)
-  - Automatic fallback если модель недоступна
-  - Model compatibility mapping (gpt-4 → llama3, etc.)
-  - Configurable fallback chains
-  - Health-based model selection
-  - **Оценка:** 4-5 часов
+- [ ] **WEBUI-07** MCP Servers Catalog → [BACKLOG/WEBUI-07_mcp_catalog.md](BACKLOG/WEBUI-07_mcp_catalog.md) → **v1.4.5**
+  - Новая страница с каталогом MCP серверов
+  - Admin CRUD для управления каталогом
+  - Публичный просмотр для пользователей
+  - Поля: название, описание, ссылка, категория, инструкция
+  - Без функционала использования в чате (только справочник)
+  - **Оценка:** 6-8 часов
 
 ---
 
-## 📦 Version 1.5.0 - DevOps & Operations
+## 🔧 Version 1.5.0 - Operations & Maintenance
 
-**Фокус:** CI/CD и операционная готовность  
+**Фокус:** Операционная готовность и устранение багов  
 **Приоритет:** MEDIUM  
-**Оценка времени:** 15-25 часов
+**Оценка времени:** 11-16 часов  
+**Версионирование:** 1 фича = 1 patch (1.5.1, 1.5.2, ...)
 
 ### Задачи
 
-- [ ] **DEVOPS-01** CI/CD Pipeline → [BACKLOG/DEVOPS-01_cicd_pipeline.md](BACKLOG/DEVOPS-01_cicd_pipeline.md)
-  - GitHub Actions workflows
-  - Automated testing on PR
-  - Build & release automation
-  - Cross-platform builds (Linux, Windows, macOS)
-  - **Оценка:** 6-8 часов
+- [ ] **BUG-01** Fix Admin Logs Display → [BACKLOG/BUG-01_fix_admin_logs.md](BACKLOG/BUG-01_fix_admin_logs.md) → **v1.5.1**
+  - **CRITICAL**: Исправить отображение "[object Object]" в System Logs
+  - Правильная сериализация объектов логов в строки
+  - Форматирование JSON логов для читаемости
+  - Файлы: web/js/admin.js
+  - **Оценка:** 2-3 часа
 
-- [ ] **OPS-01** Backup & Restore → [BACKLOG/OPS-01_backup_restore.md](BACKLOG/OPS-01_backup_restore.md)
-  - Автоматический backup API keys
-  - Configuration backup
+- [ ] **TODO-03** Password Change Implementation → [BACKLOG/TODO-03_password_change.md](BACKLOG/TODO-03_password_change.md) → **v1.5.2**
+  - Реализовать backend для смены пароля (UI уже есть)
+  - Валидация текущего пароля
+  - Файл: internal/api/handlers/auth.go
+  - **Оценка:** 3-4 часа
+
+- [ ] **TODO-04** Tenant Membership Check → [BACKLOG/TODO-04_tenant_membership.md](BACKLOG/TODO-04_tenant_membership.md) → **v1.5.3**
+  - Проверка прав доступа к tenant ресурсам
+  - Файл: internal/api/handlers/usage.go
+  - **Оценка:** 2-3 часа
+
+- [ ] **TODO-05** Error Type Checking → [BACKLOG/TODO-05_error_type_check.md](BACKLOG/TODO-05_error_type_check.md) → **v1.5.4**
+  - Улучшить обработку типов ошибок
+  - Файл: internal/api/handlers/admin.go
+  - **Оценка:** 1-2 часа
+
+- [ ] **OPS-01** Backup & Restore → [BACKLOG/OPS-01_backup_restore.md](BACKLOG/OPS-01_backup_restore.md) → **v1.5.5**
+  - Автоматический backup database и конфигурации
   - Restore procedures
   - Scheduled backups
   - **Оценка:** 3-4 часа
 
-- [ ] **OPS-02** Advanced Logging → [BACKLOG/OPS-02_advanced_logging.md](BACKLOG/OPS-02_advanced_logging.md)
-  - Structured request/response logging
-  - Automatic log rotation
-  - Log aggregation support (syslog, fluentd)
-  - Configurable log levels per component
-  - **Оценка:** 4-5 часов
-
 ---
 
-## 🎯 Version 1.6.0 - Advanced Features
+## 📊 Version 1.6.0 - Observability
 
-**Фокус:** Расширенные возможности  
+**Фокус:** Observability и мониторинг production  
 **Приоритет:** LOW  
-**Оценка времени:** 40-60 часов
+**Оценка времени:** 22-28 часов  
+**Версионирование:** 1 фича = 1 patch (1.6.1, 1.6.2, ...)
 
-### Observability
+### Задачи
 
-- [ ] **OBSERV-01** OpenTelemetry Integration → [BACKLOG/OBSERV-01_opentelemetry.md](BACKLOG/OBSERV-01_opentelemetry.md)
+- [ ] **OBSERV-01** OpenTelemetry Integration → [BACKLOG/OBSERV-01_opentelemetry.md](BACKLOG/OBSERV-01_opentelemetry.md) → **v1.6.1**
   - Distributed tracing
   - Trace context propagation
   - Span annotations
   - Integration с Jaeger/Zipkin
   - **Оценка:** 10-12 часов
 
-- [ ] **OBSERV-02** Performance Monitoring → [BACKLOG/OBSERV-02_perf_monitoring.md](BACKLOG/OBSERV-02_perf_monitoring.md)
+- [ ] **OBSERV-02** Performance Monitoring → [BACKLOG/OBSERV-02_perf_monitoring.md](BACKLOG/OBSERV-02_perf_monitoring.md) → **v1.6.2**
   - Continuous profiling в production
   - Memory leak detection
   - Slow request analysis
   - Performance regression detection
   - **Оценка:** 6-8 часов
 
-### Multi-tenancy
-
-- [ ] **TENANT-01** Multi-tenant Support → [BACKLOG/TENANT-01_multi_tenant.md](BACKLOG/TENANT-01_multi_tenant.md)
-  - Изоляция для разных клиентов
-  - Per-tenant configuration
-  - Separate rate limits
-  - Usage tracking per tenant
-  - **Оценка:** 12-15 часов
-
-### API Extensions
-
-- [ ] **API-08** Fine-tuning API Emulation → [BACKLOG/API-08_finetuning_emulation.md](BACKLOG/API-08_finetuning_emulation.md)
-  - OpenAI fine-tuning API compatibility
-  - Model adaptation simulation
-  - Fine-tuning job tracking
-  - **Оценка:** 8-10 часов
-
-- [ ] **API-09** Image Generation Support → [BACKLOG/API-09_image_generation.md](BACKLOG/API-09_image_generation.md)
-  - Support для image models (если Ollama добавит)
-  - `/v1/images/generations` endpoint
-  - Image format conversion
-  - **Оценка:** 6-8 часов (зависит от Ollama)
-
-### Reporting
-
-- [ ] **REPORT-01** Scheduled Reports → [BACKLOG/REPORT-01_scheduled_reports.md](BACKLOG/REPORT-01_scheduled_reports.md)
+- [ ] **REPORT-01** Scheduled Reports → [BACKLOG/REPORT-01_scheduled_reports.md](BACKLOG/REPORT-01_scheduled_reports.md) → **v1.6.3**
   - Автоматические отчеты по email
   - Usage statistics reports
   - Performance summaries
@@ -292,18 +297,105 @@
 
 ---
 
+## 🚀 Version 1.7.0 - API Extensions
+
+**Фокус:** Расширение OpenAI API совместимости  
+**Приоритет:** LOW  
+**Оценка времени:** 14-18 часов  
+**Версионирование:** 1 фича = 1 patch (1.7.1, 1.7.2)
+
+### Задачи
+
+- [ ] **API-08** Fine-tuning API Emulation → [BACKLOG/API-08_finetuning_emulation.md](BACKLOG/API-08_finetuning_emulation.md) → **v1.7.1**
+  - OpenAI fine-tuning API compatibility
+  - Model adaptation simulation
+  - Fine-tuning job tracking
+  - **Оценка:** 8-10 часов
+
+- [ ] **API-09** Image Generation Support → [BACKLOG/API-09_image_generation.md](BACKLOG/API-09_image_generation.md) → **v1.7.2**
+  - Support для image models (если Ollama добавит)
+  - `/v1/images/generations` endpoint
+  - Image format conversion
+  - **Оценка:** 6-8 часов (зависит от Ollama)
+
+---
+
+## 🔮 Future / Deferred
+
+**Задачи для будущих версий** (без конкретного релиза)
+
+### Scalability (отложено из 1.4.0)
+
+- [ ] **SCALE-01** Redis Rate Limiting
+  - Redis backend для distributed rate limiting
+  - Multi-instance support
+  - Shared state management
+  - Fallback to in-memory если Redis недоступен
+
+- [ ] **SCALE-04** Model Fallback Strategy
+  - Automatic fallback если модель недоступна
+  - Model compatibility mapping (gpt-4 → llama3, etc.)
+  - Configurable fallback chains
+  - Health-based model selection
+
+### Advanced Features
+
+- [ ] **OPS-02** Advanced Logging (отложено, после BUG-01)
+  - Structured request/response logging
+  - Automatic log rotation
+  - Log aggregation support (syslog, fluentd)
+  - Configurable log levels per component
+
+- [ ] **TODO-06** Redis Token Blacklist
+  - Миграция in-memory blacklist в Redis
+  - Для distributed sessions
+  - Файл: internal/auth/jwt/jwt.go
+
+- [ ] **TODO-07** PostgreSQL Stubs Implementation
+  - Заменить заглушки реальными реализациями
+  - Файл: internal/storage/postgresql/stubs.go
+
+- [ ] **TODO-08** Test Helpers Enhancement
+  - JSON парсинг и проверка error.code
+  - Детальное сравнение JSON объектов
+  - HTTP requests с JSON body
+  - Файл: internal/test/helpers.go
+
+### Legacy Cleanup
+
+- [ ] **TODO-09** Auth Middleware Cleanup
+  - Удалить legacy middleware (уже реализовано в новых файлах)
+  - Файл: internal/api/middleware/auth.go (можно удалить)
+
+### Ideas for Discussion
+
+- WebSocket для TUI (вместо HTTP polling)
+- Plugin system для custom extensions
+- GraphQL API как альтернатива REST
+- Built-in proxy для других LLM providers (Anthropic, Cohere)
+- Audit log для всех операций
+- Advanced caching (Redis, Memcached)
+- gRPC API для high-performance clients
+
+---
+
 ## 📊 Краткая статистика Roadmap
 
-| Version | Задач | Время (ч) | Приоритет | Статус |
-|---------|-------|-----------|-----------|--------|
-| **1.2.0** | 4 | 20-30 | HIGH | ✅ **Завершено** |
-| **1.3.0** | 4 | 45-57 | HIGH | ✅ **Завершено** |
-| **1.4.0** ⭐ | 2 | 12-15 | **MEDIUM** | 🎯 **Текущая** |
-| **1.5.0** | 3 | 13-17 | MEDIUM | 📋 Запланирована |
-| **1.6.0** | 6 | 40-60 | LOW | 📋 Запланирована |
-| **ИТОГО** | **19** | **130-179** | - | - |
+| Version | Задач | Время (ч) | Приоритет | Статус | Версионирование |
+|---------|-------|-----------|-----------|--------|-----------------|
+| **1.2.0** | 4 | 20-30 | HIGH | ✅ **Завершено** | - |
+| **1.3.0** | 4 | 45-57 | HIGH | ✅ **Завершено** | - |
+| **1.4.0** ⭐ | 5 | 18-24 | **MEDIUM** | 🎯 **Текущая** | v1.4.1-1.4.5 |
+| **1.5.0** | 5 | 11-16 | MEDIUM | 📋 Запланирована | v1.5.1-1.5.5 |
+| **1.6.0** | 3 | 22-28 | LOW | 📋 Запланирована | v1.6.1-1.6.3 |
+| **1.7.0** | 2 | 14-18 | LOW | 📋 Запланирована | v1.7.1-1.7.2 |
+| **Future** | 9+ | TBD | DEFERRED | 📋 Отложено | - |
+| **ИТОГО** | **32+** | **130-173** | - | - | - |
 
-**Прогресс:** ✅ 2 версии завершены | 🎯 1 в разработке (MEDIUM) | 📋 2 запланированы
+**Прогресс:** ✅ 2 версии завершены | 🎯 1 в разработке (MEDIUM) | 📋 3 запланированы
+
+**Новый подход к версионированию:**  
+🔄 1 фича = 1 patch версия (например: 1.4.0 → 1.4.1 → 1.4.2 → ... → 1.5.0)
 
 ---
 
@@ -326,8 +418,9 @@
 2. ✅ **AUTH-05** User Authentication & Multi-Tenancy (JWT, RBAC)
 3. ✅ **WEBUI-03** Interactive Chat Interface (ChatGPT-like UI) 💬
 4. ✅ **WEBUI-04** User Dashboard (personal cabinet)
+5. ✅ **BUILD-01** Cross-platform Build System (Linux, Windows, ARM64)
 
-**Итого:** ~49 часов работы (в рамках оценки 45-57ч)
+**Итого:** ~51 часов работы (в рамках оценки 45-57ч)
 
 **Достигнутые Killer Features:**
 
@@ -336,35 +429,57 @@
 - ✅ Multi-tenancy с командной работой
 - ✅ Personal dashboard с аналитикой
 - ✅ Granular API key management (personal + tenant)
-- ✅ Profile management с password change
+- ✅ Profile management
 - ✅ Tenants & members management
 - ✅ Usage statistics monitoring
 - ✅ Auth guard для защиты всех страниц
-- ✅ **Cross-platform build system** (Linux, Windows, ARM64)
 
-### Далее (Version 1.4.0) - Scalability & Reliability
+### 🎯 Текущая (Version 1.4.0) - WebUI Enhancements & Code Quality
 
-1. **SCALE-01** Redis Rate Limiting (distributed state)
-2. **SCALE-04** Model Fallback Strategy (повышаем надежность)
+**Последовательность реализации:**
 
-**Итого:** ~12-15 часов работы
+1. **WEBUI-06** Model Copy Button → **v1.4.1** (быстрая задача, 1-2ч)
+2. **TODO-01** TUI Admin API Key Config → **v1.4.2** (устранение hardcode, 2ч)
+3. **TODO-02** Build Version Info → **v1.4.3** (реальная версия, 1-2ч)
+4. **WEBUI-05** Enhanced Models Info → **v1.4.4** (расширенная информация, 8-10ч)
+5. **WEBUI-07** MCP Catalog → **v1.4.5** (новая страница, 6-8ч)
 
-**Преимущества:** Multi-instance support, distributed rate limiting, fault tolerance
+**Итого:** ~18-24 часа работы
 
-### Потом (Version 1.5.0) - DevOps & Operations
+**Фокус:** Улучшение UX, устранение технического долга, расширение функционала админки
 
-1. **DEVOPS-01** CI/CD Pipeline
-2. **OPS-01** Backup & Restore
-3. **OPS-02** Advanced Logging
+### Далее (Version 1.5.0) - Operations & Maintenance
 
-**Итого:** ~13-17 часов работы
+**Последовательность реализации:**
 
-### В будущем (Version 1.6.0) - Advanced Features
+1. **BUG-01** Fix Admin Logs Display → **v1.5.1** (CRITICAL баг, 2-3ч)
+2. **TODO-03** Password Change → **v1.5.2** (backend для UI, 3-4ч)
+3. **TODO-04** Tenant Membership Check → **v1.5.3** (проверка прав, 2-3ч)
+4. **TODO-05** Error Type Checking → **v1.5.4** (улучшение ошибок, 1-2ч)
+5. **OPS-01** Backup & Restore → **v1.5.5** (автобекап, 3-4ч)
 
-1. **OBSERV-01** OpenTelemetry (distributed tracing)
-2. **TENANT-01** Enhanced Multi-tenant Support
-3. **API-08** Fine-tuning Emulation
-4. И другие расширенные функции...
+**Итого:** ~11-16 часов работы
+
+**Фокус:** Исправление багов, завершение TODO из кода, операционная готовность
+
+### Потом (Version 1.6.0) - Observability
+
+1. **OBSERV-01** OpenTelemetry Integration → **v1.6.1** (10-12ч)
+2. **OBSERV-02** Performance Monitoring → **v1.6.2** (6-8ч)
+3. **REPORT-01** Scheduled Reports → **v1.6.3** (6-8ч)
+
+**Итого:** ~22-28 часов работы
+
+**Фокус:** Production monitoring, distributed tracing, reporting
+
+### В будущем (Version 1.7.0) - API Extensions
+
+1. **API-08** Fine-tuning API Emulation → **v1.7.1** (8-10ч)
+2. **API-09** Image Generation Support → **v1.7.2** (6-8ч)
+
+**Итого:** ~14-18 часов работы
+
+**Фокус:** Расширение OpenAI API совместимости
 
 ---
 
@@ -398,30 +513,26 @@
 
 ---
 
-## 💡 Идеи для обсуждения (не в Roadmap)
-
-- WebSocket для TUI (вместо HTTP polling)
-- Plugin system для custom extensions
-- GraphQL API как альтернатива REST
-- Built-in proxy для других LLM providers (Anthropic, Cohere)
-- Admin dashboard (отдельный WebUI для администрирования)
-- Audit log для всех операций
-- Advanced caching (Redis, Memcached)
-- gRPC API для high-performance clients
-
----
-
 ## 📞 Обратная связь
 
 Если у вас есть предложения по Roadmap:
 
-1. Создайте issue в GitHub
+1. Создайте issue в репозитории
 2. Опишите use case
 3. Укажите приоритет
-4. Мы добавим в следующий review
+4. Добавим в следующий review
 
 ---
 
-**Последнее обновление:** 2025-10-06  
-**Версия Roadmap:** 1.3  
-**Статус:** Active Development 🚀 (Version 1.3.0 ✅ Completed! → Version 1.4.0 next)
+**Последнее обновление:** 2025-10-10  
+**Версия Roadmap:** 1.4  
+**Статус:** Active Development 🚀 (Version 1.3.0 ✅ Completed! → Version 1.4.0 в разработке)
+
+**Изменения в v1.4:**
+
+- ✨ Новый подход к версионированию (1 фича = 1 patch)
+- 🔄 Реорганизация Version 1.4.0 (WebUI Enhancements вместо Scalability)
+- 🐛 Добавлена Version 1.5.0 (Operations & Maintenance с BUG-01)
+- 📊 Разделение Version 1.6.0 → 1.6.0 (Observability) + 1.7.0 (API Extensions)
+- 🔮 Новая секция Future/Deferred для отложенных задач
+- 📝 Систематизация 18 TODO комментариев из кода

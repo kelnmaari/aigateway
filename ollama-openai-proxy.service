@@ -1,0 +1,33 @@
+[Unit]
+Description=Ollama OpenAI Proxy Server
+Documentation=https://github.com/your-repo/ollama-openai-proxy
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/ollama-openai-proxy
+ExecStart=/opt/ollama-openai-proxy/bin/server -config /opt/ollama-openai-proxy/configs/config.yaml
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=60s
+StartLimitBurst=3
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=2G
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ollama-proxy
+
+# Environment
+Environment="GIN_MODE=release"
+
+[Install]
+WantedBy=multi-user.target
+

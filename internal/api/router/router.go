@@ -492,8 +492,8 @@ func (r *Router) setupOpenAIRoutes() {
 	if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
 		r.logger.Info("Using hybrid authentication (JWT + API Key) for /v1 endpoints")
 
-		// Hybrid auth принимает либо JWT либо API Key (database-backed)
-		v1.Use(middleware.HybridAuth(r.jwtManager, r.db, r.logger))
+		// Hybrid auth принимает либо JWT либо API Key (database-backed + bootstrap admin)
+		v1.Use(middleware.HybridAuth(r.jwtManager, r.config, r.db, r.logger))
 
 		// Usage tracking для аналитики (Version 1.3.0+)
 		if r.db != nil {
@@ -574,6 +574,11 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/users/:id", r.adminUserHandler.GetUser)
 		admin.PUT("/users/:id", r.adminUserHandler.UpdateUser)
 		admin.DELETE("/users/:id", r.adminUserHandler.DeleteUser)
+
+		// Additional user management actions
+		admin.POST("/users/:id/reset-password", r.adminUserHandler.ResetUserPassword)
+		admin.PATCH("/users/:id/disable", r.adminUserHandler.DisableUser)
+		admin.PATCH("/users/:id/enable", r.adminUserHandler.EnableUser)
 	}
 
 	// API Keys management (if available)
@@ -686,12 +691,20 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		logger.Info("User authentication handlers initialized")
 	}
 
+	logger.Info("DEBUG: BEFORE AdminHandler creation block")
+
 	// Admin handler с API Key Manager если доступен (+ Database для Version 1.3.0+)
 	if r.keyManager != nil {
+		logger.Info("DEBUG: Creating AdminHandler WITH keyManager and database")
+		logger.Infof("DEBUG: has_db=%v, has_keyManager=%v", r.db != nil, true)
 		r.adminHandler = handlers.NewAdminHandler(cfg, logger, r.keyManager, r.db)
 	} else {
-		r.adminHandler = handlers.NewAdminHandlerWithoutKeys(cfg, logger)
+		logger.Info("DEBUG: Creating AdminHandler WITHOUT keyManager but WITH database")
+		logger.Infof("DEBUG: has_db=%v, has_keyManager=%v", r.db != nil, false)
+		// БД всегда передается, даже если keyManager отсутствует
+		r.adminHandler = handlers.NewAdminHandlerWithoutKeys(cfg, logger, r.db)
 	}
+	logger.Info("DEBUG: AdminHandler created successfully")
 
 	// Metrics Storage (Phase 12.1)
 	r.metricsStorage = metrics.NewMetricsStorage(metrics.DefaultStorageConfig(), logger)
@@ -701,8 +714,8 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	r.requestStorage = request.NewStorage(request.DefaultStorageConfig(), logger)
 	r.requestStorage.Start()
 
-	// Stats Handler с metrics storage для latency данных
-	r.statsHandler = handlers.NewStatsHandler(cfg, logger, ollamaClient, r.keyManager, r.version, r.metricsStorage)
+	// Stats Handler с metrics storage для latency данных и Database (Version 1.3.0+)
+	r.statsHandler = handlers.NewStatsHandler(cfg, logger, ollamaClient, r.keyManager, r.version, r.metricsStorage, r.db)
 
 	// Metrics History Handler
 	r.metricsHistoryHandler = handlers.NewMetricsHistoryHandler(cfg, logger, r.metricsStorage)

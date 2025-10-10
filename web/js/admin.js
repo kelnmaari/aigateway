@@ -65,6 +65,18 @@ class AdminPanel {
             this.handleCreateAPIKey(e.target);
         });
 
+        // Edit User form
+        document.getElementById('edit-user-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleEditUser(e.target);
+        });
+
+        // Reset Password form
+        document.getElementById('reset-password-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleResetPassword(e.target);
+        });
+
         // Modal close buttons
         document.querySelectorAll('.modal-close, .cancel-btn').forEach(btn => {
             btn.addEventListener('click', () => this.closeModals());
@@ -207,6 +219,27 @@ class AdminPanel {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-width="2"/>
                             </svg>
                         </button>
+                        <button class="btn btn-icon" onclick="adminPanel.resetPassword('${user.id}', '${this.escapeHtml(user.username)}')" title="Reset Password">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="2"/>
+                                <path d="M9 11l2 2 4-4" stroke-width="2"/>
+                            </svg>
+                        </button>
+                        ${user.status === 'active' ? `
+                            <button class="btn btn-icon btn-warning" onclick="adminPanel.disableUser('${user.id}', '${this.escapeHtml(user.username)}')" title="Disable">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                                    <path d="M4.93 4.93l14.14 14.14" stroke-width="2"/>
+                                </svg>
+                            </button>
+                        ` : `
+                            <button class="btn btn-icon btn-success" onclick="adminPanel.enableUser('${user.id}', '${this.escapeHtml(user.username)}')" title="Enable">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke-width="2"/>
+                                    <path d="M22 4L12 14.01l-3-3" stroke-width="2"/>
+                                </svg>
+                            </button>
+                        `}
                         ${!user.is_admin ? `
                             <button class="btn btn-icon btn-danger" onclick="adminPanel.deleteUser('${user.id}')" title="Delete">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -234,7 +267,7 @@ class AdminPanel {
         } catch (error) {
             console.error('Failed to load API keys:', error);
             document.getElementById('apikeys-table').innerHTML = 
-                '<tr><td colspan="6" class="table-empty">Failed to load API keys. Check console for details.</td></tr>';
+                '<tr><td colspan="8" class="table-empty">Failed to load API keys. Check console for details.</td></tr>';
         }
     }
 
@@ -242,28 +275,50 @@ class AdminPanel {
         const tbody = document.getElementById('apikeys-table');
         
         if (this.apiKeys.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No API keys found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No API keys found</td></tr>';
             return;
         }
 
-        tbody.innerHTML = this.apiKeys.map(key => `
-            <tr>
-                <td><strong>${this.escapeHtml(key.name)}</strong></td>
-                <td><code>${key.id}</code></td>
-                <td><span class="badge badge-info">${key.models?.length || 'All'} models</span></td>
-                <td>${key.rate_limits?.requests_per_minute || 'Unlimited'} req/min</td>
-                <td>${key.last_used_at ? this.formatDate(key.last_used_at) : 'Never'}</td>
-                <td>
-                    <div class="table-actions">
-                        <button class="btn btn-icon btn-danger" onclick="adminPanel.deleteAPIKey('${key.id}')" title="Delete">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-width="2"/>
-                            </svg>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = this.apiKeys.map(key => {
+            // Determine owner display
+            let ownerDisplay = '-';
+            if (key.owner_username) {
+                ownerDisplay = `<span class="badge badge-info">${this.escapeHtml(key.owner_username)}</span>`;
+            } else if (key.scope === 'bootstrap') {
+                ownerDisplay = '<span class="badge badge-warning">System</span>';
+            }
+            
+            // Determine organization display
+            let orgDisplay = '-';
+            if (key.tenant_name) {
+                orgDisplay = `<span class="badge badge-success">${this.escapeHtml(key.tenant_name)}</span>`;
+            } else if (key.scope === 'personal') {
+                orgDisplay = '<span class="badge badge-secondary">Personal</span>';
+            }
+            
+            return `
+                <tr>
+                    <td><strong>${this.escapeHtml(key.name)}</strong></td>
+                    <td>${ownerDisplay}</td>
+                    <td>${orgDisplay}</td>
+                    <td><code>${key.id}</code></td>
+                    <td><span class="badge badge-info">${key.models?.length || 'All'} models</span></td>
+                    <td>${key.rate_limits?.requests_per_minute || 'Unlimited'} req/min</td>
+                    <td>${key.last_used_at ? this.formatDate(key.last_used_at) : 'Never'}</td>
+                    <td>
+                        <div class="table-actions">
+                            ${key.scope !== 'bootstrap' ? `
+                                <button class="btn btn-icon btn-danger" onclick="adminPanel.deleteAPIKey('${key.id}')" title="Delete">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-width="2"/>
+                                    </svg>
+                                </button>
+                            ` : '<span class="text-muted">Protected</span>'}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
     async loadSystem() {
@@ -349,8 +404,142 @@ class AdminPanel {
     }
 
     async editUser(userId) {
-        alert('Edit user feature coming soon!');
-        // TODO: Implement edit user modal
+        try {
+            // Load user data
+            const response = await api.request(`${api.baseURL}/api/admin/users/${userId}`);
+            if (!response.ok) {
+                throw new Error('Failed to load user');
+            }
+            
+            const user = await response.json();
+            
+            // Populate modal
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-username').value = user.username;
+            document.getElementById('edit-email').value = user.email;
+            document.getElementById('edit-fullname').value = user.full_name || '';
+            document.getElementById('edit-is-admin').checked = user.is_admin || false;
+            document.getElementById('edit-status').value = user.status;
+            
+            // Show modal
+            document.getElementById('edit-user-modal').classList.add('show');
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    async handleEditUser(form) {
+        const userId = document.getElementById('edit-user-id').value;
+        const userData = {
+            email: document.getElementById('edit-email').value,
+            full_name: document.getElementById('edit-fullname').value || undefined,
+            is_admin: document.getElementById('edit-is-admin').checked,
+            status: document.getElementById('edit-status').value
+        };
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/users/${userId}`, {
+                method: 'PUT',
+                body: JSON.stringify(userData)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to update user');
+            }
+
+            alert('User updated successfully!');
+            this.closeModals();
+            await this.loadUsers();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    async resetPassword(userId, username) {
+        // Show modal
+        document.getElementById('reset-user-id').value = userId;
+        document.getElementById('reset-user-name').textContent = username;
+        document.getElementById('reset-password').value = '';
+        document.getElementById('reset-password-confirm').value = '';
+        document.getElementById('reset-password-modal').classList.add('show');
+    }
+
+    async handleResetPassword(form) {
+        const userId = document.getElementById('reset-user-id').value;
+        const password = document.getElementById('reset-password').value;
+        const confirmPassword = document.getElementById('reset-password-confirm').value;
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match!');
+            return;
+        }
+
+        if (password.length < 8) {
+            alert('Password must be at least 8 characters!');
+            return;
+        }
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/users/${userId}/reset-password`, {
+                method: 'POST',
+                body: JSON.stringify({ new_password: password })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to reset password');
+            }
+
+            alert('Password reset successfully!');
+            this.closeModals();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    async disableUser(userId, username) {
+        if (!confirm(`Are you sure you want to disable user "${username}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/users/${userId}/disable`, {
+                method: 'PATCH'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to disable user');
+            }
+
+            alert('User disabled successfully!');
+            await this.loadUsers();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    async enableUser(userId, username) {
+        if (!confirm(`Are you sure you want to enable user "${username}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/users/${userId}/enable`, {
+                method: 'PATCH'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to enable user');
+            }
+
+            alert('User enabled successfully!');
+            await this.loadUsers();
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
     }
 
     async deleteUser(userId) {

@@ -11,12 +11,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
+	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/models"
 	"ollama-openai-proxy/internal/storage"
 )
 
 // APIKeyDBAuth middleware для аутентификации по API ключам из базы данных
-func APIKeyDBAuth(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
+// Также проверяет bootstrap admin_key из конфигурации
+func APIKeyDBAuth(cfg *config.Config, db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Получаем API ключ из заголовков
 		apiKey := c.GetHeader("x-api-key")
@@ -38,6 +40,19 @@ func APIKeyDBAuth(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 				},
 			})
 			c.Abort()
+			return
+		}
+
+		// 🔑 ПРИОРИТЕТ 1: Проверяем Bootstrap Admin Key из конфигурации
+		if cfg != nil && cfg.Auth.AdminKey != "" && apiKey == cfg.Auth.AdminKey {
+			logger.WithField("key_type", "bootstrap_admin").Info("Bootstrap admin key authenticated")
+
+			// Устанавливаем контекст для admin key
+			c.Set("auth_type", "bootstrap_admin")
+			c.Set("api_key_id", "bootstrap_admin_key")
+			c.Set("is_admin", true)
+
+			c.Next()
 			return
 		}
 

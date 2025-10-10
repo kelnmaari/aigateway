@@ -35,11 +35,13 @@ func NewAdminHandler(cfg *config.Config, logger *logrus.Logger, keyManager *apik
 }
 
 // NewAdminHandlerWithoutKeys создает admin handler без key manager (для обратной совместимости)
-func NewAdminHandlerWithoutKeys(cfg *config.Config, logger *logrus.Logger) *AdminHandler {
+// Но с доступом к БД для API ключей (Version 1.3.0+)
+func NewAdminHandlerWithoutKeys(cfg *config.Config, logger *logrus.Logger, db storage.Database) *AdminHandler {
 	return &AdminHandler{
 		config:     cfg,
 		logger:     logger,
-		keyManager: nil, // Будет возвращать "not implemented" ошибки
+		keyManager: nil, // Будет возвращать "not implemented" ошибки (legacy)
+		db:         db,  // Database для API ключей (Version 1.3.0+)
 	}
 }
 
@@ -49,11 +51,13 @@ func (h *AdminHandler) ListAPIKeys(c *gin.Context) {
 
 	// Use database if available (Version 1.3.0+), fallback to JSON storage
 	if h.db != nil {
+		h.logger.Info("Using DATABASE for API keys listing (Version 1.3.0+)")
 		h.listAPIKeysFromDB(c)
 		return
 	}
 
 	// Legacy: Use JSON storage
+	h.logger.Warn("Database not available, falling back to JSON storage (legacy)")
 	if h.keyManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": gin.H{
@@ -113,6 +117,8 @@ func (h *AdminHandler) ListAPIKeys(c *gin.Context) {
 
 // listAPIKeysFromDB reads API keys from database (Version 1.3.0+)
 func (h *AdminHandler) listAPIKeysFromDB(c *gin.Context) {
+	h.logger.Info("🔍 listAPIKeysFromDB called - reading from DATABASE")
+
 	// Parse query parameters
 	limit := parseIntQuery(c, "limit", 50)
 	offset := parseIntQuery(c, "offset", 0)
@@ -134,6 +140,8 @@ func (h *AdminHandler) listAPIKeysFromDB(c *gin.Context) {
 		return
 	}
 
+	h.logger.WithField("db_keys_count", len(keys)).Info("📊 Keys retrieved from DATABASE")
+
 	// Apply pagination
 	total := len(keys)
 	start := offset
@@ -147,21 +155,61 @@ func (h *AdminHandler) listAPIKeysFromDB(c *gin.Context) {
 
 	pagedKeys := keys[start:end]
 
+	// Enrich keys with owner and tenant information
+	for i := range pagedKeys {
+		// Get owner username if available
+		if pagedKeys[i].UserID != nil && *pagedKeys[i].UserID != "" {
+			if user, err := h.db.GetUser(ctx, *pagedKeys[i].UserID); err == nil {
+				pagedKeys[i].Metadata = map[string]interface{}{
+					"owner_username": user.Username,
+				}
+			}
+		}
+
+		// Get tenant name if available
+		if pagedKeys[i].TenantID != nil && *pagedKeys[i].TenantID != "" {
+			if tenant, err := h.db.GetTenant(ctx, *pagedKeys[i].TenantID); err == nil {
+				if pagedKeys[i].Metadata == nil {
+					pagedKeys[i].Metadata = make(map[string]interface{})
+				}
+				pagedKeys[i].Metadata["tenant_name"] = tenant.Name
+			}
+		}
+	}
+
 	// Convert to public format
 	publicKeys := make([]models.APIKeyPublic, len(pagedKeys))
 	for i, key := range pagedKeys {
+		ownerUsername := ""
+		tenantName := ""
+
+		// Extract enriched data from metadata
+		if key.Metadata != nil {
+			if username, ok := key.Metadata["owner_username"].(string); ok {
+				ownerUsername = username
+			}
+			if tname, ok := key.Metadata["tenant_name"].(string); ok {
+				tenantName = tname
+			}
+		}
+
 		publicKeys[i] = models.APIKeyPublic{
-			ID:          key.ID,
-			Name:        key.Name,
-			Description: key.Description,
-			Models:      key.Models,
-			Permissions: key.Permissions,
-			RateLimits:  key.RateLimits,
-			Status:      key.Status,
-			CreatedAt:   key.CreatedAt,
-			UpdatedAt:   key.UpdatedAt,
-			ExpiresAt:   key.ExpiresAt,
-			LastUsedAt:  key.LastUsedAt,
+			ID:            key.ID,
+			Name:          key.Name,
+			Description:   key.Description,
+			UserID:        key.UserID,
+			TenantID:      key.TenantID,
+			Scope:         key.Scope,
+			Models:        key.Models,
+			Permissions:   key.Permissions,
+			RateLimits:    key.RateLimits,
+			Status:        key.Status,
+			CreatedAt:     key.CreatedAt,
+			OwnerUsername: ownerUsername,
+			TenantName:    tenantName,
+			UpdatedAt:     key.UpdatedAt,
+			ExpiresAt:     key.ExpiresAt,
+			LastUsedAt:    key.LastUsedAt,
 		}
 	}
 

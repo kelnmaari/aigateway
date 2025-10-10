@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 
 	"ollama-openai-proxy/internal/auth/password"
 	"ollama-openai-proxy/internal/models"
@@ -335,4 +336,149 @@ func (h *AdminUserHandler) DeleteUser(c *gin.Context) {
 	}).Info("User deleted by admin")
 
 	c.Status(http.StatusNoContent)
+}
+
+// ResetUserPassword - reset user password (admin only)
+func (h *AdminUserHandler) ResetUserPassword(c *gin.Context) {
+	userID := c.Param("id")
+
+	var req struct {
+		NewPassword string `json:"new_password" binding:"required,min=8"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request: %v", err)})
+		return
+	}
+
+	// Get admin user ID from context
+	adminUserID, _ := c.Get("user_id")
+
+	// Check if user exists
+	user, err := h.db.GetUser(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to hash password")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset password"})
+		return
+	}
+
+	// Update password
+	user.PasswordHash = string(hashedPassword)
+	user.UpdatedAt = time.Now()
+
+	if err := h.db.UpdateUser(c.Request.Context(), user); err != nil {
+		h.logger.WithError(err).Error("Failed to update user password")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset password"})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"user_id":  user.ID,
+		"username": user.Username,
+		"reset_by": adminUserID,
+	}).Info("User password reset by admin")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "password reset successfully",
+		"user_id": user.ID,
+	})
+}
+
+// DisableUser - disable user account (admin only)
+func (h *AdminUserHandler) DisableUser(c *gin.Context) {
+	userID := c.Param("id")
+
+	// Get admin user ID from context
+	adminUserID, _ := c.Get("user_id")
+
+	// Prevent self-disable
+	if userID == adminUserID.(string) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot disable your own account"})
+		return
+	}
+
+	// Check if user exists
+	user, err := h.db.GetUser(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Update status to inactive
+	user.Status = models.UserStatusInactive
+	user.UpdatedAt = time.Now()
+
+	if err := h.db.UpdateUser(c.Request.Context(), user); err != nil {
+		h.logger.WithError(err).Error("Failed to disable user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to disable user"})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"user_id":     user.ID,
+		"username":    user.Username,
+		"disabled_by": adminUserID,
+	}).Info("User disabled by admin")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "user disabled successfully",
+		"user":    toPublicUser(user),
+	})
+}
+
+// EnableUser - enable user account (admin only)
+func (h *AdminUserHandler) EnableUser(c *gin.Context) {
+	userID := c.Param("id")
+
+	// Get admin user ID from context
+	adminUserID, _ := c.Get("user_id")
+
+	// Check if user exists
+	user, err := h.db.GetUser(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	// Update status to active
+	user.Status = models.UserStatusActive
+	user.UpdatedAt = time.Now()
+
+	if err := h.db.UpdateUser(c.Request.Context(), user); err != nil {
+		h.logger.WithError(err).Error("Failed to enable user")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enable user"})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"user_id":    user.ID,
+		"username":   user.Username,
+		"enabled_by": adminUserID,
+	}).Info("User enabled by admin")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "user enabled successfully",
+		"user":    toPublicUser(user),
+	})
+}
+
+// toPublicUser removes sensitive fields from user model
+func toPublicUser(user *models.User) gin.H {
+	return gin.H{
+		"id":         user.ID,
+		"username":   user.Username,
+		"email":      user.Email,
+		"full_name":  user.FullName,
+		"is_admin":   user.IsAdmin,
+		"status":     user.Status,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
+	}
 }

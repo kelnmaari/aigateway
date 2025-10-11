@@ -229,9 +229,11 @@ class ProfileManager {
         
         if (!password) return;
 
-        if (!confirm('Are you absolutely sure? This will permanently delete your account and all associated data.')) {
-            return;
-        }
+        const confirmed = await modal.danger(
+            'Are you absolutely sure? This will permanently delete your account and all associated data.',
+            'Delete Account'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await api.request(`${api.baseURL}/api/users/me`, {
@@ -244,11 +246,11 @@ class ProfileManager {
                 throw new Error(error.error || 'Failed to delete account');
             }
 
-            alert('Your account has been deleted.');
-            this.logout();
+            toast.success('Your account has been deleted.');
+            setTimeout(() => this.logout(), 1000);
 
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 

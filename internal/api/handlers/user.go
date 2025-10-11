@@ -491,9 +491,8 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	// Update password
-	user.PasswordHash = hashedPassword
-	if err := h.db.UpdateUser(c.Request.Context(), user); err != nil {
+	// Update password (using dedicated method for better performance)
+	if err := h.db.UpdateUserPassword(c.Request.Context(), userID, hashedPassword); err != nil {
 		h.logger.WithError(err).Error("Failed to update user password")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to change password",

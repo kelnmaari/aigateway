@@ -30,6 +30,12 @@ type Tenant struct {
 
 	// Metadata
 	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+
+	// User's Role in this tenant (populated only in ListUserTenants)
+	Role string `json:"role,omitempty" db:"-"`
+
+	// Member Count (populated only in ListUserTenants)
+	MemberCount int `json:"member_count,omitempty" db:"-"`
 }
 
 // TenantType представляет тип tenant
@@ -72,6 +78,10 @@ type TenantMember struct {
 
 	// Роль и права
 	Role TenantRole `json:"role" db:"role"` // Роль в tenant
+
+	// User info (from JOIN)
+	Username string `json:"username,omitempty" db:"username"` // Username пользователя
+	Email    string `json:"email,omitempty" db:"email"`       // Email пользователя
 
 	// Временные метки
 	JoinedAt  time.Time  `json:"joined_at" db:"joined_at"`

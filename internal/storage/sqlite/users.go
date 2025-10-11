@@ -228,6 +228,38 @@ func (s *SQLiteDB) UpdateUser(ctx context.Context, user *models.User) error {
 	return nil
 }
 
+// UpdateUserPassword обновляет пароль пользователя
+func (s *SQLiteDB) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	s.logger.WithField("user_id", userID).Debug("Updating user password")
+
+	query := `
+		UPDATE users 
+		SET password_hash = ?, updated_at = CURRENT_TIMESTAMP 
+		WHERE id = ?
+	`
+
+	result, err := s.db.ExecContext(ctx, query, passwordHash, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found: %s", userID)
+	}
+
+	s.logger.WithField("user_id", userID).Info("Password updated successfully")
+	return nil
+}
+
 // DeleteUser удаляет пользователя (soft delete)
 func (s *SQLiteDB) DeleteUser(ctx context.Context, id string) error {
 	if s.db == nil {

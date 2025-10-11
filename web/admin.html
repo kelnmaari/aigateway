@@ -6,6 +6,7 @@
     <title>Admin Panel - Ollama Proxy</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="dashboard-page">
@@ -25,6 +26,7 @@
             <button class="tab-btn" data-tab="users">Users</button>
             <button class="tab-btn" data-tab="apikeys">API Keys</button>
             <button class="tab-btn" data-tab="mcp">MCP Servers</button>
+            <button class="tab-btn" data-tab="backups">Backups</button>
             <button class="tab-btn" data-tab="logs">Logs</button>
             <button class="tab-btn" data-tab="system">System</button>
         </div>
@@ -235,6 +237,40 @@
                         <div class="logs-info">
                             <p>Select a log file to view</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backups Tab -->
+            <div id="backups-tab" class="tab-pane">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>💾 Database Backups</h2>
+                        <button class="btn btn-primary" id="create-backup-btn">
+                            <i class="fas fa-plus"></i> Create Backup
+                        </button>
+                    </div>
+                    
+                    <div class="info-card">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>Backup Management</strong>
+                            <p>System automatically keeps the last 10 backups. Create manual backups before major changes.</p>
+                        </div>
+                    </div>
+
+                    <div id="backups-loading" class="loading-placeholder">
+                        Loading backups...
+                    </div>
+
+                    <div id="backups-list" style="display: none;">
+                        <!-- Backups will be inserted here -->
+                    </div>
+
+                    <div id="no-backups" style="display: none;" class="empty-state">
+                        <i class="fas fa-folder-open"></i>
+                        <h3>No Backups Found</h3>
+                        <p>Create your first backup to protect your data</p>
                     </div>
                 </div>
             </div>
@@ -499,6 +535,7 @@
     <!-- Scripts -->
     <script src="/js/auth-guard.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
     <script src="/js/components/navbar.js"></script>
     <script src="/js/utils/clipboard.js"></script>
     <script src="/js/logs.js"></script>

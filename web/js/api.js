@@ -363,13 +363,29 @@ class API {
         return response.json();
     }
 
-    async addTenantMember(tenantId, userId, role) {
+    async searchTenantUsers(tenantId, query) {
+        const response = await this.request(`${this.baseURL}/api/tenants/${tenantId}/search-users?query=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'User not found');
+        }
+        return response.json();
+    }
+
+    async addTenantMember(tenantId, userInfo, role) {
+        // userInfo can be { user_id, username, or email }
+        const body = { role };
+        if (userInfo.user_id) {
+            body.user_id = userInfo.user_id;
+        } else if (userInfo.username) {
+            body.username = userInfo.username;
+        } else if (userInfo.email) {
+            body.email = userInfo.email;
+        }
+
         const response = await this.request(`${this.baseURL}/api/tenants/${tenantId}/members`, {
             method: 'POST',
-            body: JSON.stringify({
-                user_id: userId,
-                role: role
-            })
+            body: JSON.stringify(body)
         });
         
         if (!response.ok) {

@@ -16,8 +16,8 @@ class AdminPanel {
         try {
             const user = await api.getCurrentUser();
             if (!user.is_admin) {
-                alert('Access denied: Admin privileges required');
-                window.location.href = '/dashboard.html';
+                toast.error('Access denied: Admin privileges required');
+                setTimeout(() => window.location.href = '/dashboard.html', 1000);
                 return;
             }
             
@@ -62,6 +62,9 @@ class AdminPanel {
             e.preventDefault();
             this.handleCreateAPIKey(e.target);
         });
+
+        // Create Backup button
+        document.getElementById('create-backup-btn').addEventListener('click', () => this.createBackup());
 
         // Edit User form
         document.getElementById('edit-user-form').addEventListener('submit', (e) => {
@@ -129,6 +132,9 @@ class AdminPanel {
                 break;
             case 'mcp':
                 await this.loadMCPServers();
+                break;
+            case 'backups':
+                await this.loadBackups();
                 break;
             case 'system':
                 await this.loadSystem();
@@ -336,6 +342,205 @@ class AdminPanel {
         }).join('');
     }
 
+    // ==================== BACKUPS ====================
+    
+    async loadBackups() {
+        const loadingEl = document.getElementById('backups-loading');
+        const listEl = document.getElementById('backups-list');
+        const noBackupsEl = document.getElementById('no-backups');
+
+        loadingEl.style.display = 'block';
+        listEl.style.display = 'none';
+        noBackupsEl.style.display = 'none';
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/backups`);
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.backups && data.backups.length > 0) {
+                    this.renderBackups(data.backups);
+                    listEl.style.display = 'block';
+                } else {
+                    noBackupsEl.style.display = 'block';
+                }
+            } else {
+                throw new Error('Failed to load backups');
+            }
+        } catch (error) {
+            console.error('Failed to load backups:', error);
+            listEl.innerHTML = `<div class="error-message">Failed to load backups: ${error.message}</div>`;
+            listEl.style.display = 'block';
+        } finally {
+            loadingEl.style.display = 'none';
+        }
+    }
+
+    renderBackups(backups) {
+        const listEl = document.getElementById('backups-list');
+        
+        // Sort by created date (newest first)
+        backups.sort((a, b) => new Date(b.created) - new Date(a.created));
+
+        const html = `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>📁 Filename</th>
+                            <th>📅 Created</th>
+                            <th>💾 Size</th>
+                            <th>⚙️ Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${backups.map(backup => `
+                            <tr>
+                                <td><code>${backup.filename}</code></td>
+                                <td>${new Date(backup.created).toLocaleString()}</td>
+                                <td>${this.formatFileSize(backup.size)}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary" onclick="adminPanel.downloadBackup('${backup.filename}')">
+                                        <i class="fas fa-download"></i> Download
+                                    </button>
+                                    <button class="btn btn-sm btn-warning" onclick="adminPanel.restoreBackup('${backup.filename}')">
+                                        <i class="fas fa-undo"></i> Restore
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="adminPanel.deleteBackup('${backup.filename}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        listEl.innerHTML = html;
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    async createBackup() {
+        const btn = document.getElementById('create-backup-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/backup`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                toast.success(`Backup created successfully!\n\nFilename: ${data.filename}\nSize: ${this.formatFileSize(data.size)}`);
+                await this.loadBackups();
+            } else {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to create backup');
+            }
+        } catch (error) {
+            console.error('Failed to create backup:', error);
+            toast.error(`Failed to create backup: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plus"></i> Create Backup';
+        }
+    }
+
+    async downloadBackup(filename) {
+        try {
+            const token = api.getToken();
+            const url = `${api.baseURL}/api/admin/backup/${encodeURIComponent(filename)}`;
+            
+            // Create hidden link and trigger download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.setAttribute('target', '_blank');
+            
+            // Add auth header by using fetch and blob
+            const response = await api.request(url);
+            if (response.ok) {
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                link.href = blobUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(blobUrl);
+            } else {
+                throw new Error('Failed to download backup');
+            }
+        } catch (error) {
+            console.error('Failed to download backup:', error);
+            toast.error(`Failed to download backup: ${error.message}`);
+        }
+    }
+
+    async restoreBackup(filename) {
+        const confirmed = await modal.warning(
+            `This will restore the database from backup!`,
+            'Restore Database',
+            `Backup: ${filename}\n\nCurrent data will be replaced. A safety backup will be created automatically.\nThe server will need to be restarted after restore.`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/restore/${encodeURIComponent(filename)}`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                toast.success(`${data.message}\n\nPlease restart the server for changes to take effect.`);
+            } else {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to restore backup');
+            }
+        } catch (error) {
+            console.error('Failed to restore backup:', error);
+            toast.error(`Failed to restore backup: ${error.message}`);
+        }
+    }
+
+    async deleteBackup(filename) {
+        const confirmed = await modal.danger(
+            `Are you sure you want to delete this backup?`,
+            'Delete Backup',
+            `Filename: ${filename}\n\nThis action cannot be undone.`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const response = await api.request(`${api.baseURL}/api/admin/backup/${encodeURIComponent(filename)}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                toast.success('Backup deleted successfully');
+                await this.loadBackups();
+            } else {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to delete backup');
+            }
+        } catch (error) {
+            console.error('Failed to delete backup:', error);
+            toast.error(`Failed to delete backup: ${error.message}`);
+        }
+    }
+
+    // ==================== SYSTEM ====================
+
     async loadSystem() {
         // Load models
         try {
@@ -542,10 +747,12 @@ class AdminPanel {
 
         // Modelfile
         if (details.modelfile) {
+            // Удаляем LICENSE секцию из Modelfile для компактности
+            const cleanModelfile = this.stripLicenseFromModelfile(details.modelfile);
             sections.push(`
                 <div class="details-section">
                     <h4>📄 Modelfile</h4>
-                    <pre class="code-block">${this.escapeHtml(details.modelfile)}</pre>
+                    <pre class="code-block code-block-large">${this.escapeHtml(cleanModelfile)}</pre>
                 </div>
             `);
         }
@@ -614,12 +821,12 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to create user');
             }
 
-            alert('User created successfully!');
+            toast.success('User created successfully!');
             this.closeModals();
             form.reset();
             await this.loadUsers();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
@@ -644,7 +851,7 @@ class AdminPanel {
             // Show modal
             document.getElementById('edit-user-modal').classList.add('show');
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
@@ -668,11 +875,11 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to update user');
             }
 
-            alert('User updated successfully!');
+            toast.success('User updated successfully!');
             this.closeModals();
             await this.loadUsers();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
@@ -691,12 +898,12 @@ class AdminPanel {
         const confirmPassword = document.getElementById('reset-password-confirm').value;
 
         if (password !== confirmPassword) {
-            alert('Passwords do not match!');
+            toast.error('Passwords do not match!');
             return;
         }
 
         if (password.length < 8) {
-            alert('Password must be at least 8 characters!');
+            toast.error('Password must be at least 8 characters!');
             return;
         }
 
@@ -711,17 +918,19 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to reset password');
             }
 
-            alert('Password reset successfully!');
+            toast.success('Password reset successfully!');
             this.closeModals();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
     async disableUser(userId, username) {
-        if (!confirm(`Are you sure you want to disable user "${username}"?`)) {
-            return;
-        }
+        const confirmed = await modal.confirm(
+            `Are you sure you want to disable user "${username}"?`,
+            'Disable User'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await api.request(`${api.baseURL}/api/admin/users/${userId}/disable`, {
@@ -733,17 +942,19 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to disable user');
             }
 
-            alert('User disabled successfully!');
+            toast.success('User disabled successfully!');
             await this.loadUsers();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
     async enableUser(userId, username) {
-        if (!confirm(`Are you sure you want to enable user "${username}"?`)) {
-            return;
-        }
+        const confirmed = await modal.confirm(
+            `Are you sure you want to enable user "${username}"?`,
+            'Enable User'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await api.request(`${api.baseURL}/api/admin/users/${userId}/enable`, {
@@ -755,17 +966,19 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to enable user');
             }
 
-            alert('User enabled successfully!');
+            toast.success('User enabled successfully!');
             await this.loadUsers();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
     async deleteUser(userId) {
-        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-            return;
-        }
+        const confirmed = await modal.danger(
+            'Are you sure you want to delete this user? This action cannot be undone.',
+            'Delete User'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await api.request(`${api.baseURL}/api/admin/users/${userId}`, {
@@ -777,17 +990,19 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to delete user');
             }
 
-            alert('User deleted successfully!');
+            toast.success('User deleted successfully!');
             await this.loadUsers();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
     async deleteAPIKey(keyId) {
-        if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
-            return;
-        }
+        const confirmed = await modal.danger(
+            'Are you sure you want to delete this API key? This action cannot be undone.',
+            'Delete API Key'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await api.request(`${api.baseURL}/api/admin/keys/${keyId}`, {
@@ -799,10 +1014,10 @@ class AdminPanel {
                 throw new Error(error.error || 'Failed to delete API key');
             }
 
-            alert('API key deleted successfully!');
+            toast.success('API key deleted successfully!');
             await this.loadAPIKeys();
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
@@ -841,14 +1056,14 @@ class AdminPanel {
             const result = await response.json();
             
             // Show the actual API key to user (only shown once!)
-            alert(`API Key created successfully!\n\nKey: ${result.plain_key}\n\nSave this key securely - it will not be shown again!`);
+            toast.success(`API Key created successfully!\n\nKey: ${result.plain_key}\n\nSave this key securely - it will not be shown again!`, 30000);
             
             this.closeModals();
             form.reset();
             await this.loadAPIKeys();
             await this.loadDashboard(); // Refresh stats
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     }
 
@@ -1020,10 +1235,10 @@ class AdminPanel {
             this.closeModals();
             await this.loadMCPServers();
             
-            alert(`MCP server ${isEdit ? 'updated' : 'created'} successfully!`);
+            toast.success(`MCP server ${isEdit ? 'updated' : 'created'} successfully!`);
         } catch (error) {
             console.error('Failed to save MCP server:', error);
-            alert(`Failed to save MCP server: ${error.message}`);
+            toast.error(`Failed to save MCP server: ${error.message}`);
         }
     }
 
@@ -1031,7 +1246,11 @@ class AdminPanel {
         const server = this.mcpServers.find(s => s.id === serverId);
         if (!server) return;
 
-        if (!confirm(`Are you sure you want to delete "${server.name}"?`)) return;
+        const confirmed = await modal.danger(
+            `Are you sure you want to delete "${server.name}"?`,
+            'Delete MCP Server'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await api.request(`${api.baseURL}/api/admin/mcp/servers/${serverId}`, {
@@ -1044,10 +1263,10 @@ class AdminPanel {
             }
 
             await this.loadMCPServers();
-            alert('MCP server deleted successfully!');
+            toast.success('MCP server deleted successfully!');
         } catch (error) {
             console.error('Failed to delete MCP server:', error);
-            alert(`Failed to delete MCP server: ${error.message}`);
+            toast.error(`Failed to delete MCP server: ${error.message}`);
         }
     }
 
@@ -1056,6 +1275,24 @@ class AdminPanel {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    stripLicenseFromModelfile(modelfile) {
+        if (!modelfile) return modelfile;
+        
+        // Ищем строку LICENSE """ или LICENSE """ и все что после нее
+        const licenseMatch = modelfile.match(/^LICENSE\s+"""/mi);
+        if (licenseMatch) {
+            return modelfile.substring(0, licenseMatch.index).trim();
+        }
+        
+        // Альтернативный вариант: просто LICENSE с многострочным текстом
+        const licenseLine = modelfile.match(/^LICENSE\s*$/mi);
+        if (licenseLine) {
+            return modelfile.substring(0, licenseLine.index).trim();
+        }
+        
+        return modelfile;
     }
 
     formatDate(dateString) {

@@ -11,9 +11,9 @@ type APIUsage struct {
 	ID string `json:"id" db:"id"` // Уникальный ID (UUID)
 
 	// Владение
-	UserID   string  `json:"user_id" db:"user_id"`               // ID пользователя
-	TenantID *string `json:"tenant_id,omitempty" db:"tenant_id"` // ID tenant (если в контексте организации)
-	APIKeyID string  `json:"api_key_id" db:"api_key_id"`         // ID использованного API ключа
+	UserID   string  `json:"user_id" db:"user_id"`                 // ID пользователя
+	TenantID *string `json:"tenant_id,omitempty" db:"tenant_id"`   // ID tenant (если в контексте организации)
+	APIKeyID *string `json:"api_key_id,omitempty" db:"api_key_id"` // ID использованного API ключа (nullable для JWT auth, v1.5.12)
 
 	// Запрос
 	Endpoint string `json:"endpoint" db:"endpoint"` // Эндпоинт (/v1/chat/completions, etc.)

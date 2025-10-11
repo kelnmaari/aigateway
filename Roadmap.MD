@@ -1,9 +1,9 @@
 # 🗺️ Roadmap: Ollama-OpenAI Proxy
 
-> **Текущая версия:** 1.5.5 ✅  
+> **Текущая версия:** 1.5.16 ✅  
 > **План развития:** Version 1.5.0 - 1.7.0+  
-> **Статус:** Active Development (Version 1.5.5 Complete!)  
-> **Последнее обновление:** 2025-10-10
+> **Статус:** Active Development (Version 1.5.0 Complete! - 12/12 задач)  
+> **Последнее обновление:** 2025-10-11
 
 ---
 
@@ -225,13 +225,14 @@
 
 ---
 
-## 🔧 Version 1.5.0 - Operations & Maintenance **[IN PROGRESS]**
+## 🔧 Version 1.5.0 - Operations & Maintenance **[✅ COMPLETE]**
 
 **Фокус:** Операционная готовность и устранение багов  
 **Приоритет:** MEDIUM  
-**Оценка времени:** 11-16 часов  
-**Версионирование:** 1 фича = 1 patch (1.5.1, 1.5.2, ...)  
-**Статус:** 🚀 В разработке (1/5 задач завершено)
+**Оценка времени:** 20-27 часов (обновлено с учетом BUG-02, BUG-03, UI Notifications)  
+**Фактическое время:** ~22-25 часов (12 задач завершено)
+**Версионирование:** 1 фича = 1 patch (1.5.1 - 1.5.16)
+**Статус:** 100% завершено (12/12 задач)
 
 ### Задачи
 
@@ -256,27 +257,98 @@
     - Auto-select текущего лог-файла
   - **Выполнено:** 100% (заменяет BUG-01)
 
-- [ ] **TODO-03** Password Change Implementation → **v1.5.6**
+- [x] **Modelfile Display Enhancement** → **v1.5.6** ✅ **COMPLETED!**
+  - ✅ LICENSE секция автоматически скрывается из Modelfile
+  - ✅ Увеличена высота поля до 20 строк с прокруткой
+  - ✅ Метод `stripLicenseFromModelfile()` для очистки
+  - ✅ CSS класс `.code-block-large` для управления размером
+  - **Выполнено:** 100% (UI enhancement)
+
+- [x] **TODO-03** Password Change Implementation → **v1.5.7** ✅ **COMPLETED!**
   - Реализовать backend для смены пароля (UI уже есть)
   - Валидация текущего пароля
   - Файл: internal/api/handlers/auth.go
   - **Оценка:** 3-4 часа
 
-- [ ] **TODO-04** Tenant Membership Check → **v1.5.7**
+- [x] **TODO-04** Tenant Membership Check + Enhanced Member Management → **v1.5.8** ✅ **COMPLETED!**
   - Проверка прав доступа к tenant ресурсам
-  - Файл: internal/api/handlers/usage.go
-  - **Оценка:** 2-3 часа
+  - Middleware для автоматической проверки членства
+  - Поиск пользователей по username/email
+  - UI modal для добавления участников с live search
+  - Change Role и Remove функции
+  - Файл: internal/api/handlers/usage.go, tenant.go
+  - **Оценка:** 2-3 часа → Расширено до 5-6 часов
 
-- [ ] **TODO-05** Error Type Checking → **v1.5.8**
-  - Улучшить обработку типов ошибок
-  - Файл: internal/api/handlers/admin.go
-  - **Оценка:** 1-2 часа
+- [x] **Members Display Fix** → **v1.5.9** ✅ **COMPLETED!**
+  - ✅ JOIN с таблицей users для получения username/email
+  - ✅ Обновлен `TenantMember` model (+Username, +Email)
+  - ✅ Новая функция `scanTenantMemberWithUserInfo`
+  - ✅ Улучшены стили search results (черный текст, светло-зеленый hover)
+  - ✅ Фикс `GetTenant` response structure (tenant/role wrapper)
+  - **Выполнено:** 100% (UI + Backend fix)
 
-- [ ] **OPS-01** Backup & Restore → [BACKLOG/OPS-01_backup_restore.md](BACKLOG/OPS-01_backup_restore.md) → **v1.5.9**
+- [x] **Tenant Member Count Display** → **v1.5.10** ✅ **COMPLETED!**
+  - ✅ SQL подзапрос COUNT для подсчета участников
+  - ✅ Обновлен `Tenant` model (+MemberCount поле)
+  - ✅ Обновлена функция `scanTenantWithRole` для member_count
+  - ✅ Frontend уже готов (отображение "👥 X members")
+  - **Выполнено:** 100% (Backend + Model fix)
+
+- [x] **BUG-02** Tenant API Keys Creation → **v1.5.11** ✅ **COMPLETED!**
+  - ✅ **Проблема:** 404 при создании API ключей для организации
+  - ✅ Добавлен endpoint `POST /api/tenants/:id/api-keys`
+  - ✅ Добавлен endpoint `GET /api/tenants/:id/api-keys`
+  - ✅ Добавлен endpoint `DELETE /api/tenants/:id/api-keys/:key_id`
+  - ✅ Frontend уже реализован в `web/api-keys.html`
+  - Реализовано:
+    - ✅ Добавлены роуты в `router.go`
+    - ✅ Созданы handlers `CreateTenantAPIKey`, `ListTenantAPIKeys`, `DeleteTenantAPIKey`
+    - ✅ Проверка прав доступа (owner/admin)
+    - ✅ Связь API ключа с tenant через `tenant_id`
+  - **Выполнено:** 100%
+
+- [x] **BUG-03** WebUI Chat Usage Tracking → **v1.5.12** ✅ **COMPLETED!**
+  - ✅ **Проблема:** FOREIGN KEY constraint failed при использовании WebUI чата
+  - ✅ **Решение:** Сделать `api_key_id` nullable с `ON DELETE SET NULL`
+  - Реализовано:
+    - ✅ Миграция v16 в `internal/storage/sqlite/sqlite.go`
+    - ✅ Создание временной таблицы с nullable api_key_id
+    - ✅ Автоконвертация "jwt_auth"/"unknown" → NULL
+    - ✅ Обновлен `APIUsage.APIKeyID` → `*string` (nullable)
+    - ✅ Middleware устанавливает `nil` вместо "jwt_auth"/"unknown"
+    - ✅ Пересозданы индексы с учетом nullable значений
+  - **Выполнено:** 100% (Database + Model + Middleware)
+
+- [x] **TODO-05** Error Type Checking → **v1.5.13** ✅ **COMPLETED!**
+  - ✅ Улучшена обработка типов ошибок
+  - Реализовано:
+    - ✅ `isNotFoundError()` с использованием `errors.As()`
+    - ✅ `isAlreadyExistsError()` для проверки дубликатов
+    - ✅ `isInvalidDataError()` для валидационных ошибок
+    - ✅ `isPermissionError()` для проверки прав доступа
+    - ✅ Добавлен импорт `"errors"` пакета
+  - **Выполнено:** 100% (Type-safe error checking)
+
+- [x] **OPS-01** Backup & Restore → [BACKLOG/OPS-01_backup_restore.md](BACKLOG/OPS-01_backup_restore.md) → **v1.5.14 ✅**
   - Автоматический backup database и конфигурации
-  - Restore procedures
-  - Scheduled backups
+  - Restore procedures (с safety backup)
+  - API endpoints: создание, список, скачивание, восстановление, удаление
+  - Автоматическая ротация бэкапов (хранит 10 последних)
   - **Оценка:** 3-4 часа
+  - **Выполнено:** 100% (Full backup/restore system)
+
+- [x] **UI Notifications & Modals** → **v1.5.15-v1.5.16 ✅**
+  - **v1.5.15**: Toast notification system + Modal confirmations
+    - Зеленые/красные уведомления снизу справа
+    - Автоскрытие: 10s (успех), 60s (ошибка)
+    - Global API: `window.toast`, `window.modal`
+    - Полный рефакторинг Admin Panel
+  - **v1.5.16**: Внедрение во все остальные страницы
+    - Dashboard, Chat, Profile, Tenants, Usage, API Keys, MCP, About
+    - ~10 alert() → toast, ~8 confirm() → modal
+    - Единообразный UX на всех 8 страницах
+  - **Оценка:** 2-3 часа (v1.5.15) + 1-2 часа (v1.5.16)
+  - **Выполнено:** 100% (Complete notification system across all pages)
 
 ---
 
@@ -473,12 +545,15 @@
    - v1.5.3: Enhanced Log Parsing
    - v1.5.4: SSE Stream Auth Fix
    - v1.5.5: Logs Stream File Selection
-2. **TODO-03** Password Change → **v1.5.6** (backend для UI, 3-4ч)
-3. **TODO-04** Tenant Membership Check → **v1.5.7** (проверка прав, 2-3ч)
-4. **TODO-05** Error Type Checking → **v1.5.8** (улучшение ошибок, 1-2ч)
-5. **OPS-01** Backup & Restore → **v1.5.9** (автобекап, 3-4ч)
+2. ✅ **Modelfile Display Enhancement** → **v1.5.6** (COMPLETED!)
+   - LICENSE удаление из Modelfile
+   - 20 строк с прокруткой
+3. ✅ **TODO-03** Password Change → **v1.5.7** (backend для UI, 3-4ч) **DONE!**
+4. ✅ **TODO-04** Tenant Membership Check + Members → **v1.5.8** (проверка прав + UI, 5-6ч) **DONE!**
+5. **TODO-05** Error Type Checking → **v1.5.9** (улучшение ошибок, 1-2ч)
+6. **OPS-01** Backup & Restore → **v1.5.10** (автобекап, 3-4ч)
 
-**Итого:** ~11-16 часов работы (1/5 завершено)
+**Итого:** ~11-16 часов работы (4/6 завершено → 66% complete!)
 
 **Фокус:** Исправление багов, завершение TODO из кода, операционная готовность
 

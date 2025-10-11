@@ -84,6 +84,9 @@ type Database interface {
 	// UpdateUser обновляет данные пользователя
 	UpdateUser(ctx context.Context, user *models.User) error
 
+	// UpdateUserPassword обновляет пароль пользователя
+	UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error
+
 	// DeleteUser удаляет пользователя (soft delete)
 	DeleteUser(ctx context.Context, id string) error
 

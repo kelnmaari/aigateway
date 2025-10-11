@@ -273,9 +273,11 @@ class Dashboard {
 
     // Delete conversation
     async deleteConversation(id) {
-        if (!confirm('Are you sure you want to delete this conversation?')) {
-            return;
-        }
+        const confirmed = await modal.danger(
+            'Are you sure you want to delete this conversation?',
+            'Delete Conversation'
+        );
+        if (!confirmed) return;
         
         try {
             await api.deleteConversation(id);
@@ -283,7 +285,7 @@ class Dashboard {
             await this.loadStats();
         } catch (error) {
             console.error('Failed to delete conversation:', error);
-            alert('Failed to delete conversation');
+            toast.error('Failed to delete conversation');
         }
     }
 

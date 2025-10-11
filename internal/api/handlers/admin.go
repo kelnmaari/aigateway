@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -872,7 +873,37 @@ func parseIntQuery(c *gin.Context, key string, defaultValue int) int {
 
 // isNotFoundError проверяет является ли ошибка "не найдено"
 func isNotFoundError(err error) bool {
-	// TODO: Реализовать проверку типа ошибки
+	var storageErr *storage.StorageError
+	if errors.As(err, &storageErr) {
+		return storageErr.Type == storage.StorageErrorTypeNotFound
+	}
+	return false
+}
+
+// isAlreadyExistsError проверяет является ли ошибка "уже существует"
+func isAlreadyExistsError(err error) bool {
+	var storageErr *storage.StorageError
+	if errors.As(err, &storageErr) {
+		return storageErr.Type == storage.StorageErrorTypeAlreadyExists
+	}
+	return false
+}
+
+// isInvalidDataError проверяет является ли ошибка "неверные данные"
+func isInvalidDataError(err error) bool {
+	var storageErr *storage.StorageError
+	if errors.As(err, &storageErr) {
+		return storageErr.Type == storage.StorageErrorTypeInvalidData
+	}
+	return false
+}
+
+// isPermissionError проверяет является ли ошибка "доступ запрещен"
+func isPermissionError(err error) bool {
+	var storageErr *storage.StorageError
+	if errors.As(err, &storageErr) {
+		return storageErr.Type == storage.StorageErrorTypePermission
+	}
 	return false
 }
 
@@ -890,7 +921,7 @@ func parseModelParameters(paramsStr string) map[string]interface{} {
 		if line == "" {
 			continue
 		}
-		
+
 		// Разбиваем на key и value по первому пробелу
 		parts := splitFirst(line, " ")
 		if len(parts) == 2 {
@@ -899,7 +930,7 @@ func parseModelParameters(paramsStr string) map[string]interface{} {
 			params[key] = value
 		}
 	}
-	
+
 	return params
 }
 
@@ -965,14 +996,14 @@ func splitFirst(s, sep string) []string {
 func trimSpace(s string) string {
 	start := 0
 	end := len(s)
-	
+
 	for start < end && (s[start] == ' ' || s[start] == '\t') {
 		start++
 	}
-	
+
 	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
 		end--
 	}
-	
+
 	return s[start:end]
 }

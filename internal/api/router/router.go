@@ -68,6 +68,7 @@ type Router struct {
 	requestsHandler       *handlers.RequestsHandler       // Handler для request monitoring (TUI-04)
 	mcpHandler            *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
 	changelogHandler      *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
+	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -402,10 +403,16 @@ func (r *Router) setupAuthRoutes() {
 			tenants.DELETE("/:id", r.tenantHandler.DeleteTenant)
 
 			// Tenant members
+			tenants.GET("/:id/search-users", r.tenantHandler.SearchUsers)
 			tenants.GET("/:id/members", r.tenantHandler.ListMembers)
 			tenants.POST("/:id/members", r.tenantHandler.AddMember)
 			tenants.PUT("/:id/members/:user_id", r.tenantHandler.UpdateMemberRole)
 			tenants.DELETE("/:id/members/:user_id", r.tenantHandler.RemoveMember)
+
+			// Tenant API keys (v1.5.11)
+			tenants.GET("/:id/api-keys", r.tenantHandler.ListTenantAPIKeys)
+			tenants.POST("/:id/api-keys", r.tenantHandler.CreateTenantAPIKey)
+			tenants.DELETE("/:id/api-keys/:key_id", r.tenantHandler.DeleteTenantAPIKey)
 		}
 	}
 
@@ -630,6 +637,16 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/models/:name/details", r.adminHandler.GetModelDetails)
 	}
 
+	// Backup & Restore endpoints (v1.5.14)
+	if r.backupHandler != nil {
+		r.logger.Info("Admin routes: Registering Backup & Restore endpoints")
+		admin.POST("/backup", r.backupHandler.CreateBackup)
+		admin.GET("/backups", r.backupHandler.ListBackups)
+		admin.GET("/backup/:filename", r.backupHandler.DownloadBackup)
+		admin.POST("/restore/:filename", r.backupHandler.RestoreBackup)
+		admin.DELETE("/backup/:filename", r.backupHandler.DeleteBackup)
+	}
+
 	// System endpoints
 	admin.GET("/stats", func(c *gin.Context) {
 		if r.keyManager != nil {
@@ -786,6 +803,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	} else {
 		logger.Warn("Changelog handler NOT initialized: database is nil")
 	}
+
+	// Backup Handler (v1.5.14)
+	r.backupHandler = handlers.NewBackupHandler(r.config, logger, r.db)
+	logger.Info("Backup handler initialized")
 
 	// Metrics Storage (Phase 12.1)
 	r.metricsStorage = metrics.NewMetricsStorage(metrics.DefaultStorageConfig(), logger)

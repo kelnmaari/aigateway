@@ -386,6 +386,69 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*j
 	return newTokenPair, nil
 }
 
+// ChangePasswordRequest запрос на смену пароля
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required,min=8"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=100"`
+}
+
+// ChangePasswordResponse ответ на смену пароля
+type ChangePasswordResponse struct {
+	Message string `json:"message"`
+}
+
+// ChangePassword изменяет пароль пользователя
+func (s *AuthService) ChangePassword(ctx context.Context, userID string, req ChangePasswordRequest) (*ChangePasswordResponse, error) {
+	// Get user from database
+	user, err := s.db.GetUser(ctx, userID)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to get user")
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	// Verify current password
+	if err := password.Verify(user.PasswordHash, req.CurrentPassword); err != nil {
+		s.logger.WithField("user_id", userID).Warn("Invalid current password")
+		return nil, fmt.Errorf("current password is incorrect")
+	}
+
+	// Validate new password strength
+	if err := password.Validate(req.NewPassword); err != nil {
+		return nil, err // ValidationError from password package
+	}
+
+	// Check if new password is same as current
+	if req.CurrentPassword == req.NewPassword {
+		return nil, password.ValidationError{
+			Field:   "new_password",
+			Message: "new password must be different from current password",
+		}
+	}
+
+	// Hash new password
+	newHash, err := password.Hash(req.NewPassword)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to hash password")
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password in database
+	if err := s.db.UpdateUserPassword(ctx, userID, newHash); err != nil {
+		s.logger.WithError(err).Error("Failed to update password")
+		return nil, fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Log the password change
+	s.logger.WithField("user_id", userID).Info("Password changed successfully")
+
+	// TODO: Optionally invalidate all existing sessions except current
+	// This would require additional implementation
+
+	return &ChangePasswordResponse{
+		Message: "Password changed successfully",
+	}, nil
+}
+
 // Helper functions
 
 func generateID(prefix string) string {

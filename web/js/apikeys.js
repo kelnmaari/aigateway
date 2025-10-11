@@ -523,9 +523,11 @@ class APIKeysManager {
 
     // Delete API key
     async deleteKey(keyId, type) {
-        if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
-            return;
-        }
+        const confirmed = await modal.danger(
+            'Are you sure you want to delete this API key? This action cannot be undone.',
+            'Delete API Key'
+        );
+        if (!confirmed) return;
 
         try {
             if (type === 'personal') {

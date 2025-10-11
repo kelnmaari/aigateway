@@ -334,6 +334,36 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_5_5",
 			SQL:     s.getChangelogV155Migration(),
 		},
+		{
+			Version: 11,
+			Name:    "add_changelog_v1_5_6",
+			SQL:     s.getChangelogV156Migration(),
+		},
+		{
+			Version: 12,
+			Name:    "add_changelog_v1_5_7",
+			SQL:     s.getChangelogV157Migration(),
+		},
+		{
+			Version: 13,
+			Name:    "add_changelog_v1_5_8",
+			SQL:     s.getChangelogV158Migration(),
+		},
+		{
+			Version: 14,
+			Name:    "add_changelog_v1_5_9",
+			SQL:     s.getChangelogV159Migration(),
+		},
+		{
+			Version: 15,
+			Name:    "add_changelog_v1_5_10",
+			SQL:     s.getChangelogV1510Migration(),
+		},
+		{
+			Version: 16,
+			Name:    "fix_api_usage_nullable_api_key_id",
+			SQL:     s.getFixAPIUsageNullableAPIKeyIDMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -607,6 +637,134 @@ CREATE INDEX IF NOT EXISTS idx_changelogs_release_date ON changelogs(release_dat
 -- ========================================
 
 INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.16', '2025-10-11', '## [1.5.16] - 2025-10-11
+
+### Changed
+- **All WebUI Pages**: Система уведомлений внедрена во все 8 страниц
+  - dashboard, chat, profile, tenants, usage, api-keys, mcp, about
+  - ~10 alert() → toast notifications
+  - ~8 confirm() → modal confirmations
+  - Единообразный UX на всех страницах
+
+### Technical
+- notifications.css и notifications.js подключены во все HTML
+- Консистентный порядок загрузки скриптов
+- toast.* и modal.* API используется везде'),
+
+('1.5.15', '2025-10-11', '## [1.5.15] - 2025-10-11
+
+### Added
+- **Toast Notification System**: Профессиональная система всплывающих уведомлений
+  - Уведомления справа снизу: зеленые (успех, 10с), красные (ошибка, 60с)
+  - Желтые (предупреждения) и синие (информация)
+  - Возможность закрыть вручную, плавные анимации
+  - Поддержка темной темы и mobile
+
+- **Modal Confirmation System**: Модальные окна для подтверждения действий
+  - Заменяют стандартные confirm dialogs
+  - confirm(), danger(), warning() с Promise-based API
+  - Красивый дизайн с иконками
+
+- **Global API**: window.toast и window.modal для всех страниц
+  - toast.success/error/warning/info(message)
+  - await modal.confirm/danger/warning(message, title)
+
+### Changed
+- **Admin Panel**: Полностью переведен на новую систему уведомлений
+  - Все alert() → toast notifications
+  - Все confirm() → modal confirmations
+  - Улучшен UX для операций backup, users, API keys, MCP
+
+### Technical
+- Class-based architecture, HTML escape для XSS
+- Auto-stacking для multiple toasts
+- CSS transitions 300ms, backdrop blur
+- Mobile-responsive, dark theme support'),
+
+('1.5.14', '2025-10-11', '## [1.5.14] - 2025-10-11
+
+### Added
+- **Backup & Restore System**: Полнофункциональная система резервного копирования и восстановления БД
+  - POST /api/admin/backup - создание бэкапа с автоматическим timestamp
+  - GET /api/admin/backups - список доступных бэкапов
+  - GET /api/admin/backup/:filename - скачивание backup файла
+  - POST /api/admin/restore/:filename - восстановление из бэкапа
+  - DELETE /api/admin/backup/:filename - удаление старых бэкапов
+  - Автоматическая ротация: хранение последних 10 бэкапов
+  - Safety backup перед restore операцией
+  - Бэкапы сохраняются в ./data/backups/ директорию
+
+### Changed
+- internal/api/handlers/backup.go - новый handler для backup операций
+- internal/api/router/router.go - добавлены роуты для backup/restore в admin API
+- Все backup операции требуют JWT аутентификацию + admin role
+
+### Technical
+- Использование io.Copy для эффективного копирования больших файлов
+- Path security checks для защиты от path traversal
+- Atomic restore with rollback на случай ошибки
+- File sync после записи для data integrity
+- Structured logging для всех backup операций'),
+
+('1.5.13', '2025-10-11', '## [1.5.13] - 2025-10-11
+
+### Changed
+- **Error Type Checking**: Улучшена обработка типов ошибок в admin handlers
+  - Реализована функция isNotFoundError() с использованием errors.As
+  - Добавлены функции isAlreadyExistsError, isInvalidDataError, isPermissionError
+  - Type-safe error checking вместо string comparison
+
+### Technical
+- Использование Go 1.20+ errors.As() для type assertions
+- Proper unwrapping of wrapped errors
+- Удален TODO комментарий из admin.go'),
+
+('1.5.12', '2025-10-11', '## [1.5.12] - 2025-10-11
+
+### Fixed
+- **BUG-03: WebUI Chat Usage Tracking**: FOREIGN KEY constraint failed при использовании WebUI чата
+  - Проблема: api_key_id ссылался на несуществующие ключи (jwt_auth, unknown)
+  - Решение: Сделать api_key_id nullable с ON DELETE SET NULL
+  - Теперь статистика WebUI чата корректно учитывается
+
+### Changed
+- Database Schema: api_key_id TEXT nullable (было NOT NULL)
+- FOREIGN KEY constraint: ON DELETE SET NULL (было CASCADE)
+- Миграция v16 автоматически конвертирует jwt_auth/unknown в NULL
+
+### Technical
+- Migration v16: создает временную таблицу с правильной структурой
+- Автоматическая конвертация существующих записей с fake keys
+- Пересоздание индексов с учетом nullable значений'),
+
+('1.5.11', '2025-10-11', '## [1.5.11] - 2025-10-11
+
+### Fixed
+- **BUG-02: Tenant API Keys Creation**: 404 при создании API ключей для организации
+  - Добавлены endpoints для управления tenant API keys
+  - GET /api/tenants/:id/api-keys - получение списка ключей организации
+  - POST /api/tenants/:id/api-keys - создание ключа организации
+  - DELETE /api/tenants/:id/api-keys/:key_id - удаление ключа организации
+
+### Added
+- **Tenant API Keys Management**: Полноценное управление API ключами организаций
+  - Handler ListTenantAPIKeys для получения списка ключей
+  - Handler CreateTenantAPIKey для создания ключей с правами owner/admin
+  - Handler DeleteTenantAPIKey для удаления ключей с проверкой владения
+  - Автоматическая проверка прав доступа (owner/admin only)
+  - Валидация принадлежности ключа к tenant при удалении
+
+### Security
+- **Role-based Access Control**: Только owner и admin могут создавать/удалять tenant API keys
+- **Tenant Ownership Verification**: Проверка принадлежности ключа к tenant перед удалением
+- **Membership Check**: Проверка членства пользователя в tenant для всех операций
+
+### Technical
+- Default rate limits для tenant keys: 100 req/min, 5000 req/hour, 50000 req/day
+- Key scope автоматически устанавливается в APIKeyScopeTenant
+- TenantID связывается с API key через foreign key
+- Plaintext key возвращается только один раз при создании'),
+
 ('1.4.10', '2025-10-10', '## [1.4.10] - 2025-10-10
 
 ### Added
@@ -718,6 +876,88 @@ Enhanced Monitoring & Management
 - WebUI Metrics Visualization
 - Advanced Logs Features
 - Enhanced API Key Management');
+	`
+}
+
+// getFixAPIUsageNullableAPIKeyIDMigration исправляет FOREIGN KEY constraint для api_key_id (v1.5.12)
+func (s *SQLiteDB) getFixAPIUsageNullableAPIKeyIDMigration() string {
+	return `
+-- ========================================
+-- Fix API Usage Table: Nullable api_key_id (Migration v6: BUG-03 v1.5.12)
+-- ========================================
+-- Problem: FOREIGN KEY constraint failed при использовании WebUI чата
+-- Solution: Сделать api_key_id nullable с ON DELETE SET NULL
+
+-- Шаг 1: Создаем временную таблицу с правильной структурой
+CREATE TABLE api_usage_new (
+	id TEXT PRIMARY KEY,
+	user_id TEXT NOT NULL,
+	tenant_id TEXT, -- NULL для personal usage
+	api_key_id TEXT, -- ✅ NULLABLE для JWT auth (было NOT NULL)
+	endpoint TEXT NOT NULL,
+	method TEXT NOT NULL,
+	model TEXT NOT NULL,
+	status_code INTEGER NOT NULL,
+	success BOOLEAN NOT NULL,
+	error_message TEXT,
+	prompt_tokens INTEGER DEFAULT 0,
+	completion_tokens INTEGER DEFAULT 0,
+	total_tokens INTEGER DEFAULT 0,
+	duration_ms INTEGER NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	user_agent TEXT,
+	ip_address TEXT,
+	conversation_id TEXT,
+	metadata TEXT, -- JSON
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+	FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL, -- ✅ SET NULL вместо CASCADE
+	FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+);
+
+-- Шаг 2: Копируем существующие данные
+-- Фильтруем записи с несуществующими api_key_id ("jwt_auth", "unknown")
+INSERT INTO api_usage_new 
+SELECT 
+	id,
+	user_id,
+	tenant_id,
+	CASE 
+		WHEN api_key_id IN ('jwt_auth', 'unknown') THEN NULL
+		ELSE api_key_id
+	END as api_key_id,
+	endpoint,
+	method,
+	model,
+	status_code,
+	success,
+	error_message,
+	prompt_tokens,
+	completion_tokens,
+	total_tokens,
+	duration_ms,
+	created_at,
+	user_agent,
+	ip_address,
+	conversation_id,
+	metadata
+FROM api_usage;
+
+-- Шаг 3: Удаляем старую таблицу
+DROP TABLE api_usage;
+
+-- Шаг 4: Переименовываем новую таблицу
+ALTER TABLE api_usage_new RENAME TO api_usage;
+
+-- Шаг 5: Пересоздаем индексы
+CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_tenant_id ON api_usage(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_api_key_id ON api_usage(api_key_id) WHERE api_key_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage(endpoint);
+CREATE INDEX IF NOT EXISTS idx_api_usage_model ON api_usage(model);
+CREATE INDEX IF NOT EXISTS idx_api_usage_user_created ON api_usage(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_usage_tenant_created ON api_usage(tenant_id, created_at DESC) WHERE tenant_id IS NOT NULL;
 	`
 }
 
@@ -987,6 +1227,151 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 ### Technical
 - Problem: hardcoded "proxy.log"
 - Solution: query param + auto-select');
+	`
+}
+
+// getChangelogV156Migration добавляет версию 1.5.6 (инкрементальная миграция v11)
+func (s *SQLiteDB) getChangelogV156Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.6 (Migration v11)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.6', '2025-10-10', '## [1.5.6] - 2025-10-10
+
+### Improved
+- **Modelfile Display**: LICENSE скрывается
+  - Только конфигурация модели
+  - 20 строк с прокруткой
+
+### Changed
+- Frontend: stripLicenseFromModelfile()
+- CSS: code-block-large класс
+
+### Technical
+- Frontend-only изменение
+- Regex парсинг LICENSE');
+	`
+}
+
+// getChangelogV157Migration добавляет версию 1.5.7 (инкрементальная миграция v12)
+func (s *SQLiteDB) getChangelogV157Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.7 (Migration v12)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.7', '2025-10-10', '## [1.5.7] - 2025-10-10
+
+### Added
+- **Password Change**: Смена пароля
+  - Endpoint /api/users/me/password
+  - Валидация текущего пароля
+  - Проверка силы нового пароля
+
+### Changed
+- Backend: UpdateUserPassword() метод
+- SQLite/PostgreSQL реализация
+
+### Security
+- Bcrypt хеширование
+- Audit logging
+- Валидация силы пароля
+
+### Technical
+- Транзакционная поддержка
+- Structured logging');
+	`
+}
+
+// getChangelogV158Migration добавляет версию 1.5.8 (инкрементальная миграция v13)
+func (s *SQLiteDB) getChangelogV158Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.8 (Migration v13)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.8', '2025-10-10', '## [1.5.8] - 2025-10-10
+
+### Added
+- **Tenant Membership Check**: Проверка прав доступа
+  - Middleware для проверки членства
+  - RBAC для tenant ресурсов
+  - TODO удален из GetTenantUsage
+
+- **Enhanced Member Management**: Управление участниками
+  - Search endpoint для поиска пользователей
+  - UI modal с live search
+  - Change Role и Remove кнопки
+  - Debounced search (500ms)
+
+### Security
+- Access control для tenant ресурсов
+- Audit logging (403)
+- Directory traversal protection
+
+### Technical
+- Middleware chain
+- Context-based role storage
+- Lazy loading user info');
+	`
+}
+
+// getChangelogV159Migration добавляет версию 1.5.9 (инкрементальная миграция v14)
+func (s *SQLiteDB) getChangelogV159Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.9 (Migration v14)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.9', '2025-10-10', '## [1.5.9] - 2025-10-10
+
+### Fixed
+- **Members Display Issue**: Username и email не отображались
+  - SQL JOIN с таблицей users
+  - TenantMember model: +Username, +Email
+  - scanTenantMemberWithUserInfo()
+
+- **Search Results UX**: Улучшена контрастность
+  - Черный текст на белом фоне
+  - Светло-зеленый hover
+  - Темно-серый email
+
+- **GetTenant Response**: Исправлен wrapper
+  - Frontend: response.tenant extraction
+  - currentTenant.id fix
+
+### Technical
+- SQL JOIN optimization
+- Nullable fields handling
+- Frontend state management');
+	`
+}
+
+// getChangelogV1510Migration добавляет версию 1.5.10 (инкрементальная миграция v15)
+func (s *SQLiteDB) getChangelogV1510Migration() string {
+	return `
+-- ========================================
+-- Add Changelog v1.5.10 (Migration v15)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.10', '2025-10-10', '## [1.5.10] - 2025-10-10
+
+### Fixed
+- **Tenant Member Count**: Количество участников не отображалось
+  - SQL подзапрос COUNT(*)
+  - Tenant model: +MemberCount
+  - scanTenantWithRole updated
+
+### Technical
+- SQL Subquery optimization
+- Minimal code changes
+- Frontend compatibility');
 	`
 }
 

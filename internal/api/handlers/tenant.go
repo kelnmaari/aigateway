@@ -326,6 +326,70 @@ func (h *TenantHandler) ListMembers(c *gin.Context) {
 	})
 }
 
+// SearchUsers ищет пользователей по username или email для добавления в tenant
+// GET /api/tenants/:id/search-users?query=...
+func (h *TenantHandler) SearchUsers(c *gin.Context) {
+	userID, exists := middleware.RequireJWTAuth(c)
+	if !exists {
+		return
+	}
+
+	tenantID := c.Param("id")
+
+	// Check if requester is owner or admin
+	requesterMember, err := h.db.GetTenantMember(c.Request.Context(), tenantID, userID)
+	if err != nil || requesterMember == nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Access denied",
+		})
+		return
+	}
+
+	if requesterMember.Role != models.TenantRoleOwner && requesterMember.Role != models.TenantRoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Only owners and admins can search users",
+		})
+		return
+	}
+
+	query := c.Query("query")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "query parameter is required",
+		})
+		return
+	}
+
+	// Try to find user by username
+	user, err := h.db.GetUserByUsername(c.Request.Context(), query)
+	if err == nil && user != nil {
+		// Check if user is already a member
+		member, _ := h.db.GetTenantMember(c.Request.Context(), tenantID, user.ID)
+		c.JSON(http.StatusOK, gin.H{
+			"user":           user,
+			"already_member": member != nil,
+		})
+		return
+	}
+
+	// Try to find user by email
+	user, err = h.db.GetUserByEmail(c.Request.Context(), query)
+	if err == nil && user != nil {
+		// Check if user is already a member
+		member, _ := h.db.GetTenantMember(c.Request.Context(), tenantID, user.ID)
+		c.JSON(http.StatusOK, gin.H{
+			"user":           user,
+			"already_member": member != nil,
+		})
+		return
+	}
+
+	// User not found
+	c.JSON(http.StatusNotFound, gin.H{
+		"error": "User not found",
+	})
+}
+
 // AddMember добавляет участника в tenant
 // POST /api/tenants/:id/members
 func (h *TenantHandler) AddMember(c *gin.Context) {
@@ -353,13 +417,38 @@ func (h *TenantHandler) AddMember(c *gin.Context) {
 	}
 
 	var req struct {
-		UserID string            `json:"user_id" binding:"required"`
-		Role   models.TenantRole `json:"role" binding:"required"`
+		UserID   string            `json:"user_id,omitempty"`
+		Username string            `json:"username,omitempty"`
+		Email    string            `json:"email,omitempty"`
+		Role     models.TenantRole `json:"role" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "user_id and role are required",
+			"error": "role is required",
+		})
+		return
+	}
+
+	// Find user by ID, username, or email
+	var targetUser *models.User
+	if req.UserID != "" {
+		targetUser, err = h.db.GetUser(c.Request.Context(), req.UserID)
+	} else if req.Username != "" {
+		targetUser, err = h.db.GetUserByUsername(c.Request.Context(), req.Username)
+	} else if req.Email != "" {
+		targetUser, err = h.db.GetUserByEmail(c.Request.Context(), req.Email)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "user_id, username, or email is required",
+		})
+		return
+	}
+
+	// Check if user was found
+	if err != nil || targetUser == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "User not found",
 		})
 		return
 	}
@@ -372,17 +461,8 @@ func (h *TenantHandler) AddMember(c *gin.Context) {
 		return
 	}
 
-	// Check if user exists
-	_, err = h.db.GetUser(c.Request.Context(), req.UserID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "User not found",
-		})
-		return
-	}
-
 	// Check if already a member
-	existingMember, _ := h.db.GetTenantMember(c.Request.Context(), tenantID, req.UserID)
+	existingMember, _ := h.db.GetTenantMember(c.Request.Context(), tenantID, targetUser.ID)
 	if existingMember != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "User is already a member of this tenant",
@@ -393,7 +473,7 @@ func (h *TenantHandler) AddMember(c *gin.Context) {
 	// Add member
 	member := &models.TenantMember{
 		TenantID:  tenantID,
-		UserID:    req.UserID,
+		UserID:    targetUser.ID,
 		Role:      req.Role,
 		InvitedBy: userID,
 		JoinedAt:  time.Now(),
@@ -410,11 +490,16 @@ func (h *TenantHandler) AddMember(c *gin.Context) {
 
 	h.logger.WithFields(logrus.Fields{
 		"tenant_id": tenantID,
-		"user_id":   req.UserID,
+		"user_id":   targetUser.ID,
+		"username":  targetUser.Username,
 		"role":      req.Role,
 	}).Info("Member added to tenant")
 
-	c.JSON(http.StatusCreated, member)
+	// Return member with user info
+	c.JSON(http.StatusCreated, gin.H{
+		"member": member,
+		"user":   targetUser,
+	})
 }
 
 // UpdateMemberRole обновляет роль участника
@@ -553,6 +638,235 @@ func (h *TenantHandler) RemoveMember(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Member removed successfully",
+	})
+}
+
+// ListTenantAPIKeys возвращает список API ключей организации
+// GET /api/tenants/:id/api-keys
+func (h *TenantHandler) ListTenantAPIKeys(c *gin.Context) {
+	userID, exists := middleware.RequireJWTAuth(c)
+	if !exists {
+		return
+	}
+
+	tenantID := c.Param("id")
+
+	// Check if user is member of this tenant
+	member, err := h.db.GetTenantMember(c.Request.Context(), tenantID, userID)
+	if err != nil || member == nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Access denied to this tenant",
+		})
+		return
+	}
+
+	// Get tenant API keys
+	keys, err := h.db.ListTenantAPIKeys(c.Request.Context(), tenantID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get tenant API keys")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get API keys",
+		})
+		return
+	}
+
+	// Remove sensitive key data
+	for _, key := range keys {
+		key.KeyHash = ""
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"api_keys": keys,
+		"count":    len(keys),
+	})
+}
+
+// CreateTenantAPIKey создает API ключ для организации
+// POST /api/tenants/:id/api-keys
+func (h *TenantHandler) CreateTenantAPIKey(c *gin.Context) {
+	userID, exists := middleware.RequireJWTAuth(c)
+	if !exists {
+		return
+	}
+
+	tenantID := c.Param("id")
+
+	// Check if user is owner or admin
+	member, err := h.db.GetTenantMember(c.Request.Context(), tenantID, userID)
+	if err != nil || member == nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Access denied",
+		})
+		return
+	}
+
+	if member.Role != models.TenantRoleOwner && member.Role != models.TenantRoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Only owners and admins can create API keys",
+		})
+		return
+	}
+
+	var req struct {
+		Name        string             `json:"name" binding:"required"`
+		Description string             `json:"description,omitempty"`
+		Models      []string           `json:"models,omitempty"`
+		Permissions []string           `json:"permissions,omitempty"`
+		RateLimits  *models.RateLimits `json:"rate_limits,omitempty"`
+		ExpiresAt   *time.Time         `json:"expires_at,omitempty"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	// Generate key ID first
+	keyID := models.GenerateAPIKeyID()
+
+	// Generate API key with embedded ID
+	plainKey, err := models.GenerateAPIKeyWithID(keyID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to generate API key")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate API key",
+		})
+		return
+	}
+
+	// Hash the key
+	keyHash, err := models.HashAPIKey(plainKey)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to hash API key")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to create API key",
+		})
+		return
+	}
+
+	// Set defaults
+	if len(req.Models) == 0 {
+		req.Models = []string{"*"} // All models
+	}
+	if len(req.Permissions) == 0 {
+		req.Permissions = []string{"chat", "models"} // Basic permissions
+	}
+
+	// Create API key
+	apiKey := &models.APIKey{
+		ID:          keyID,
+		Name:        req.Name,
+		Description: req.Description,
+		KeyHash:     keyHash,
+		UserID:      nil,
+		TenantID:    &tenantID,
+		Scope:       models.APIKeyScopeTenant,
+		Models:      req.Models,
+		Permissions: req.Permissions,
+		Status:      models.APIKeyStatusActive,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		ExpiresAt:   req.ExpiresAt,
+	}
+
+	if req.RateLimits != nil {
+		apiKey.RateLimits = *req.RateLimits
+	} else {
+		// Default rate limits for tenant keys
+		apiKey.RateLimits = models.RateLimits{
+			RequestsPerMinute: 100,
+			RequestsPerHour:   5000,
+			RequestsPerDay:    50000,
+		}
+	}
+
+	// Save to database
+	if err := h.db.CreateAPIKey(c.Request.Context(), apiKey); err != nil {
+		h.logger.WithError(err).Error("Failed to save API key")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to create API key",
+		})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"tenant_id": tenantID,
+		"key_id":    apiKey.ID,
+		"user_id":   userID,
+	}).Info("Tenant API key created")
+
+	// Return API key with plaintext (only shown once!)
+	apiKey.KeyHash = "" // Don't return hash
+	c.JSON(http.StatusCreated, gin.H{
+		"api_key": apiKey,
+		"key":     plainKey, // Plaintext key shown only once
+	})
+}
+
+// DeleteTenantAPIKey удаляет API ключ организации
+// DELETE /api/tenants/:id/api-keys/:key_id
+func (h *TenantHandler) DeleteTenantAPIKey(c *gin.Context) {
+	userID, exists := middleware.RequireJWTAuth(c)
+	if !exists {
+		return
+	}
+
+	tenantID := c.Param("id")
+	keyID := c.Param("key_id")
+
+	// Check if user is owner or admin
+	member, err := h.db.GetTenantMember(c.Request.Context(), tenantID, userID)
+	if err != nil || member == nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Access denied",
+		})
+		return
+	}
+
+	if member.Role != models.TenantRoleOwner && member.Role != models.TenantRoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Only owners and admins can delete API keys",
+		})
+		return
+	}
+
+	// Get the API key to verify it belongs to this tenant
+	apiKey, err := h.db.GetAPIKey(c.Request.Context(), keyID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get API key")
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "API key not found",
+		})
+		return
+	}
+
+	// Verify key belongs to this tenant
+	if apiKey.TenantID == nil || *apiKey.TenantID != tenantID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "API key does not belong to this tenant",
+		})
+		return
+	}
+
+	// Delete API key
+	if err := h.db.DeleteAPIKey(c.Request.Context(), keyID); err != nil {
+		h.logger.WithError(err).Error("Failed to delete API key")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to delete API key",
+		})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"tenant_id": tenantID,
+		"key_id":    keyID,
+		"user_id":   userID,
+	}).Info("Tenant API key deleted")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "API key deleted successfully",
 	})
 }
 

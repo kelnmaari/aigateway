@@ -6,6 +6,7 @@
     <title>Tenants - Ollama Proxy</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
 </head>
 <body class="dashboard-page">
     <!-- Top Navigation inserted by navbar.js -->
@@ -172,12 +173,60 @@
         </div>
     </div>
 
+    <!-- Add Member Modal -->
+    <div class="modal" id="add-member-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Member</h2>
+                <button class="modal-close" id="add-member-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="add-member-form">
+                    <div class="form-group">
+                        <label for="member-search">Search User</label>
+                        <input 
+                            type="text" 
+                            id="member-search" 
+                            placeholder="Enter username or email"
+                            autocomplete="off"
+                        />
+                        <div id="search-results" class="search-results" style="display: none;"></div>
+                        <small class="form-hint">Search for a user by their username or email</small>
+                    </div>
+
+                    <div class="form-group" id="selected-user-group" style="display: none;">
+                        <label>Selected User</label>
+                        <div class="selected-user-card" id="selected-user-card">
+                            <!-- User info will be displayed here -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="member-role">Role</label>
+                        <select id="member-role" required>
+                            <option value="">Select role...</option>
+                            <option value="viewer">Viewer - Can view tenant resources</option>
+                            <option value="member">Member - Can use tenant resources</option>
+                            <option value="admin">Admin - Can manage tenant and members</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-add-member-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submit-add-member-btn" disabled>Add Member</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <!-- Auth Guard MUST be loaded FIRST to protect the page -->
     <script src="/js/auth-guard.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
     <script src="/js/components/navbar.js"></script>
-    <script src="/js/tenants.js"></script>
+    <script src="/js/tenants.js?v=1.5.8.2"></script>
 </body>
 </html>
 

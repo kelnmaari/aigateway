@@ -118,6 +118,10 @@ func (tx *sqliteTx) UpdateUser(ctx context.Context, user *models.User) error {
 	return tx.db.UpdateUser(ctx, user)
 }
 
+func (tx *sqliteTx) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	return tx.db.UpdateUserPassword(ctx, userID, passwordHash)
+}
+
 func (tx *sqliteTx) DeleteUser(ctx context.Context, id string) error {
 	return tx.db.DeleteUser(ctx, id)
 }

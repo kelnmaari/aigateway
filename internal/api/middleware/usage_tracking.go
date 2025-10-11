@@ -100,17 +100,13 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 			}
 		}
 
-		// API Key ID (обязательное поле)
+		// API Key ID (nullable для JWT auth) - v1.5.12: BUG-03 fix
 		if apiKeyID != nil {
-			usage.APIKeyID = apiKeyID.(string)
+			keyIDStr := apiKeyID.(string)
+			usage.APIKeyID = &keyIDStr
 		} else {
-			// Если нет API key (JWT auth), используем специальный ID
-			authType, _ := c.Get("auth_type")
-			if authType == "jwt" {
-				usage.APIKeyID = "jwt_auth"
-			} else {
-				usage.APIKeyID = "unknown"
-			}
+			// Если нет API key (JWT auth), оставляем NULL вместо "jwt_auth"/"unknown"
+			usage.APIKeyID = nil
 		}
 
 		if tenantID != nil {

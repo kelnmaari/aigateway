@@ -224,25 +224,30 @@ func (s *SQLiteDB) DeleteTenant(ctx context.Context, id string) error {
 	return nil
 }
 
-// ListUserTenants возвращает список tenants пользователя
+// ListUserTenants возвращает список tenants пользователя с их ролями
 func (s *SQLiteDB) ListUserTenants(ctx context.Context, userID string) ([]*models.Tenant, error) {
 	if s.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	// Get tenants where user is owner OR member
+	// Get tenants where user is owner OR member (with role and member count)
 	query := `
 		SELECT DISTINCT
 			t.id, t.name, t.slug, t.type, t.description, t.owner_id,
 			t.status, t.is_active, t.created_at, t.updated_at,
-			t.settings, t.metadata
+			t.settings, t.metadata,
+			CASE 
+				WHEN t.owner_id = ? THEN 'owner'
+				ELSE COALESCE(tm.role, 'member')
+			END as role,
+			(SELECT COUNT(*) FROM tenant_members WHERE tenant_id = t.id) as member_count
 		FROM tenants t
-		LEFT JOIN tenant_members tm ON t.id = tm.tenant_id
+		LEFT JOIN tenant_members tm ON t.id = tm.tenant_id AND tm.user_id = ?
 		WHERE t.owner_id = ? OR tm.user_id = ?
 		ORDER BY t.created_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, userID, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID, userID, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user tenants: %w", err)
 	}
@@ -250,7 +255,7 @@ func (s *SQLiteDB) ListUserTenants(ctx context.Context, userID string) ([]*model
 
 	var tenants []*models.Tenant
 	for rows.Next() {
-		tenant, err := s.scanTenant(rows)
+		tenant, err := s.scanTenantWithRole(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan tenant: %w", err)
 		}
@@ -451,12 +456,14 @@ func (s *SQLiteDB) ListTenantMembers(ctx context.Context, tenantID string) ([]*m
 
 	query := `
 		SELECT 
-			tenant_id, user_id, role,
-			joined_at, updated_at, left_at, invited_by,
-			metadata
-		FROM tenant_members
-		WHERE tenant_id = ?
-		ORDER BY joined_at ASC
+			tm.tenant_id, tm.user_id, tm.role,
+			tm.joined_at, tm.updated_at, tm.left_at, tm.invited_by,
+			tm.metadata,
+			u.username, u.email
+		FROM tenant_members tm
+		LEFT JOIN users u ON tm.user_id = u.id
+		WHERE tm.tenant_id = ?
+		ORDER BY tm.joined_at ASC
 	`
 
 	rows, err := s.db.QueryContext(ctx, query, tenantID)
@@ -467,7 +474,7 @@ func (s *SQLiteDB) ListTenantMembers(ctx context.Context, tenantID string) ([]*m
 
 	var members []*models.TenantMember
 	for rows.Next() {
-		member, err := s.scanTenantMember(rows)
+		member, err := s.scanTenantMemberWithUserInfo(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan tenant member: %w", err)
 		}
@@ -532,6 +539,54 @@ func (s *SQLiteDB) scanTenant(row scanner) (*models.Tenant, error) {
 	return &tenant, nil
 }
 
+// scanTenantWithRole сканирует строку БД в модель Tenant с ролью пользователя
+func (s *SQLiteDB) scanTenantWithRole(row scanner) (*models.Tenant, error) {
+	var tenant models.Tenant
+	var settingsJSON []byte
+	var metadataJSON []byte
+	var description sql.NullString
+
+	err := row.Scan(
+		&tenant.ID,
+		&tenant.Name,
+		&tenant.Slug,
+		&tenant.Type,
+		&description,
+		&tenant.OwnerID,
+		&tenant.Status,
+		&tenant.IsActive,
+		&tenant.CreatedAt,
+		&tenant.UpdatedAt,
+		&settingsJSON,
+		&metadataJSON,
+		&tenant.Role,        // Добавлено поле role
+		&tenant.MemberCount, // Добавлено поле member_count
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nullable description
+	if description.Valid {
+		tenant.Description = description.String
+	}
+
+	// Deserialize settings
+	if err := json.Unmarshal(settingsJSON, &tenant.Settings); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal settings: %w", err)
+	}
+
+	// Deserialize metadata if present
+	if len(metadataJSON) > 0 {
+		if err := json.Unmarshal(metadataJSON, &tenant.Metadata); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+	}
+
+	return &tenant, nil
+}
+
 // scanTenantMember сканирует строку БД в модель TenantMember
 func (s *SQLiteDB) scanTenantMember(row scanner) (*models.TenantMember, error) {
 	var member models.TenantMember
@@ -561,6 +616,56 @@ func (s *SQLiteDB) scanTenantMember(row scanner) (*models.TenantMember, error) {
 	if invitedBy.Valid {
 		str := invitedBy.String
 		member.InvitedBy = str
+	}
+
+	// Deserialize metadata if present
+	if len(metadataJSON) > 0 {
+		if err := json.Unmarshal(metadataJSON, &member.Metadata); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+	}
+
+	return &member, nil
+}
+
+// scanTenantMemberWithUserInfo сканирует строку БД в модель TenantMember с информацией о пользователе
+func (s *SQLiteDB) scanTenantMemberWithUserInfo(row scanner) (*models.TenantMember, error) {
+	var member models.TenantMember
+	var metadataJSON []byte
+	var leftAt sql.NullTime
+	var invitedBy sql.NullString
+	var username sql.NullString
+	var email sql.NullString
+
+	err := row.Scan(
+		&member.TenantID,
+		&member.UserID,
+		&member.Role,
+		&member.JoinedAt,
+		&member.UpdatedAt,
+		&leftAt,
+		&invitedBy,
+		&metadataJSON,
+		&username,
+		&email,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nullable fields
+	if leftAt.Valid {
+		member.LeftAt = &leftAt.Time
+	}
+	if invitedBy.Valid {
+		member.InvitedBy = invitedBy.String
+	}
+	if username.Valid {
+		member.Username = username.String
+	}
+	if email.Valid {
+		member.Email = email.String
 	}
 
 	// Deserialize metadata if present

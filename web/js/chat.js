@@ -265,7 +265,7 @@ class ChatManager {
     showError(message) {
         // Could implement a toast notification here
         console.error(message);
-        alert(message);
+        toast.error(message);
     }
 }
 

@@ -5,6 +5,425 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.16] - 2025-10-11
+
+### Changed
+
+- **All WebUI Pages**: Внедрена система уведомлений и модальных окон во все страницы
+  - ✅ `dashboard.html` + `dashboard.js` - удаление conversations
+  - ✅ `chat.html` + `chat.js` - error messages
+  - ✅ `profile.html` + `profile.js` - удаление аккаунта
+  - ✅ `tenants.html` + `tenants.js` - удаление тенантов, удаление участников
+  - ✅ `usage.html` - подключены CSS/JS
+  - ✅ `api-keys.html` + `apikeys.js` - удаление API ключей
+  - ✅ `mcp.html` - подключены CSS/JS
+  - ✅ `about.html` - подключены CSS/JS
+
+- Все 8 основных страниц теперь используют единую систему уведомлений
+- Замены: ~10 alert() → toast notifications, ~8 confirm() → modal confirmations
+- Единообразный UX на всех страницах приложения
+
+### Technical
+
+- Подключены `notifications.css` и `notifications.js` во все HTML страницы
+- Все JS файлы обновлены для использования `toast.*` и `modal.*` API
+- Консистентный порядок загрузки скриптов (auth-guard → api → notifications → компоненты)
+
+## [1.5.15] - 2025-10-11
+
+### Added
+
+- **Toast Notification System**: Профессиональная система всплывающих уведомлений
+  - Уведомления появляются справа снизу
+  - Зеленые для успешных операций (10 секунд)
+  - Красные для ошибок (60 секунд)
+  - Желтые для предупреждений (10 секунд)
+  - Синие для информационных сообщений (10 секунд)
+  - Возможность закрыть вручную кнопкой ×
+  - Плавные CSS анимации и transitions
+  - Поддержка темной темы
+  - Адаптивный дизайн для mobile
+
+- **Modal Confirmation System**: Модальные окна для подтверждения действий
+  - Заменяют стандартные browser confirm dialogs
+  - Красивый дизайн с иконками и типизацией
+  - confirm() - стандартное подтверждение
+  - danger() - опасные операции (удаление)
+  - warning() - предупреждения с деталями
+  - Закрытие по ESC или клику на backdrop
+  - Promise-based API для async/await
+
+- **Global API**: `window.toast` и `window.modal` доступны везде
+  - `toast.success(message)`, `toast.error(message)`
+  - `toast.warning(message)`, `toast.info(message)`
+  - `await modal.confirm(message, title)`
+  - `await modal.danger(message, title)`
+  - `await modal.warning(message, title, details)`
+
+### Changed
+
+- **Admin Panel**: Полностью переведен на новую систему уведомлений
+  - Все alert() заменены на toast notifications
+  - Все confirm() заменены на modal confirmations
+  - Улучшен UX для всех операций (backup, users, API keys, MCP servers)
+  - Более информативные сообщения об ошибках
+
+- `web/js/utils/notifications.js` - новый модуль уведомлений
+- `web/css/notifications.css` - стили для toast и modal
+- `web/admin.html` - подключены новые CSS и JS
+
+### Technical
+
+- Class-based architecture для ToastNotification и ModalConfirmation
+- HTML escape для защиты от XSS
+- Auto-stacking для нескольких toast уведомлений
+- Настраиваемые duration для разных типов уведомлений
+- CSS transitions для плавных анимаций (300ms)
+- Backdrop blur effect для modal windows
+- Mobile-responsive design (media queries)
+- Dark theme support через prefers-color-scheme
+
+## [1.5.14] - 2025-10-11
+
+### Added
+
+- **Backup & Restore System**: Полнофункциональная система резервного копирования и восстановления БД
+  - `POST /api/admin/backup` - создание бэкапа с автоматическим timestamp
+  - `GET /api/admin/backups` - список доступных бэкапов
+  - `GET /api/admin/backup/:filename` - скачивание backup файла
+  - `POST /api/admin/restore/:filename` - восстановление из бэкапа
+  - `DELETE /api/admin/backup/:filename` - удаление старых бэкапов
+  - Автоматическая ротация: хранение последних 10 бэкапов
+  - Safety backup перед restore операцией
+  - Бэкапы сохраняются в `./data/backups/` директорию
+
+### Changed
+
+- `internal/api/handlers/backup.go` - новый handler для backup операций
+- `internal/api/router/router.go` - добавлены роуты для backup/restore в admin API
+- Все backup операции требуют JWT аутентификацию + admin role
+
+### Technical
+
+- Использование `io.Copy` для эффективного копирования больших файлов
+- Path security checks для защиты от path traversal
+- Atomic restore with rollback на случай ошибки
+- File sync после записи для data integrity
+- Structured logging для всех backup операций
+
+## [1.5.13] - 2025-10-11
+
+### Changed
+
+- **Error Type Checking**: Улучшена обработка типов ошибок в admin handlers
+  - Реализована функция `isNotFoundError()` с использованием `errors.As`
+  - Добавлена функция `isAlreadyExistsError()` для проверки дубликатов
+  - Добавлена функция `isInvalidDataError()` для валидационных ошибок
+  - Добавлена функция `isPermissionError()` для проверки прав доступа
+  - Все функции используют правильную проверку типа `*storage.StorageError`
+
+### Technical
+
+- Использование Go 1.20+ `errors.As()` для type assertions
+- Proper unwrapping of wrapped errors
+- Type-safe error checking вместо string comparison
+- Удален TODO комментарий из admin.go (строка 875)
+
+## [1.5.12] - 2025-10-11
+
+### Fixed
+
+- **BUG-03: WebUI Chat Usage Tracking**: FOREIGN KEY constraint failed при использовании WebUI чата
+  - Проблема: `api_key_id` ссылался на несуществующие ключи ("jwt_auth", "unknown")
+  - Решение: Сделать `api_key_id` nullable с `ON DELETE SET NULL`
+  - Теперь статистика WebUI чата корректно учитывается
+
+### Changed
+
+- **Database Schema (`api_usage` table)**:
+  - `api_key_id TEXT` → nullable (было NOT NULL)
+  - FOREIGN KEY constraint: `ON DELETE SET NULL` (было CASCADE)
+  - Миграция v16 автоматически конвертирует "jwt_auth"/"unknown" → NULL
+
+- **Backend (`internal/models/usage.go`)**:
+  - `APIUsage.APIKeyID` → `*string` (nullable)
+
+- **Backend (`internal/api/middleware/usage_tracking.go`)**:
+  - При JWT auth устанавливает `nil` вместо "jwt_auth"
+  - При отсутствии ключа устанавливает `nil` вместо "unknown"
+
+### Technical
+
+- Migration v16: создает временную таблицу с правильной структурой
+- Автоматическая конвертация существующих записей с fake keys
+- Пересоздание индексов с учетом nullable значений
+
+## [1.5.11] - 2025-10-11
+
+### Fixed
+
+- **BUG-02: Tenant API Keys Creation**: 404 при создании API ключей для организации
+  - Добавлены endpoints для управления tenant API keys
+  - `GET /api/tenants/:id/api-keys` - получение списка ключей организации
+  - `POST /api/tenants/:id/api-keys` - создание ключа организации
+  - `DELETE /api/tenants/:id/api-keys/:key_id` - удаление ключа организации
+
+### Added
+
+- **Tenant API Keys Management**: Полноценное управление API ключами организаций
+  - Handler `ListTenantAPIKeys` для получения списка ключей
+  - Handler `CreateTenantAPIKey` для создания ключей с правами owner/admin
+  - Handler `DeleteTenantAPIKey` для удаления ключей с проверкой владения
+  - Автоматическая проверка прав доступа (owner/admin only)
+  - Валидация принадлежности ключа к tenant при удалении
+
+### Changed
+
+- **Backend (`internal/api/handlers/tenant.go`)**:
+  - NEW: `ListTenantAPIKeys()` - список API ключей организации
+  - NEW: `CreateTenantAPIKey()` - создание ключа с scope=tenant
+  - NEW: `DeleteTenantAPIKey()` - удаление с проверкой прав
+
+- **Backend (`internal/api/router/router.go`)**:
+  - Добавлены routes в tenant group:
+    - `GET /:id/api-keys`
+    - `POST /:id/api-keys`
+    - `DELETE /:id/api-keys/:key_id`
+
+- **Frontend (`web/api-keys.html`, `web/js/apikeys.js`)**:
+  - Уже готов к работе с tenant API keys (реализован ранее)
+  - Работают tabs Personal/Organization Keys
+  - Tenant selector и создание ключей для организации
+
+### Security
+
+- **Role-based Access Control**: Только owner и admin могут создавать/удалять tenant API keys
+- **Tenant Ownership Verification**: Проверка принадлежности ключа к tenant перед удалением
+- **Membership Check**: Проверка членства пользователя в tenant для всех операций
+
+### Technical
+
+- Default rate limits для tenant keys: 100 req/min, 5000 req/hour, 50000 req/day
+- Key scope автоматически устанавливается в `APIKeyScopeTenant`
+- TenantID связывается с API key через foreign key
+- Plaintext key возвращается только один раз при создании
+
+## [1.5.10] - 2025-10-10
+
+### Fixed
+
+- **Tenant Member Count Display**: Количество участников не отображалось в списке организаций
+  - Добавлен SQL подзапрос `COUNT(*)` в `ListUserTenants`
+  - Расширена модель `Tenant` (+`MemberCount` поле)
+  - Обновлена `scanTenantWithRole` для сканирования `member_count`
+
+### Changed
+
+- **Backend (`internal/models/tenant.go`)**:
+  - `Tenant` struct: добавлено поле `MemberCount int`
+
+- **Backend (`internal/storage/sqlite/tenants.go`)**:
+  - `ListUserTenants()`: добавлен подзапрос для подсчета членов tenant
+  - `scanTenantWithRole()`: обновлен для сканирования поля `member_count`
+
+- **Frontend (`web/js/tenants.js`)**:
+  - Уже готов к отображению `tenant.member_count` (строка 115)
+
+### Technical
+
+- SQL Subquery для эффективного подсчета участников
+- Минимальные изменения в коде (1 поле в модели, 1 строка SQL, 1 параметр Scan)
+- Совместимость с существующим frontend кодом
+
+## [1.5.9] - 2025-10-10
+
+### Fixed
+
+- **Members Display Issue**: Username и email не отображались в списке участников tenant
+  - Добавлен SQL JOIN с таблицей `users` в `ListTenantMembers`
+  - Расширена модель `TenantMember` (+Username, +Email поля)
+  - Новая функция `scanTenantMemberWithUserInfo` для сканирования с JOIN данными
+
+- **Search Results UX**: Улучшена контрастность результатов поиска
+  - Черный текст на белом фоне (#000000 / #ffffff)
+  - Светло-зеленый фон при hover (rgba(16, 185, 129, 0.15))
+  - Темно-серый для email (#4a5568)
+
+- **GetTenant Response Structure**: Исправлена обработка wrapper объекта
+  - Frontend теперь правильно извлекает `response.tenant` вместо всего объекта
+  - `currentTenant.id` теперь корректно инициализируется в Add Member modal
+
+### Changed
+
+- **Backend (`internal/models/tenant.go`)**:
+  - `TenantMember` struct: добавлены поля `Username` и `Email`
+
+- **Backend (`internal/storage/sqlite/tenants.go`)**:
+  - `ListTenantMembers()`: обновлен SQL для JOIN с `users` таблицей
+  - NEW: `scanTenantMemberWithUserInfo()` для сканирования расширенных данных
+
+- **Frontend (`web/js/tenants.js`)**:
+  - `showTenantDetail()`: исправлена обработка `response.tenant` wrapper
+  - `addMemberTenantId`: отдельное хранение tenant ID для modal
+
+- **Frontend (`web/css/style.css`)**:
+  - `.search-result-item`: белый фон, светло-зеленый hover
+  - `.search-result-name`: черный текст (#000000)
+  - `.search-result-email`: темно-серый (#4a5568)
+
+### Technical
+
+- SQL Query Optimization: LEFT JOIN с users для получения user info
+- Nullable fields handling для username/email
+- Cache busting: tenants.js?v=1.5.8.2
+- Frontend state management для tenant modals
+
+## [1.5.8] - 2025-10-10
+
+### Added
+
+- **Tenant Membership Check**: Проверка прав доступа к ресурсам tenant
+  - Middleware `TenantMembershipMiddleware` для автоматической проверки членства
+  - Middleware `RequireTenantRole` для проверки конкретных ролей
+  - Проверка членства в `GetTenantUsage` handler (удален TODO)
+
+- **Enhanced Member Management**: Полноценное управление участниками tenant
+  - Search endpoint `/api/tenants/:id/search-users` для поиска по username/email
+  - Поддержка добавления членов по username, email или user_id
+  - UI modal для добавления участников с live search
+  - Кнопки "Change Role" и "Remove" для каждого участника
+  - Debounced search (500ms) для оптимизации
+
+### Changed
+
+- **Backend (`internal/api/middleware/tenant_membership.go`)**: NEW
+  - `TenantMembershipMiddleware` проверяет членство и устанавливает контекст
+  - `RequireTenantRole` проверяет конкретные роли
+
+- **Backend (`internal/api/handlers/usage.go`)**:
+  - Добавлена проверка членства в `GetTenantUsage`
+  - Удален TODO комментарий
+
+- **Backend (`internal/api/handlers/tenant.go`)**:
+  - NEW: `SearchUsers()` для поиска пользователей по query
+  - Обновлен `AddMember()` для поддержки username/email/user_id
+  - Расширенный response с user info
+
+- **Backend (`internal/api/router/router.go`)**:
+  - Добавлен роут `GET /api/tenants/:id/search-users`
+
+- **Frontend (`web/tenants.html`)**:
+  - NEW: Modal "Add Member" с search функционалом
+  - Selected user card
+  - Role selector
+
+- **Frontend (`web/css/style.css`)**:
+  - Стили для search results dropdown
+  - Стили для selected user card
+  - "Already Member" badge
+  - Form hint styling
+
+- **Frontend (`web/js/api.js`)**:
+  - NEW: `searchTenantUsers()` метод
+  - Обновлен `addTenantMember()` для username/email
+
+- **Frontend (`web/js/tenants.js`)**:
+  - NEW: `showAddMemberModal()`, `hideAddMemberModal()`
+  - NEW: `searchUsers()` с debounce
+  - NEW: `displaySearchResults()`, `selectUser()`, `deselectUser()`
+  - NEW: `submitAddMember()`
+  - Обновлен: `removeMember()` с правильными параметрами
+  - NEW: `updateMemberRole()` с prompt UI
+  - Обновлен `loadMembers()` с кнопками действий
+
+### Security
+
+- Проверка членства для всех tenant-specific ресурсов
+- Audit logging при отказе в доступе (403)
+- Предотвращение directory traversal
+- Role-based access control (RBAC)
+
+### Technical
+
+- Middleware chain для tenant routes
+- Context-based role storage
+- Debounced search для производительности
+- Lazy loading user info
+
+## [1.5.7] - 2025-10-10
+
+### Added
+
+- **Password Change**: Полная реализация смены пароля
+  - Endpoint `/api/users/me/password` (POST)
+  - Валидация текущего пароля
+  - Проверка силы нового пароля
+  - Предотвращение повторного использования текущего пароля
+
+### Changed
+
+- **Backend (`internal/models/auth.go`)**:
+  - `ChangePasswordRequest` модель
+  - `ChangePasswordResponse` модель
+
+- **Backend (`internal/auth/service/auth_service.go`)**:
+  - Метод `ChangePassword()` с полной валидацией
+  - Проверка текущего пароля через bcrypt
+  - Хеширование нового пароля
+
+- **Backend (`internal/storage/database.go`)**:
+  - Интерфейс `UpdateUserPassword()` метод
+
+- **Backend (`internal/storage/sqlite/users.go`)**:
+  - Реализация `UpdateUserPassword()` для SQLite
+  - Эффективное обновление только пароля
+
+- **Backend (`internal/storage/postgresql/users.go`)**:
+  - Реализация `UpdateUserPassword()` для PostgreSQL
+
+- **Backend (`internal/api/handlers/user.go`)**:
+  - Обновлен `ChangePassword()` для использования `UpdateUserPassword()`
+  - Улучшена производительность (обновляется только пароль)
+
+### Security
+
+- Валидация силы пароля (минимум 8 символов, uppercase, lowercase, digit)
+- Bcrypt хеширование с DefaultCost
+- Audit logging для всех смен пароля
+- Проверка на совпадение старого и нового пароля
+
+### Technical
+
+- Транзакционная поддержка через Tx interface
+- Консистентная обработка ошибок
+- Structured logging с user_id
+
+## [1.5.6] - 2025-10-10
+
+### Improved
+
+- **Modelfile Display**: Улучшено отображение Modelfile в admin панели
+  - LICENSE секция автоматически скрывается из Modelfile
+  - Только актуальная конфигурация модели отображается
+  - LICENSE по-прежнему доступна в отдельной секции
+
+### Changed
+
+- **Frontend (`web/js/admin.js`)**:
+  - Новый метод `stripLicenseFromModelfile()` для очистки
+  - Поддержка форматов: `LICENSE """` и `LICENSE\n`
+  - Автоматический trim результата
+
+- **Frontend (`web/css/style.css`)**:
+  - Класс `.code-block-large` для Modelfile (20 строк с прокруткой)
+  - Вертикальный и горизонтальный scrollbar
+
+### Technical
+
+- Frontend-only изменение (не требует перекомпиляции)
+- Regex парсинг для удаления LICENSE
+- License остается в отдельной секции ниже
+
 ## [1.5.5] - 2025-10-10
 
 ### Fixed

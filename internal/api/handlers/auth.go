@@ -200,8 +200,62 @@ func (h *AuthHandler) Me(c *gin.Context) {
 // ChangePassword изменяет пароль пользователя
 // POST /api/auth/password/change
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
-	// TODO: Implement password change
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "Not implemented yet",
-	})
+	// Get user ID from JWT middleware (set by middleware.JWTAuth)
+	userID, exists := c.Get("userID")
+	if !exists {
+		h.logger.Debug("User ID not found in context")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Unauthorized",
+		})
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		h.logger.Error("User ID is not a string")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error",
+		})
+		return
+	}
+
+	// Parse request
+	var req service.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.WithError(err).Debug("Invalid change password request")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	// Call auth service to change password
+	resp, err := h.authService.ChangePassword(c.Request.Context(), userIDStr, req)
+	if err != nil {
+		// Check if it's a validation error
+		if valErr, ok := err.(password.ValidationError); ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": valErr.Message,
+				"field": valErr.Field,
+			})
+			return
+		}
+
+		// Check if it's an authentication error (wrong current password)
+		if err.Error() == "current password is incorrect" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "Current password is incorrect",
+			})
+			return
+		}
+
+		// Generic error
+		h.logger.WithError(err).Error("Failed to change password")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to change password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

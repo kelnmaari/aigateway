@@ -69,10 +69,19 @@ func (h *UsageHandler) GetUserUsage(c *gin.Context) {
 // GET /api/usage/tenant/:tenant_id
 func (h *UsageHandler) GetTenantUsage(c *gin.Context) {
 	// Get user ID from JWT auth middleware context (for access control)
-	_, exists := c.Get("user_id")
+	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "authentication required",
+		})
+		return
+	}
+
+	userID, ok := userIDVal.(string)
+	if !ok {
+		h.logger.Error("user_id is not a string")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "internal server error",
 		})
 		return
 	}
@@ -85,9 +94,26 @@ func (h *UsageHandler) GetTenantUsage(c *gin.Context) {
 		return
 	}
 
-	// Verify user has access to this tenant
-	// (This should check tenant membership, but for simplicity we'll allow it for now)
-	// TODO: Add proper tenant membership check
+	// Verify user has access to this tenant (membership check)
+	member, err := h.db.GetTenantMember(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to check tenant membership")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to verify access",
+		})
+		return
+	}
+
+	if member == nil {
+		h.logger.WithFields(logrus.Fields{
+			"user_id":   userID,
+			"tenant_id": tenantID,
+		}).Warn("Access denied: user is not a member of tenant")
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Access denied: you are not a member of this tenant",
+		})
+		return
+	}
 
 	// Parse time period (default: 7 days)
 	period := 7 * 24 * time.Hour

@@ -12,17 +12,18 @@ import (
 
 // Config представляет конфигурацию всего приложения
 type Config struct {
-	Server      ServerConfig      `mapstructure:"server"`
-	Ollama      OllamaConfig      `mapstructure:"ollama"`
-	Auth        AuthConfig        `mapstructure:"auth"`
-	Database    DatabaseConfig    `mapstructure:"database"` // Version 1.3.0+: Database abstraction
-	Logging     LoggingConfig     `mapstructure:"logging"`
-	Models      ModelsConfig      `mapstructure:"models"`
-	Tools       ToolsConfig       `mapstructure:"tools"`
-	Prompts     PromptsConfig     `mapstructure:"prompts"` // Настройки промптов
-	Metrics     MetricsConfig     `mapstructure:"metrics"`
-	TUI         TUIConfig         `mapstructure:"tui"`
-	Development DevelopmentConfig `mapstructure:"development"`
+	Server        ServerConfig        `mapstructure:"server"`
+	Ollama        OllamaConfig        `mapstructure:"ollama"`
+	Auth          AuthConfig          `mapstructure:"auth"`
+	Database      DatabaseConfig      `mapstructure:"database"` // Version 1.3.0+: Database abstraction
+	Logging       LoggingConfig       `mapstructure:"logging"`
+	Models        ModelsConfig        `mapstructure:"models"`
+	Tools         ToolsConfig         `mapstructure:"tools"`
+	Prompts       PromptsConfig       `mapstructure:"prompts"` // Настройки промптов
+	Metrics       MetricsConfig       `mapstructure:"metrics"`
+	TUI           TUIConfig           `mapstructure:"tui"`
+	Development   DevelopmentConfig   `mapstructure:"development"`
+	Observability ObservabilityConfig `mapstructure:"observability"` // Version 1.6.0+: Tracing and monitoring
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -235,6 +236,42 @@ type DevelopmentConfig struct {
 	} `mapstructure:"mock_ollama"`
 }
 
+// ObservabilityConfig настройки для observability и tracing (Version 1.6.0+)
+type ObservabilityConfig struct {
+	Tracing     TracingConfig     `mapstructure:"tracing"`
+	Performance PerformanceConfig `mapstructure:"performance"`
+}
+
+// TracingConfig конфигурация OpenTelemetry distributed tracing
+type TracingConfig struct {
+	Enabled      bool    `mapstructure:"enabled"`
+	Provider     string  `mapstructure:"provider"`      // "jaeger" или "zipkin"
+	ServiceName  string  `mapstructure:"service_name"`  // Название сервиса в traces
+	SamplingRate float64 `mapstructure:"sampling_rate"` // 0.0 - 1.0 (1.0 = 100%)
+
+	// Jaeger specific
+	Jaeger struct {
+		Endpoint string `mapstructure:"endpoint"` // http://localhost:14268/api/traces
+	} `mapstructure:"jaeger"`
+
+	// Zipkin specific
+	Zipkin struct {
+		Endpoint string `mapstructure:"endpoint"` // http://localhost:9411/api/v2/spans
+	} `mapstructure:"zipkin"`
+}
+
+// PerformanceConfig конфигурация performance monitoring (Version 1.6.2+)
+type PerformanceConfig struct {
+	Enabled              bool   `mapstructure:"enabled"`                // Включить performance monitoring
+	CollectionInterval   string `mapstructure:"collection_interval"`    // Интервал сбора метрик (default: "30s")
+	MemoryThresholdMB    int64  `mapstructure:"memory_threshold_mb"`    // Alert если heap > этого (default: 1024)
+	GoroutineThreshold   int    `mapstructure:"goroutine_threshold"`    // Alert если goroutines > этого (default: 1000)
+	SlowRequestThreshold string `mapstructure:"slow_request_threshold"` // Log запросы медленнее этого (default: "5s")
+	GCPercentage         int    `mapstructure:"gc_percentage"`          // GOGC value (default: 100)
+	LeakDetection        bool   `mapstructure:"leak_detection"`         // Включить leak detection (default: true)
+	PprofEnabled         bool   `mapstructure:"pprof_enabled"`          // Включить pprof endpoints (default: true)
+}
+
 // Load загружает конфигурацию из файла и переменных окружения
 func Load(configPath string) (*Config, error) {
 	viper := viper.New()
@@ -363,6 +400,24 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("tui.enabled", true)
 	v.SetDefault("tui.refresh_rate", "1s")
 	v.SetDefault("tui.theme", "default")
+
+	// Observability defaults (Version 1.6.0+)
+	v.SetDefault("observability.tracing.enabled", false)
+	v.SetDefault("observability.tracing.provider", "jaeger")
+	v.SetDefault("observability.tracing.service_name", "ollama-proxy")
+	v.SetDefault("observability.tracing.sampling_rate", 1.0)
+	v.SetDefault("observability.tracing.jaeger.endpoint", "http://localhost:14268/api/traces")
+	v.SetDefault("observability.tracing.zipkin.endpoint", "http://localhost:9411/api/v2/spans")
+
+	// Performance monitoring defaults (Version 1.6.2+)
+	v.SetDefault("observability.performance.enabled", false)
+	v.SetDefault("observability.performance.collection_interval", "30s")
+	v.SetDefault("observability.performance.memory_threshold_mb", 1024)
+	v.SetDefault("observability.performance.goroutine_threshold", 1000)
+	v.SetDefault("observability.performance.slow_request_threshold", "5s")
+	v.SetDefault("observability.performance.gc_percentage", 100)
+	v.SetDefault("observability.performance.leak_detection", true)
+	v.SetDefault("observability.performance.pprof_enabled", true)
 }
 
 // PromptsConfig конфигурация промптов и системных сообщений

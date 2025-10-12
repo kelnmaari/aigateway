@@ -364,6 +364,21 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "fix_api_usage_nullable_api_key_id",
 			SQL:     s.getFixAPIUsageNullableAPIKeyIDMigration(),
 		},
+		{
+			Version: 17,
+			Name:    "add_changelogs_v1_5_11_to_v1_5_16",
+			SQL:     s.getAddChangelogsV1511ToV1516Migration(),
+		},
+		{
+			Version: 18,
+			Name:    "add_changelog_v1_6_1",
+			SQL:     s.getAddChangelogV161Migration(),
+		},
+		{
+			Version: 19,
+			Name:    "add_changelog_v1_6_2",
+			SQL:     s.getAddChangelogV162Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -880,6 +895,143 @@ Enhanced Monitoring & Management
 }
 
 // getFixAPIUsageNullableAPIKeyIDMigration исправляет FOREIGN KEY constraint для api_key_id (v1.5.12)
+// getAddChangelogsV1511ToV1516Migration adds changelog entries for versions 1.5.11-1.5.16 (Migration v17)
+func (s *SQLiteDB) getAddChangelogsV1511ToV1516Migration() string {
+	return `
+-- ========================================
+-- Add Changelogs for v1.5.11 - v1.5.16 (Migration v17)
+-- ========================================
+
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.5.16', '2025-10-11', '## [1.5.16] - 2025-10-11
+
+### Changed
+- **All WebUI Pages**: Система уведомлений внедрена во все 8 страниц
+  - dashboard, chat, profile, tenants, usage, api-keys, mcp, about
+  - ~10 alert() → toast notifications
+  - ~8 confirm() → modal confirmations
+  - Единообразный UX на всех страницах
+
+### Technical
+- notifications.css и notifications.js подключены во все HTML
+- Консистентный порядок загрузки скриптов
+- toast.* и modal.* API используется везде'),
+
+('1.5.15', '2025-10-11', '## [1.5.15] - 2025-10-11
+
+### Added
+- **Toast Notification System**: Профессиональная система всплывающих уведомлений
+  - Уведомления справа снизу: зеленые (успех, 10с), красные (ошибка, 60с)
+  - Желтые (предупреждения) и синие (информация)
+  - Возможность закрыть вручную, плавные анимации
+  - Поддержка темной темы и mobile
+
+- **Modal Confirmation System**: Модальные окна для подтверждения действий
+  - Заменяют стандартные confirm dialogs
+  - confirm(), danger(), warning() с Promise-based API
+  - Красивый дизайн с иконками
+
+- **Global API**: window.toast и window.modal для всех страниц
+  - toast.success/error/warning/info(message)
+  - await modal.confirm/danger/warning(message, title)
+
+### Changed
+- **Admin Panel**: Полностью переведен на новую систему уведомлений
+  - Все alert() → toast notifications
+  - Все confirm() → modal confirmations
+  - Улучшен UX для операций backup, users, API keys, MCP
+
+### Technical
+- Class-based architecture, HTML escape для XSS
+- Auto-stacking для multiple toasts
+- CSS transitions 300ms, backdrop blur
+- Mobile-responsive, dark theme support'),
+
+('1.5.14', '2025-10-11', '## [1.5.14] - 2025-10-11
+
+### Added
+- **Backup & Restore System**: Полнофункциональная система резервного копирования и восстановления БД
+  - POST /api/admin/backup - создание бэкапа с автоматическим timestamp
+  - GET /api/admin/backups - список доступных бэкапов
+  - GET /api/admin/backup/:filename - скачивание backup файла
+  - POST /api/admin/restore/:filename - восстановление из бэкапа
+  - DELETE /api/admin/backup/:filename - удаление старых бэкапов
+  - Автоматическая ротация: хранение последних 10 бэкапов
+  - Safety backup перед restore операцией
+  - Бэкапы сохраняются в ./data/backups/ директорию
+
+### Changed
+- internal/api/handlers/backup.go - новый handler для backup операций
+- internal/api/router/router.go - добавлены роуты для backup/restore в admin API
+- Все backup операции требуют JWT аутентификацию + admin role
+
+### Technical
+- Использование io.Copy для эффективного копирования больших файлов
+- Path security checks для защиты от path traversal
+- Atomic restore with rollback на случай ошибки
+- File sync после записи для data integrity
+- Structured logging для всех backup операций'),
+
+('1.5.13', '2025-10-11', '## [1.5.13] - 2025-10-11
+
+### Changed
+- **Error Type Checking**: Улучшена обработка типов ошибок в admin handlers
+  - Реализована функция isNotFoundError() с использованием errors.As
+  - Добавлены функции isAlreadyExistsError, isInvalidDataError, isPermissionError
+  - Type-safe error checking вместо string comparison
+
+### Technical
+- Использование Go 1.20+ errors.As() для type assertions
+- Proper unwrapping of wrapped errors
+- Удален TODO комментарий из admin.go'),
+
+('1.5.12', '2025-10-11', '## [1.5.12] - 2025-10-11
+
+### Fixed
+- **BUG-03: WebUI Chat Usage Tracking**: FOREIGN KEY constraint failed при использовании WebUI чата
+  - Схема api_usage.api_key_id теперь nullable
+  - Foreign key с ON DELETE SET NULL
+  - JWT authenticated requests теперь используют NULL вместо jwt_auth/unknown
+  - Миграция v16: конвертация существующих данных
+
+### Changed
+- models.APIUsage.APIKeyID изменен с string на *string
+- middleware.UsageTracking обновлен для NULL значений
+- internal/storage/sqlite/sqlite.go: новая миграция v16
+
+### Technical
+- Правильная обработка nullable fields в Go (*string)
+- Database migration с data conversion
+- Foreign key constraints с ON DELETE SET NULL'),
+
+('1.5.11', '2025-10-11', '## [1.5.11] - 2025-10-11
+
+### Fixed
+- **BUG-02: Tenant API Keys Creation**: 404 ошибка при создании API ключей для организаций
+  - Реализованы недостающие endpoints для tenant API keys
+  - POST /api/tenants/:id/api-keys - создание ключа организации
+  - GET /api/tenants/:id/api-keys - список ключей организации
+  - DELETE /api/tenants/:id/api-keys/:key_id - удаление ключа
+
+### Added
+- internal/api/handlers/tenant.go: три новых метода
+  - ListTenantAPIKeys с проверкой membership
+  - CreateTenantAPIKey с owner/admin role check
+  - DeleteTenantAPIKey с key ownership validation
+
+### Changed
+- internal/api/router/router.go: добавлены новые роуты
+- Улучшена валидация прав доступа (owner/admin)
+- Маскирование sensitive данных в ListTenantAPIKeys
+
+### Technical
+- Robust access control с role-based checks
+- Proper key ownership validation
+- Secure key generation с GenerateAPIKeyWithID
+- Default rate limits для tenant keys');
+`
+}
+
 func (s *SQLiteDB) getFixAPIUsageNullableAPIKeyIDMigration() string {
 	return `
 -- ========================================
@@ -1372,6 +1524,89 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - SQL Subquery optimization
 - Minimal code changes
 - Frontend compatibility');
+	`
+}
+
+// getAddChangelogV161Migration returns SQL for adding changelog v1.6.1 (v18 migration)
+func (s *SQLiteDB) getAddChangelogV161Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.6.1', '2025-10-12', '## [1.6.1] - 2025-10-12
+
+### Added
+- **OpenTelemetry Distributed Tracing**: Полная интеграция OpenTelemetry для distributed tracing
+  - Поддержка Jaeger и Zipkin экспортеров
+  - Автоматическая трассировка всех HTTP запросов
+  - W3C Trace Context propagation
+  - Настраиваемый sampling rate (0.0 - 1.0)
+  - Span annotations с HTTP metadata (method, URL, status code)
+  - Error tracking для запросов со status code >= 400
+
+### Changed
+- **Configuration**: Добавлена секция observability.tracing в конфигурацию
+  - enabled: включение/отключение tracing
+  - provider: выбор между "jaeger" или "zipkin"
+  - service_name: название сервиса в traces
+  - sampling_rate: процент трассируемых запросов
+  - jaeger.endpoint и zipkin.endpoint: настройка экспортеров
+
+### Technical
+- Новый пакет internal/observability с TracerProvider
+- TracingMiddleware для автоматической трассировки Gin запросов
+- Интеграция в router и main.go с graceful shutdown
+- Зависимости: go.opentelemetry.io/otel v1.38.0
+- Тесты: 100% покрытие для observability и tracing middleware
+- Tracing middleware применяется первым в цепочке для полной трассировки');
+	`
+}
+
+// getAddChangelogV162Migration returns SQL for adding changelog v1.6.2 (v19 migration)
+func (s *SQLiteDB) getAddChangelogV162Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.6.2', '2025-10-12', '## [1.6.2] - 2025-10-12
+
+### Added
+- **Performance Monitoring**: Continuous performance monitoring в production
+  - Runtime metrics collection (CPU, memory, goroutines, GC stats)
+  - Automatic performance anomaly detection
+  - Baseline comparison для regression tracking
+  - Configurable thresholds
+
+- **Leak Detection**: Автоматическое выявление утечек
+  - Memory и goroutine leak detection
+  - Trend analysis (10 samples, 1/minute)
+  - Warning alerts при sustained growth
+
+- **Slow Request Logging**: Медленные запросы
+  - Middleware для отслеживания request time
+  - Configurable threshold (default: 5s)
+  - Детальная информация о каждом slow request
+
+- **pprof Endpoints**: Runtime profiling
+  - /api/admin/pprof/* endpoints (admin only)
+  - CPU profile, heap, goroutine dump
+  - Memory allocations, block, mutex profiles
+
+- **Performance API**: REST API для metrics
+  - GET /api/admin/performance/metrics
+  - GET /api/admin/performance/leaks
+  - POST /api/admin/performance/reset-baseline
+  - POST /api/admin/performance/reset-leaks
+
+### Changed
+- **Configuration**: Добавлена секция observability.performance
+  - enabled, collection_interval, thresholds
+  - gc_percentage для GC tuning
+  - leak_detection и pprof_enabled flags
+
+### Technical
+- internal/observability/perfmon.go - Performance Monitor
+- internal/observability/leak_detector.go - Leak Detector
+- internal/api/middleware/slow_request.go - Slow Request Logger
+- internal/api/handlers/performance.go - Performance API
+- Thread-safe metrics, minimal overhead (<1%)
+- Graceful shutdown support');
 	`
 }
 

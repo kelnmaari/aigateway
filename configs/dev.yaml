@@ -180,3 +180,31 @@ development:
     response_delay: "500ms"
     random_errors: false
     error_rate: 0.1
+
+# 🔍 OBSERVABILITY - Distributed Tracing & Monitoring (Version 1.6.0+)
+observability:
+  # OpenTelemetry Distributed Tracing
+  tracing:
+    enabled: true  # Отключено по умолчанию, требует Jaeger/Zipkin
+    provider: "jaeger"  # Поддержка: "jaeger" или "zipkin"
+    service_name: "ollama-proxy"
+    sampling_rate: 1.0  # 1.0 = 100% traces, 0.1 = 10% traces
+    
+    # Jaeger configuration (если provider = "jaeger")
+    jaeger:
+      endpoint: "http://localhost:4318"
+    
+    # Zipkin configuration (если provider = "zipkin")
+    zipkin:
+      endpoint: "http://localhost:9411/api/v2/spans"
+  
+  # Performance Monitoring (Version 1.6.2+)
+  performance:
+    enabled: true  # Отключено по умолчанию для development
+    collection_interval: "30s"  # Как часто собирать метрики
+    memory_threshold_mb: 1024  # Alert если heap > 1GB
+    goroutine_threshold: 1000  # Alert если goroutines > 1000
+    slow_request_threshold: "5s"  # Log requests медленнее 5 секунд
+    gc_percentage: 100  # GOGC value (default: 100)
+    leak_detection: true  # Включить leak detection
+    pprof_enabled: true  # Включить pprof endpoints (/debug/pprof)

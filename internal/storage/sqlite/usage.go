@@ -485,3 +485,240 @@ func (s *SQLiteDB) GetTenantUsageStats(ctx context.Context, tenantID string, per
 
 	return &stats, nil
 }
+
+// ========================================
+// Reports Statistics Methods (v1.6.3+)
+// ========================================
+
+// GetUsageStats возвращает статистику использования за период для отчетов
+func (s *SQLiteDB) GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error) {
+if s.db == nil {
+return nil, fmt.Errorf("database not connected")
+}
+
+stats := &models.UsageReportStats{}
+
+// Get aggregate statistics
+query := `
+SELECT
+COUNT(*) as total_requests,
+SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_requests,
+SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_requests,
+SUM(total_tokens) as total_tokens,
+COUNT(DISTINCT user_id) as unique_users,
+COUNT(DISTINCT model) as unique_models
+FROM api_usage
+WHERE created_at >= ? AND created_at <= ?
+`
+
+err := s.db.QueryRowContext(ctx, query, start, end).Scan(
+&stats.TotalRequests,
+&stats.SuccessfulRequests,
+&stats.FailedRequests,
+&stats.TotalTokens,
+&stats.UniqueUsers,
+&stats.UniqueModels,
+)
+if err != nil {
+return nil, fmt.Errorf("failed to get usage stats: %w", err)
+}
+
+// Get top models
+modelQuery := `
+SELECT model, COUNT(*) as requests, SUM(total_tokens) as tokens
+FROM api_usage
+WHERE created_at >= ? AND created_at <= ?
+GROUP BY model
+ORDER BY requests DESC
+LIMIT 10
+`
+
+rows, err := s.db.QueryContext(ctx, modelQuery, start, end)
+if err != nil {
+return nil, fmt.Errorf("failed to get top models: %w", err)
+}
+defer rows.Close()
+
+for rows.Next() {
+var model struct {
+Model    string
+Requests int64
+Tokens   int64
+}
+if err := rows.Scan(&model.Model, &model.Requests, &model.Tokens); err != nil {
+continue
+}
+stats.TopModels = append(stats.TopModels, model)
+}
+
+// Get top users (join with users table to get usernames)
+userQuery := `
+SELECT u.username, COUNT(a.id) as requests, SUM(a.total_tokens) as tokens
+FROM api_usage a
+JOIN users u ON a.user_id = u.id
+WHERE a.created_at >= ? AND a.created_at <= ?
+GROUP BY u.username
+ORDER BY requests DESC
+LIMIT 10
+`
+
+rows2, err := s.db.QueryContext(ctx, userQuery, start, end)
+if err == nil {
+defer rows2.Close()
+for rows2.Next() {
+var user struct {
+Username string
+Requests int64
+Tokens   int64
+}
+if err := rows2.Scan(&user.Username, &user.Requests, &user.Tokens); err != nil {
+continue
+}
+stats.TopUsers = append(stats.TopUsers, user)
+}
+}
+
+return stats, nil
+}
+
+// GetPerformanceStats возвращает статистику производительности за период для отчетов
+func (s *SQLiteDB) GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error) {
+if s.db == nil {
+return nil, fmt.Errorf("database not connected")
+}
+
+stats := &models.PerformanceReportStats{}
+
+// Get aggregate statistics
+query := `
+SELECT
+COUNT(*) as total_requests,
+AVG(duration_ms) as avg_latency,
+MIN(duration_ms) as fastest,
+MAX(duration_ms) as slowest,
+SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as error_count
+FROM api_usage
+WHERE created_at >= ? AND created_at <= ?
+`
+
+err := s.db.QueryRowContext(ctx, query, start, end).Scan(
+&stats.TotalRequests,
+&stats.AvgLatencyMS,
+&stats.FastestRequest,
+&stats.SlowestRequest,
+&stats.ErrorCount,
+)
+if err != nil {
+return nil, fmt.Errorf("failed to get performance stats: %w", err)
+}
+
+// Calculate percentiles (simplified - use sorting)
+percQuery := `
+SELECT duration_ms
+FROM api_usage
+WHERE created_at >= ? AND created_at <= ?
+ORDER BY duration_ms
+`
+
+rows, err := s.db.QueryContext(ctx, percQuery, start, end)
+if err == nil {
+defer rows.Close()
+durations := []float64{}
+for rows.Next() {
+var d float64
+if err := rows.Scan(&d); err == nil {
+durations = append(durations, d)
+}
+}
+
+if len(durations) > 0 {
+stats.P50LatencyMS = percentile(durations, 0.50)
+stats.P95LatencyMS = percentile(durations, 0.95)
+stats.P99LatencyMS = percentile(durations, 0.99)
+}
+}
+
+// Count slow requests (>5 seconds)
+slowQuery := `SELECT COUNT(*) FROM api_usage WHERE created_at >= ? AND created_at <= ? AND duration_ms > 5000`
+s.db.QueryRowContext(ctx, slowQuery, start, end).Scan(&stats.SlowRequestsCount)
+
+// Calculate requests per second
+duration := end.Sub(start).Seconds()
+if duration > 0 {
+stats.RequestsPerSecond = float64(stats.TotalRequests) / duration
+}
+
+return stats, nil
+}
+
+// CountActiveUsers возвращает количество активных пользователей за период
+func (s *SQLiteDB) CountActiveUsers(ctx context.Context, period time.Duration) (int, error) {
+if s.db == nil {
+return 0, fmt.Errorf("database not connected")
+}
+
+since := time.Now().Add(-period)
+var count int
+
+query := `
+SELECT COUNT(DISTINCT user_id)
+FROM api_usage
+WHERE created_at >= ?
+`
+
+err := s.db.QueryRowContext(ctx, query, since).Scan(&count)
+if err != nil {
+return 0, fmt.Errorf("failed to count active users: %w", err)
+}
+
+return count, nil
+}
+
+// CountTotalUsers возвращает общее количество пользователей
+func (s *SQLiteDB) CountTotalUsers(ctx context.Context) (int, error) {
+if s.db == nil {
+return 0, fmt.Errorf("database not connected")
+}
+
+var count int
+query := `SELECT COUNT(*) FROM users WHERE status != 'deleted'`
+
+err := s.db.QueryRowContext(ctx, query).Scan(&count)
+if err != nil {
+return 0, fmt.Errorf("failed to count total users: %w", err)
+}
+
+return count, nil
+}
+
+// CountActiveAPIKeys возвращает количество активных API ключей
+func (s *SQLiteDB) CountActiveAPIKeys(ctx context.Context) (int, error) {
+if s.db == nil {
+return 0, fmt.Errorf("database not connected")
+}
+
+var count int
+query := `SELECT COUNT(*) FROM api_keys WHERE status = 'active' AND (expires_at IS NULL OR expires_at > datetime('now'))`
+
+err := s.db.QueryRowContext(ctx, query).Scan(&count)
+if err != nil {
+return 0, fmt.Errorf("failed to count active API keys: %w", err)
+}
+
+return count, nil
+}
+
+// percentile calculates percentile from sorted slice
+func percentile(sorted []float64, p float64) float64 {
+if len(sorted) == 0 {
+return 0
+}
+idx := int(float64(len(sorted)-1) * p)
+if idx < 0 {
+idx = 0
+}
+if idx >= len(sorted) {
+idx = len(sorted) - 1
+}
+return sorted[idx]
+}

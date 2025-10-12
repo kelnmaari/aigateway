@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 30px;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        .header p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+        .section {
+            padding: 25px 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .section:last-child {
+            border-bottom: none;
+        }
+        .section h2 {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 20px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 3px solid #f093fb;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+        }
+        .metric-value.good {
+            color: #28a745;
+        }
+        .metric-value.warning {
+            color: #ffc107;
+        }
+        .metric-value.bad {
+            color: #dc3545;
+        }
+        .footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ Performance Report</h1>
+            <p><strong>Period:</strong> {{.Period}}</p>
+            <p><strong>Generated:</strong> {{.GeneratedAt.Format "2006-01-02 15:04:05"}}</p>
+        </div>
+
+        <div class="section">
+            <h2>Latency Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Average Latency</div>
+                    <div class="metric-value">{{printf "%.2f" .AvgLatencyMS}} ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">P50 Latency</div>
+                    <div class="metric-value">{{printf "%.2f" .P50LatencyMS}} ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">P95 Latency</div>
+                    <div class="metric-value warning">{{printf "%.2f" .P95LatencyMS}} ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">P99 Latency</div>
+                    <div class="metric-value bad">{{printf "%.2f" .P99LatencyMS}} ms</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Request Statistics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Requests</div>
+                    <div class="metric-value">{{.TotalRequests}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Requests/Second</div>
+                    <div class="metric-value">{{printf "%.2f" .RequestsPerSecond}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Slow Requests</div>
+                    <div class="metric-value bad">{{.SlowRequestsCount}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Error Count</div>
+                    <div class="metric-value bad">{{.ErrorCount}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Performance Summary</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Fastest Request</div>
+                    <div class="metric-value good">{{printf "%.2f" .FastestRequest}} ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Slowest Request</div>
+                    <div class="metric-value bad">{{printf "%.2f" .SlowestRequest}} ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Error Rate</div>
+                    <div class="metric-value {{if gt .ErrorRate 5.0}}bad{{else}}good{{end}}">{{printf "%.2f" .ErrorRate}}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Slow Threshold</div>
+                    <div class="metric-value">{{.SlowRequestThreshold}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Generated by Ollama-OpenAI Proxy - Performance Monitoring</p>
+        </div>
+    </div>
+</body>
+</html>
+

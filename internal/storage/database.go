@@ -244,6 +244,25 @@ type Database interface {
 
 	// ListChangelogs возвращает список всех changelog записей
 	ListChangelogs(ctx context.Context) ([]*models.Changelog, error)
+
+	// ========================================
+	// Reports Statistics (v1.6.3+)
+	// ========================================
+
+	// GetUsageStats возвращает статистику использования за период
+	GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error)
+
+	// GetPerformanceStats возвращает статистику производительности за период
+	GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error)
+
+	// CountActiveUsers возвращает количество активных пользователей за период
+	CountActiveUsers(ctx context.Context, period time.Duration) (int, error)
+
+	// CountTotalUsers возвращает общее количество пользователей
+	CountTotalUsers(ctx context.Context) (int, error)
+
+	// CountActiveAPIKeys возвращает количество активных API ключей
+	CountActiveAPIKeys(ctx context.Context) (int, error)
 }
 
 // Tx представляет транзакцию БД

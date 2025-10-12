@@ -1,9 +1,10 @@
 # 🗺️ Roadmap: Ollama-OpenAI Proxy
 
 > **Текущая версия:** 1.5.16 ✅  
-> **План развития:** Version 1.5.0 - 1.7.0+  
+> **План развития:** Version 1.5.0 - 1.10.0+  
 > **Статус:** Active Development (Version 1.5.0 Complete! - 12/12 задач)  
-> **Последнее обновление:** 2025-10-11
+> **Последнее обновление:** 2025-10-11  
+> **Новое:** 📱 Roadmap расширен до v1.10.0 (15 новых задач!)
 
 ---
 
@@ -407,6 +408,152 @@
 
 ---
 
+## 📱 Version 1.8.0 - Smart Chat & Content
+
+**Фокус:** Улучшенный чат и работа с контентом  
+**Приоритет:** HIGH  
+**Оценка времени:** 38-52 часа  
+**Статус:** 📋 Запланировано (0/5 задач)
+
+### Задачи
+
+- [ ] **VISION-01** Vision OCR Service (Multimodal Chat) → [BACKLOG/VISION-01_ocr_multimodal_chat.md](BACKLOG/VISION-01_ocr_multimodal_chat.md) → **v1.8.1**
+  - Multimodal models через Ollama (LLaVA, BakLLaVA)
+  - Upload изображений в чат + drag&drop
+  - Распознавание текста → контекст для LLM
+  - Image storage & management
+  - Thumbnail generation
+  - **Оценка:** 8-12 часов
+
+- [ ] **WEB-01** Web Content Fetcher & Summarization → [BACKLOG/WEB-01_content_fetcher.md](BACKLOG/WEB-01_content_fetcher.md) → **v1.8.2**
+  - HTTP client + goquery для парсинга HTML
+  - Извлечение текста, metadata
+  - Summarization через LLM
+  - URL validation и security
+  - Rate limiting для web fetches
+  - **Оценка:** 6-10 часов
+
+- [ ] **FILE-01** File Upload Support (PDF, DOCX, TXT) → [BACKLOG/FILE-01_file_upload_support.md](BACKLOG/FILE-01_file_upload_support.md) → **v1.8.3**
+  - PDF, DOCX, TXT text extraction
+  - Интеграция с чатом (file → context)
+  - File storage & management
+  - Validation и size limits
+  - **Оценка:** 8-10 часов
+
+- [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.8.4**
+  - Export to JSON, Markdown
+  - Bulk export для всех conversations
+  - Import для восстановления истории
+  - Date range filtering
+  - **Оценка:** 4-6 часов
+
+- [ ] **WS-01** WebSocket Real-time Updates (WebUI only) → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.8.5**
+  - Real-time updates вместо polling
+  - Live chat streaming
+  - System notifications push
+  - Auto-reconnect logic
+  - **Примечание:** TUI development остановлена, фокус на WebUI
+  - **Оценка:** 8-12 часов
+
+---
+
+## 🔐 Version 1.9.0 - Enterprise Auth
+
+**Фокус:** Корпоративная аутентификация  
+**Приоритет:** HIGH  
+**Оценка времени:** 58-78 часов  
+**Статус:** 📋 Запланировано (0/5 задач)
+
+### Задачи
+
+- [ ] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.9.1**
+  - OAuth2/OIDC flow
+  - Token validation & refresh
+  - UI для настройки через админку
+  - User auto-provisioning
+  - Fallback to local auth
+  - **Оценка:** 16-24 часа
+
+- [ ] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.9.2**
+  - Claims parsing (groups, roles)
+  - Automatic tenant creation/mapping
+  - Group sync (manual/scheduled)
+  - Admin groups role assignment
+  - **Оценка:** 8-12 часов
+
+- [ ] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.9.3**
+  - LDAP bind + search
+  - User/group sync
+  - UI для настройки через админку
+  - TLS/LDAPS support
+  - **Оценка:** 12-16 часов
+
+- [ ] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.9.4**
+  - Security events (login, permissions)
+  - Compliance logs
+  - Query API с filters
+  - Export to CSV
+  - Retention policy
+  - **Оценка:** 8-12 часов
+
+- [ ] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.9.5**
+  - Fine-grained permissions
+  - Per-tenant role templates
+  - Permission inheritance
+  - RBAC middleware
+  - Admin UI для role management
+  - **Оценка:** 10-14 часов
+
+---
+
+## ⚙️ Version 1.10.0 - Model Management Pro
+
+**Фокус:** Продвинутое управление моделями  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 44-60 часов  
+**Статус:** 📋 Запланировано (0/5 задач)
+
+### Задачи
+
+- [ ] **MODEL-01** Dynamic Model Parameters Configuration → [BACKLOG/MODEL-01_dynamic_parameters.md](BACKLOG/MODEL-01_dynamic_parameters.md) → **v1.10.1**
+  - UI для настройки (temperature, top_p, num_ctx, etc.)
+  - Per-tenant/per-user configs
+  - Validation через Ollama API
+  - Templates для быстрых настроек
+  - **Оценка:** 8-12 часов
+
+- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.10.2**
+  - Per-tenant/per-user limits
+  - Token-based quotas
+  - Request quotas (daily, monthly)
+  - Storage quotas
+  - Quota monitoring & alerts
+  - **Оценка:** 10-14 часов
+
+- [ ] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.10.3**
+  - Keep models in memory
+  - Configurable warm-up strategy
+  - Health checks для loaded models
+  - Automatic unload of unused models
+  - **Оценка:** 6-8 часов
+
+- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.10.4**
+  - Metrics endpoint `/metrics`
+  - Request counters, latency histograms
+  - Model usage statistics
+  - Quota metrics
+  - Grafana dashboard template
+  - **Оценка:** 4-6 часов
+
+- [ ] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.10.5**
+  - Per tenant, per model limits
+  - Sliding window algorithm
+  - Rate limit headers в response
+  - Burst allowance
+  - **Оценка:** 8-10 часов
+
+---
+
 ## 🔮 Future / Deferred
 
 **Задачи для будущих версий** (без конкретного релиза)
@@ -619,15 +766,16 @@
 
 ---
 
-**Последнее обновление:** 2025-10-10  
-**Версия Roadmap:** 1.4  
-**Статус:** Active Development 🚀 (Version 1.3.0 ✅ Completed! → Version 1.4.0 в разработке)
+**Последнее обновление:** 2025-10-11  
+**Версия Roadmap:** 1.5  
+**Статус:** Active Development 🚀 (Version 1.5.0 ✅ Completed! → Planning v1.6.0-1.10.0)
 
-**Изменения в v1.4:**
+**Изменения в v1.5:**
 
-- ✨ Новый подход к версионированию (1 фича = 1 patch)
-- 🔄 Реорганизация Version 1.4.0 (WebUI Enhancements вместо Scalability)
-- 🐛 Добавлена Version 1.5.0 (Operations & Maintenance с BUG-01)
-- 📊 Разделение Version 1.6.0 → 1.6.0 (Observability) + 1.7.0 (API Extensions)
-- 🔮 Новая секция Future/Deferred для отложенных задач
-- 📝 Систематизация 18 TODO комментариев из кода
+- 📱 **Version 1.8.0**: Smart Chat & Content (Vision OCR, Web Fetcher, File Upload, Export, WebSocket)
+- 🔐 **Version 1.9.0**: Enterprise Auth (OIDC/Keycloak, LDAP, Audit, RBAC)
+- ⚙️ **Version 1.10.0**: Model Management Pro (Dynamic Params, Quotas, Preloading, Prometheus, Rate Limiting)
+- 📝 Создано 15 новых детальных BACKLOG файлов
+- 🎯 Фокус на enterprise features и advanced model management
+- 🚫 TUI development остановлена, фокус на WebUI
+- 💡 Roadmap построен на основе user feedback и production needs

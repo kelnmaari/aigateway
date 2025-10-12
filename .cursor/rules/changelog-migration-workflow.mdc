@@ -1,0 +1,204 @@
+---
+alwaysApply: true
+description: Workflow для обновления changelog при завершении задач
+---
+
+# Changelog Migration Workflow
+
+## 🚨 КРИТИЧЕСКИ ВАЖНО: Запрещено удалять БД
+
+**НИКОГДА** не удаляй `data/proxy.db` файл. Это приведет к потере:
+
+- Всех пользователей и их аккаунтов
+- API ключей
+- Истории conversations
+- Usage статистики
+- Настроек tenants и members
+
+## ✅ Правильный workflow при завершении задачи
+
+### 1. Обновление VERSION файла
+
+```bash
+# Обнови VERSION файл с новым номером
+echo "1.X.Y" > VERSION
+```
+
+### 2. Обновление CHANGELOG.md
+
+Добавь новую версию в начало файла по формату [Keep a Changelog](https://keepachangelog.com/):
+
+```markdown
+## [1.X.Y] - YYYY-MM-DD
+
+### Added
+- **Новая фича**: Описание
+  - Детали реализации
+  - Подфичи
+
+### Changed
+- **Изменения**: Что изменилось
+
+### Fixed
+- **Исправления**: Что исправлено
+
+### Technical
+- Технические детали
+- Новые пакеты/зависимости
+- Изменения в архитектуре
+```
+
+### 3. Создание SQL миграции в sqlite.go
+
+**Файл:** [internal/storage/sqlite/sqlite.go](mdc:internal/storage/sqlite/sqlite.go)
+
+#### Шаг 3.1: Добавь миграцию в getMigrations()
+
+Найди функцию `getMigrations()` и добавь новую запись:
+
+```go
+{
+    Version: 18,  // Следующий номер по порядку
+    Name:    "add_changelog_v1_X_Y",
+    SQL:     s.getAddChangelogV1XYMigration(),
+},
+```
+
+#### Шаг 3.2: Создай функцию миграции
+
+В конце файла перед `// NOTE: CRUD Operations Implementation` добавь:
+
+```go
+// getAddChangelogV1XYMigration returns SQL for adding changelog vX.Y.Z (vN migration)
+func (s *SQLiteDB) getAddChangelogV1XYMigration() string {
+    return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.X.Y', 'YYYY-MM-DD', '## [1.X.Y] - YYYY-MM-DD
+
+### Added
+- **Feature Name**: Полное описание
+  - Детали...
+
+### Changed
+- **Configuration**: Изменения в конфигурации
+  
+### Technical
+- Технические детали
+- Новые зависимости
+- Архитектурные изменения');
+    `
+}
+```
+
+**ВАЖНО:**
+
+- SQL content должен точно соответствовать записи в CHANGELOG.md
+- Escape одинарные кавычки в тексте как `''`
+- Используй INSERT OR REPLACE для idempotency
+- Markdown форматирование должно быть корректным
+
+### 4. Проверка компиляции
+
+```bash
+go build -o bin/server.exe cmd/server/main.go
+```
+
+## 📊 Как это работает
+
+1. **При старте сервера**: Система применяет все pending миграции автоматически
+2. **Миграция v18+**: Добавляет запись в таблицу `changelogs`
+3. **API endpoint**: `/api/system/changelogs` возвращает все версии
+4. **WebUI**: Страница "О Системе" отображает историю изменений в accordion UI
+
+## 🔄 Последовательность действий при завершении задачи
+
+```
+1. ✅ Задача полностью завершена и протестирована
+2. ✅ Обновить VERSION файл (1.X.Y)
+3. ✅ Добавить запись в CHANGELOG.md
+4. ✅ Создать миграцию vN в sqlite.go
+5. ✅ Проверить компиляцию (go build)
+6. ✅ Коммит всех изменений вместе
+```
+
+## ❌ Что НЕ делать
+
+- ❌ **НЕ удалять data/proxy.db**
+- ❌ НЕ изменять существующие миграции (v1-v17)
+- ❌ НЕ добавлять версию в миграцию v3 (changelogs initial data)
+- ❌ НЕ пропускать создание миграции при завершении задачи
+- ❌ НЕ использовать sqlite3 CLI для ручного INSERT
+
+## 🎯 Пример реализации
+
+**Задача:** Добавлена OpenTelemetry интеграция в v1.6.1
+
+**VERSION:**
+
+```
+1.6.1
+```
+
+**CHANGELOG.md:**
+
+```markdown
+## [1.6.1] - 2025-10-12
+
+### Added
+- **OpenTelemetry Distributed Tracing**: Полная интеграция OpenTelemetry
+  - Поддержка Jaeger и Zipkin экспортеров
+  - Автоматическая трассировка всех HTTP запросов
+  - W3C Trace Context propagation
+  - Настраиваемый sampling rate (0.0 - 1.0)
+
+### Technical
+- Новый пакет internal/observability с TracerProvider
+- TracingMiddleware для Gin
+- Зависимости: go.opentelemetry.io/otel v1.38.0
+```
+
+**sqlite.go:**
+
+```go
+// В getMigrations():
+{
+    Version: 18,
+    Name:    "add_changelog_v1_6_1",
+    SQL:     s.getAddChangelogV161Migration(),
+},
+
+// В конце файла:
+func (s *SQLiteDB) getAddChangelogV161Migration() string {
+    return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.6.1', '2025-10-12', '## [1.6.1] - 2025-10-12
+
+### Added
+- **OpenTelemetry Distributed Tracing**: Полная интеграция OpenTelemetry
+  - Поддержка Jaeger и Zipkin экспортеров
+  - Автоматическая трассировка всех HTTP запросов
+  - W3C Trace Context propagation
+  - Настраиваемый sampling rate (0.0 - 1.0)
+
+### Technical
+- Новый пакет internal/observability с TracerProvider
+- TracingMiddleware для Gin
+- Зависимости: go.opentelemetry.io/otel v1.38.0');
+    `
+}
+```
+
+## 🔍 Проверка результата
+
+После запуска сервера:
+
+1. Проверь логи: `Migration applied successfully: version=18`
+2. API: `curl http://localhost:8080/api/system/changelogs`
+3. WebUI: Открой "О Системе" - должна быть новая версия
+
+## 📝 Заметки
+
+- Миграции применяются **только один раз** при первом запуске после обновления
+- INSERT OR REPLACE позволяет безопасно перезапускать миграцию
+- Для клиентов и production: **НЕ нужно удалять БД**, миграция применится автоматически
+- Номер миграции должен быть уникальным и последовательным

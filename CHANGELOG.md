@@ -5,6 +5,164 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2025-10-12
+
+### Added
+
+- **Performance Monitoring**: Continuous performance monitoring в production
+  - Runtime metrics collection (CPU, memory, goroutines, GC stats)
+  - Automatic performance anomaly detection (memory/goroutine leaks)
+  - Baseline comparison for performance regression tracking
+  - Configurable thresholds для memory и goroutine counts
+  
+- **Leak Detection**: Автоматическое выявление утечек памяти и goroutines
+  - Trend analysis на основе 10 samples (1 sample/minute)
+  - Warning alerts при sustained growth (>80% samples показывают рост)
+  - Детальная информация о growth rate и duration
+  
+- **Slow Request Logging**: Автоматическое логирование медленных запросов
+  - Middleware для отслеживания request processing time
+  - Configurable threshold (default: 5 seconds)
+  - Детальная информация: method, path, duration, status, user agent
+  
+- **pprof Endpoints**: Runtime profiling для deep analysis
+  - `/api/admin/pprof/*` endpoints (admin only)
+  - CPU profile, heap profile, goroutine dump
+  - Memory allocations, block profile, mutex profile
+  - Execution trace для advanced debugging
+
+- **Performance API**: REST API для доступа к metrics
+  - `GET /api/admin/performance/metrics` - текущие метрики
+  - `GET /api/admin/performance/leaks` - leak detection status  
+  - `POST /api/admin/performance/reset-baseline` - reset baseline
+  - `POST /api/admin/performance/reset-leaks` - reset leak detector
+
+### Changed
+
+- **Configuration**: Добавлена секция `observability.performance`
+  - `enabled`: включение/отключение performance monitoring
+  - `collection_interval`: интервал сбора метрик (default: 30s)
+  - `memory_threshold_mb`: alert threshold для heap memory (default: 1024MB)
+  - `goroutine_threshold`: alert threshold для goroutines (default: 1000)
+  - `slow_request_threshold`: threshold для slow requests (default: 5s)
+  - `gc_percentage`: GOGC value для GC tuning (default: 100)
+  - `leak_detection`: включение leak detection (default: true)
+  - `pprof_enabled`: включение pprof endpoints (default: true)
+
+### Technical
+
+- Новые пакеты:
+  - `internal/observability/perfmon.go` - Performance Monitor Service
+  - `internal/observability/leak_detector.go` - Memory/Goroutine Leak Detector
+  - `internal/api/middleware/slow_request.go` - Slow Request Logger
+  - `internal/api/handlers/performance.go` - Performance API Handler
+
+- Performance Monitor features:
+  - Continuous metrics collection в background goroutine
+  - Thread-safe metrics access с sync.RWMutex
+  - Automatic anomaly detection и alerting
+  - Baseline tracking для regression detection
+  
+- Leak Detector features:
+  - 10-sample rolling window для trend analysis
+  - Separate tracking для memory и goroutine leaks
+  - Configurable thresholds и sensitivity
+
+- pprof integration:
+  - Все стандартные pprof handlers через Gin
+  - Admin authentication required
+  - Configurable enable/disable
+
+- Middleware integration:
+  - SlowRequestLogger после TracingMiddleware
+  - Minimal performance overhead (<1%)
+  - Graceful shutdown support
+
+### Configuration Example
+
+```yaml
+observability:
+  performance:
+    enabled: true
+    collection_interval: "30s"
+    memory_threshold_mb: 1024
+    goroutine_threshold: 1000
+    slow_request_threshold: "5s"
+    gc_percentage: 100
+    leak_detection: true
+    pprof_enabled: true
+```
+
+### Usage Examples
+
+```bash
+# Get current performance metrics
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/admin/performance/metrics
+
+# Get leak detection status
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/admin/performance/leaks
+
+# CPU profile (30 seconds)
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/admin/pprof/profile?seconds=30 \
+  -o cpu.prof
+
+# Analyze profile
+go tool pprof cpu.prof
+
+# Heap profile
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/admin/pprof/heap \
+  -o heap.prof
+
+# Goroutine dump
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/api/admin/pprof/goroutine?debug=1"
+```
+
+## [1.6.1] - 2025-10-12
+
+### Added
+
+- **OpenTelemetry Distributed Tracing**: Полная интеграция OpenTelemetry для distributed tracing
+  - Поддержка Jaeger и Zipkin экспортеров
+  - Автоматическая трассировка всех HTTP запросов
+  - W3C Trace Context propagation
+  - Настраиваемый sampling rate (0.0 - 1.0)
+  - Span annotations с HTTP metadata (method, URL, status code)
+  - Error tracking для запросов со status code >= 400
+
+### Changed
+
+- **Configuration**: Добавлена секция `observability.tracing` в конфигурацию
+  - `enabled`: включение/отключение трacing
+  - `provider`: выбор между "jaeger" или "zipkin"
+  - `service_name`: название сервиса в traces
+  - `sampling_rate`: процент трассируемых запросов
+  - `jaeger.endpoint` и `zipkin.endpoint`: настройка экспортеров
+
+### Technical
+
+- Новый пакет `internal/observability` с TracerProvider
+- TracingMiddleware для автоматической трассировки Gin запросов
+- Интеграция в router и main.go с graceful shutdown
+- Зависимости: go.opentelemetry.io/otel v1.38.0
+- Тесты: 100% покрытие для observability и tracing middleware
+- Tracing middleware применяется первым в цепочке для полной трассировки
+
+### Configuration Example
+
+```yaml
+observability:
+  tracing:
+    enabled: true
+    provider: "jaeger"
+    service_name: "ollama-proxy"
+    sampling_rate: 1.0
+    jaeger:
+      endpoint: "http://localhost:14268/api/traces"
+```
+
 ## [1.5.16] - 2025-10-11
 
 ### Changed

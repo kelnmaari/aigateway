@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"strings"
 	"time"
 
@@ -22,9 +23,12 @@ import (
 	"ollama-openai-proxy/internal/client/ollama"
 	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/metrics"
+	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/request"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/websocket"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Router представляет HTTP роутер приложения с опциональным API Key Management
@@ -33,7 +37,8 @@ type Router struct {
 	logger       *logrus.Logger
 	engine       *gin.Engine
 	ollamaClient *ollama.ClientWithCircuitBreaker
-	version      string // Версия сервера
+	version      string       // Версия сервера
+	tracer       trace.Tracer // OpenTelemetry tracer (v1.6.0+)
 
 	// API Key Management компоненты (опциональные)
 	storage       storage.APIKeyStorage
@@ -69,6 +74,7 @@ type Router struct {
 	mcpHandler            *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
 	changelogHandler      *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
 	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
+	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -81,15 +87,22 @@ type Router struct {
 
 	// Request tracking
 	requestStorage *request.Storage
+
+	// Performance monitoring (v1.6.2)
+	performanceMonitor *observability.PerformanceMonitor
+	leakDetector       *observability.LeakDetector
 }
 
 // NewOptions содержит опции для создания роутера
 type NewOptions struct {
-	Config     *config.Config
-	Logger     *logrus.Logger
-	Version    string
-	Database   storage.Database // Опциональная база данных для user auth
-	JWTManager *jwt.Manager     // Опциональный JWT manager
+	Config             *config.Config
+	Logger             *logrus.Logger
+	Version            string
+	Database           storage.Database                  // Опциональная база данных для user auth
+	JWTManager         *jwt.Manager                      // Опциональный JWT manager
+	TracerProvider     *observability.TracerProvider     // Опциональный OpenTelemetry tracer (v1.6.0+)
+	PerformanceMonitor *observability.PerformanceMonitor // Опциональный performance monitor (v1.6.2+)
+	LeakDetector       *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -110,12 +123,20 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 	}
 
 	r := &Router{
-		config:       opts.Config,
-		logger:       opts.Logger,
-		ollamaClient: ollamaClient,
-		version:      opts.Version,
-		db:           opts.Database,
-		jwtManager:   opts.JWTManager,
+		config:             opts.Config,
+		logger:             opts.Logger,
+		ollamaClient:       ollamaClient,
+		version:            opts.Version,
+		db:                 opts.Database,
+		jwtManager:         opts.JWTManager,
+		performanceMonitor: opts.PerformanceMonitor,
+		leakDetector:       opts.LeakDetector,
+	}
+
+	// Setup tracer if provided
+	if opts.TracerProvider != nil {
+		r.tracer = opts.TracerProvider.Tracer()
+		opts.Logger.Info("OpenTelemetry tracer initialized")
 	}
 
 	// Setup Auth Service если есть database и JWT manager
@@ -204,7 +225,23 @@ func (r *Router) setupEngine() {
 
 // setupMiddleware настраивает базовые middleware
 func (r *Router) setupMiddleware() {
-	// Error handling middleware (должен быть первым)
+	// OpenTelemetry tracing middleware (должен быть первым для полной трассировки)
+	if r.tracer != nil {
+		r.engine.Use(middleware.TracingMiddleware(r.tracer))
+		r.logger.Info("OpenTelemetry tracing middleware enabled")
+	}
+
+	// Slow request logging middleware (v1.6.2) - после tracing
+	if r.config.Observability.Performance.Enabled {
+		threshold, err := time.ParseDuration(r.config.Observability.Performance.SlowRequestThreshold)
+		if err != nil {
+			threshold = 5 * time.Second
+		}
+		r.engine.Use(middleware.SlowRequestLogger(r.logger, threshold))
+		r.logger.WithField("threshold", threshold).Info("Slow request logging middleware enabled")
+	}
+
+	// Error handling middleware
 	r.engine.Use(middleware.ErrorHandling(r.logger))
 
 	// Panic recovery с error handling
@@ -680,6 +717,34 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/logs/:filename/download", r.logsHandler.DownloadLogFile) // Скачать файл
 	}
 
+	// Performance Monitoring endpoints (v1.6.2)
+	if r.performanceHandler != nil {
+		r.logger.Info("Admin routes: Registering Performance Monitoring endpoints")
+		admin.GET("/performance/metrics", r.performanceHandler.GetMetrics)             // Текущие метрики
+		admin.GET("/performance/leaks", r.performanceHandler.GetLeakStatus)            // Leak detection status
+		admin.POST("/performance/reset-baseline", r.performanceHandler.ResetBaseline)  // Reset baseline
+		admin.POST("/performance/reset-leaks", r.performanceHandler.ResetLeakDetector) // Reset leak detector
+	}
+
+	// pprof endpoints (v1.6.2) - Admin only, if enabled
+	if r.config.Observability.Performance.PprofEnabled {
+		r.logger.Info("Admin routes: Registering pprof endpoints")
+		pprofGroup := admin.Group("/pprof")
+		{
+			pprofGroup.GET("/", gin.WrapF(pprof.Index))
+			pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
+			pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
+			pprofGroup.GET("/symbol", gin.WrapF(pprof.Symbol))
+			pprofGroup.GET("/trace", gin.WrapF(pprof.Trace))
+			pprofGroup.GET("/allocs", gin.WrapH(pprof.Handler("allocs")))
+			pprofGroup.GET("/block", gin.WrapH(pprof.Handler("block")))
+			pprofGroup.GET("/goroutine", gin.WrapH(pprof.Handler("goroutine")))
+			pprofGroup.GET("/heap", gin.WrapH(pprof.Handler("heap")))
+			pprofGroup.GET("/mutex", gin.WrapH(pprof.Handler("mutex")))
+			pprofGroup.GET("/threadcreate", gin.WrapH(pprof.Handler("threadcreate")))
+		}
+	}
+
 	r.logger.Info("Admin routes configured successfully")
 
 	// SSE stream вне admin group (SSE не поддерживает Authorization header)
@@ -807,6 +872,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// Backup Handler (v1.5.14)
 	r.backupHandler = handlers.NewBackupHandler(r.config, logger, r.db)
 	logger.Info("Backup handler initialized")
+
+	// Performance Handler (v1.6.2)
+	r.performanceHandler = handlers.NewPerformanceHandler(r.performanceMonitor, r.leakDetector)
+	logger.Info("Performance handler initialized")
 
 	// Metrics Storage (Phase 12.1)
 	r.metricsStorage = metrics.NewMetricsStorage(metrics.DefaultStorageConfig(), logger)

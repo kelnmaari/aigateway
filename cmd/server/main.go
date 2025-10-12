@@ -18,6 +18,7 @@ import (
 	"ollama-openai-proxy/internal/dbfactory"
 	"ollama-openai-proxy/internal/logger"
 	"ollama-openai-proxy/internal/metrics"
+	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/version"
 )
@@ -105,15 +106,119 @@ func main() {
 		fmt.Println("🔐 JWT Manager инициализирован")
 	}
 
+	// Инициализация OpenTelemetry Tracing (Version 1.6.0+)
+	var tracerProvider *observability.TracerProvider
+	if cfg.Observability.Tracing.Enabled {
+		appLogger.Info("Initializing OpenTelemetry Tracing...")
+
+		// Определяем endpoint в зависимости от provider
+		endpoint := ""
+		switch cfg.Observability.Tracing.Provider {
+		case "jaeger":
+			endpoint = cfg.Observability.Tracing.Jaeger.Endpoint
+		case "zipkin":
+			endpoint = cfg.Observability.Tracing.Zipkin.Endpoint
+		}
+
+		tracerProvider, err = observability.NewTracerProvider(observability.TracingConfig{
+			Enabled:      true,
+			Provider:     cfg.Observability.Tracing.Provider,
+			ServiceName:  cfg.Observability.Tracing.ServiceName,
+			Endpoint:     endpoint,
+			SamplingRate: cfg.Observability.Tracing.SamplingRate,
+		})
+		if err != nil {
+			log.Fatalf("❌ Не удалось инициализировать OpenTelemetry: %v", err)
+		}
+
+		// Graceful shutdown для tracer provider
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracerProvider.Shutdown(shutdownCtx); err != nil {
+				appLogger.WithError(err).Error("Error shutting down tracer provider")
+			}
+		}()
+
+		appLogger.WithFields(map[string]interface{}{
+			"provider":      cfg.Observability.Tracing.Provider,
+			"endpoint":      endpoint,
+			"sampling_rate": cfg.Observability.Tracing.SamplingRate,
+		}).Info("✅ OpenTelemetry Tracing initialized successfully")
+		fmt.Println("🔍 OpenTelemetry трассировка включена")
+	}
+
+	// Инициализация Performance Monitor (Version 1.6.2+)
+	var perfMonitor *observability.PerformanceMonitor
+	var leakDetector *observability.LeakDetector
+	if cfg.Observability.Performance.Enabled {
+		appLogger.Info("Initializing Performance Monitor...")
+
+		// Parse durations
+		collectionInterval, err := time.ParseDuration(cfg.Observability.Performance.CollectionInterval)
+		if err != nil {
+			appLogger.WithError(err).Warn("Invalid collection interval, using default 30s")
+			collectionInterval = 30 * time.Second
+		}
+
+		slowRequestThreshold, err := time.ParseDuration(cfg.Observability.Performance.SlowRequestThreshold)
+		if err != nil {
+			appLogger.WithError(err).Warn("Invalid slow request threshold, using default 5s")
+			slowRequestThreshold = 5 * time.Second
+		}
+
+		perfMonitor = observability.NewPerformanceMonitor(appLogger, observability.PerfMonConfig{
+			Enabled:              true,
+			CollectionInterval:   collectionInterval,
+			MemoryThresholdMB:    cfg.Observability.Performance.MemoryThresholdMB,
+			GoroutineThreshold:   cfg.Observability.Performance.GoroutineThreshold,
+			SlowRequestThreshold: slowRequestThreshold,
+			GCPercentage:         cfg.Observability.Performance.GCPercentage,
+		})
+
+		// Start performance monitor in background
+		monitorCtx, monitorCancel := context.WithCancel(context.Background())
+		defer monitorCancel()
+		go perfMonitor.Start(monitorCtx)
+
+		// Graceful shutdown
+		defer perfMonitor.Stop()
+
+		appLogger.WithFields(map[string]interface{}{
+			"collection_interval":    collectionInterval,
+			"memory_threshold_mb":    cfg.Observability.Performance.MemoryThresholdMB,
+			"goroutine_threshold":    cfg.Observability.Performance.GoroutineThreshold,
+			"slow_request_threshold": slowRequestThreshold,
+		}).Info("✅ Performance Monitor initialized successfully")
+		fmt.Println("📊 Performance мониторинг включен")
+
+		// Initialize Leak Detector if enabled
+		if cfg.Observability.Performance.LeakDetection {
+			appLogger.Info("Initializing Leak Detector...")
+			leakDetector = observability.NewLeakDetector(appLogger)
+
+			// Start leak detector in background
+			leakCtx, leakCancel := context.WithCancel(context.Background())
+			defer leakCancel()
+			go leakDetector.Start(leakCtx)
+
+			appLogger.Info("✅ Leak Detector initialized successfully")
+			fmt.Println("🔍 Leak Detection включен")
+		}
+	}
+
 	// Создание роутера
 	var appRouter *router.Router
 	// Всегда используем NewWithOptions для передачи database (необходим для MCP и других фич)
 	appRouter, err = router.NewWithOptions(router.NewOptions{
-		Config:     cfg,
-		Logger:     appLogger,
-		Version:    version.Version,
-		Database:   db,         // Может быть nil для legacy mode
-		JWTManager: jwtManager, // Может быть nil для legacy mode
+		Config:             cfg,
+		Logger:             appLogger,
+		Version:            version.Version,
+		Database:           db,             // Может быть nil для legacy mode
+		JWTManager:         jwtManager,     // Может быть nil для legacy mode
+		TracerProvider:     tracerProvider, // Может быть nil если tracing отключен (v1.6.0+)
+		PerformanceMonitor: perfMonitor,    // Может быть nil если performance monitoring отключен (v1.6.2+)
+		LeakDetector:       leakDetector,   // Может быть nil если leak detection отключен (v1.6.2+)
 	})
 
 	if err != nil {

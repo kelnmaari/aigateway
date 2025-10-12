@@ -151,3 +151,41 @@ type UsageFilters struct {
 	Limit  int `json:"limit,omitempty"`
 	Offset int `json:"offset,omitempty"`
 }
+
+// ========================================
+// Reports Statistics Models (v1.6.3+)
+// ========================================
+
+// UsageReportStats представляет статистику для usage отчета
+type UsageReportStats struct {
+	TotalRequests      int64
+	SuccessfulRequests int64
+	FailedRequests     int64
+	TotalTokens        int64
+	UniqueUsers        int
+	UniqueModels       int
+	TopModels          []struct {
+		Model    string
+		Requests int64
+		Tokens   int64
+	}
+	TopUsers []struct {
+		Username string
+		Requests int64
+		Tokens   int64
+	}
+}
+
+// PerformanceReportStats представляет статистику для performance отчета
+type PerformanceReportStats struct {
+	TotalRequests      int64
+	AvgLatencyMS       float64
+	P50LatencyMS       float64
+	P95LatencyMS       float64
+	P99LatencyMS       float64
+	SlowRequestsCount  int
+	ErrorCount         int
+	RequestsPerSecond  float64
+	FastestRequest     float64
+	SlowestRequest     float64
+}

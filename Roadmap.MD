@@ -362,21 +362,21 @@
 
 ### Задачи
 
-- [ ] **OBSERV-01** OpenTelemetry Integration → [BACKLOG/OBSERV-01_opentelemetry.md](BACKLOG/OBSERV-01_opentelemetry.md) → **v1.6.1**
+- [x] **OBSERV-01** OpenTelemetry Integration → [BACKLOG/OBSERV-01_opentelemetry.md](BACKLOG/OBSERV-01_opentelemetry.md) → **v1.6.1** ✅
   - Distributed tracing
   - Trace context propagation
   - Span annotations
   - Integration с Jaeger/Zipkin
   - **Оценка:** 10-12 часов
 
-- [ ] **OBSERV-02** Performance Monitoring → [BACKLOG/OBSERV-02_perf_monitoring.md](BACKLOG/OBSERV-02_perf_monitoring.md) → **v1.6.2**
+- [x] **OBSERV-02** Performance Monitoring → [BACKLOG/OBSERV-02_perf_monitoring.md](BACKLOG/OBSERV-02_perf_monitoring.md) → **v1.6.2** ✅
   - Continuous profiling в production
   - Memory leak detection
   - Slow request analysis
   - Performance regression detection
   - **Оценка:** 6-8 часов
 
-- [ ] **REPORT-01** Scheduled Reports → [BACKLOG/REPORT-01_scheduled_reports.md](BACKLOG/REPORT-01_scheduled_reports.md) → **v1.6.3**
+- [x] **REPORT-01** Scheduled Reports → [BACKLOG/REPORT-01_scheduled_reports.md](BACKLOG/REPORT-01_scheduled_reports.md) → **v1.6.3** ✅
   - Автоматические отчеты по email
   - Usage statistics reports
   - Performance summaries

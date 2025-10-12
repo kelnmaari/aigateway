@@ -385,30 +385,7 @@
 
 ---
 
-## 🚀 Version 1.7.0 - API Extensions
-
-**Фокус:** Расширение OpenAI API совместимости  
-**Приоритет:** LOW  
-**Оценка времени:** 14-18 часов  
-**Версионирование:** 1 фича = 1 patch (1.7.1, 1.7.2)
-
-### Задачи
-
-- [ ] **API-08** Fine-tuning API Emulation → [BACKLOG/API-08_finetuning_emulation.md](BACKLOG/API-08_finetuning_emulation.md) → **v1.7.1**
-  - OpenAI fine-tuning API compatibility
-  - Model adaptation simulation
-  - Fine-tuning job tracking
-  - **Оценка:** 8-10 часов
-
-- [ ] **API-09** Image Generation Support → [BACKLOG/API-09_image_generation.md](BACKLOG/API-09_image_generation.md) → **v1.7.2**
-  - Support для image models (если Ollama добавит)
-  - `/v1/images/generations` endpoint
-  - Image format conversion
-  - **Оценка:** 6-8 часов (зависит от Ollama)
-
----
-
-## 📱 Version 1.8.0 - Smart Chat & Content
+## 📱 Version 1.7.0 - Smart Chat & Content (переименована из 1.8.0)
 
 **Фокус:** Улучшенный чат и работа с контентом  
 **Приоритет:** HIGH  
@@ -417,7 +394,7 @@
 
 ### Задачи
 
-- [ ] **VISION-01** Vision OCR Service (Multimodal Chat) → [BACKLOG/VISION-01_ocr_multimodal_chat.md](BACKLOG/VISION-01_ocr_multimodal_chat.md) → **v1.8.1**
+- [ ] **VISION-01** Vision OCR Service (Multimodal Chat) → [BACKLOG/VISION-01_ocr_multimodal_chat.md](BACKLOG/VISION-01_ocr_multimodal_chat.md) → **v1.7.1**
   - Multimodal models через Ollama (LLaVA, BakLLaVA)
   - Upload изображений в чат + drag&drop
   - Распознавание текста → контекст для LLM
@@ -425,7 +402,7 @@
   - Thumbnail generation
   - **Оценка:** 8-12 часов
 
-- [ ] **WEB-01** Web Content Fetcher & Summarization → [BACKLOG/WEB-01_content_fetcher.md](BACKLOG/WEB-01_content_fetcher.md) → **v1.8.2**
+- [ ] **WEB-01** Web Content Fetcher & Summarization → [BACKLOG/WEB-01_content_fetcher.md](BACKLOG/WEB-01_content_fetcher.md) → **v1.7.2**
   - HTTP client + goquery для парсинга HTML
   - Извлечение текста, metadata
   - Summarization через LLM
@@ -433,21 +410,21 @@
   - Rate limiting для web fetches
   - **Оценка:** 6-10 часов
 
-- [ ] **FILE-01** File Upload Support (PDF, DOCX, TXT) → [BACKLOG/FILE-01_file_upload_support.md](BACKLOG/FILE-01_file_upload_support.md) → **v1.8.3**
+- [ ] **FILE-01** File Upload Support (PDF, DOCX, TXT) → [BACKLOG/FILE-01_file_upload_support.md](BACKLOG/FILE-01_file_upload_support.md) → **v1.7.3**
   - PDF, DOCX, TXT text extraction
   - Интеграция с чатом (file → context)
   - File storage & management
   - Validation и size limits
   - **Оценка:** 8-10 часов
 
-- [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.8.4**
+- [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.7.4**
   - Export to JSON, Markdown
   - Bulk export для всех conversations
   - Import для восстановления истории
   - Date range filtering
   - **Оценка:** 4-6 часов
 
-- [ ] **WS-01** WebSocket Real-time Updates (WebUI only) → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.8.5**
+- [ ] **WS-01** WebSocket Real-time Updates (WebUI only) → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.7.5**
   - Real-time updates вместо polling
   - Live chat streaming
   - System notifications push
@@ -457,7 +434,7 @@
 
 ---
 
-## 🔐 Version 1.9.0 - Enterprise Auth
+## 🔐 Version 1.8.0 - Enterprise Auth
 
 **Фокус:** Корпоративная аутентификация  
 **Приоритет:** HIGH  
@@ -466,7 +443,7 @@
 
 ### Задачи
 
-- [ ] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.9.1**
+- [ ] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.8.1**
   - OAuth2/OIDC flow
   - Token validation & refresh
   - UI для настройки через админку
@@ -474,21 +451,21 @@
   - Fallback to local auth
   - **Оценка:** 16-24 часа
 
-- [ ] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.9.2**
+- [ ] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.8.2**
   - Claims parsing (groups, roles)
   - Automatic tenant creation/mapping
   - Group sync (manual/scheduled)
   - Admin groups role assignment
   - **Оценка:** 8-12 часов
 
-- [ ] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.9.3**
+- [ ] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.8.3**
   - LDAP bind + search
   - User/group sync
   - UI для настройки через админку
   - TLS/LDAPS support
   - **Оценка:** 12-16 часов
 
-- [ ] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.9.4**
+- [ ] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.8.4**
   - Security events (login, permissions)
   - Compliance logs
   - Query API с filters
@@ -496,7 +473,7 @@
   - Retention policy
   - **Оценка:** 8-12 часов
 
-- [ ] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.9.5**
+- [ ] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.8.5**
   - Fine-grained permissions
   - Per-tenant role templates
   - Permission inheritance
@@ -506,7 +483,7 @@
 
 ---
 
-## ⚙️ Version 1.10.0 - Model Management Pro
+## ⚙️ Version 1.9.0 - Model Management Pro
 
 **Фокус:** Продвинутое управление моделями  
 **Приоритет:** MEDIUM  
@@ -515,14 +492,14 @@
 
 ### Задачи
 
-- [ ] **MODEL-01** Dynamic Model Parameters Configuration → [BACKLOG/MODEL-01_dynamic_parameters.md](BACKLOG/MODEL-01_dynamic_parameters.md) → **v1.10.1**
+- [ ] **MODEL-01** Dynamic Model Parameters Configuration → [BACKLOG/MODEL-01_dynamic_parameters.md](BACKLOG/MODEL-01_dynamic_parameters.md) → **v1.9.1**
   - UI для настройки (temperature, top_p, num_ctx, etc.)
   - Per-tenant/per-user configs
   - Validation через Ollama API
   - Templates для быстрых настроек
   - **Оценка:** 8-12 часов
 
-- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.10.2**
+- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.9.2**
   - Per-tenant/per-user limits
   - Token-based quotas
   - Request quotas (daily, monthly)
@@ -530,14 +507,14 @@
   - Quota monitoring & alerts
   - **Оценка:** 10-14 часов
 
-- [ ] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.10.3**
+- [ ] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.9.3**
   - Keep models in memory
   - Configurable warm-up strategy
   - Health checks для loaded models
   - Automatic unload of unused models
   - **Оценка:** 6-8 часов
 
-- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.10.4**
+- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.9.4**
   - Metrics endpoint `/metrics`
   - Request counters, latency histograms
   - Model usage statistics
@@ -545,7 +522,7 @@
   - Grafana dashboard template
   - **Оценка:** 4-6 часов
 
-- [ ] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.10.5**
+- [ ] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.9.5**
   - Per tenant, per model limits
   - Sliding window algorithm
   - Rate limit headers в response
@@ -600,6 +577,25 @@
 - [ ] **TODO-09** Auth Middleware Cleanup
   - Удалить legacy middleware (уже реализовано в новых файлах)
   - Файл: internal/api/middleware/auth.go (можно удалить)
+
+### ⏸️ Postponed Tasks (API Extensions - отложено)
+
+**Причина отложения:** Низкий приоритет, зависимость от Ollama capabilities
+
+- [ ] **API-08** Fine-tuning API Emulation → [BACKLOG/API-08_finetuning_emulation.md](BACKLOG/API-08_finetuning_emulation.md)
+  - OpenAI `/v1/fine_tuning/jobs` API эмуляция
+  - Job simulation и tracking  
+  - Model aliasing (ft:model:suffix → model)
+  - File upload API compatibility
+  - **Оценка:** 8-10 часов
+  - **Статус:** ⏸️ Отложено - низкий приоритет
+
+- [ ] **API-09** Image Generation Support → [BACKLOG/API-09_image_generation.md](BACKLOG/API-09_image_generation.md)
+  - OpenAI `/v1/images/generations` API
+  - Support для image models (если Ollama добавит)
+  - Image format conversion (PNG, JPEG, WebP, base64)
+  - **Оценка:** 6-8 часов
+  - **Статус:** ⏸️ BLOCKED - Ollama не поддерживает image generation
 
 ### Ideas for Discussion
 

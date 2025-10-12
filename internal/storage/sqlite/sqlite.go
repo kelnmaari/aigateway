@@ -21,11 +21,13 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
 
 	"ollama-openai-proxy/internal/config"
+	"ollama-openai-proxy/internal/models"
 	"ollama-openai-proxy/internal/storage"
 )
 
@@ -206,6 +208,30 @@ func (tx *sqliteTx) Rollback() error {
 }
 
 // ========================================
+// Reports Statistics Methods (v1.6.3+) - Delegation to DB
+// ========================================
+
+func (tx *sqliteTx) GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error) {
+	return tx.db.GetUsageStats(ctx, start, end)
+}
+
+func (tx *sqliteTx) GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error) {
+	return tx.db.GetPerformanceStats(ctx, start, end)
+}
+
+func (tx *sqliteTx) CountActiveUsers(ctx context.Context, period time.Duration) (int, error) {
+	return tx.db.CountActiveUsers(ctx, period)
+}
+
+func (tx *sqliteTx) CountTotalUsers(ctx context.Context) (int, error) {
+	return tx.db.CountTotalUsers(ctx)
+}
+
+func (tx *sqliteTx) CountActiveAPIKeys(ctx context.Context) (int, error) {
+	return tx.db.CountActiveAPIKeys(ctx)
+}
+
+// ========================================
 // Migrations
 // ========================================
 
@@ -378,6 +404,11 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Version: 19,
 			Name:    "add_changelog_v1_6_2",
 			SQL:     s.getAddChangelogV162Migration(),
+		},
+		{
+			Version: 20,
+			Name:    "add_changelog_v1_6_3",
+			SQL:     s.getAddChangelogV163Migration(),
 		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
@@ -1607,6 +1638,56 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - internal/api/handlers/performance.go - Performance API
 - Thread-safe metrics, minimal overhead (<1%)
 - Graceful shutdown support');
+	`
+}
+
+// getAddChangelogV163Migration returns SQL for adding changelog v1.6.3 (v20 migration)
+func (s *SQLiteDB) getAddChangelogV163Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.6.3', '2025-10-12', '## [1.6.3] - 2025-10-12
+
+### Added
+- **Scheduled Reports**: Автоматическая генерация и отправка отчетов по email
+  - Cron-based scheduler с поддержкой гибких расписаний
+  - Report Generator для Usage, Performance и System Health отчетов
+  - Email Mailer с SMTP отправкой (поддержка TLS/SSL)
+  - HTML email templates с современным дизайном
+  - Поддержка множественных recipients
+
+- **Report Types**: Три типа отчетов
+  - **Usage Report**: Total requests, tokens, top models, top users
+  - **Performance Report**: Latency metrics (P50/P95/P99), slow requests, error rates
+  - **System Health Report**: Uptime, memory, goroutines, database stats
+
+### Changed
+- **Configuration**: Добавлена секция reports
+  - enabled: включение/отключение scheduler
+  - smtp: SMTP конфигурация (host, port, username, password, TLS)
+  - schedules: массив scheduled reports с cron expressions
+  - Поддержка переменных окружения для паролей
+
+- **Database Interface**: Добавлены методы для reports statistics
+  - GetUsageStats(): агрегированная статистика использования
+  - GetPerformanceStats(): performance metrics за период
+  - CountActiveUsers(), CountTotalUsers(), CountActiveAPIKeys()
+
+### Technical
+- Новый пакет internal/reports с полной реализацией
+  - scheduler.go: Cron scheduler с github.com/robfig/cron/v3
+  - generator.go: Report generation с embedded HTML templates
+  - mailer.go: SMTP email delivery с gopkg.in/gomail.v2
+  - types.go: Report models и data structures
+  - templates/*.html: Beautiful HTML email templates
+
+- SQLite реализация reports statistics методов
+  - Percentile calculations для latency metrics
+  - JOIN queries для user/model aggregations
+  - Optimized queries для больших datasets
+
+- PostgreSQL stub реализация (для будущей поддержки)
+- Зависимости: github.com/robfig/cron/v3, gopkg.in/gomail.v2
+- Graceful shutdown для scheduler');
 	`
 }
 

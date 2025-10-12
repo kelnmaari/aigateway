@@ -193,3 +193,27 @@ func (db *PostgreSQLDB) GetChangelog(ctx context.Context, version string) (*mode
 func (db *PostgreSQLDB) ListChangelogs(ctx context.Context) ([]*models.Changelog, error) {
 	return nil, fmt.Errorf("ListChangelogs not implemented for PostgreSQL yet")
 }
+
+// ========================================
+// Reports Statistics Methods (Stubs - v1.6.3)
+// ========================================
+
+func (db *PostgreSQLDB) GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error) {
+	return nil, fmt.Errorf("GetUsageStats not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error) {
+	return nil, fmt.Errorf("GetPerformanceStats not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) CountActiveUsers(ctx context.Context, period time.Duration) (int, error) {
+	return 0, fmt.Errorf("CountActiveUsers not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) CountTotalUsers(ctx context.Context) (int, error) {
+	return 0, fmt.Errorf("CountTotalUsers not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) CountActiveAPIKeys(ctx context.Context) (int, error) {
+	return 0, fmt.Errorf("CountActiveAPIKeys not implemented for PostgreSQL yet")
+}

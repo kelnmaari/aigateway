@@ -22,11 +22,13 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
 	"ollama-openai-proxy/internal/config"
+	"ollama-openai-proxy/internal/models"
 	"ollama-openai-proxy/internal/storage"
 )
 
@@ -548,6 +550,30 @@ CREATE INDEX IF NOT EXISTS idx_mcp_servers_tags ON mcp_servers USING GIN (tags);
 //   - Transaction support
 //   - Migration system
 // ========================================
+
+// ========================================
+// Reports Statistics Methods (v1.6.3+) - Delegation to DB
+// ========================================
+
+func (tx *postgresqlTx) GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error) {
+	return tx.db.GetUsageStats(ctx, start, end)
+}
+
+func (tx *postgresqlTx) GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error) {
+	return tx.db.GetPerformanceStats(ctx, start, end)
+}
+
+func (tx *postgresqlTx) CountActiveUsers(ctx context.Context, period time.Duration) (int, error) {
+	return tx.db.CountActiveUsers(ctx, period)
+}
+
+func (tx *postgresqlTx) CountTotalUsers(ctx context.Context) (int, error) {
+	return tx.db.CountTotalUsers(ctx)
+}
+
+func (tx *postgresqlTx) CountActiveAPIKeys(ctx context.Context) (int, error) {
+	return tx.db.CountActiveAPIKeys(ctx)
+}
 
 // Ensure postgresqlTx implements storage.Tx interface
 var _ storage.Tx = (*postgresqlTx)(nil)

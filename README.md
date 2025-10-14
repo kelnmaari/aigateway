@@ -1,102 +1,261 @@
 # 🦙 Ollama-OpenAI Proxy
 
-> **OpenAI-compatible API for local Ollama models with Enterprise-grade features**
+> **Enterprise-grade OpenAI-compatible API for local Ollama models**  
+> Multi-tenancy • ChatGPT-like UI • JWT Auth • Performance Monitoring • GPU Metrics
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Test Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/yourusername/ollama-openai-proxy)
-
-## 📖 What is this?
-
-Ollama-OpenAI Proxy is a **production-ready Go application** that provides an **OpenAI-compatible API** for local Ollama models. It serves as a bridge between clients expecting OpenAI API and your local Ollama server, enabling seamless integration with existing tools and workflows.
-
-### 🎯 Key Features
-
-- ✅ **Full OpenAI API Compatibility** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, `/v1/completions`
-- 🔥 **Real-time Streaming** - Server-Sent Events (SSE) for live responses
-- 🛠️ **Function Calling (Tools)** - OpenAI-style function calling with automatic model routing
-- 🔐 **Enterprise Security** - API key management, rate limiting, permissions, bcrypt hashing
-- 📊 **Professional Monitoring** - Prometheus metrics, Terminal UI, Web UI, detailed logs
-- ⚡ **High Performance** - Connection pooling, circuit breakers, request timeout handling
-- 🧠 **Intelligent Conversion** - Automatic OpenAI ↔ Ollama format conversion
-- 🎨 **Dual UI Options** - Terminal UI (TUI) and Web UI (WebUI) for monitoring and management
-- 📝 **Comprehensive Logging** - Structured logs with rotation, file output
+[![Version](https://img.shields.io/badge/version-1.9.3-brightgreen.svg)](VERSION)
 
 ---
 
-## 🚀 Quick Start
+## 📖 Что это?
 
-### Prerequisites
+**Ollama-OpenAI Proxy** — production-ready Go приложение, предоставляющее **OpenAI-совместимый API** для локальных Ollama моделей. Идеальное решение для интеграции LLM в корпоративную инфраструктуру.
 
-- **Go 1.25+** (for building from source)
-- **Ollama** server running locally or remotely ([Download Ollama](https://ollama.ai/))
-- At least one Ollama model installed (`ollama pull llama3.1`)
+### 🎯 Ключевые возможности
 
-### Installation
+#### 🚀 Основные
 
-#### Option 1: Build from Source
+- ✅ **Full OpenAI API** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, `/v1/completions`
+- 🔥 **Real-time Streaming** - Server-Sent Events (SSE) для живых ответов
+- 🛠️ **Function Calling** - Инструменты в стиле OpenAI с автомаршрутизацией моделей
+- 💬 **ChatGPT-like WebUI** - Полноценный чат-интерфейс с историей разговоров
+
+#### 🔐 Enterprise Security
+
+- 🔒 **JWT Authentication** - Полноценная система аутентификации пользователей
+- 👥 **Multi-Tenancy** - Организации с членством и RBAC (Owner/Admin/Member/Viewer)
+- 🔑 **API Key Management** - Personal & Tenant API keys с гранулярными правами
+- ⏱️ **Rate Limiting** - Настраиваемые лимиты per-key/per-tenant
+
+#### 📊 Мониторинг & Observability
+
+- 📈 **MoniGo Dashboard** - Real-time performance monitoring (CPU, Memory, Goroutines)
+- 🎮 **NVIDIA GPU Metrics** - Multi-GPU мониторинг через `nvidia-smi` (БЕЗ CGO!)
+- 📉 **Prometheus Metrics** - Полная интеграция для Grafana
+- 🔍 **OpenTelemetry** - Distributed tracing (Jaeger/Zipkin)
+- 📋 **Enhanced Logs** - Structured logging с SSE real-time streaming
+
+#### ⚡ Performance & UX
+
+- 🎨 **Dynamic Model Parameters** - Настройка температуры, top_p, context window в UI
+- 📊 **Context Tracking** - Real-time отслеживание использования контекста
+- 🔄 **Auto-Summarization** - Автоматическое сжатие при переполнении контекста
+- 💾 **Backup & Restore** - Автоматическое резервное копирование БД
+- 🌐 **WebUI + TUI** - Два интерфейса управления на выбор
+
+---
+
+## 🚀 Быстрый старт
+
+### Требования
+
+- **Go 1.25+** (для сборки из исходников)
+- **Ollama** server ([Скачать Ollama](https://ollama.ai/))
+- Хотя бы одна модель: `ollama pull llama3.2`
+
+### Установка
+
+#### Docker Compose (рекомендуется)
 
 ```bash
-# Clone the repository
+git clone https://github.com/yourusername/ollama-openai-proxy.git
+cd ollama-openai-proxy
+
+# Build & Start
+docker compose --profile build up --build
+
+# Сервер: http://localhost:8080
+# WebUI: http://localhost:8080/login
+```
+
+#### Сборка из исходников
+
+```bash
 git clone https://github.com/yourusername/ollama-openai-proxy.git
 cd ollama-openai-proxy
 
 # Install dependencies
 go mod tidy
 
-# Build the server, TUI and WebUI
-go build -o bin/server.exe cmd/server/main.go
-go build -o bin/tui.exe cmd/tui/*.go
-go build -o bin/webui.exe cmd/webui/main.go
+# Build all binaries
+./build.sh all
 
-# Run the server
-./bin/server.exe
+# Или через Docker
+docker compose --profile build up --build
 
-# Or use air for hot-reload during development
-air
+# Binaries в папке dist/
 ```
 
-#### Option 2: Pre-built Binaries
+### Первый запуск
+
+1. **Запустите Ollama**:
 
 ```bash
-# Download from releases
-# Coming soon...
+ollama serve
+ollama pull llama3.2  # Или любую другую модель
 ```
 
-### First Run
-
-1. **Start Ollama** (if not already running):
+2. **Запустите Proxy Server** (WSL/Linux рекомендуется для GPU monitoring):
 
    ```bash
-   ollama serve
-   ```
+# Linux/macOS
+./dist/ollama-proxy-linux-amd64 -config configs/dev.yaml
 
-2. **Start the Proxy Server**:
+# Windows (без GPU monitoring)
+dist\ollama-proxy-windows-amd64.exe -config configs/dev.yaml
+
+# Server: http://localhost:8080
+```
+
+3. **Bootstrap Admin User**:
+
+При первом запуске система предложит создать admin пользователя через специальный токен. Следуйте инструкциям в логах.
+
+4. **Откройте WebUI**:
+
+```
+http://localhost:8080/login
+```
+
+Зарегистрируйтесь и начните использовать!
+
+---
+
+## 💬 ChatGPT-like WebUI
+
+### Основные возможности
+
+- 🎨 **Modern Dark Theme** - Красивый, отзывчивый интерфейс
+- 💬 **Real-time Chat** - Streaming ответы с поддержкой Markdown
+- 📚 **Conversations History** - Сохранение и восстановление диалогов
+- 🎛️ **Dynamic Parameters** - Настройка model parameters прямо в чате
+- 📊 **Context Tracking** - Визуальный индикатор использования контекста
+- 🔄 **Auto-Summarization** - Автоматическое сжатие при заполнении
+
+### Страницы WebUI
+
+| Страница | Описание | Доступ |
+|----------|----------|--------|
+| **Chat** | ChatGPT-подобный интерфейс | Все пользователи |
+| **Dashboard** | Статистика использования, быстрые действия | Все пользователи |
+| **Profile** | Управление профилем, смена пароля | Все пользователи |
+| **API Keys** | Personal & Tenant API keys management | Все пользователи |
+| **Tenants** | Управление организациями и участниками | Owner/Admin |
+| **Usage** | Детальная аналитика использования | Все пользователи |
+| **Admin** | Models, System, Logs, Performance, GPU | Admin only |
+| **MCP** | Catalog MCP серверов (справочник) | Все пользователи |
+| **About** | Changelog и информация о системе | Все пользователи |
+
+### Dynamic Model Parameters
+
+В чате доступна панель настройки параметров:
+
+- **Temperature** (0.0 - 2.0) - Креативность ответов
+- **Top P** (0.0 - 1.0) - Nucleus sampling
+- **Top K** (0 - 100) - Ограничение словаря
+- **Context Window** (512 - 128000) - Размер контекста
+- **Max Tokens** - Максимум токенов в ответе
+
+**Quick Presets:**
+- 🎨 Creative (temp: 1.2, top_p: 0.95)
+- ⚖️ Balanced (temp: 0.7, top_p: 0.9)
+- 🎯 Precise (temp: 0.3, top_p: 0.5)
+- 💻 Coding (temp: 0.2, top_p: 0.1)
+
+Настройки сохраняются в `localStorage` браузера.
+
+---
+
+## 🔐 Multi-Tenancy & Authentication
+
+### User Roles
+
+| Role | Описание | Права |
+|------|----------|-------|
+| **Owner** | Создатель организации | Полный доступ, добавление админов |
+| **Admin** | Администратор | Управление участниками, API keys |
+| **Member** | Участник | Доступ к tenant resources |
+| **Viewer** | Наблюдатель | Только чтение |
+
+### Организации (Tenants)
+
+- **Personal Workspace** - Автоматически для каждого пользователя
+- **Organization Tenants** - Создаются вручную для команд
+- **API Keys Scoping** - Personal (user-scoped) + Tenant (org-scoped)
+- **Members Management** - Добавление/удаление участников с ролями
+
+### API Keys Management
+
+**Personal API Keys** - привязаны к пользователю:
 
    ```bash
-   ./bin/server.exe
-   # Server will start on http://localhost:8080
-   ```
+# Создать в WebUI: API Keys → Personal Keys → Create New
+# Использование:
+curl -H "Authorization: Bearer sk-your-personal-key" \
+  http://localhost:8080/v1/chat/completions
+```
 
-3. **Test the connection**:
+**Tenant API Keys** - привязаны к организации:
 
 ```bash
-curl http://localhost:8080/v1/models
-   ```
+# Создать в WebUI: API Keys → Tenant Keys → Create New
+# Использование аналогично
+```
 
-4. **Launch TUI** (optional):
+Каждый ключ имеет:
+- ✅ Список разрешенных моделей
+- ⏱️ Rate limits (requests/min, requests/hour)
+- 📅 Expiration date
+- 🔒 Enable/Disable toggle
 
-   ```bash
-   ./bin/tui.exe
-   # Press 1-7 to navigate between screens
-   ```
+---
 
-5. **Launch WebUI** (optional):
+## 📊 Performance Monitoring
 
-   ```bash
-   ./bin/webui.exe
-   # WebUI will be available at http://localhost:8081
-   # Open in your browser
+### MoniGo Dashboard
+
+Доступен на отдельном порту **:9091** для админов:
+
+```
+http://localhost:9091
+```
+
+**Quick Stats Cards** (интегрированы в Admin → System):
+- 💻 **CPU Usage** - Real-time загрузка процессора
+- 🧠 **Memory Usage** - Использование RAM
+- 🔄 **Goroutines** - Активные горутины
+- ✅ **System Health** - Общее состояние
+
+### NVIDIA GPU Monitoring
+
+**Multi-GPU поддержка** через `nvidia-smi` (Linux/macOS only):
+
+Метрики на каждую GPU:
+- 🌡️ **Temperature** (с цветовыми индикаторами)
+- ⚡ **Power Usage** (W / % от лимита)
+- 📊 **GPU Load** (utilization %)
+- 💾 **VRAM Usage** (used / total GB)
+- 🔧 **Clock Speed** (MHz)
+- 💨 **Fan Speed** (%)
+
+Автообновление каждые 5 секунд. Unified card дизайн для всех GPU.
+
+**Примечание:** Windows использует stub версию (GPU monitoring disabled).
+
+### OpenTelemetry
+
+Distributed tracing для production мониторинга:
+
+```yaml
+observability:
+  enabled: true
+  tracing:
+    enabled: true
+    exporter: "jaeger"
+    jaeger_endpoint: "http://localhost:14268/api/traces"
+    sampling_rate: 0.1  # 10% запросов
    ```
 
 ---
@@ -105,519 +264,182 @@ curl http://localhost:8080/v1/models
 
 ### Supported Endpoints
 
-| Endpoint | Method | Description | OpenAI Compatible |
-|----------|--------|-------------|-------------------|
-| `/v1/chat/completions` | POST | Chat completions with streaming | ✅ Yes |
-| `/v1/models` | GET | List available models | ✅ Yes |
-| `/v1/embeddings` | POST | Generate embeddings | ✅ Yes |
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/v1/chat/completions` | POST | Chat completions с streaming | ✅ Yes |
+| `/v1/models` | GET | Список доступных моделей | ✅ Yes |
+| `/v1/embeddings` | POST | Генерация embeddings | ✅ Yes |
 | `/v1/completions` | POST | Legacy text completions | ✅ Yes |
-| `/health` | GET | Health check | - |
-| `/api/stats` | GET | Server statistics | - |
-| `/api/config` | GET | Server configuration | - |
-| `/metrics` | GET | Prometheus metrics | - |
+| `/health` | GET | Health check | ❌ No |
+| `/api/system/changelogs` | GET | Changelog истории | ✅ Yes |
+| `/api/gpu/metrics` | GET | NVIDIA GPU метрики | ✅ Admin |
+| `/metrics` | GET | Prometheus metrics | ❌ No |
 
-### Chat Completions
-
-#### Basic Request
+### Chat Completions Example
 
 ```bash
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-your-api-key" \
   -d '{
-    "model": "qwen2.5-coder:7b",
+    "model": "llama3.2",
     "messages": [
-      {"role": "system", "content": "You are a helpful coding assistant."},
-      {"role": "user", "content": "Write a bubble sort function in Go"}
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Explain quantum computing"}
     ],
     "temperature": 0.7,
-    "max_tokens": 500
-  }'
-```
-
-#### Streaming Request
-
-```bash
-curl -X POST http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-api-key" \
-  -d '{
-    "model": "qwen2.5-coder:7b", 
-    "messages": [{"role": "user", "content": "Explain async/await in JavaScript"}],
+    "max_tokens": 500,
     "stream": true
-  }' \
-  --no-buffer
-```
-
-#### Function Calling (Tools)
-
-```bash
-curl -X POST http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-api-key" \
-  -d '{
-    "model": "llama3.1",
-    "messages": [
-      {"role": "user", "content": "What is the weather in London?"}
-    ],
-    "tools": [
-      {
-        "type": "function",
-        "function": {
-          "name": "get_weather",
-          "description": "Get current weather for a location",
-          "parameters": {
-            "type": "object",
-            "properties": {
-              "location": {
-                "type": "string",
-                "description": "City name"
-              }
-            },
-            "required": ["location"]
-          }
-        }
-      }
-    ],
-    "tool_choice": "auto"
   }'
 ```
 
-**Response:**
+**Streaming response:**
 
-```json
-{
-  "id": "chatcmpl-123",
-  "object": "chat.completion",
-  "created": 1699999999,
-  "model": "llama3.1",
-  "choices": [{
-    "index": 0,
-    "message": {
-      "role": "assistant",
-      "content": null,
-      "tool_calls": [{
-        "id": "call_abc123",
-        "type": "function",
-        "function": {
-          "name": "get_weather",
-          "arguments": "{\"location\":\"London\"}"
-        }
-      }]
-    },
-    "finish_reason": "tool_calls"
-  }]
-}
+```
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1699999999,"model":"llama3.2","choices":[{"index":0,"delta":{"role":"assistant","content":"Quantum"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1699999999,"model":"llama3.2","choices":[{"index":0,"delta":{"content":" computing"},"finish_reason":null}]}
+
+...
+
+data: [DONE]
 ```
 
-### Embeddings
-
-```bash
-curl -X POST http://localhost:8080/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-api-key" \
-  -d '{
-    "model": "nomic-embed-text",
-    "input": ["Hello world", "Goodbye world"]
-  }'
-```
-
-**Response:**
-
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "object": "embedding",
-      "embedding": [0.123, -0.456, 0.789, ...],
-      "index": 0
-    },
-    {
-      "object": "embedding",
-      "embedding": [0.321, -0.654, 0.987, ...],
-      "index": 1
-    }
-  ],
-  "model": "nomic-embed-text",
-  "usage": {
-    "prompt_tokens": 4,
-    "total_tokens": 4
-  }
-}
-```
-
-### Legacy Completions
-
-```bash
-curl -X POST http://localhost:8080/v1/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-api-key" \
-  -d '{
-    "model": "llama3.1",
-    "prompt": "Once upon a time",
-    "max_tokens": 100,
-    "temperature": 0.7
-  }'
-```
+Полная документация: [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
 
 ---
 
-## 🔐 API Key Management
+## ⚙️ Конфигурация
 
-### Creating API Keys (via TUI)
+### Основная конфигурация
 
-1. Launch TUI: `./bin/tui.exe`
-2. Press `4` to go to API Keys screen
-3. Press `n` to create a new key
-4. Fill in the form:
-   - **Name**: Descriptive name (e.g., "Development Key")
-   - **Permissions**: Comma-separated models or `*` for all
-   - **Rate Limits**: Optional (requests per minute/hour)
-5. Press `Enter` to create
-6. **Copy the displayed key immediately** - it won't be shown again!
-7. Press `c` to copy to clipboard
-
-### Using API Keys
-
-Include the API key in the `Authorization` header:
-
-```bash
-curl -H "Authorization: Bearer sk-your-api-key-here" \
-  http://localhost:8080/v1/models
-```
-
-### Admin API Key
-
-The bootstrap admin key is defined in `configs/dev.yaml`:
+`configs/dev.yaml`:
 
 ```yaml
-auth:
-  admin_key: "sk-admin-dev-key-12345"
-```
-
-**⚠️ Change this in production!**
-
-Admin keys have:
-
-- Unlimited rate limits
-- Access to all models
-- Access to all API endpoints
-
----
-
-## 🖥️ Terminal User Interface (TUI)
-
-Launch the TUI for monitoring and management:
-
-```bash
-./bin/tui.exe
-```
-
-### TUI Features
-
-| Screen | Key | Description |
-|--------|-----|-------------|
-| **Dashboard** | `1` | Overview, metrics, Prometheus stats |
-| **Requests** | `2` | Request monitoring (placeholder) |
-| **Models** | `3` | Available Ollama models |
-| **API Keys** | `4` | Manage API keys, create new keys |
-| **Config** | `5` | View server configuration |
-| **Logs** | `6` | Real-time log viewer with color coding |
-| **Control** | `7` | Server status, Ollama connection, statistics |
-
-### TUI Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `1-7` | Navigate between screens |
-| `n` | Create new API key (on API Keys screen) |
-| `r` | Refresh statistics |
-| `↑`/`↓` or `j`/`k` | Scroll up/down (line by line) |
-| `PgUp`/`PgDn` | Scroll up/down (10 lines) |
-| `Home` | Jump to top |
-| `c` | Copy API key to clipboard (when shown) |
-| `q` or `Ctrl+C` | Quit TUI |
-| `Esc` | Clear error message |
-
-### TUI Screenshots
-
-**Dashboard:**
-
-```
-🦙 Ollama-OpenAI Proxy TUI
-v1.0.0 | Обновлено: 12:34:56
-
-[1: Dashboard] [2: Requests] [3: Models] [4: API Keys] ...
-
-📊 СЕРВЕР
-• Статус: ✅ Запущен
-• Uptime: 2h15m30s
-• Всего запросов: 1,234
-
-📊 PROMETHEUS METRICS
-• HTTP Requests: 1234 (0 in-flight)
-• Ollama Requests: 1100 (5 errors)
-• Avg HTTP Latency: 45.32 ms
-• Avg Ollama Latency: 2345.67 ms
-```
-
----
-
-## 🌐 Web User Interface (WebUI)
-
-Launch the WebUI for browser-based monitoring and management:
-
-```bash
-./bin/webui.exe
-# WebUI will be available at http://localhost:8081
-```
-
-### WebUI Features
-
-| Screen | Description |
-|--------|-------------|
-| **Dashboard** | Real-time metrics, server status, Ollama connection |
-| **API Keys** | Create, view, and delete API keys with admin authentication |
-| **Models** | Browse available Ollama models |
-| **Config** | View server configuration (JSON format) |
-| **Logs** | Real-time log viewer (coming soon) |
-
-### WebUI Highlights
-
-- ✨ **Modern Dark Theme** - Beautiful, responsive UI
-- 🔄 **Auto-Refresh** - Updates every 5 seconds
-- 📱 **Mobile-Friendly** - Works on any device
-- 🔐 **Secure** - Admin key required for operations
-- 📋 **Copy to Clipboard** - One-click API key copying
-- 🚀 **Single Binary** - No Node.js required, everything embedded
-
-### WebUI Configuration
-
-```bash
-# Change WebUI port
-./bin/webui.exe -port 9000
-
-# Connect to remote server
-./bin/webui.exe -server-url http://192.168.1.100:8080
-
-# Bind to specific host
-./bin/webui.exe -host 127.0.0.1
-```
-
-**📚 Full documentation:**
-
-- **Terminal UI**: [docs/TUI_GUIDE.md](docs/TUI_GUIDE.md)
-- **Web UI**: [docs/WEBUI_GUIDE.md](docs/WEBUI_GUIDE.md)
-
----
-
-## ⚙️ Configuration
-
-Configuration is stored in `configs/dev.yaml` (development) or `configs/production.yaml` (production).
-
-### Full Configuration Example
-
-```yaml
-# Server configuration
 server:
   host: "0.0.0.0"
   port: 8080
   read_timeout: "30s"
-  write_timeout: "180s"  # High for streaming
-  idle_timeout: "120s"
-  max_header_bytes: 1048576  # 1MB
+  write_timeout: "180s"
 
-# Ollama connection
 ollama:
   url: "http://localhost:11434"
-  timeout: "180s"  # High timeout for large models
+  timeout: "180s"
   retry_attempts: 3
-  retry_delay: "2s"
-  connection_pool_size: 100
-  keep_alive: true
 
-# Authentication
+database:
+  type: "sqlite"  # или "postgresql"
+  sqlite:
+    path: "data/proxy.db"
+
 auth:
-  enabled: true
-  storage_type: "json"  # or "sqlite"
-  storage_path: "data/api_keys.json"
-  admin_key: "sk-admin-dev-key-12345"  # ⚠️ CHANGE IN PRODUCTION!
-  
-  # Rate limiting
-  rate_limiting:
-    enabled: true
-    default_requests_per_minute: 30
-    default_requests_per_hour: 500
+  jwt_secret: "change-me-in-production"
+  token_expiration: "24h"
+  refresh_expiration: "7d"
 
-# Logging
+observability:
+  enabled: true
+  tracing:
+    enabled: true
+    exporter: "jaeger"
+    jaeger_endpoint: "http://localhost:14268/api/traces"
+
+performance:
+  monigo:
+    enabled: true
+    port: 9091
+  gpu_monitoring:
+    enabled: true
+    refresh_interval: "5s"
+
 logging:
-  level: "debug"  # debug, info, warn, error
-  format: "text"  # text or json
-  output: "both"  # stdout, file, or both
+  level: "info"
+  format: "text"
+  output: "both"
   file_path: "logs/proxy-dev.log"
-  max_size: 100  # MB
-  max_backups: 5
-  max_age: 30  # days
-  compress: true
-
-# Models
-models:
-  mapping: {}  # OpenAI name -> Ollama name
-  aliases: {}  # Custom aliases
-  hidden: []   # Hide specific models
-  cache:
-    enabled: true
-    ttl: "5m"
-    refresh_interval: "1m"
-
-# Tools (Function Calling)
-tools:
-  force_usage: false  # Auto-apply tool_choice: required
-  default_choice: "auto"  # auto, required, none
-  fallback_model: "llama3.1"  # Model for tool calls
-  
-  optimizer:
-    enabled: true
-    simplify_system_message: true
-    smart_tool_filtering: false
-    max_tools_per_request: 0  # 0 = unlimited
-
-# Prometheus Metrics
-metrics:
-  enabled: true
-  prometheus_path: "/metrics"
-  
-  collection:
-    enabled: true
-    buffer_size: 1000
-    flush_interval: "10s"
-
-# Terminal UI
-tui:
-  enabled: true
-  refresh_rate: "1s"
-  theme: "default"
-
-# Development
-development:
-  hot_reload: true
-  debug_mode: true
-  profile_enabled: false
-  pprof_enabled: false
-  race_detection: true
 ```
 
 ### Environment Variables
 
-You can override configuration with environment variables:
-
 ```bash
 export PROXY_SERVER_PORT=9000
 export PROXY_OLLAMA_URL="http://remote-server:11434"
-export PROXY_AUTH_ADMIN_KEY="sk-secure-production-key"
+export PROXY_JWT_SECRET="super-secret-key"
+export PROXY_DATABASE_TYPE="postgresql"
 ```
 
-See [CONFIGURATION.md](docs/CONFIGURATION.md) for full documentation.
+Полная документация: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
 
 ---
 
-## 📊 Monitoring & Metrics
-
-### Prometheus Metrics
-
-Metrics are exposed at `/metrics` endpoint:
-
-```bash
-curl http://localhost:8080/metrics
-```
-
-**Available metrics:**
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| `ollama_proxy_http_requests_total` | Counter | Total HTTP requests |
-| `ollama_proxy_http_request_duration_seconds` | Histogram | HTTP request duration |
-| `ollama_proxy_http_requests_in_flight` | Gauge | Current active requests |
-| `ollama_proxy_http_response_size_bytes` | Histogram | Response sizes |
-| `ollama_proxy_ollama_requests_total` | Counter | Ollama API calls |
-| `ollama_proxy_ollama_request_duration_seconds` | Histogram | Ollama request duration |
-| `ollama_proxy_ollama_errors_total` | Counter | Ollama errors |
-| `ollama_proxy_api_key_requests_total` | Counter | Requests per API key |
-| `ollama_proxy_api_key_rate_limit_exceeded_total` | Counter | Rate limit violations |
-| `ollama_proxy_api_keys_active_total` | Gauge | Active API keys count |
-
-### Grafana Dashboard
-
-Import the provided Grafana dashboard (coming soon) for visualization.
-
----
-
-## 🏗️ Architecture
+## 🏗️ Архитектура
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENT APPLICATIONS                       │
-│         (Zed IDE, Continue.dev, VSCode, Custom Apps)            │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ OpenAI API Format
-                            │ (Authorization: Bearer sk-xxx)
+┌─────────────────────────────────────────────────────────────┐
+│                    CLIENT APPLICATIONS                       │
+│   (Zed, Continue.dev, VSCode, Custom Apps, WebUI Chat)      │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ OpenAI API + JWT Auth
                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      OLLAMA-OPENAI PROXY                         │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  HTTP Server (Gin)                                          │ │
-│  │  • /v1/chat/completions  • /v1/models                      │ │
-│  │  • /v1/embeddings        • /v1/completions                 │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                            │                                     │
-│  ┌─────────────────────────┴────────────────────────────────┐  │
-│  │  Middleware Pipeline                                      │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌─────────┐ ┌──────────────┐ │  │
-│  │  │   Auth   │→│   Rate   │→│  Stats  │→│  Prometheus  │ │  │
-│  │  │   Keys   │ │ Limiting │ │         │ │   Metrics    │ │  │
-│  │  └──────────┘ └──────────┘ └─────────┘ └──────────────┘ │  │
-│  └────────────────────────────────────────────────────────────┘ │
-│                            │                                     │
-│  ┌─────────────────────────┴────────────────────────────────┐  │
-│  │  Converters & Handlers                                    │  │
-│  │  • OpenAI → Ollama format conversion                      │  │
-│  │  • Streaming SSE handling                                 │  │
-│  │  • Tools/Function calling support                         │  │
-│  │  • Prompt optimization                                    │  │
-│  └────────────────────────────────────────────────────────────┘ │
-└───────────────────────────┬─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                 OLLAMA-OPENAI PROXY (v1.9.3)                │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  HTTP Server (Gin) + WebUI (Embedded)                │  │
+│  │  • /v1/chat/completions  • /v1/models                │  │
+│  │  • /login  • /chat  • /dashboard  • /admin           │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                            │                                 │
+│  ┌─────────────────────────┴────────────────────────────┐  │
+│  │  Middleware Pipeline                                  │  │
+│  │  JWT → RBAC → Rate Limit → Tracing → Metrics         │  │
+│  └────────────────────────────────────────────────────────┘ │
+│                            │                                 │
+│  ┌─────────────────────────┴────────────────────────────┐  │
+│  │  Business Logic                                       │  │
+│  │  • User/Tenant Management  • Conversations            │  │
+│  │  • API Keys (Personal/Tenant)  • Context Tracking    │  │
+│  │  • Dynamic Parameters  • Auto-Summarization          │  │
+│  └────────────────────────────────────────────────────────┘ │
+│                            │                                 │
+│  ┌─────────────────────────┴────────────────────────────┐  │
+│  │  Database (SQLite/PostgreSQL)                        │  │
+│  │  • Users  • Tenants  • Members  • API Keys           │  │
+│  │  • Conversations  • Messages  • Usage  • Changelogs  │  │
+│  └────────────────────────────────────────────────────────┘ │
+└───────────────────────────┬─────────────────────────────────┘
                             │ Ollama API Format
                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OLLAMA SERVER                             │
-│              (llama3.1, qwen2.5-coder, etc.)                    │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      OLLAMA SERVER                           │
+│            (llama3.2, qwen2.5-coder, etc.)                  │
+└─────────────────────────────────────────────────────────────┘
 
-                  ┌─────────────────────┐
-                  │   TERMINAL UI (TUI) │
-                  │   • Monitoring      │
-                  │   • API Keys Mgmt   │
-                  │   • Logs Viewer     │
-                  │   • Config Viewer   │
-                  └─────────────────────┘
+       ┌──────────────────┐        ┌──────────────────┐
+       │  MoniGo :9091    │        │  TUI (optional)  │
+       │  Performance     │        │  Monitoring      │
+       │  Monitoring      │        │  Management      │
+       └──────────────────┘        └──────────────────┘
+
+       ┌──────────────────┐
+       │  nvidia-smi      │
+       │  GPU Metrics     │
+       │  (Linux/macOS)   │
+       └──────────────────┘
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
+Подробная архитектура: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## 🧪 Testing
+## 🧪 Тестирование
 
-The project has **100% test coverage** across critical components.
-
-### Run Tests
+Проект имеет **высокое покрытие** тестами критических компонентов.
 
 ```bash
-# All tests
+# Все тесты
 go test ./...
 
-# With coverage
+# С покрытием
 go test -cover ./...
 
 # Coverage report
@@ -626,18 +448,13 @@ go tool cover -html=coverage.out
 
 # Race detection
 go test -race ./...
-
-# Specific package
-go test ./internal/auth/...
 ```
 
-### Test Categories
-
-- **Unit Tests**: All core packages (`internal/auth`, `internal/client`, etc.)
-- **Integration Tests**: API handlers, middleware chains
-- **Security Tests**: Timing attacks, brute force, injection
-- **Performance Tests**: Rate limiting, concurrent operations
-- **Penetration Tests**: Invalid keys, privilege escalation
+**Категории тестов:**
+- ✅ Unit Tests (auth, converter, client)
+- ✅ Integration Tests (API handlers, middleware)
+- ✅ Security Tests (timing attacks, brute force)
+- ✅ Performance Tests (rate limiting, concurrency)
 
 ---
 
@@ -645,326 +462,205 @@ go test ./internal/auth/...
 
 ### Systemd Service (Linux)
 
-Create `/etc/systemd/system/ollama-proxy.service`:
+```bash
+# Скопируйте пример
+sudo cp ollama-openai-proxy.service /etc/systemd/system/
 
-```ini
-[Unit]
-Description=Ollama-OpenAI Proxy Server
-After=network.target ollama.service
-Requires=ollama.service
+# Отредактируйте пути и настройки
+sudo nano /etc/systemd/system/ollama-openai-proxy.service
 
-[Service]
-Type=simple
-User=ollama-proxy
-WorkingDirectory=/opt/ollama-proxy
-ExecStart=/opt/ollama-proxy/bin/server
-Restart=on-failure
-RestartSec=5s
-
-# Environment
-Environment="PROXY_SERVER_PORT=8080"
-Environment="PROXY_OLLAMA_URL=http://localhost:11434"
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/ollama-proxy/logs /opt/ollama-proxy/data
-
-[Install]
-WantedBy=multi-user.target
+# Включите и запустите
+sudo systemctl enable ollama-openai-proxy
+sudo systemctl start ollama-openai-proxy
+sudo systemctl status ollama-openai-proxy
 ```
 
-Enable and start:
+Подробная инструкция: [SYSTEMD_INSTALL.md](SYSTEMD_INSTALL.md)
+
+### Docker Production
 
 ```bash
-sudo systemctl enable ollama-proxy
-sudo systemctl start ollama-proxy
-sudo systemctl status ollama-proxy
-```
+# Build production image
+docker compose -f docker-compose.yml up -d
 
-### Windows Service
-
-Use [NSSM](https://nssm.cc/) to create a Windows service:
-
-```cmd
-nssm install OllamaProxy "C:\ollama-proxy\bin\server.exe"
-nssm set OllamaProxy AppDirectory "C:\ollama-proxy"
-nssm start OllamaProxy
+# Или через build скрипт
+./docker/build.sh
 ```
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Common Issues
-
-#### 1. "Connection refused" to Ollama
-
-**Problem**: Proxy can't connect to Ollama server.
-
-**Solution**:
+### "Connection refused" to Ollama
 
 ```bash
-# Check Ollama is running
+# Проверьте Ollama
 curl http://localhost:11434/api/tags
 
-# Start Ollama if needed
+# Запустите если не работает
 ollama serve
-
-# Check firewall (Linux)
-sudo ufw allow 11434
 ```
 
-#### 2. API key not working
+### API key not working
 
-**Problem**: `401 Unauthorized` or `API key not found`.
+- Проверьте header: `Authorization: Bearer sk-xxx`
+- Проверьте права доступа к модели
+- Проверьте rate limits
 
-**Solution**:
+### GPU monitoring не работает
 
-- Ensure `Authorization: Bearer sk-xxx` header is present
-- Check key is not disabled in TUI (screen 4)
-- Verify key has permissions for the requested model
-- Check rate limits haven't been exceeded
+**Linux/macOS:**
+```bash
+# Проверьте nvidia-smi
+nvidia-smi
 
-#### 3. Slow responses
-
-**Problem**: Requests take too long.
-
-**Solution**:
-
-```yaml
-# Increase timeouts in config
-ollama:
-  timeout: "300s"
-
-server:
-  write_timeout: "300s"
+# Должен вывести список GPU
 ```
 
-#### 4. Tool calling not working
+**Windows:** GPU monitoring не поддерживается (используется stub).
 
-**Problem**: Model returns text instead of tool calls.
-
-**Solution**:
-
-- Use a model that supports tools: `llama3.1`, `llama3.2`, `mistral`, `qwen2.5`
-- Set `fallback_model: "llama3.1"` in config
-- Check logs for tool call detection issues
-
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more solutions.
+Полное руководство: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ---
 
-## 📈 Performance Tuning
-
-### For RTX 4090 (24GB VRAM)
-
-```yaml
-# Ollama configuration (in Ollama's config)
-# Adjust num_ctx and num_predict based on model size
-
-# For 7B models (e.g., qwen2.5-coder:7b)
-num_ctx: 32768      # Context window
-num_predict: 4096   # Max tokens to generate
-
-# For 30B models (e.g., qwen2.5-coder:30b)
-num_ctx: 16384
-num_predict: 2048
-
-# Proxy configuration
-ollama:
-  timeout: "180s"
-  connection_pool_size: 50
-
-server:
-  write_timeout: "180s"
-```
-
-### Connection Pool Tuning
-
-```yaml
-ollama:
-  connection_pool_size: 100  # Increase for high traffic
-  keep_alive: true           # Reuse connections
-```
-
-See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for comprehensive tuning guide.
-
----
-
-## 📦 Project Structure
+## 📦 Структура проекта
 
 ```
 ollama-openai-proxy/
 ├── cmd/
-│   ├── server/              # HTTP server entry point
-│   │   └── main.go
-│   └── tui/                 # Terminal UI entry point
-│       ├── main.go
-│       ├── logs_reader.go   # Log file viewer
-│       ├── metrics_parser.go # Prometheus parser
-│       ├── scroll_helper.go  # Scrolling utilities
-│       └── time_helper.go    # Time parsing
+│   ├── server/main.go          # HTTP server + WebUI
+│   └── tui/                    # Terminal UI (legacy)
 ├── internal/
 │   ├── api/
-│   │   ├── handlers/        # HTTP request handlers
-│   │   │   ├── chat.go      # Chat completions
-│   │   │   ├── embeddings.go # Embeddings API
-│   │   │   ├── completions.go # Legacy completions
-│   │   │   ├── models.go    # Models listing
-│   │   │   ├── stats.go     # Statistics endpoint
-│   │   │   └── config.go    # Configuration endpoint
-│   │   ├── middleware/      # HTTP middleware
-│   │   │   ├── auth_keys.go # API key authentication
-│   │   │   ├── logging.go   # Request logging
-│   │   │   ├── stats.go     # Statistics collection
-│   │   │   ├── metrics.go   # Prometheus metrics
-│   │   │   ├── cors.go      # CORS handling
-│   │   │   └── recovery.go  # Panic recovery
-│   │   └── router/          # Route configuration
-│   ├── auth/
-│   │   ├── apikey/          # API key manager
-│   │   │   ├── manager.go
-│   │   │   └── storage.go   # JSON/SQLite storage
-│   │   └── ratelimit/       # Rate limiting
-│   ├── client/
-│   │   └── ollama/          # Ollama API client
-│   │       ├── client.go
-│   │       ├── methods.go   # Chat, Embed, etc.
-│   │       └── streaming.go # SSE streaming
-│   ├── config/              # Configuration management
-│   │   └── config.go
-│   ├── converter/           # Request/Response converters
-│   │   ├── request.go       # OpenAI → Ollama
-│   │   ├── response.go      # Ollama → OpenAI
-│   │   ├── streaming.go     # Streaming conversion
-│   │   ├── embeddings.go    # Embeddings conversion
-│   │   └── completions.go   # Completions conversion
-│   ├── logger/              # Logging utilities
-│   ├── metrics/             # Prometheus metrics
-│   │   └── metrics.go
-│   ├── models/              # Data models
-│   │   ├── openai.go
-│   │   └── ollama.go
-│   └── optimizer/           # Prompt optimization
-│       └── prompt_optimizer.go
+│   │   ├── handlers/           # REST API handlers
+│   │   ├── middleware/         # JWT, RBAC, Rate Limit
+│   │   └── router/             # Route configuration
+│   ├── auth/                   # Authentication & Authorization
+│   ├── storage/                # Database (SQLite/PostgreSQL)
+│   ├── metrics/                # MoniGo, GPU, Prometheus
+│   ├── converter/              # OpenAI ↔ Ollama
+│   └── models/                 # Data models
+├── web/                        # WebUI (HTML/CSS/JS)
+│   ├── *.html                  # Pages
+│   ├── js/                     # JavaScript
+│   └── css/                    # Styles
 ├── configs/
-│   ├── dev.yaml             # Development config
+│   ├── dev.yaml                # Development config
 │   └── production.yaml.example # Production template
-├── data/                    # Runtime data
-│   └── api_keys.json        # API keys storage
-├── logs/                    # Log files
-│   └── proxy-dev.log
-├── docs/                    # Documentation
-│   ├── TUI_GUIDE.md
-│   ├── API_DOCUMENTATION.md
-│   ├── CONFIGURATION.md
-│   ├── TROUBLESHOOTING.md
-│   ├── ARCHITECTURE.md
-│   └── PERFORMANCE.md
-├── tests/                   # Test files
+├── data/                       # Runtime data (SQLite DB)
+├── logs/                       # Log files
+├── docs/                       # Documentation
+├── BACKLOG/                    # Task specifications (85 files)
 ├── go.mod
-├── go.sum
-├── Makefile
+├── Roadmap.MD                  # Development roadmap
 └── README.md
 ```
 
 ---
 
+## 🗺️ Roadmap
+
+### ✅ Завершено (v1.9.3)
+
+- ✅ **Full OpenAI API** compatibility
+- ✅ **Multi-Tenancy** с RBAC
+- ✅ **JWT Authentication** + Bootstrap system
+- ✅ **ChatGPT-like WebUI** с conversations
+- ✅ **Dynamic Model Parameters** в чате
+- ✅ **Context Tracking** + Auto-Summarization
+- ✅ **MoniGo Performance Monitoring**
+- ✅ **NVIDIA GPU Monitoring** (multi-GPU)
+- ✅ **OpenTelemetry** distributed tracing
+- ✅ **Backup & Restore** system
+
+### 📋 Запланировано
+
+**v1.10.0 - Smart Chat & Content**
+- Vision OCR (Multimodal Chat)
+- Web Content Fetcher & Summarization
+- File Upload (PDF, DOCX, TXT)
+- Conversation Export/Import
+- WebSocket Real-time Updates
+
+**v1.11.0 - Enterprise Auth**
+- Keycloak SSO Integration
+- LDAP/Active Directory
+- Enhanced Audit Logging
+- Custom Roles & Permissions
+
+**v1.12.0 - Model Management Pro II**
+- Usage Quotas System
+- Model Preloading & Warming
+- Prometheus Metrics Export
+- Advanced Rate Limiting
+
+Полный roadmap: [Roadmap.MD](Roadmap.MD)
+
+---
+
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these guidelines:
+Приветствуются contributions!
 
-1. **Fork** the repository
-2. Create a **feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Write tests** for your changes (100% coverage required)
-4. Run **linters** (`go vet`, `golangci-lint`)
-5. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-6. **Push** to the branch (`git push origin feature/amazing-feature`)
-7. Open a **Pull Request**
+1. Fork репозитория
+2. Создайте feature branch (`git checkout -b feature/amazing`)
+3. Напишите тесты
+4. Commit (`git commit -m 'Add amazing feature'`)
+5. Push (`git push origin feature/amazing`)
+6. Откройте Pull Request
 
-### Code Standards
-
-- Follow Go best practices and idioms
-- Document all exported functions and types
-- Write comprehensive tests
-- Use structured logging (logrus)
-- Handle errors explicitly
-- Use contexts for cancellation
-
-See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for details.
+**Code Standards:**
+- Go 1.25+ idioms
+- 100% coverage критических компонентов
+- Structured logging (logrus)
+- Explicit error handling
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+MIT License - см. [LICENSE](LICENSE)
 
 ---
 
 ## 🙏 Acknowledgments
 
-- **Ollama** team for the amazing local LLM platform
-- **OpenAI** for the API standard
-- **Go community** for excellent libraries:
+- **Ollama** - Замечательная платформа для локальных LLM
+- **OpenAI** - API стандарт
+- **Go Libraries:**
   - [Gin](https://github.com/gin-gonic/gin) - HTTP framework
-  - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - TUI framework
+  - [GORM](https://gorm.io/) - ORM для SQLite/PostgreSQL
+  - [JWT-Go](https://github.com/golang-jwt/jwt) - JWT tokens
   - [Viper](https://github.com/spf13/viper) - Configuration
   - [Logrus](https://github.com/sirupsen/logrus) - Logging
-  - [Prometheus](https://github.com/prometheus/client_golang) - Metrics
+  - [MoniGo](https://github.com/iyashjayesh/monigo) - Performance monitoring
+  - [OpenTelemetry](https://opentelemetry.io/) - Tracing
 
 ---
 
-## 📚 Additional Documentation
+## 📚 Документация
 
-- **[TUI Guide](docs/TUI_GUIDE.md)** - Complete Terminal UI documentation
-- **[API Documentation](docs/API_DOCUMENTATION.md)** - Full API reference
-- **[Configuration](docs/CONFIGURATION.md)** - All configuration options
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-- **[Architecture](docs/ARCHITECTURE.md)** - System architecture details
-- **[Performance](docs/PERFORMANCE.md)** - Performance tuning guide
-- **[Plan.md](Plan.md)** - Development roadmap
-- **[Architecture.MD](Architecture.MD)** - Original architecture document
-- **[MVP.MD](MVP.MD)** - MVP criteria
+- **[API Documentation](docs/API_DOCUMENTATION.md)** - Полный API reference
+- **[Configuration](docs/CONFIGURATION.md)** - Все параметры конфигурации
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Решение проблем
+- **[Architecture](docs/ARCHITECTURE.md)** - Архитектура системы
+- **[Performance](docs/PERFORMANCE.md)** - Performance tuning
+- **[TUI Guide](docs/TUI_GUIDE.md)** - Terminal UI документация
+- **[WebUI Guide](docs/WEBUI_GUIDE.md)** - Web UI документация
+- **[Roadmap](Roadmap.MD)** - План развития
+- **[Build Guide](BUILD.md)** - Инструкции по сборке
 
 ---
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ollama-openai-proxy/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/ollama-openai-proxy/discussions)
-- **Email**: <your.email@example.com>
+- **Issues:** [GitHub Issues](https://github.com/yourusername/ollama-openai-proxy/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ollama-openai-proxy/discussions)
 
 ---
 
-## 🗺️ Roadmap
+**Made with ❤️ for the Open Source Community**
 
-- [x] OpenAI API compatibility
-- [x] Streaming support
-- [x] Function calling (Tools)
-- [x] API key management
-- [x] Terminal UI
-- [x] Prometheus metrics
-- [x] Embeddings API
-- [x] Legacy Completions API
-- [x] **Web UI (Phase 14)** ✅ **ЗАВЕРШЕНО**
-  - [x] Dashboard с real-time метриками
-  - [x] API Keys Management
-  - [x] Extended Model Info
-  - [x] Real-time Logs Viewer
-  - [x] Toast Notifications
-  - [x] Dark/Light Theme Toggle
-  - [x] Export Functions (CSV, JSON)
-- [ ] WebSocket для real-time updates (Phase 12.2)
-- [ ] Advanced Metrics Collection (Phase 12.1)
-- [ ] Multi-user support
-- [ ] Usage analytics dashboard с графиками
-- [ ] Model fine-tuning integration
+⭐ Star this repo if you find it useful!
 
----
-
-**Made with ❤️ by the Ollama-OpenAI Proxy team**
-
-Star ⭐ this repo if you find it useful!
+**Current Version:** 1.9.3 | **Status:** Active Development 🚀

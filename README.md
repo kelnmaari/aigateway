@@ -99,7 +99,7 @@ ollama pull llama3.2  # Или любую другую модель
 
 2. **Запустите Proxy Server** (WSL/Linux рекомендуется для GPU monitoring):
 
-   ```bash
+```bash
 # Linux/macOS
 ./dist/ollama-proxy-linux-amd64 -config configs/dev.yaml
 

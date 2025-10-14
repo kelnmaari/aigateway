@@ -12,6 +12,7 @@ import (
 	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/converter"
 	"ollama-openai-proxy/internal/models"
+	"ollama-openai-proxy/internal/storage"
 )
 
 // ChatHandler обрабатывает chat completions эндпоинт с упрощенными конвертерами
@@ -20,6 +21,7 @@ type ChatHandler struct {
 	logger       *logrus.Logger
 	ollamaClient OllamaClientInterface
 	converter    *converter.SimpleConverter
+	db           storage.Database // для model configs (v1.9.1+)
 }
 
 // NewChatHandler создает новый chat handler с упрощенными конвертерами
@@ -29,6 +31,18 @@ func NewChatHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient Olla
 		logger:       logger,
 		ollamaClient: ollamaClient,
 		converter:    converter.NewSimpleConverter(cfg, logger),
+		db:           nil, // backward compatibility
+	}
+}
+
+// NewChatHandlerWithDB создает новый chat handler с database для model configs
+func NewChatHandlerWithDB(cfg *config.Config, logger *logrus.Logger, ollamaClient OllamaClientInterface, db storage.Database) *ChatHandler {
+	return &ChatHandler{
+		config:       cfg,
+		logger:       logger,
+		ollamaClient: ollamaClient,
+		converter:    converter.NewSimpleConverter(cfg, logger),
+		db:           db,
 	}
 }
 
@@ -40,6 +54,7 @@ func NewChatHandlerWithManager(cfg *config.Config, logger *logrus.Logger, ollama
 		logger:       logger,
 		ollamaClient: ollamaClient,
 		converter:    converter.NewSimpleConverter(cfg, logger),
+		db:           nil, // backward compatibility
 	}
 }
 
@@ -98,6 +113,51 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 
 	// Генерируем ID запроса
 	requestID := h.converter.GenerateRequestID()
+
+	// 0. Применяем effective model config (v1.9.1+)
+	if h.db != nil {
+		// Получаем user_id и tenant_id из контекста (устанавливаются auth middleware)
+		userID, _ := c.Get("user_id")
+		tenantID, _ := c.Get("tenant_id")
+
+		userIDStr := ""
+		tenantIDStr := ""
+		if userID != nil {
+			userIDStr, _ = userID.(string)
+		}
+		if tenantID != nil {
+			tenantIDStr, _ = tenantID.(string)
+		}
+
+		// Получаем effective config для модели
+		effectiveParams, err := h.db.GetEffectiveModelConfig(ctx, req.Model, userIDStr, tenantIDStr)
+		if err != nil {
+			h.logger.WithError(err).Warn("Failed to get effective model config, using defaults")
+		} else if effectiveParams != nil {
+			// Применяем effective params если они не были явно указаны в запросе
+			if req.Temperature == nil && effectiveParams.Temperature != nil {
+				temp := float64(*effectiveParams.Temperature)
+				req.Temperature = &temp
+			}
+			if req.TopP == nil && effectiveParams.TopP != nil {
+				topP := float64(*effectiveParams.TopP)
+				req.TopP = &topP
+			}
+			if req.MaxTokens == nil && effectiveParams.NumPredict != nil {
+				maxTokens := *effectiveParams.NumPredict
+				req.MaxTokens = &maxTokens
+			}
+
+			h.logger.WithFields(logrus.Fields{
+				"model":       req.Model,
+				"user_id":     userIDStr,
+				"tenant_id":   tenantIDStr,
+				"temperature": req.Temperature,
+				"top_p":       req.TopP,
+				"max_tokens":  req.MaxTokens,
+			}).Debug("Applied effective model config")
+		}
+	}
 
 	// 1. Преобразовать запрос OpenAI в формат Ollama (прямая конвертация)
 	ollamaReq, err := h.converter.ConvertChatRequest(&req)

@@ -122,6 +122,32 @@ func (c *SimpleConverter) ConvertChatRequest(req *models.ChatCompletionRequest) 
 		if req.Seed != nil {
 			options.Seed = req.Seed
 		}
+
+		// Применяем Ollama-specific options из req.Options (v1.9.1+)
+		if req.Options != nil {
+			c.logger.WithField("options", req.Options).Debug("Processing Ollama-specific options")
+
+			// num_ctx - context window size
+			if numCtx, ok := req.Options["num_ctx"].(float64); ok {
+				options.NumCtx = intPtr(int(numCtx))
+				c.logger.WithField("num_ctx", int(numCtx)).Debug("Applied num_ctx from options")
+			} else if numCtx, ok := req.Options["num_ctx"].(int); ok {
+				options.NumCtx = intPtr(numCtx)
+				c.logger.WithField("num_ctx", numCtx).Debug("Applied num_ctx from options")
+			}
+
+			// top_k
+			if topK, ok := req.Options["top_k"].(float64); ok {
+				options.TopK = intPtr(int(topK))
+			} else if topK, ok := req.Options["top_k"].(int); ok {
+				options.TopK = intPtr(topK)
+			}
+
+			// repeat_penalty
+			if repeatPenalty, ok := req.Options["repeat_penalty"].(float64); ok {
+				options.RepeatPenalty = float64Ptr(repeatPenalty)
+			}
+		}
 	}
 
 	// Создаем Ollama запрос
@@ -363,7 +389,8 @@ func (c *SimpleConverter) hasOptions(req *models.ChatCompletionRequest) bool {
 		req.TopP != nil ||
 		req.MaxTokens != nil ||
 		req.Seed != nil ||
-		len(req.Stop) > 0
+		len(req.Stop) > 0 ||
+		req.Options != nil // v1.9.1: Ollama-specific options
 }
 
 // extractMessageContent извлекает содержимое сообщения
@@ -614,6 +641,20 @@ The tools are available and ready to use - call the most appropriate one immedia
 	}
 
 	return messages
+}
+
+// ========================================
+// Helper Functions (v1.9.1+)
+// ========================================
+
+// intPtr returns a pointer to an int
+func intPtr(v int) *int {
+	return &v
+}
+
+// float64Ptr returns a pointer to a float64
+func float64Ptr(v float64) *float64 {
+	return &v
 }
 
 // injectAdditionalSystemMessage добавляет дополнительное системное сообщение к messages

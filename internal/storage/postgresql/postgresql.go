@@ -575,6 +575,35 @@ func (tx *postgresqlTx) CountActiveAPIKeys(ctx context.Context) (int, error) {
 	return tx.db.CountActiveAPIKeys(ctx)
 }
 
+// Model Configurations delegation (v1.9.1+)
+func (tx *postgresqlTx) CreateModelConfig(ctx context.Context, config *models.ModelConfig) error {
+	return tx.db.CreateModelConfig(ctx, config)
+}
+
+func (tx *postgresqlTx) GetModelConfig(ctx context.Context, id string) (*models.ModelConfig, error) {
+	return tx.db.GetModelConfig(ctx, id)
+}
+
+func (tx *postgresqlTx) GetModelConfigByScope(ctx context.Context, modelName, scope string, scopeID *string) (*models.ModelConfig, error) {
+	return tx.db.GetModelConfigByScope(ctx, modelName, scope, scopeID)
+}
+
+func (tx *postgresqlTx) ListModelConfigs(ctx context.Context, scope string, scopeID *string) ([]*models.ModelConfig, error) {
+	return tx.db.ListModelConfigs(ctx, scope, scopeID)
+}
+
+func (tx *postgresqlTx) UpdateModelConfig(ctx context.Context, config *models.ModelConfig) error {
+	return tx.db.UpdateModelConfig(ctx, config)
+}
+
+func (tx *postgresqlTx) DeleteModelConfig(ctx context.Context, id string) error {
+	return tx.db.DeleteModelConfig(ctx, id)
+}
+
+func (tx *postgresqlTx) GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error) {
+	return tx.db.GetEffectiveModelConfig(ctx, modelName, userID, tenantID)
+}
+
 // Ensure postgresqlTx implements storage.Tx interface
 var _ storage.Tx = (*postgresqlTx)(nil)
 

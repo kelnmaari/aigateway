@@ -23,6 +23,8 @@ type ChatCompletionRequest struct {
 	ToolChoice       interface{}        `json:"tool_choice,omitempty"`
 	ResponseFormat   *ResponseFormat    `json:"response_format,omitempty"`
 	Seed             *int               `json:"seed,omitempty"`
+	// Ollama-specific options (v1.9.1+)
+	Options map[string]interface{} `json:"options,omitempty"`
 	// Дополнительные поля для функций
 	Functions    []Function  `json:"functions,omitempty"`     // Deprecated
 	FunctionCall interface{} `json:"function_call,omitempty"` // Deprecated

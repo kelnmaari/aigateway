@@ -91,6 +91,13 @@ type Router struct {
 	// Performance monitoring (v1.6.2)
 	performanceMonitor *observability.PerformanceMonitor
 	leakDetector       *observability.LeakDetector
+
+	// MoniGo performance dashboard (v1.9.3)
+	monigoPort int // Порт на котором запущен MoniGo (0 если отключен)
+
+	// GPU Monitoring (v1.9.3)
+	gpuMonitor *metrics.GPUMonitor
+	gpuHandler *handlers.GPUHandler
 }
 
 // NewOptions содержит опции для создания роутера
@@ -103,6 +110,8 @@ type NewOptions struct {
 	TracerProvider     *observability.TracerProvider     // Опциональный OpenTelemetry tracer (v1.6.0+)
 	PerformanceMonitor *observability.PerformanceMonitor // Опциональный performance monitor (v1.6.2+)
 	LeakDetector       *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
+	MonigoPort         int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
+	GPUMonitor         *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -131,6 +140,8 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		jwtManager:         opts.JWTManager,
 		performanceMonitor: opts.PerformanceMonitor,
 		leakDetector:       opts.LeakDetector,
+		monigoPort:         opts.MonigoPort,
+		gpuMonitor:         opts.GPUMonitor,
 	}
 
 	// Setup tracer if provided
@@ -282,6 +293,7 @@ func (r *Router) setupMiddleware() {
 func (r *Router) setupRoutes() {
 	r.setupHealthRoutes()
 	r.setupMetricsRoutes()
+	r.setupMonigoRoutes()         // MoniGo Performance Dashboard (v1.9.3+)
 	r.setupStatsRoutes()          // Для TUI
 	r.setupConfigRoutes()         // Для TUI Configuration Viewer
 	r.setupMetricsHistoryRoutes() // Для historical metrics (Phase 12.1)
@@ -295,6 +307,7 @@ func (r *Router) setupRoutes() {
 	r.setupOpenAIRoutes()
 	r.setupAdminRoutes()
 	r.setupMCPRoutes() // MCP Servers Catalog (v1.4.5)
+	r.setupGPURoutes() // GPU Monitoring (v1.9.3)
 }
 
 // setupHealthRoutes настраивает эндпоинты проверки здоровья
@@ -311,6 +324,91 @@ func (r *Router) setupMetricsRoutes() {
 		r.engine.GET(r.config.Metrics.PrometheusPath, gin.WrapH(promhttp.Handler()))
 		r.logger.WithField("path", r.config.Metrics.PrometheusPath).Info("Prometheus metrics endpoint enabled")
 	}
+}
+
+// setupMonigoRoutes настраивает MoniGo Performance Dashboard (v1.9.3+)
+// MoniGo работает на отдельном порту (9090)
+// Reverse proxy только для API endpoints (для карточек метрик в admin panel)
+func (r *Router) setupMonigoRoutes() {
+	if r.monigoPort == 0 {
+		r.logger.Info("MoniGo disabled (port = 0)")
+		return
+	}
+
+	monigoURL := fmt.Sprintf("http://localhost:%d", r.monigoPort)
+
+	// Reverse proxy ТОЛЬКО для API эндпоинтов (для карточек метрик)
+	r.engine.GET("/admin/performance/monigo/api/v1/metrics", r.createMonigoAPIProxy(monigoURL))
+
+	r.logger.WithFields(logrus.Fields{
+		"monigo_port":   r.monigoPort,
+		"monigo_url":    monigoURL,
+		"api_proxy":     "/admin/performance/monigo/api/v1/metrics",
+		"dashboard_url": monigoURL,
+	}).Info("✅ MoniGo Performance Dashboard running on separate port")
+}
+
+// createMonigoAPIProxy создает простой reverse proxy для MoniGo API
+func (r *Router) createMonigoAPIProxy(targetURL string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Проксируем на /monigo/api/v1/metrics
+		proxyURL := targetURL + "/monigo/api/v1/metrics"
+
+		client := &http.Client{Timeout: 30 * time.Second}
+
+		resp, err := client.Get(proxyURL)
+		if err != nil {
+			r.logger.WithError(err).Error("Failed to proxy MoniGo API request")
+			c.JSON(http.StatusBadGateway, gin.H{"error": "MoniGo unavailable"})
+			return
+		}
+		defer resp.Body.Close()
+
+		// Копируем заголовки ответа
+		for key, values := range resp.Header {
+			for _, value := range values {
+				c.Writer.Header().Add(key, value)
+			}
+		}
+
+		// Копируем статус и тело
+		c.Status(resp.StatusCode)
+		c.Writer.Write(mustReadAll(resp.Body))
+	}
+}
+
+// mustReadAll reads all data from reader
+func mustReadAll(r interface{ Read([]byte) (int, error) }) []byte {
+	buf := make([]byte, 0, 512)
+	for {
+		if len(buf) == cap(buf) {
+			newBuf := make([]byte, len(buf), 2*cap(buf)+1)
+			copy(newBuf, buf)
+			buf = newBuf
+		}
+		n, err := r.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+n]
+		if err != nil {
+			break
+		}
+	}
+	return buf
+}
+
+// setupGPURoutes настраивает эндпоинты GPU мониторинга (v1.9.3+)
+func (r *Router) setupGPURoutes() {
+	if r.gpuHandler == nil {
+		r.logger.Info("GPU monitoring disabled - no NVIDIA GPUs detected")
+		return
+	}
+
+	// Публичный endpoint для GPU метрик (требует аутентификации)
+	api := r.engine.Group("/api/gpu")
+	{
+		api.GET("/metrics", r.gpuHandler.GetGPUMetrics)
+	}
+
+	r.logger.Info("✅ GPU monitoring routes registered")
 }
 
 // setupStatsRoutes настраивает эндпоинты статистики для TUI
@@ -795,7 +893,14 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 
 	r.healthHandler = handlers.NewHealthHandler(cfg, logger, ollamaClient)
 	r.modelsHandler = handlers.NewModelsHandler(cfg, logger, ollamaClient)
-	r.chatHandler = handlers.NewChatHandler(cfg, logger, ollamaClient)
+
+	// Chat handler with database for model configs (v1.9.1+)
+	if r.db != nil {
+		r.chatHandler = handlers.NewChatHandlerWithDB(cfg, logger, ollamaClient, r.db)
+	} else {
+		r.chatHandler = handlers.NewChatHandler(cfg, logger, ollamaClient)
+	}
+
 	r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)
 	r.completionsHandler = handlers.NewCompletionsHandler(cfg, logger, ollamaClient)
 	r.configHandler = handlers.NewConfigHandler(cfg, logger) // Для TUI configuration viewer
@@ -876,6 +981,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// Performance Handler (v1.6.2)
 	r.performanceHandler = handlers.NewPerformanceHandler(r.performanceMonitor, r.leakDetector)
 	logger.Info("Performance handler initialized")
+
+	// GPU Handler (v1.9.3)
+	if r.gpuMonitor != nil {
+		r.gpuHandler = handlers.NewGPUHandler(logger, r.gpuMonitor)
+		logger.Info("GPU handler initialized")
+	}
 
 	// Metrics Storage (Phase 12.1)
 	r.metricsStorage = metrics.NewMetricsStorage(metrics.DefaultStorageConfig(), logger)

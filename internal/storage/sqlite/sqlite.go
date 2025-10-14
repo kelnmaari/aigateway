@@ -410,6 +410,31 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_6_3",
 			SQL:     s.getAddChangelogV163Migration(),
 		},
+		{
+			Version: 21,
+			Name:    "add_model_configs_table",
+			SQL:     s.getModelConfigsTableMigration(),
+		},
+		{
+			Version: 22,
+			Name:    "add_changelog_v1_9_1",
+			SQL:     s.getAddChangelogV191Migration(),
+		},
+		{
+			Version: 23,
+			Name:    "add_changelog_v1_9_2",
+			SQL:     s.getAddChangelogV192Migration(),
+		},
+		{
+			Version: 24,
+			Name:    "add_changelog_v1_9_3",
+			SQL:     s.getAddChangelogV193Migration(),
+		},
+		{
+			Version: 25,
+			Name:    "update_changelog_v1_9_3_final",
+			SQL:     s.getUpdateChangelogV193FinalMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -1688,6 +1713,275 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - PostgreSQL stub реализация (для будущей поддержки)
 - Зависимости: github.com/robfig/cron/v3, gopkg.in/gomail.v2
 - Graceful shutdown для scheduler');
+	`
+}
+
+// getModelConfigsTableMigration returns SQL for creating model_configs table (v21 migration)
+func (s *SQLiteDB) getModelConfigsTableMigration() string {
+	return `
+-- Model Configurations table for dynamic model parameters (v1.9.1)
+CREATE TABLE IF NOT EXISTS model_configs (
+    id TEXT PRIMARY KEY,
+    model_name TEXT NOT NULL,
+    scope TEXT NOT NULL CHECK(scope IN ('global', 'tenant', 'user')),
+    tenant_id TEXT,
+    user_id TEXT,
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    parameters TEXT NOT NULL, -- JSON: ModelParameters
+    
+    -- Foreign keys
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Constraints
+    CHECK (
+        (scope = 'global' AND tenant_id IS NULL AND user_id IS NULL) OR
+        (scope = 'tenant' AND tenant_id IS NOT NULL AND user_id IS NULL) OR
+        (scope = 'user' AND user_id IS NOT NULL)
+    ),
+    
+    -- Unique constraint для предотвращения дубликатов
+    UNIQUE(model_name, scope, tenant_id, user_id)
+);
+
+-- Indexes для быстрого поиска config по scope
+CREATE INDEX IF NOT EXISTS idx_model_configs_model ON model_configs(model_name);
+CREATE INDEX IF NOT EXISTS idx_model_configs_scope ON model_configs(scope);
+CREATE INDEX IF NOT EXISTS idx_model_configs_tenant ON model_configs(tenant_id) WHERE tenant_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_model_configs_user ON model_configs(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_model_configs_lookup ON model_configs(model_name, scope, tenant_id, user_id);
+
+-- Trigger для автоматического обновления updated_at
+CREATE TRIGGER IF NOT EXISTS update_model_configs_timestamp 
+AFTER UPDATE ON model_configs
+FOR EACH ROW
+BEGIN
+    UPDATE model_configs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+	`
+}
+
+// getAddChangelogV191Migration returns SQL for adding changelog v1.9.1 (v22 migration)
+func (s *SQLiteDB) getAddChangelogV191Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.9.1', '2025-10-13', '## [1.9.1] - 2025-10-13
+
+### Added
+- **Dynamic Model Parameters Configuration**: Красивая панель управления параметрами модели
+  - Chat UI - интуитивная панель над строкой ввода с collapsible design
+  - Model Selector с автоматической загрузкой доступных моделей из API
+  - Real-time параметры: Temperature, Top P, Max Tokens, Context Window
+  - Sliders с синхронизацией с number inputs для точной настройки
+  - Tooltips с объяснениями для каждого параметра
+
+- **Quick Presets**: 4 готовых пресета для разных сценариев
+  - 🎨 Creative (temp 1.2) - для творческой генерации
+  - ⚖️ Balanced (temp 0.7) - универсальный режим
+  - 🎯 Precise (temp 0.3) - для точных ответов
+  - 💻 Coding (temp 0.2) - оптимизирован для программирования
+
+- **localStorage Persistence**: Автоматическое сохранение настроек
+  - Запоминание выбранной модели между сессиями
+  - Сохранение параметров в браузере
+  - Автовосстановление при перезагрузке страницы
+
+- **Backend Model Configuration System**:
+  - ModelConfig и ModelParameters models на основе официального Ollama API
+  - Database schema с поддержкой global/tenant/user scopes
+  - Priority-based config resolution (user → tenant → global → defaults)
+  - Automatic effective config application в chat handler
+
+### Changed
+- **Chat Interface**: Переработан UI чата
+  - Model selector перемещен из header над строку ввода
+  - Добавлена expandable parameters panel
+  - Улучшена визуальная иерархия элементов
+  - Responsive design для мобильных устройств
+
+- **API Integration**: Обновлен формат запросов
+  - api.streamChatMessage теперь принимает объект с параметрами
+  - Backward compatibility с old string format
+  - Support для Ollama-specific options (num_ctx)
+
+- **Database Interface**: Новые методы для model configs
+  - CreateModelConfig, GetModelConfig, UpdateModelConfig, DeleteModelConfig
+  - GetModelConfigByScope для получения config по scope
+  - GetEffectiveModelConfig с автоматическим priority resolution
+
+### Technical
+- **Backend (Go)**:
+  - Новый файл internal/models/model_config.go с полными типами параметров
+  - Миграция v21: таблица model_configs с indexes и triggers
+  - SQLite реализация CRUD для model configs в internal/storage/sqlite/model_configs.go
+  - PostgreSQL stubs в internal/storage/postgresql/stubs.go
+  - Интеграция в internal/api/handlers/chat.go с type-safe конвертацией
+
+- **Frontend (JavaScript)**:
+  - Новый контроллер web/js/model-panel.js для управления панелью
+  - CSS стили в web/css/model-panel.css с dark/light mode support
+  - Обновлен web/js/chat.js для использования modelPanel
+  - Обновлен web/js/api.js с поддержкой параметров в requests
+
+- **Параметры основаны на официальном Ollama API**:
+  - Predict options: Temperature, TopP, TopK, NumPredict, RepeatPenalty и др.
+  - Runner options: NumCtx, NumBatch, NumGPU, MainGPU, UseMMap, NumThread
+  - Полная совместимость с ollama-lib/api/types.go');
+	`
+}
+
+// getAddChangelogV192Migration returns SQL for adding changelog v1.9.2 (v23 migration)
+func (s *SQLiteDB) getAddChangelogV192Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.9.2', '2025-10-13', '## [1.9.2] - 2025-10-13
+
+### Added
+- **Compact UI Design (Cursor-style)**: Переработан дизайн панели моделей
+  - Компактная горизонтальная панель с минималистичным дизайном
+  - Model selector в виде элегантного dropdown без лишних элементов
+  - Кнопка параметров в виде иконки (32x32px) для экономии места
+  - Адаптивный дизайн для мобильных устройств
+
+- **Context Window Tracking**: Умное управление контекстным окном
+  - Real-time индикатор использования контекста (tokens used / max tokens)
+  - Визуальные уровни предупреждений:
+    - ✅ Нормальный (0-60%%): серый фон
+    - ⚠️ Предупреждение (60-75%%): желтый фон
+    - 🔴 Критический (75%%+): красный фон
+  - Динамическое обновление при изменении num_ctx в параметрах
+
+- **Auto-Summarization**: Автоматическая суммаризация при заполнении контекста
+  - Автоматический триггер при достижении 75%% контекста
+  - Умная суммаризация с сохранением последних 3 обменов сообщениями
+  - Запрос к модели для создания лаконичного summary (2-3 параграфа)
+  - Замена старых сообщений на system message с summary
+  - Уведомления об успешной суммаризации с метриками токенов
+
+- **Context Manager Module**: Новый модуль для управления контекстом
+  - Оценка токенов в реальном времени (~1 токен = 4 символа)
+  - Отслеживание всех сообщений с подсчетом токенов
+  - API для получения статистики контекста
+  - Автоматическая очистка при начале новой беседы
+
+### Changed
+- **Model Panel UI**: Компактный дизайн в стиле Cursor
+  - Уменьшен padding с 16px до 8px для компактности
+  - Model selector без label, только dropdown
+  - Parameters toggle в виде иконки вместо текстовой кнопки
+  - Уменьшены размеры шрифтов для экономии места
+  - Sliders уменьшены с 18px до 14px thumb size
+
+- **Request Parameters**: Ollama-specific options теперь применяются
+  - Добавлено поле Options в ChatCompletionRequest model
+  - Converter обрабатывает req.Options (num_ctx, top_k, repeat_penalty)
+  - Полная интеграция с Ollama API types
+
+- **Chat Flow**: Интеграция Context Manager
+  - Автоматическое добавление сообщений в context tracker
+  - Обновление context window size при смене параметров
+  - Очистка контекста при начале нового чата
+
+### Technical
+- **Frontend (JavaScript)**:
+  - Новый модуль web/js/context-manager.js с ContextManager class
+  - Интеграция в chat.js для tracking user/assistant messages
+  - Автоматическая суммаризация через /v1/chat/completions API
+  - Notification system для уведомлений о суммаризации
+
+- **Backend (Go)**:
+  - Добавлено поле Options map[string]interface{} в models.ChatCompletionRequest
+  - Converter применяет num_ctx, top_k, repeat_penalty из req.Options
+  - Helper functions intPtr(), float64Ptr() для конвертации типов
+
+- **CSS Updates**:
+  - Полная переработка web/css/model-panel.css для compact design
+  - Responsive breakpoints для мобильных устройств
+  - Dark/Light mode совместимость с новыми стилями');
+	`
+}
+
+// getAddChangelogV193Migration returns SQL for adding changelog v1.9.3 (v24 migration - initial version)
+func (s *SQLiteDB) getAddChangelogV193Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.9.3', '2025-10-14', '## [1.9.3] - 2025-10-14
+
+### Added
+- **MoniGo Performance Dashboard**: Real-time performance monitoring интеграция
+- **Admin Panel Reorganization**: Улучшенная структура навигации
+
+### Technical
+- MoniGo integration
+- Admin panel restructuring');
+	`
+}
+
+// getUpdateChangelogV193FinalMigration returns SQL for updating changelog v1.9.3 with full details (v25 migration)
+func (s *SQLiteDB) getUpdateChangelogV193FinalMigration() string {
+	return `
+UPDATE changelogs 
+SET content = '## [1.9.3] - 2025-10-14
+
+### Added
+- **MoniGo Performance Dashboard**: Real-time performance monitoring интеграция
+  - MoniGo запускается на отдельном порту 9091 для изоляции
+  - Quick Stats Cards с автоматическим обновлением каждые 5 секунд
+  - Real-time метрики: CPU Usage, Memory Usage, Goroutines, System Health
+  - Visual indicators (success/warning/critical) для метрик
+  - API proxy для /admin/performance/monigo/api/v1/metrics
+  - Direct link на Advanced Dashboard для полных возможностей MoniGo
+
+- **NVIDIA GPU Monitoring**: Мониторинг GPU метрик через nvidia-smi
+  - БЕЗ CGO зависимостей - использует nvidia-smi CLI напрямую
+  - БЕЗ NVML headers - работает на любой системе с nvidia-smi
+  - Поддержка нескольких GPU (multi-GPU configurations)
+  - Единый компактный блок для всех GPU с gradient top border
+  - Real-time метрики: Temperature, Power, GPU Load, VRAM, Clock, Fan Speed
+  - Автообновление каждые 5 секунд
+  - Hover эффект с подсветкой для каждой GPU строки
+  - Цветовые индикаторы: Green (<70°C), Orange (70-80°C), Red (>80°C)
+  - Graceful degradation если GPU не обнаружены или nvidia-smi недоступен
+  - Platform-specific builds: Linux/macOS (full GPU support), Windows (stub)
+
+- **Admin Panel Reorganization**: Улучшенная структура навигации
+  - Новая вкладка Models с Available Models списком
+  - Refresh Models кнопка для обновления списка моделей
+  - System Tab переработан для Performance & GPU Monitoring
+
+### Changed
+- **System Tab**: Переработан полностью под мониторинг
+  - Убраны Available Models (перенесены в Models Tab)
+  - MoniGo Dashboard link вместо embedded iframe
+  - Quick Stats Cards для основных метрик
+  - NVIDIA GPU Metrics секция (если GPU доступны)
+
+- **Models Tab**: Новая навигационная структура
+  - Fix: Модели корректно загружаются при первом заходе
+
+- **GPU Monitoring Architecture**:
+  - Отказ от go-nvml (CGO зависимость) в пользу nvidia-smi CLI
+  - Build tags для platform-specific реализаций
+  - Windows: stub версия (GPU monitoring disabled)
+  - Linux/macOS: полная функциональность через nvidia-smi
+
+### Fixed
+- **Models Tab Loading**: Исправлен баг с загрузкой моделей при первом заходе
+- **MoniGo Integration**: Убран iframe, решены проблемы с CORS и static files
+- **GPU Monitoring**: Убраны CGO compilation errors на Windows/Linux
+
+### Technical
+- **Backend**: internal/metrics/gpu_monitor_smi.go (Linux/macOS), gpu_monitor_windows.go (stub), internal/api/handlers/gpu.go для REST API
+- **Frontend**: web/js/gpu-monitor.js - NVIDIA GPU metrics, unified GPU card дизайн, gradient top border, grid layout
+- **Migration**: v25 для полного обновления changelog v1.9.3
+
+### Security
+- MoniGo dashboard доступен только через JWT authentication
+- API proxy защищен Bearer token authentication
+- GPU metrics endpoint требует аутентификацию'
+WHERE version = '1.9.3';
 	`
 }
 

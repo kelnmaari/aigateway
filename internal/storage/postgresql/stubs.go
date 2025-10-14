@@ -217,3 +217,35 @@ func (db *PostgreSQLDB) CountTotalUsers(ctx context.Context) (int, error) {
 func (db *PostgreSQLDB) CountActiveAPIKeys(ctx context.Context) (int, error) {
 	return 0, fmt.Errorf("CountActiveAPIKeys not implemented for PostgreSQL yet")
 }
+
+// ========================================
+// Model Configurations Stubs (v1.9.1+)
+// ========================================
+
+func (db *PostgreSQLDB) CreateModelConfig(ctx context.Context, config *models.ModelConfig) error {
+	return fmt.Errorf("CreateModelConfig not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetModelConfig(ctx context.Context, id string) (*models.ModelConfig, error) {
+	return nil, fmt.Errorf("GetModelConfig not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetModelConfigByScope(ctx context.Context, modelName, scope string, scopeID *string) (*models.ModelConfig, error) {
+	return nil, fmt.Errorf("GetModelConfigByScope not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) ListModelConfigs(ctx context.Context, scope string, scopeID *string) ([]*models.ModelConfig, error) {
+	return nil, fmt.Errorf("ListModelConfigs not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) UpdateModelConfig(ctx context.Context, config *models.ModelConfig) error {
+	return fmt.Errorf("UpdateModelConfig not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) DeleteModelConfig(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteModelConfig not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error) {
+	return nil, fmt.Errorf("GetEffectiveModelConfig not implemented for PostgreSQL yet")
+}

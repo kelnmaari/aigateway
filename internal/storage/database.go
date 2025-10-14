@@ -263,6 +263,35 @@ type Database interface {
 
 	// CountActiveAPIKeys возвращает количество активных API ключей
 	CountActiveAPIKeys(ctx context.Context) (int, error)
+
+	// ========================================
+	// Model Configurations (v1.9.1+)
+	// ========================================
+
+	// CreateModelConfig создает новую конфигурацию модели
+	CreateModelConfig(ctx context.Context, config *models.ModelConfig) error
+
+	// GetModelConfig получает конфигурацию модели по ID
+	GetModelConfig(ctx context.Context, id string) (*models.ModelConfig, error)
+
+	// GetModelConfigByScope получает конфигурацию модели по scope и ID
+	// modelName: имя модели (e.g., "llama3.1:latest")
+	// scope: "global", "tenant", "user"
+	// scopeID: nil для global, tenant_id для tenant, user_id для user
+	GetModelConfigByScope(ctx context.Context, modelName, scope string, scopeID *string) (*models.ModelConfig, error)
+
+	// ListModelConfigs возвращает список конфигураций по фильтру
+	ListModelConfigs(ctx context.Context, scope string, scopeID *string) ([]*models.ModelConfig, error)
+
+	// UpdateModelConfig обновляет конфигурацию модели
+	UpdateModelConfig(ctx context.Context, config *models.ModelConfig) error
+
+	// DeleteModelConfig удаляет конфигурацию модели
+	DeleteModelConfig(ctx context.Context, id string) error
+
+	// GetEffectiveModelConfig возвращает effective конфигурацию с приоритетом:
+	// user config > tenant config > global config > defaults
+	GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error)
 }
 
 // Tx представляет транзакцию БД

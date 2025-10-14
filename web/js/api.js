@@ -120,16 +120,30 @@ class API {
 
     // ==================== Chat APIs ====================
 
-    async sendChatMessage(messages, model, stream = false) {
+    async sendChatMessage(messages, modelParams, stream = false) {
+        // Support both old (string) and new (object with params) formats
+        const requestBody = {
+            messages: messages,
+            stream: stream
+        };
+
+        if (typeof modelParams === 'string') {
+            // Old format: just model name
+            requestBody.model = modelParams;
+            requestBody.temperature = 0.7;
+            requestBody.max_tokens = 2048;
+        } else if (typeof modelParams === 'object') {
+            // New format (v1.9.1+): model + parameters
+            requestBody.model = modelParams.model;
+            if (modelParams.temperature !== undefined) requestBody.temperature = modelParams.temperature;
+            if (modelParams.top_p !== undefined) requestBody.top_p = modelParams.top_p;
+            if (modelParams.max_tokens !== undefined) requestBody.max_tokens = modelParams.max_tokens;
+            if (modelParams.options) requestBody.options = modelParams.options;
+        }
+
         const response = await this.request(`${this.baseURL}/v1/chat/completions`, {
             method: 'POST',
-            body: JSON.stringify({
-                model: model,
-                messages: messages,
-                stream: stream,
-                temperature: 0.7,
-                max_tokens: 2048
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -141,8 +155,8 @@ class API {
     }
 
     // Stream chat response
-    async *streamChatMessage(messages, model) {
-        const response = await this.sendChatMessage(messages, model, true);
+    async *streamChatMessage(messages, modelParams) {
+        const response = await this.sendChatMessage(messages, modelParams, true);
         
         if (!response.ok) {
             throw new Error('Stream request failed');

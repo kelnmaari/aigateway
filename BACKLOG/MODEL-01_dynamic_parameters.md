@@ -1,13 +1,18 @@
 # MODEL-01: Dynamic Model Parameters Configuration
 
-**Версия:** 1.10.0  
+**Версия:** 1.9.1  
 **Приоритет:** Medium  
 **Сложность:** Medium  
-**Оценка:** 8-12 часов
+**Оценка:** 10-14 часов (расширенная с Chat UI)
 
 ## Описание
 
-UI для настройки параметров моделей (temperature, top_p, num_ctx, и др.) через Admin Panel. Per-tenant и per-user конфигурации с валидацией через Ollama API.
+Динамическая настройка параметров моделей (temperature, top_p, num_ctx, и др.) с тремя уровнями управления:
+1. **Chat UI** (Primary) - красивая панель над строкой ввода для per-chat настроек с localStorage persistence
+2. **Admin Panel** - глобальные, tenant, и user конфигурации
+3. **Profile** (Secondary) - permanent user preferences
+
+Выбранная модель и параметры запоминаются в localStorage и автоматически восстанавливаются при перезагрузке.
 
 ## Проблема
 
@@ -16,6 +21,10 @@ UI для настройки параметров моделей (temperature, t
 - Невозможно настроить temperature, top_p через UI
 - Нет per-tenant/per-user model configs
 - Админы не могут ограничить параметры для пользователей
+- **Выбор модели расположен неудобно (в верхней части чата)**
+- **Нет возможности быстро менять параметры без перезагрузки**
+- **Не сохраняется последняя использованная модель**
+- **Нет интуитивного UX для настройки параметров в чате**
 
 ## Решение
 
@@ -347,14 +356,510 @@ func (v *ParameterValidator) Validate(params *ModelParameters) error {
 </div>
 ```
 
-### User UI (Profile Settings)
+### Chat UI - Model Selector Panel (Primary Interface)
+
+**Расположение:** Над строкой ввода в web/chat.html
 
 ```html
-<!-- web/profile.html → Model Preferences -->
-<div class="user-model-prefs">
-  <h3>My Model Preferences</h3>
+<!-- web/chat.html → Model Control Panel (above input) -->
+<div class="chat-model-panel">
   
-  <p>Override default model settings for your chat sessions.</p>
+  <!-- Model Selector (красивый dropdown с иконками) -->
+  <div class="model-selector-wrapper">
+    <label class="model-label">
+      <i class="bi bi-robot"></i> Model
+    </label>
+    <select id="chat-model-select" class="model-select">
+      <optgroup label="Recommended">
+        <option value="qwen2.5-coder-tuned:7b" data-icon="⚡">Qwen 2.5 Coder (Fast)</option>
+        <option value="qwen3-coder-tuned:30b" data-icon="🎯">Qwen 3 Coder (Accurate)</option>
+      </optgroup>
+      <optgroup label="All Models">
+        <option value="devstral-tuned:latest" data-icon="🔬">Devstral</option>
+        <!-- Динамически загружается с /v1/models -->
+      </optgroup>
+    </select>
+  </div>
+  
+  <!-- Parameters Panel (collapsible) -->
+  <div class="model-params-toggle">
+    <button id="params-toggle" class="btn-params" aria-expanded="false">
+      <i class="bi bi-sliders"></i> Parameters
+      <i class="bi bi-chevron-down chevron-icon"></i>
+    </button>
+  </div>
+  
+  <!-- Expandable Parameters Panel -->
+  <div id="params-panel" class="params-collapse" hidden>
+    <div class="params-grid">
+      
+      <!-- Temperature -->
+      <div class="param-control">
+        <label for="chat-temperature">
+          Temperature 
+          <span class="param-info" data-tooltip="Creativity level (0.0 = focused, 2.0 = creative)">
+            <i class="bi bi-info-circle"></i>
+          </span>
+        </label>
+        <div class="param-slider-group">
+          <input type="range" id="chat-temperature" min="0" max="2" step="0.1" value="0.7" />
+          <input type="number" id="chat-temperature-value" min="0" max="2" step="0.1" value="0.7" class="param-number" />
+        </div>
+      </div>
+      
+      <!-- Top P -->
+      <div class="param-control">
+        <label for="chat-top-p">
+          Top P
+          <span class="param-info" data-tooltip="Nucleus sampling (0.0-1.0)">
+            <i class="bi bi-info-circle"></i>
+          </span>
+        </label>
+        <div class="param-slider-group">
+          <input type="range" id="chat-top-p" min="0" max="1" step="0.05" value="0.9" />
+          <input type="number" id="chat-top-p-value" min="0" max="1" step="0.05" value="0.9" class="param-number" />
+        </div>
+      </div>
+      
+      <!-- Max Tokens -->
+      <div class="param-control">
+        <label for="chat-max-tokens">
+          Max Tokens
+          <span class="param-info" data-tooltip="Maximum response length (-1 = unlimited)">
+            <i class="bi bi-info-circle"></i>
+          </span>
+        </label>
+        <input type="number" id="chat-max-tokens" min="-1" max="4096" value="-1" class="param-input" />
+      </div>
+      
+      <!-- Context Window -->
+      <div class="param-control">
+        <label for="chat-num-ctx">
+          Context Window
+          <span class="param-info" data-tooltip="Number of context tokens (128-131072)">
+            <i class="bi bi-info-circle"></i>
+          </span>
+        </label>
+        <input type="number" id="chat-num-ctx" min="128" max="131072" value="4096" class="param-input" />
+      </div>
+      
+    </div>
+    
+    <!-- Quick Presets -->
+    <div class="params-presets">
+      <button class="preset-btn" onclick="applyPreset('creative')">
+        <i class="bi bi-palette"></i> Creative
+      </button>
+      <button class="preset-btn" onclick="applyPreset('balanced')">
+        <i class="bi bi-balance-scale"></i> Balanced
+      </button>
+      <button class="preset-btn" onclick="applyPreset('precise')">
+        <i class="bi bi-bullseye"></i> Precise
+      </button>
+      <button class="preset-btn" onclick="applyPreset('coding')">
+        <i class="bi bi-code-slash"></i> Coding
+      </button>
+    </div>
+    
+    <!-- Reset Button -->
+    <button class="btn-reset" onclick="resetChatParams()">
+      <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+    </button>
+  </div>
+  
+</div>
+
+<!-- Styles для Chat Model Panel -->
+<style>
+.chat-model-panel {
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.model-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.model-label {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bs-primary);
+}
+
+.model-select {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 2px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.model-select:focus {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+  outline: none;
+}
+
+.btn-params {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bs-secondary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-params:hover {
+  background: var(--bs-tertiary-bg);
+}
+
+.btn-params[aria-expanded="true"] .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.params-collapse {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--bs-border-color);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.param-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.param-control label {
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.param-info {
+  cursor: help;
+  color: var(--bs-secondary);
+}
+
+.param-slider-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.param-slider-group input[type="range"] {
+  flex: 1;
+}
+
+.param-number, .param-input {
+  width: 80px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--bs-border-color);
+}
+
+.params-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.preset-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preset-btn:hover {
+  background: var(--bs-primary);
+  color: white;
+  border-color: var(--bs-primary);
+}
+
+.btn-reset {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--bs-border-color);
+  background: var(--bs-secondary-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-reset:hover {
+  background: var(--bs-danger);
+  color: white;
+  border-color: var(--bs-danger);
+}
+</style>
+```
+
+### Chat UI - JavaScript Logic
+
+```javascript
+// web/js/chat.js
+
+// Constants
+const STORAGE_KEY_MODEL = 'chat_selected_model';
+const STORAGE_KEY_PARAMS = 'chat_model_params';
+
+// Presets
+const PRESETS = {
+  creative: {
+    temperature: 1.2,
+    top_p: 0.95,
+    num_predict: -1,
+    num_ctx: 4096
+  },
+  balanced: {
+    temperature: 0.7,
+    top_p: 0.9,
+    num_predict: -1,
+    num_ctx: 4096
+  },
+  precise: {
+    temperature: 0.3,
+    top_p: 0.8,
+    num_predict: 2048,
+    num_ctx: 2048
+  },
+  coding: {
+    temperature: 0.2,
+    top_p: 0.95,
+    num_predict: 4096,
+    num_ctx: 8192
+  }
+};
+
+// Load saved model and params on page load
+document.addEventListener('DOMContentLoaded', () => {
+  loadModelsIntoSelector();
+  restoreSavedModelAndParams();
+  setupParamsPanelListeners();
+  setupModelChangeListener();
+});
+
+// Load models from API
+async function loadModelsIntoSelector() {
+  try {
+    const response = await fetch('/v1/models', {
+      headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+    });
+    const data = await response.json();
+    
+    const selector = document.getElementById('chat-model-select');
+    const allModelsGroup = selector.querySelector('optgroup[label="All Models"]');
+    
+    // Clear existing
+    allModelsGroup.innerHTML = '';
+    
+    // Populate with models
+    data.data.forEach(model => {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = model.id;
+      option.setAttribute('data-icon', getModelIcon(model.id));
+      allModelsGroup.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Failed to load models:', error);
+  }
+}
+
+function getModelIcon(modelName) {
+  if (modelName.includes('coder')) return '💻';
+  if (modelName.includes('vision')) return '👁️';
+  if (modelName.includes('llama')) return '🦙';
+  return '🤖';
+}
+
+// Restore saved model and params from localStorage
+function restoreSavedModelAndParams() {
+  // Restore model selection
+  const savedModel = localStorage.getItem(STORAGE_KEY_MODEL);
+  if (savedModel) {
+    const modelSelect = document.getElementById('chat-model-select');
+    if (modelSelect.querySelector(`option[value="${savedModel}"]`)) {
+      modelSelect.value = savedModel;
+    }
+  }
+  
+  // Restore parameters
+  const savedParams = localStorage.getItem(STORAGE_KEY_PARAMS);
+  if (savedParams) {
+    const params = JSON.parse(savedParams);
+    applyParamsToUI(params);
+  }
+}
+
+// Setup listeners for params panel
+function setupParamsPanelListeners() {
+  // Toggle panel
+  const toggleBtn = document.getElementById('params-toggle');
+  const panel = document.getElementById('params-panel');
+  
+  toggleBtn.addEventListener('click', () => {
+    const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+    toggleBtn.setAttribute('aria-expanded', !isExpanded);
+    panel.hidden = isExpanded;
+  });
+  
+  // Sync sliders with number inputs
+  syncSliderWithInput('chat-temperature', 'chat-temperature-value');
+  syncSliderWithInput('chat-top-p', 'chat-top-p-value');
+  
+  // Save params on change
+  document.querySelectorAll('.param-control input').forEach(input => {
+    input.addEventListener('change', saveCurrentParams);
+  });
+}
+
+function syncSliderWithInput(sliderId, inputId) {
+  const slider = document.getElementById(sliderId);
+  const input = document.getElementById(inputId);
+  
+  slider.addEventListener('input', () => {
+    input.value = slider.value;
+  });
+  
+  input.addEventListener('input', () => {
+    slider.value = input.value;
+  });
+}
+
+// Setup model change listener
+function setupModelChangeListener() {
+  const modelSelect = document.getElementById('chat-model-select');
+  modelSelect.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEY_MODEL, modelSelect.value);
+    console.log(`Model changed to: ${modelSelect.value}`);
+  });
+}
+
+// Apply preset
+function applyPreset(presetName) {
+  const preset = PRESETS[presetName];
+  if (!preset) return;
+  
+  applyParamsToUI(preset);
+  saveCurrentParams();
+  
+  // Visual feedback
+  showToast(`Applied "${presetName}" preset`, 'success');
+}
+
+function applyParamsToUI(params) {
+  if (params.temperature !== undefined) {
+    document.getElementById('chat-temperature').value = params.temperature;
+    document.getElementById('chat-temperature-value').value = params.temperature;
+  }
+  if (params.top_p !== undefined) {
+    document.getElementById('chat-top-p').value = params.top_p;
+    document.getElementById('chat-top-p-value').value = params.top_p;
+  }
+  if (params.num_predict !== undefined) {
+    document.getElementById('chat-max-tokens').value = params.num_predict;
+  }
+  if (params.num_ctx !== undefined) {
+    document.getElementById('chat-num-ctx').value = params.num_ctx;
+  }
+}
+
+// Save current params to localStorage
+function saveCurrentParams() {
+  const params = {
+    temperature: parseFloat(document.getElementById('chat-temperature').value),
+    top_p: parseFloat(document.getElementById('chat-top-p').value),
+    num_predict: parseInt(document.getElementById('chat-max-tokens').value),
+    num_ctx: parseInt(document.getElementById('chat-num-ctx').value)
+  };
+  
+  localStorage.setItem(STORAGE_KEY_PARAMS, JSON.stringify(params));
+}
+
+// Reset to defaults
+function resetChatParams() {
+  applyParamsToUI(PRESETS.balanced);
+  saveCurrentParams();
+  showToast('Reset to balanced defaults', 'info');
+}
+
+// Get current params for chat request
+function getCurrentModelParams() {
+  return {
+    model: document.getElementById('chat-model-select').value,
+    temperature: parseFloat(document.getElementById('chat-temperature').value),
+    top_p: parseFloat(document.getElementById('chat-top-p').value),
+    num_predict: parseInt(document.getElementById('chat-max-tokens').value),
+    num_ctx: parseInt(document.getElementById('chat-num-ctx').value)
+  };
+}
+
+// Modify sendMessage to include params
+async function sendMessage(message) {
+  const params = getCurrentModelParams();
+  
+  const requestBody = {
+    model: params.model,
+    messages: [...chatHistory, { role: 'user', content: message }],
+    temperature: params.temperature,
+    top_p: params.top_p,
+    max_tokens: params.num_predict === -1 ? null : params.num_predict,
+    // Ollama uses 'options' for num_ctx
+    options: {
+      num_ctx: params.num_ctx
+    },
+    stream: true
+  };
+  
+  // ... (rest of sendMessage logic)
+}
+```
+
+### User UI (Profile Settings - Secondary)
+
+```html
+<!-- web/profile.html → Model Preferences (для permanent settings) -->
+<div class="user-model-prefs">
+  <h3>Default Model Preferences</h3>
+  
+  <p>Set your default model settings. These are overridden by per-chat settings.</p>
   
   <select id="user-pref-model">
     <option value="llama3.1:latest">llama3.1:latest</option>
@@ -381,11 +886,21 @@ func (v *ParameterValidator) Validate(params *ModelParameters) error {
 3. ✅ Config resolution с priority
 4. ✅ Parameter validation
 5. ✅ Admin UI для model configuration
-6. ✅ User UI для personal preferences
-7. ✅ Test configuration function
-8. ✅ Reset to defaults
-9. ✅ Apply config в chat requests
-10. ✅ Templates для popular configs (preset buttons)
+6. ✅ **Chat UI - Model Selector Panel** (Primary UX)
+   - Красивый dropdown над строкой ввода
+   - Collapsible parameters panel
+   - Real-time sliders с синхронизацией
+   - Quick presets (Creative, Balanced, Precise, Coding)
+   - Tooltips с объяснениями параметров
+7. ✅ **localStorage persistence**
+   - Запоминание выбранной модели
+   - Запоминание параметров
+   - Восстановление при перезагрузке страницы
+8. ✅ User UI для permanent preferences (Profile)
+9. ✅ Test configuration function
+10. ✅ Reset to defaults
+11. ✅ Apply config в chat requests
+12. ✅ Dynamic model loading из API
 
 ### Нефункциональные
 
@@ -400,18 +915,39 @@ func (v *ParameterValidator) Validate(params *ModelParameters) error {
 
 ## Acceptance Criteria
 
+### Backend
 - [ ] Model configs сохраняются в БД
 - [ ] Global, tenant, user scopes работают
 - [ ] Config resolution правильно применяет priority
 - [ ] Parameter validation блокирует invalid values
-- [ ] Admin UI позволяет настроить model parameters
-- [ ] User UI позволяет установить personal preferences
-- [ ] Test configuration проверяет валидность
 - [ ] Chat requests используют effective config
 - [ ] User-provided params override config params
-- [ ] Reset to defaults восстанавливает default values
 - [ ] Unit tests для config resolution, validation
 - [ ] Integration tests для chat with custom params
+
+### Admin UI
+- [ ] Admin UI позволяет настроить model parameters
+- [ ] Test configuration проверяет валидность
+- [ ] Reset to defaults восстанавливает default values
+
+### Chat UI (Primary)
+- [ ] Model selector расположен над строкой ввода
+- [ ] Dropdown загружает модели динамически из `/v1/models`
+- [ ] Parameters panel collapsible/expandable
+- [ ] Sliders синхронизируются с number inputs
+- [ ] Tooltips объясняют каждый параметр
+- [ ] Quick presets применяются одним кликом
+- [ ] **Выбранная модель сохраняется в localStorage**
+- [ ] **Параметры сохраняются в localStorage**
+- [ ] **Модель и параметры восстанавливаются при перезагрузке**
+- [ ] Reset button возвращает к balanced preset
+- [ ] Chat requests используют выбранную модель и параметры
+- [ ] Visual feedback (toast) при изменениях
+- [ ] Responsive design (работает на мобильных)
+
+### Profile UI (Secondary)
+- [ ] User UI позволяет установить permanent preferences
+- [ ] Defaults применяются если нет chat-specific настроек
 
 ## Риски и зависимости
 
@@ -438,9 +974,12 @@ func (v *ParameterValidator) Validate(params *ModelParameters) error {
 - Parameters не все модели поддерживают одинаково
 - Validation основана на Ollama API v1
 - Advanced params (num_gpu, num_thread) требуют admin rights
+- **localStorage** используется для chat preferences (не требует backend)
+- **Chat UI** - primary interface, Profile/Admin - secondary
+- Presets подобраны на основе best practices для разных use cases
 
 ---
 
-**Статус:** 📋 Planned for v1.10.0  
-**Последнее обновление:** 2025-10-11
+**Статус:** 📋 Planned for v1.9.1 (приоритет перед VISION-01)  
+**Последнее обновление:** 2025-10-13
 

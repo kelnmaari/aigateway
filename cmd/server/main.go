@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/iyashjayesh/monigo"
+
 	"ollama-openai-proxy/internal/api/router"
 	"ollama-openai-proxy/internal/auth/jwt"
 	"ollama-openai-proxy/internal/config"
@@ -207,9 +209,98 @@ func main() {
 		}
 	}
 
+	// Инициализация GPU Monitor (Version 1.9.3+)
+	var gpuMonitor *metrics.GPUMonitor
+	gpuMonitor, err = metrics.NewGPUMonitor(appLogger, 10*time.Second)
+	if err != nil {
+		appLogger.WithError(err).Error("Failed to initialize GPU monitor")
+		// Не критичная ошибка, продолжаем
+	} else if gpuMonitor != nil {
+		gpuMonitor.Start()
+		defer gpuMonitor.Stop()
+		appLogger.Info("✅ GPU Monitor initialized successfully")
+		fmt.Println("🎮 NVIDIA GPU мониторинг включен")
+	}
+
+	// Инициализация MoniGo Performance Dashboard (Version 1.9.3+)
+	var monigoInstance *monigo.Monigo
+	var customMetrics *metrics.CustomMonigoMetrics
+	var monigoPort int = 9091 // Отдельный порт для MoniGo dashboard (9091 чтобы избежать конфликта с hwinfo)
+
+	if db != nil && jwtManager != nil {
+		appLogger.Info("Initializing MoniGo Performance Dashboard...")
+
+		// Создаем MoniGo instance
+		monigoInstance = &monigo.Monigo{
+			ServiceName: "Ollama-OpenAI-Proxy",
+		}
+
+		// Инициализируем MoniGo
+		appLogger.Debug("Calling MoniGo.Initialize()...")
+		monigoInstance.Initialize()
+		appLogger.Debug("MoniGo.Initialize() completed")
+
+		// Запускаем отдельный HTTP сервер для MoniGo на порту 9090
+		monigoMux := http.NewServeMux()
+
+		// Получаем unified handler от MoniGo
+		monigoHandler := monigo.GetUnifiedHandler()
+		monigoMux.Handle("/", monigoHandler)
+
+		monigoServer := &http.Server{
+			Addr:    fmt.Sprintf(":%d", monigoPort),
+			Handler: monigoMux,
+		}
+
+		// Запускаем MoniGo сервер в отдельной горутине
+		go func() {
+			appLogger.WithField("port", monigoPort).Info("Starting MoniGo HTTP server...")
+			if err := monigoServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				appLogger.WithError(err).Error("MoniGo server failed")
+			}
+		}()
+
+		// Graceful shutdown для MoniGo сервера
+		defer func() {
+			appLogger.Info("Shutting down MoniGo server...")
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := monigoServer.Shutdown(ctx); err != nil {
+				appLogger.WithError(err).Error("Failed to shutdown MoniGo server")
+			}
+		}()
+
+		// Запускаем custom metrics collector
+		customMetrics = metrics.NewCustomMonigoMetrics(monigoInstance, db, cfg, appLogger)
+		customMetrics.Start()
+
+		// Graceful shutdown для custom metrics
+		defer customMetrics.Stop()
+
+		appLogger.WithFields(map[string]interface{}{
+			"service_name": "Ollama-OpenAI-Proxy",
+			"monigo_port":  monigoPort,
+			"proxy_path":   "/admin/performance",
+		}).Info("✅ MoniGo Performance Dashboard initialized successfully")
+		fmt.Printf("📊 MoniGo Dashboard: http://localhost:%d (metrics API proxy: /admin/performance/monigo/api/v1/metrics)\n", monigoPort)
+	} else {
+		appLogger.WithFields(map[string]interface{}{
+			"db_initialized":  db != nil,
+			"jwt_initialized": jwtManager != nil,
+		}).Warn("MoniGo Performance Dashboard NOT initialized - missing dependencies")
+		fmt.Println("⚠️  MoniGo Performance Dashboard НЕ включен (требуется database + JWT)")
+	}
+
 	// Создание роутера
 	var appRouter *router.Router
 	// Всегда используем NewWithOptions для передачи database (необходим для MCP и других фич)
+
+	// DEBUG: Проверяем что MoniGo настроен корректно
+	appLogger.WithFields(map[string]interface{}{
+		"monigo_enabled": monigoInstance != nil,
+		"monigo_port":    monigoPort,
+	}).Debug("Creating router with MoniGo configuration")
+
 	appRouter, err = router.NewWithOptions(router.NewOptions{
 		Config:             cfg,
 		Logger:             appLogger,
@@ -219,6 +310,8 @@ func main() {
 		TracerProvider:     tracerProvider, // Может быть nil если tracing отключен (v1.6.0+)
 		PerformanceMonitor: perfMonitor,    // Может быть nil если performance monitoring отключен (v1.6.2+)
 		LeakDetector:       leakDetector,   // Может быть nil если leak detection отключен (v1.6.2+)
+		MonigoPort:         monigoPort,     // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
+		GPUMonitor:         gpuMonitor,     // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
 	})
 
 	if err != nil {

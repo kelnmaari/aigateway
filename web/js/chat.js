@@ -56,6 +56,11 @@ class ChatManager {
         this.chatTitle.textContent = 'New Chat';
         this.messageInput.value = '';
         this.messageInput.focus();
+        
+        // Clear context manager (v1.9.1+)
+        if (window.contextManager) {
+            window.contextManager.clear();
+        }
     }
 
     // Load conversation
@@ -82,9 +87,20 @@ class ChatManager {
     async sendMessage(content) {
         if (!content.trim() || this.isStreaming) return;
         
-        // Get selected model
-        const modelSelect = document.getElementById('model-select');
-        this.currentModel = modelSelect.value || this.currentModel;
+        // Get selected model from Model Panel (v1.9.1+)
+        if (window.modelPanel) {
+            this.currentModel = window.modelPanel.getSelectedModel() || this.currentModel;
+            
+            // Update context window size from model params
+            const params = window.modelPanel.getCurrentParams();
+            if (window.contextManager && params.num_ctx) {
+                window.contextManager.updateContextWindow(params.num_ctx);
+            }
+        } else {
+            // Fallback to old model-select
+            const modelSelect = document.getElementById('model-select');
+            this.currentModel = modelSelect?.value || this.currentModel;
+        }
         
         if (!this.currentModel) {
             this.showError('Please select a model');
@@ -102,6 +118,11 @@ class ChatManager {
         
         this.messages.push(userMessage);
         this.renderMessage(userMessage);
+        
+        // Track in context manager (v1.9.1+)
+        if (window.contextManager) {
+            window.contextManager.addMessage('user', content);
+        }
         
         // Clear input
         this.messageInput.value = '';
@@ -158,8 +179,13 @@ class ChatManager {
         let fullResponse = '';
 
         try {
-            // Stream from API
-            const stream = api.streamChatMessage(this.messages, this.currentModel);
+            // Get model parameters from Model Panel (v1.9.1+)
+            const requestParams = window.modelPanel ? window.modelPanel.getRequestParams() : {
+                model: this.currentModel
+            };
+            
+            // Stream from API with parameters
+            const stream = api.streamChatMessage(this.messages, requestParams);
             
             // Remove typing indicator
             contentDiv.innerHTML = '';
@@ -177,6 +203,11 @@ class ChatManager {
             };
             
             this.messages.push(assistantMessage);
+            
+            // Track in context manager (v1.9.1+)
+            if (window.contextManager) {
+                window.contextManager.addMessage('assistant', fullResponse);
+            }
 
             if (this.currentConversationId) {
                 try {

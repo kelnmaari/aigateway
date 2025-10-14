@@ -92,6 +92,12 @@ class AdminPanel {
             this.filterMCPServers(e.target.value);
         });
 
+        // Refresh models button (v1.9.3+)
+        const refreshModelsBtn = document.getElementById('refresh-models-btn');
+        if (refreshModelsBtn) {
+            refreshModelsBtn.addEventListener('click', () => this.refreshModels());
+        }
+
         // Modal close buttons
         document.querySelectorAll('.modal-close, .cancel-btn').forEach(btn => {
             btn.addEventListener('click', () => this.closeModals());
@@ -129,6 +135,9 @@ class AdminPanel {
                 break;
             case 'apikeys':
                 await this.loadAPIKeys();
+                break;
+            case 'models':
+                await this.loadModels();
                 break;
             case 'mcp':
                 await this.loadMCPServers();
@@ -541,8 +550,8 @@ class AdminPanel {
 
     // ==================== SYSTEM ====================
 
-    async loadSystem() {
-        // Load models
+    // Load Models (v1.9.3+)
+    async loadModels() {
         try {
             const response = await api.request(`${api.baseURL}/api/admin/models`);
             if (response.ok) {
@@ -552,43 +561,25 @@ class AdminPanel {
             }
         } catch (error) {
             console.error('Failed to load models:', error);
-        }
-
-        // Load logs
-        try {
-            const response = await api.request(`${api.baseURL}/api/admin/logs?limit=50`);
-            if (response.ok) {
-                const data = await response.json();
-                const logsDisplay = document.getElementById('logs-display');
-                
-                if (!data.logs || data.logs.length === 0) {
-                    logsDisplay.textContent = 'No logs available';
-                    return;
-                }
-
-                // Format logs properly
-                const formattedLogs = data.logs.map(log => {
-                    if (typeof log === 'string') {
-                        return log;
-                    }
-                    
-                    // If log is an object, format it nicely
-                    const timestamp = log.timestamp || log.time || new Date().toISOString();
-                    const level = (log.level || 'INFO').toUpperCase().padEnd(5);
-                    const message = log.message || log.msg || JSON.stringify(log);
-                    const fields = Object.entries(log)
-                        .filter(([key]) => !['timestamp', 'time', 'level', 'message', 'msg'].includes(key))
-                        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-                        .join(' ');
-                    
-                    return `[${timestamp}] ${level} ${message}${fields ? ' | ' + fields : ''}`;
-                }).join('\n');
-
-                logsDisplay.textContent = formattedLogs;
+            const container = document.getElementById('models-accordion');
+            if (container) {
+                container.innerHTML = '<div class="error-placeholder">Failed to load models</div>';
             }
-        } catch (error) {
-            console.error('Failed to load logs:', error);
-            document.getElementById('logs-display').textContent = 'Failed to load logs: ' + error.message;
+        }
+    }
+
+    async loadSystem() {
+        // System tab теперь только для Performance Monitoring (v1.9.3+)
+        // Модели перенесены в Models Tab
+        // Логи остались в Logs Tab
+        
+        // Performance Monitor автоматически запускается при активации System Tab
+        // через performance.js event listeners
+        console.log('System tab loaded - Performance Monitor will auto-start');
+        
+        // GPU Monitor инициализация (v1.9.3+)
+        if (window.gpuMonitor) {
+            await window.gpuMonitor.init();
         }
     }
 
@@ -789,6 +780,36 @@ class AdminPanel {
 
     sanitizeId(str) {
         return str.replace(/[^a-zA-Z0-9-_]/g, '-');
+    }
+
+    // Refresh models (v1.9.3+)
+    async refreshModels() {
+        const btn = document.getElementById('refresh-models-btn');
+        const originalHTML = btn.innerHTML;
+        
+        try {
+            // Disable button and show loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            
+            // Reload models
+            const response = await api.request(`${api.baseURL}/api/admin/models`);
+            if (response.ok) {
+                const data = await response.json();
+                this.models = data.data || data.models || [];
+                this.renderModels();
+                notifications.showSuccess('Models refreshed successfully');
+            } else {
+                throw new Error('Failed to refresh models');
+            }
+        } catch (error) {
+            console.error('Failed to refresh models:', error);
+            notifications.showError('Failed to refresh models');
+        } finally {
+            // Re-enable button
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
     }
 
     // User Management

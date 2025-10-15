@@ -120,11 +120,12 @@ func TestSecurity_TimingAttackResistance(t *testing.T) {
 		// Пытаемся использовать укороченные версии ключа
 		// Примечание: bcrypt имеет ограничение на длину входа (72 байта),
 		// поэтому добавление символов после этого предела может не повлиять на валидацию
+		keyLen := len(validKey.PlainKey)
 		shortKeys := []string{
-			validKey.PlainKey[:10], // Очень короткий
-			validKey.PlainKey[:20], // Короткий
-			validKey.PlainKey[:40], // Средний
-			validKey.PlainKey[:60], // Почти полный
+			validKey.PlainKey[:10],       // Очень короткий
+			validKey.PlainKey[:20],       // Короткий
+			validKey.PlainKey[:keyLen/2], // Половина
+			validKey.PlainKey[:keyLen-2], // Почти полный
 		}
 
 		for _, shortKey := range shortKeys {

@@ -125,7 +125,7 @@ func TestCreateAPIKey(t *testing.T) {
 
 		// Проверяем plaintext ключ
 		assert.NotEmpty(t, resp.PlainKey)
-		assert.Contains(t, resp.PlainKey, "sk-proj-")
+		assert.Contains(t, resp.PlainKey, "sk-ak_")
 
 		// Проверяем, что можем найти ключ по ID
 		foundKey, err := manager.GetAPIKey(ctx, resp.APIKey.ID)

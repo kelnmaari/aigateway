@@ -1,10 +1,10 @@
 # 🗺️ Roadmap: Ollama-OpenAI Proxy
 
 > **Текущая версия:** 1.9.3 ✅  
-> **План развития:** Version 1.9.0 - 1.12.0+  
+> **План развития:** Version 1.9.0 - 1.13.0+  
 > **Статус:** Active Development (Version 1.9.0 Complete! - 3/3 задачи)  
-> **Последнее обновление:** 2025-10-14  
-> **Новое:** 🎯 v1.9.0 завершена! Roadmap перестроен: v1.10 (Smart Chat), v1.11 (Enterprise Auth), v1.12 (Model Pro II)
+> **Последнее обновление:** 2025-01-15  
+> **Новое:** 🧠 Добавлена v1.13.0 - RAG System! Roadmap: v1.10 (Smart Chat), v1.11 (Enterprise Auth), v1.12 (Model Pro II), v1.13 (RAG)
 
 ---
 
@@ -249,6 +249,88 @@
 
 ---
 
+## 🧠 Version 1.13.0 - RAG System
+
+**Фокус:** Полноценная RAG (Retrieval-Augmented Generation) система  
+**Приоритет:** HIGH  
+**Оценка времени:** 60-80 часов  
+**Статус:** 📋 Запланировано (0/5 задач)  
+**Версионирование:** v1.13.1-v1.13.5
+
+### Задачи
+
+- [ ] **RAG-01** Foundation & Data Sources Management → [BACKLOG/RAG-01_system_architecture.md](BACKLOG/RAG-01_system_architecture.md) → **v1.13.1**
+  - Database schema (sources, documents, chunks, jobs)
+  - Data sources CRUD API
+  - File storage (Local + S3/MinIO)
+  - WebUI: Data Sources management
+  - Basic in-memory queue
+  - **Оценка:** 15-20 часов
+
+- [ ] **RAG-02** Document Processing Pipeline → **v1.13.2**
+  - PDF/DOCX/CSV extractors
+  - Semantic chunking engine
+  - PostgreSQL job queue
+  - Worker pool (async processing)
+  - Progress tracking UI
+  - **Оценка:** 15-20 часов
+
+- [ ] **RAG-03** Embeddings & Vector Search → **v1.13.3**
+  - Ollama embeddings integration (nomic-embed-text, bge-m3)
+  - pgvector setup + HNSW indexing
+  - Batch embedding processing
+  - Vector search API
+  - Search testing UI
+  - **Оценка:** 12-16 часов
+
+- [ ] **RAG-04** External Data Sources → **v1.13.4**
+  - REST API source implementation
+  - PostgreSQL database source
+  - Credentials encryption (AES-256)
+  - Connection testing
+  - Scheduled auto-sync
+  - **Оценка:** 10-14 часов
+
+- [ ] **RAG-05** RAG Integration & Chat UI → **v1.13.5**
+  - RAG Orchestrator
+  - Reranking logic
+  - Context assembly (max 64k of 128k)
+  - Chat API integration
+  - WebUI: Source selector in chat sidebar
+  - RAG metadata in responses
+  - **Оценка:** 8-10 часов
+
+### 🎯 Ключевые возможности
+
+- 📄 Multi-format файлы (PDF, DOCX, CSV, TXT, изображения)
+- 🔌 Внешние API с Bearer token аутентификацией
+- 🗄️ PostgreSQL data sources с параметризованными запросами
+- 🧠 Semantic chunking с учетом контекста (512 tokens, 10% overlap)
+- 🔍 Vector search через pgvector (HNSW indexing)
+- ⚡ Async processing с worker pool
+- 🎨 UI-first approach для управления источниками
+- 🔐 AES-256 encryption для credentials
+- 📊 Analytics dashboard для RAG usage
+
+### 🏗️ Технический стек
+
+- **Vector DB:** pgvector (PostgreSQL extension) или Qdrant
+- **Embeddings:** Ollama (nomic-embed-text 768d или bge-m3 1024d)
+- **File Storage:** Local FS или MinIO/S3
+- **Queue:** PostgreSQL или in-memory
+- **Extractors:** PDF, DOCX, CSV parsers
+- **Chunking:** Semantic + Fixed-size hybrid
+
+### 📈 Use Cases
+
+1. **CSV Analysis:** "У меня в CSV есть клиенты с балансом >10000₽, дай список"
+2. **PDF Knowledge Base:** Загрузка документации → вопросы по содержимому
+3. **API Integration:** Реал-тайм данные из внешних систем
+4. **Database Queries:** Прямые запросы к корп. БД с контекстом
+5. **Multi-source:** Комбинирование данных из разных источников
+
+---
+
 ## 🔮 Future / Deferred
 
 **Задачи для будущих версий** (без конкретного релиза)
@@ -337,10 +419,11 @@
 | **v1.10.0** | 5 | 38-52 | HIGH | 📋 Запланировано |
 | **v1.11.0** | 5 | 58-78 | HIGH | 📋 Запланировано |
 | **v1.12.0** | 4 | 28-38 | MEDIUM | 📋 Запланировано |
+| **v1.13.0** | 5 | 60-80 | HIGH | 📋 Запланировано |
 | **Future** | 9+ | TBD | DEFERRED | 📋 Отложено |
-| **ИТОГО** | **17** | **144-196** | - | - |
+| **ИТОГО** | **22** | **204-276** | - | - |
 
-**Прогресс:** ✅ 2 major версии завершены (v1.6, v1.9) | 📋 3 запланированы (v1.10-v1.12)
+**Прогресс:** ✅ 2 major версии завершены (v1.6, v1.9) | 📋 4 запланированы (v1.10-v1.13)
 
 **Подход к версионированию:**  
 🔄 1 фича = 1 patch версия (например: v1.10.1, v1.10.2, ... → v1.11.0)
@@ -388,6 +471,6 @@
 
 ---
 
-**Последнее обновление:** 2025-10-14  
-**Версия Roadmap:** 2.0  
-**Статус:** Active Development 🚀 (Version 1.9.0 ✅ Complete! → Planning v1.10.0-v1.12.0)
+**Последнее обновление:** 2025-01-15  
+**Версия Roadmap:** 2.1  
+**Статус:** Active Development 🚀 (Version 1.9.0 ✅ Complete! → Planning v1.10.0-v1.13.0)

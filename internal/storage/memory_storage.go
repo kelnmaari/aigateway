@@ -114,6 +114,10 @@ func (s *MemoryStorage) ListAPIKeys(ctx context.Context, req models.ListAPIKeysR
 	}
 
 	end := start + req.Limit
+	// Если limit = 0, возвращаем все ключи от start
+	if req.Limit == 0 {
+		end = len(allKeys)
+	}
 	if end > len(allKeys) {
 		end = len(allKeys)
 	}

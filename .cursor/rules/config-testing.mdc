@@ -1,5 +1,5 @@
 ---
-globs: ollama-openai-proxy/internal/config/*.go,*_test.go,configs/*.yaml
+globs: internal/config/*.go,*_test.go,configs/*.yaml
 ---
 
 # Configuration & Testing Guidelines

@@ -21,6 +21,183 @@ import (
 	"ollama-openai-proxy/internal/storage"
 )
 
+// testDBAdapter wraps MemoryStorage to implement storage.Database interface
+type testDBAdapter struct {
+	*storage.MemoryStorage
+}
+
+// Database interface implementations (required methods)
+func (a *testDBAdapter) Connect(ctx context.Context) error                    { return nil }
+func (a *testDBAdapter) Ping(ctx context.Context) error                       { return nil }
+func (a *testDBAdapter) Migrate(ctx context.Context) error                    { return nil }
+func (a *testDBAdapter) GetMigrationVersion(ctx context.Context) (int, error) { return 0, nil }
+func (a *testDBAdapter) BeginTx(ctx context.Context) (storage.Tx, error)      { return nil, nil }
+
+func (a *testDBAdapter) ListAPIKeys(ctx context.Context) ([]*models.APIKey, error) {
+	req := models.ListAPIKeysRequest{}
+	keys, _, err := a.MemoryStorage.ListAPIKeys(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*models.APIKey, len(keys))
+	for i := range keys {
+		result[i] = &keys[i]
+	}
+	return result, nil
+}
+
+// User methods
+func (a *testDBAdapter) CreateUser(ctx context.Context, user *models.User) error { return nil }
+func (a *testDBAdapter) GetUser(ctx context.Context, id string) (*models.User, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateUser(ctx context.Context, user *models.User) error { return nil }
+func (a *testDBAdapter) UpdateUserPassword(ctx context.Context, userID string, passwordHash string) error {
+	return nil
+}
+func (a *testDBAdapter) DeleteUser(ctx context.Context, id string) error { return nil }
+func (a *testDBAdapter) ListUsers(ctx context.Context, filters models.UserFilters) ([]*models.User, error) {
+	return nil, nil
+}
+
+// Tenant methods
+func (a *testDBAdapter) CreateTenant(ctx context.Context, tenant *models.Tenant) error { return nil }
+func (a *testDBAdapter) GetTenant(ctx context.Context, id string) (*models.Tenant, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateTenant(ctx context.Context, tenant *models.Tenant) error { return nil }
+func (a *testDBAdapter) DeleteTenant(ctx context.Context, id string) error             { return nil }
+func (a *testDBAdapter) ListUserTenants(ctx context.Context, userID string) ([]*models.Tenant, error) {
+	return nil, nil
+}
+
+// Tenant member methods
+func (a *testDBAdapter) AddTenantMember(ctx context.Context, member *models.TenantMember) error {
+	return nil
+}
+func (a *testDBAdapter) GetTenantMember(ctx context.Context, tenantID, userID string) (*models.TenantMember, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateTenantMember(ctx context.Context, member *models.TenantMember) error {
+	return nil
+}
+func (a *testDBAdapter) RemoveTenantMember(ctx context.Context, tenantID, userID string) error {
+	return nil
+}
+func (a *testDBAdapter) ListTenantMembers(ctx context.Context, tenantID string) ([]*models.TenantMember, error) {
+	return nil, nil
+}
+
+// Additional API key methods
+func (a *testDBAdapter) ListPersonalAPIKeys(ctx context.Context, userID string) ([]*models.APIKey, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListTenantAPIKeys(ctx context.Context, tenantID string) ([]*models.APIKey, error) {
+	return nil, nil
+}
+
+// Conversation methods
+func (a *testDBAdapter) CreateConversation(ctx context.Context, conv *models.Conversation) error {
+	return nil
+}
+func (a *testDBAdapter) GetConversation(ctx context.Context, id string) (*models.Conversation, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateConversation(ctx context.Context, conv *models.Conversation) error {
+	return nil
+}
+func (a *testDBAdapter) DeleteConversation(ctx context.Context, id string) error { return nil }
+func (a *testDBAdapter) ListUserConversations(ctx context.Context, userID string, filters models.ConversationFilters) ([]*models.Conversation, error) {
+	return nil, nil
+}
+
+// Message methods
+func (a *testDBAdapter) CreateMessage(ctx context.Context, msg *models.Message) error { return nil }
+func (a *testDBAdapter) GetMessage(ctx context.Context, id string) (*models.Message, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListConversationMessages(ctx context.Context, convID string) ([]*models.Message, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) DeleteConversationMessages(ctx context.Context, convID string) error {
+	return nil
+}
+
+// Usage methods
+func (a *testDBAdapter) RecordAPIUsage(ctx context.Context, usage *models.APIUsage) error { return nil }
+func (a *testDBAdapter) GetUserUsageStats(ctx context.Context, userID string, period time.Duration) (*models.UsageStats, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetTenantUsageStats(ctx context.Context, tenantID string, period time.Duration) (*models.UsageStats, error) {
+	return nil, nil
+}
+
+// MCP Server methods
+func (a *testDBAdapter) CreateMCPServer(ctx context.Context, server *models.MCPServer) error {
+	return nil
+}
+func (a *testDBAdapter) GetMCPServer(ctx context.Context, id string) (*models.MCPServer, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateMCPServer(ctx context.Context, server *models.MCPServer) error {
+	return nil
+}
+func (a *testDBAdapter) DeleteMCPServer(ctx context.Context, id string) error { return nil }
+func (a *testDBAdapter) ListMCPServers(ctx context.Context, req models.MCPServerListRequest) (*models.MCPServerListResponse, error) {
+	return nil, nil
+}
+
+// Changelog methods
+func (a *testDBAdapter) GetChangelog(ctx context.Context, version string) (*models.Changelog, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListChangelogs(ctx context.Context) ([]*models.Changelog, error) {
+	return nil, nil
+}
+
+// Report methods
+func (a *testDBAdapter) GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) CountActiveUsers(ctx context.Context, period time.Duration) (int, error) {
+	return 0, nil
+}
+func (a *testDBAdapter) CountTotalUsers(ctx context.Context) (int, error)    { return 0, nil }
+func (a *testDBAdapter) CountActiveAPIKeys(ctx context.Context) (int, error) { return 0, nil }
+
+// Model config methods
+func (a *testDBAdapter) CreateModelConfig(ctx context.Context, config *models.ModelConfig) error {
+	return nil
+}
+func (a *testDBAdapter) GetModelConfig(ctx context.Context, id string) (*models.ModelConfig, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetModelConfigByScope(ctx context.Context, modelName, scope string, scopeID *string) (*models.ModelConfig, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListModelConfigs(ctx context.Context, scope string, scopeID *string) ([]*models.ModelConfig, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateModelConfig(ctx context.Context, config *models.ModelConfig) error {
+	return nil
+}
+func (a *testDBAdapter) DeleteModelConfig(ctx context.Context, id string) error { return nil }
+func (a *testDBAdapter) GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error) {
+	return nil, nil
+}
+
 // setupAdminTest создает тестовое окружение для admin handler
 func setupAdminTest(t *testing.T) (*AdminHandler, *storage.MemoryStorage) {
 	gin.SetMode(gin.TestMode)
@@ -31,7 +208,8 @@ func setupAdminTest(t *testing.T) (*AdminHandler, *storage.MemoryStorage) {
 	stor := storage.NewMemoryStorage()
 	keyManager := apikey.NewManager(cfg, logger, stor)
 
-	handler := NewAdminHandler(cfg, logger, keyManager)
+	adapter := &testDBAdapter{MemoryStorage: stor}
+	handler := NewAdminHandler(cfg, logger, keyManager, adapter)
 	return handler, stor
 }
 
@@ -385,14 +563,15 @@ func TestAdminHandler_UpdateAPIKeyPermissions_Success(t *testing.T) {
 	assert.Len(t, key.Permissions, 3)
 }
 
-// TestAdminHandler_WithoutKeyManager_ReturnsError тестирует handler без key manager
+// TestAdminHandler_WithoutKeyManager_ReturnsError тестирует handler без key manager и db
 func TestAdminHandler_WithoutKeyManager_ReturnsError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{}
 	logger := logrus.New()
 	logger.SetOutput(io.Discard)
 
-	handler := NewAdminHandlerWithoutKeys(cfg, logger)
+	// Создаем handler БЕЗ db и БЕЗ keyManager
+	handler := NewAdminHandlerWithoutKeys(cfg, logger, nil)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -402,4 +581,36 @@ func TestAdminHandler_WithoutKeyManager_ReturnsError(t *testing.T) {
 
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 	assert.Contains(t, w.Body.String(), "API Key management not available")
+}
+
+// TestAdminHandler_WithDB_Success тестирует handler с базой данных
+func TestAdminHandler_WithDB_Success(t *testing.T) {
+	handler, stor := setupAdminTest(t)
+
+	// Создаем тестовый ключ
+	ctx := context.Background()
+	testKey := &models.APIKey{
+		ID:          "db-test-id",
+		Name:        "db-test-key",
+		KeyHash:     "hashed",
+		Models:      []string{"gpt-4"},
+		Permissions: []string{"chat"},
+		Status:      models.APIKeyStatusActive,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	stor.CreateAPIKey(ctx, testKey)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/admin/keys", nil)
+
+	handler.ListAPIKeys(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp models.ListAPIKeysResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(resp.APIKeys), 1)
 }

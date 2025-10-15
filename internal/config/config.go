@@ -354,7 +354,7 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	fmt.Printf("\n🚀 Server will bind to: %s:%d\n", config.Server.Host, config.Server.Port)
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Валидация конфигурации
 	if err := config.Validate(); err != nil {

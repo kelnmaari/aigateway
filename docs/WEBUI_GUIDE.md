@@ -1,794 +1,755 @@
-# 🌐 WebUI Guide - Ollama-OpenAI Proxy
+# 🌐 WebUI Guide - Ollama-OpenAI Proxy v1.9.3
 
-## Версия: 1.0.0
+> **Enterprise-grade ChatGPT-like interface for local Ollama models**
 
 ---
 
 ## 📖 Содержание
 
 1. [Введение](#введение)
-2. [Запуск WebUI](#запуск-webui)
-3. [Аутентификация](#аутентификация)
-4. [Dashboard](#dashboard)
-5. [API Keys Management](#api-keys-management)
-6. [Models](#models)
-7. [Configuration](#configuration)
-8. [Logs Viewer](#logs-viewer)
-9. [Export Functions](#export-functions)
-10. [Темы и настройки](#темы-и-настройки)
-11. [Troubleshooting](#troubleshooting)
+2. [Первый запуск](#первый-запуск)
+3. [Authentication & Multi-Tenancy](#authentication--multi-tenancy)
+4. [Chat Interface](#chat-interface)
+5. [Dashboard](#dashboard)
+6. [Profile Management](#profile-management)
+7. [API Keys](#api-keys)
+8. [Tenants & Teams](#tenants--teams)
+9. [Usage Statistics](#usage-statistics)
+10. [Admin Panel](#admin-panel)
+11. [MCP Catalog](#mcp-catalog)
+12. [About & Changelog](#about--changelog)
 
 ---
 
 ## 🎯 Введение
 
-**WebUI** — это веб-интерфейс для управления Ollama-OpenAI Proxy. Он предоставляет удобный графический интерфейс для:
+**WebUI v1.9.3** — полноценный ChatGPT-подобный интерфейс с enterprise возможностями:
 
-- 📊 Мониторинга метрик сервера в real-time
-- 🔑 Управления API ключами (создание, просмотр, удаление)
-- 🤖 Просмотра информации о моделях
-- ⚙️ Просмотра конфигурации
-- 📝 Real-time просмотра логов
-- 📤 Экспорта данных (CSV, JSON)
+### Ключевые возможности
 
-### Архитектура
+#### 💬 Chat Features
+- **Real-time streaming** responses
+- **Markdown rendering** с code highlighting
+- **Conversation history** с автосохранением
+- **Dynamic model parameters** в UI
+- **Context tracking** с автоматической суммаризацией
+- **Quick presets** для model parameters
 
-```
-┌─────────────────┐
-│   Browser       │
-│  (localhost:    │
-│     8081)       │
-└────────┬────────┘
-         │ HTTP
-         ↓
-┌─────────────────┐
-│  WebUI Server   │
-│  (cmd/webui)    │
-└────────┬────────┘
-         │ Proxy API
-         ↓
-┌─────────────────┐
-│  Main Server    │
-│  (localhost:    │
-│     8080)       │
-└─────────────────┘
-```
+#### 🔐 Enterprise Features
+- **JWT Authentication** - полноценная система пользователей
+- **Multi-Tenancy** - организации с членством и RBAC
+- **API Keys Management** - Personal & Tenant keys
+- **Rate Limiting** - настраиваемые лимиты per-key
+- **Usage Analytics** - детальная статистика
 
-WebUI работает как **отдельный сервис**, проксирующий запросы к основному API серверу.
+#### 📊 Monitoring (Admin only)
+- **MoniGo Dashboard** - real-time performance
+- **NVIDIA GPU Metrics** - multi-GPU monitoring
+- **Models Management** - список и обновление
+- **System Logs** - real-time streaming через SSE
 
 ---
 
-## 🚀 Запуск WebUI
+## 🚀 Первый запуск
 
-### Предварительные требования
+### Требования
 
-1. **Main Server** должен быть запущен:
-
-   ```bash
-   ./bin/server.exe
-   # или через air
-   air
-   ```
-
-2. **Ollama** должен быть доступен:
-
+1. **Ollama server** запущен:
    ```bash
    ollama serve
+   ollama pull llama3.2  # Или любая другая модель
    ```
 
-### Запуск
+2. **Proxy server** запущен:
+   ```bash
+   # Linux/macOS
+   ./dist/ollama-proxy-linux-amd64 -config configs/dev.yaml
+   
+   # Windows
+   dist\ollama-proxy-windows-amd64.exe -config configs/dev.yaml
+   ```
 
-#### Windows
+### Bootstrap Admin User
 
-```bash
-.\bin\webui.exe
-```
-
-#### Linux/MacOS
-
-```bash
-./bin/webui
-```
-
-### Параметры запуска
+При первом запуске система предложит создать admin пользователя:
 
 ```bash
-.\bin\webui.exe --help
+# В логах сервера увидите:
+🔐 Bootstrap Token: http://localhost:8080/bootstrap?token=abc123def456...
 
-Flags:
-  --port int           Port to run WebUI on (default: 8081)
-  --host string        Host to bind to (default: "0.0.0.0")
-  --server-url string  Main server URL (default: "http://localhost:8080")
+# Откройте эту ссылку в браузере
+# Заполните форму регистрации первого admin пользователя
 ```
 
-### Примеры
+**Важно:** Bootstrap token действует **10 минут** и **одноразовый**!
 
-**Запуск на другом порту:**
-
-```bash
-.\bin\webui.exe --port 9090
-```
-
-**Подключение к удаленному серверу:**
-
-```bash
-.\bin\webui.exe --server-url http://192.168.1.100:8080
-```
-
-### Доступ
-
-После запуска откройте браузер:
+### Доступ к WebUI
 
 ```
-http://localhost:8081
+http://localhost:8080/login
 ```
 
 ---
 
-## 🔐 Аутентификация
+## 🔐 Authentication & Multi-Tenancy
 
-### Login Modal
+### Регистрация
 
-При первом входе появится **Login Modal**:
+1. Откройте `/register`
+2. Заполните форму:
+   - **Username** (3-50 символов)
+   - **Email** (валидный email)
+   - **Password** (минимум 8 символов)
+3. Нажмите **Register**
+4. Автоматический вход после регистрации
+
+### Login
+
+1. Откройте `/login`
+2. Введите **Email** и **Password**
+3. JWT token сохраняется в `localStorage`
+4. Автоматический redirect на `/dashboard`
+
+### Logout
+
+- Кнопка **Logout** в правом верхнем углу
+- Очистка JWT token из `localStorage`
+- Redirect на `/login`
+
+### User Roles
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| **Owner** | Создатель организации | Полный доступ, добавление админов |
+| **Admin** | Администратор | Управление участниками, API keys |
+| **Member** | Участник | Доступ к tenant resources |
+| **Viewer** | Наблюдатель | Только чтение |
+
+### Personal Workspace
+
+Каждый пользователь автоматически получает **Personal Tenant**:
+- Имя: "username's Personal Workspace"
+- Role: Owner
+- Используется для personal API keys
+
+---
+
+## 💬 Chat Interface
+
+### Основная страница
+
+`/chat` - ChatGPT-подобный интерфейс
 
 ```
-┌──────────────────────────────────┐
-│ 🔐 Admin Authentication         │
-├──────────────────────────────────┤
-│ Please enter your admin API key │
-│ to access management features.   │
-│                                  │
-│ Admin API Key:                   │
-│ [sk-admin-........................] │
-│                                  │
-│      [🔓 Login]                  │
-└──────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│ Sidebar          │ Main Chat Area                       │
+│                  │                                       │
+│ Conversations:   │ ┌─────────────────────────────────┐ │
+│ • New Chat       │ │ Model Selection & Parameters    │ │
+│ • Chat 1         │ │ ▼ llama3.2  [⚙️ Parameters]     │ │
+│ • Chat 2         │ ├─────────────────────────────────┤ │
+│                  │ │ Chat Messages                   │ │
+│                  │ │ [User message...]               │ │
+│                  │ │ [AI response...]                │ │
+│                  │ │                                 │ │
+│                  │ ├─────────────────────────────────┤ │
+│                  │ │ 📊 Context: 1.2K / 32K (3.8%)   │ │
+│                  │ └─────────────────────────────────┘ │
+│                  │ [Type your message...] [Send]       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Получение Admin Key
+### Model Selection
 
-Admin key берется из конфигурации сервера:
+**Dropdown над input field:**
+- Список всех доступных моделей из Ollama
+- Сохранение последней выбранной модели в `localStorage`
+- Автоматическая загрузка при входе в чат
 
-**configs/dev.yaml:**
+### Dynamic Parameters Panel
 
-```yaml
-auth:
-  enabled: true
-  admin_key: "sk-admin-dev-key-12345"  # ← Этот ключ
+**Кнопка [⚙️ Parameters]** открывает collapsible панель:
+
+```
+┌─────────────────────────────────────────────────┐
+│ Model Parameters                                │
+├─────────────────────────────────────────────────┤
+│ Quick Presets:                                  │
+│ [🎨 Creative] [⚖️ Balanced] [🎯 Precise] [💻 Coding]│
+├─────────────────────────────────────────────────┤
+│ Temperature: 0.7      [━━━━━━━━━━]              │
+│ Top P: 0.9           [━━━━━━━━━━]              │
+│ Top K: 40            [━━━━━━━━━━]              │
+│ Context Window: 32000 [━━━━━━━━━━]              │
+│ Max Tokens: 2048     [━━━━━━━━━━]              │
+└─────────────────────────────────────────────────┘
 ```
 
-### Session Management
+**Quick Presets:**
+- 🎨 **Creative**: temp=1.2, top_p=0.95, top_k=60
+- ⚖️ **Balanced**: temp=0.7, top_p=0.9, top_k=40 (default)
+- 🎯 **Precise**: temp=0.3, top_p=0.5, top_k=20
+- 💻 **Coding**: temp=0.2, top_p=0.1, top_k=10
 
-- ✅ После успешного логина ключ сохраняется в **SessionStorage**
-- ✅ Ключ действует до закрытия вкладки/браузера
-- ✅ При новой сессии нужно логиниться заново
-- ✅ **Logout** кнопка в правом верхнем углу
+**Параметры сохраняются:**
+- В `localStorage` браузера
+- Отдельно для каждого чата
+- Восстанавливаются при возврате к чату
 
-### Security
+### Context Tracking
 
-- 🔒 Admin key передается через `Authorization: Bearer` header
-- 🔒 Key не логируется в console
-- 🔒 Key хранится только в SessionStorage (не LocalStorage)
-- 🔒 HTTPS рекомендуется для production
+**Real-time индикатор под messages:**
+
+```
+📊 Context: 1,234 / 32,000 tokens (3.8%)
+```
+
+**Цветовые индикаторы:**
+- 🟢 Green: < 70% (нормально)
+- 🟡 Yellow: 70-90% (предупреждение)
+- 🔴 Red: > 90% (критично)
+
+**Auto-Summarization:**
+При достижении 90% контекста:
+1. Автоматический вызов `/api/chat/summarize`
+2. Сжатие старых сообщений
+3. Уведомление пользователя
+4. Продолжение чата с освобожденным контекстом
+
+### Conversation Management
+
+**Sidebar:**
+- ➕ **New Chat** - создать новый разговор
+- 📝 Список всех conversations
+- 🗑️ **Delete** при hover на conversation
+- 🔍 **Search** для фильтрации (coming soon)
+
+**Auto-save:**
+- Каждое сообщение сохраняется автоматически
+- ID conversation в URL: `/chat?id=conv_123`
+- Восстановление при перезагрузке страницы
 
 ---
 
 ## 📊 Dashboard
 
-### Обзор
+`/dashboard` - Обзор использования и быстрые действия
 
-Dashboard — главный экран WebUI с real-time метриками:
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Dashboard                    [📊 CSV] [📄 JSON]     │
-├─────────────────────────────────────────────────────┤
-│ ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐            │
-│ │ 📈   │  │ ✅   │  │ ❌   │  │ 🔑   │            │
-│ │ 1,234│  │  950 │  │   12 │  │   5  │            │
-│ │Total │  │Success│  │Errors│  │Keys │            │
-│ └──────┘  └──────┘  └──────┘  └──────┘            │
-│                                                     │
-│ ┌─────────────────────┐  ┌────────────────────┐   │
-│ │ 🖥️ Server Info     │  │ 🤖 Ollama Status   │   │
-│ │ Status: Running    │  │ Connected: Yes     │   │
-│ │ Uptime: 2h 15m     │  │ Models: 12         │   │
-│ │ Address: :8080     │  │ URL: localhost:... │   │
-│ └─────────────────────┘  └────────────────────┘   │
-└─────────────────────────────────────────────────────┘
-```
-
-### Метрики
-
-**Stat Cards:**
-
-- 📈 **Total Requests** - всего запросов с момента запуска
-- ✅ **Success** - успешные запросы
-- ❌ **Errors** - запросы с ошибками
-- 🔑 **API Keys** - количество активных ключей
-
-**Server Info:**
-
-- **Status**: Running / Stopped
-- **Uptime**: время работы сервера
-- **Address**: адрес HTTP сервера
-
-**Ollama Status:**
-
-- **Connected**: статус подключения
-- **Models**: количество доступных моделей
-- **URL**: адрес Ollama сервера
-
-### Auto-Refresh
-
-Dashboard обновляется **каждые 5 секунд** автоматически.
-
-**Ручное обновление:**
+### Quick Stats
 
 ```
-[🔄 Refresh] кнопка в header
+┌─────────────────────────────────────────────────┐
+│ Total Requests  │ This Month │ API Keys │ Usage │
+│     1,234       │    456     │    5     │ 12.5GB│
+└─────────────────────────────────────────────────┘
 ```
 
-### Export Data
+### Quick Actions
 
-**📊 Export CSV** - экспорт метрик в CSV:
+- ➕ **New Chat** → `/chat`
+- 🔑 **Create API Key** → `/api-keys`
+- 👥 **Invite Member** → `/tenants`
+- 📊 **View Usage** → `/usage`
 
-```csv
-Metric,Value
-Server Uptime,2h 15m 30s
-Total Requests,1234
-Success Requests,950
-Error Requests,12
-Ollama Connected,Yes
-Ollama Models Count,12
-Total API Keys,5
-Active API Keys,4
-Disabled API Keys,1
-```
+### Recent Activity
 
-**📄 Export JSON** - экспорт всех данных в JSON:
-
-```json
-{
-  "stats": {
-    "uptime": 8130,
-    "total_requests": 1234,
-    "success_requests": 950,
-    "error_requests": 12
-  },
-  "ollama": {
-    "connected": true,
-    "models_count": 12
-  },
-  "api_keys": {
-    "total": 5,
-    "active": 4,
-    "disabled": 1
-  }
-}
-```
+Последние 10 events:
+- Chat conversations created
+- API keys generated
+- Tenant members added
+- Usage milestones
 
 ---
 
-## 🔑 API Keys Management
+## 👤 Profile Management
 
-### Просмотр ключей
+`/profile` - Управление профилем пользователя
 
-```
-┌──────────────────────────────────────────────────────┐
-│ API Keys Management      [📊 CSV] [➕ Create New]   │
-├──────────────────────────────────────────────────────┤
-│ Name     │ Status │ Rate Limit │ Models │ Last Used │
-├──────────┼────────┼────────────┼────────┼───────────┤
-│ DevKey1  │ 🟢     │ 60/min    │ *      │ 2m ago    │
-│ ProdKey  │ 🟢     │ 1000/min  │ gpt-4  │ 5s ago    │
-│ TestKey  │ 🔴     │ 10/min    │ llama3 │ Never     │
-└──────────┴────────┴────────────┴────────┴───────────┘
-```
+### Profile Information
 
-**Столбцы:**
+- **Username** (read-only after registration)
+- **Email** (editable)
+- **Created At** (read-only)
+- **Last Login** (read-only)
 
-- **Name**: имя ключа
-- **Status**: 🟢 Active / 🔴 Disabled
-- **Rate Limit**: лимит запросов в минуту
-- **Models**: разрешенные модели (* = все)
-- **Last Used**: последнее использование
-
-### Создание ключа
-
-**1. Нажать [➕ Create New Key]**
-
-**2. Заполнить форму:**
+### Change Password
 
 ```
 ┌────────────────────────────────┐
-│ ➕ Create New API Key         │
+│ Change Password                │
+├────────────────────────────────┤
+│ Current Password:              │
+│ [••••••••••]                   │
+│                                │
+│ New Password:                  │
+│ [••••••••••]                   │
+│                                │
+│ Confirm Password:              │
+│ [••••••••••]                   │
+│                                │
+│ [Change Password]              │
+└────────────────────────────────┘
+```
+
+**Требования:**
+- Минимум 8 символов
+- Текущий пароль обязателен
+- New password != current password
+
+### Delete Account
+
+⚠️ **Danger Zone:**
+- Удаление всех conversations
+- Удаление всех personal API keys
+- Выход из всех tenants (кроме owned)
+- Необратимое действие!
+
+---
+
+## 🔑 API Keys
+
+`/api-keys` - Управление API ключами
+
+### Personal Keys Tab
+
+**Привязаны к пользователю:**
+
+```
+┌──────────────────────────────────────────────────┐
+│ Personal API Keys         [➕ Create New]        │
+├────────┬────────┬────────────┬────────┬─────────┤
+│ Name   │ Status │ Rate Limit │ Models │ Actions │
+├────────┼────────┼────────────┼────────┼─────────┤
+│ DevKey │ 🟢     │ 60/min    │ *      │ [🗑️]   │
+│ TestKey│ 🔴     │ 10/min    │ llama3 │ [🗑️]   │
+└────────┴────────┴────────────┴────────┴─────────┘
+```
+
+### Tenant Keys Tab
+
+**Привязаны к организации:**
+
+Требуется роль **Owner** или **Admin** в tenant.
+
+```
+┌──────────────────────────────────────────────────┐
+│ Select Tenant: [My Organization ▼]               │
+├────────┬────────┬────────────┬────────┬─────────┤
+│ Name   │ Status │ Rate Limit │ Models │ Actions │
+├────────┼────────┼────────────┼────────┼─────────┤
+│ ProdKey│ 🟢     │ 1000/min  │ gpt-4  │ [🗑️]   │
+└────────┴────────┴────────────┴────────┴─────────┘
+```
+
+### Create API Key
+
+```
+┌────────────────────────────────┐
+│ Create New API Key             │
 ├────────────────────────────────┤
 │ Key Name:                      │
-│ [My Application Key...........]│
+│ [Production Key...............]│
 │                                │
-│ Rate Limit (req/min):          │
-│ [60...........................]│
+│ Rate Limits:                   │
+│ • Per Minute: [60...........]  │
+│ • Per Hour:   [1000.........]  │
 │                                │
 │ Allowed Models:                │
-│ [*............................]│
-│ (* for all, comma-separated)   │
+│ [*] (* for all, comma-sep)     │
 │                                │
-│  [Cancel]   [Create Key]       │
+│ Expires In (days):             │
+│ [30..........................]  │
+│                                │
+│ [Cancel] [Create]              │
 └────────────────────────────────┘
 ```
 
-**3. Получить plaintext key:**
+**После создания:**
+
+```
+✅ API Key Created!
+
+⚠️ Save this key now - you won't see it again!
+
+┌────────────────────────────────────┐
+│ sk-1234567890abcdef1234567890abcd │
+│          [📋 Copy to Clipboard]    │
+└────────────────────────────────────┘
+
+[Done]
+```
+
+---
+
+## 👥 Tenants & Teams
+
+`/tenants` - Управление организациями
+
+### My Tenants List
+
+```
+┌─────────────────────────────────────────────────┐
+│ My Tenants                  [➕ Create Tenant]  │
+├──────────────┬──────┬────────┬─────────────────┤
+│ Name         │ Role │ Members│ Actions         │
+├──────────────┼──────┼────────┼─────────────────┤
+│ Personal WS  │ Owner│   1    │ [👁️]           │
+│ My Company   │ Owner│   12   │ [👁️] [✏️] [🗑️]│
+│ Client Team  │ Admin│   5    │ [👁️] [✏️]      │
+└──────────────┴──────┴────────┴─────────────────┘
+```
+
+### Create Tenant
 
 ```
 ┌────────────────────────────────┐
-│ ✅ API Key Created!           │
+│ Create Organization            │
 ├────────────────────────────────┤
-│ ⚠️ Save this key now - you    │
-│ won't be able to see it again! │
+│ Organization Name:             │
+│ [Acme Corporation.............]│
 │                                │
-│ ┌────────────────────────────┐ │
-│ │ sk-1234567890abcdef...     │ │
-│ │ [📋 Copy]                  │ │
-│ └────────────────────────────┘ │
+│ Description (optional):        │
+│ [Our main development team...]│
 │                                │
-│           [Done]               │
+│ [Cancel] [Create]              │
 └────────────────────────────────┘
 ```
 
-**4. Копировать ключ:**
+### Manage Members
 
-- Нажать **[📋 Copy]**
-- Ключ скопируется в буфер обмена
-- Toast уведомление: ✅ "API key copied to clipboard!"
+**View Tenant → Members Tab:**
 
-### Удаление ключа
-
-**Кнопка [🗑️ Delete]** в строке ключа:
-
-```javascript
-Confirm: Are you sure you want to delete "DevKey1"?
-[Cancel] [Delete]
+```
+┌─────────────────────────────────────────────────┐
+│ Members                     [➕ Add Member]     │
+├───────────┬──────────────┬──────┬──────────────┤
+│ Username  │ Email        │ Role │ Actions      │
+├───────────┼──────────────┼──────┼──────────────┤
+│ john_doe  │ john@co.com  │ Owner│ -            │
+│ jane_smith│ jane@co.com  │ Admin│ [✏️] [🗑️]   │
+│ bob_dev   │ bob@co.com   │ Member│[✏️] [🗑️]   │
+└───────────┴──────────────┴──────┴──────────────┘
 ```
 
-После удаления:
+**Add Member Modal:**
 
-- ✅ Toast: "API key deleted successfully"
-- Таблица обновляется автоматически
-
-### Export Keys
-
-**📊 Export CSV** - экспорт всех ключей:
-
-```csv
-Key ID,Name,Status,Rate Limit,Allowed Models,Created,Last Used
-ak_123,DevKey1,active,60,*,2025-10-01 10:00,2m ago
-ak_456,ProdKey,active,1000,gpt-4,2025-10-02 15:30,5s ago
 ```
+┌────────────────────────────────┐
+│ Add Member to Tenant           │
+├────────────────────────────────┤
+│ Search User:                   │
+│ [john@........................]│
+│                                │
+│ Search Results:                │
+│ ┌────────────────────────────┐ │
+│ │ john_doe (john@example.com)│ │
+│ │ johnny (johnny@corp.com)   │ │
+│ └────────────────────────────┘ │
+│                                │
+│ Assign Role:                   │
+│ • ( ) Admin                    │
+│ • (•) Member                   │
+│ • ( ) Viewer                   │
+│                                │
+│ [Cancel] [Add]                 │
+└────────────────────────────────┘
+```
+
+**Live Search:**
+- Поиск по username или email
+- Автоматический поиск при вводе
+- Только users не в текущем tenant
+
+**Change Role:**
+- Кнопка [✏️] открывает modal
+- Выбор новой роли (Admin/Member/Viewer)
+- Owner role не изменяется
+
+**Remove Member:**
+- Кнопка [🗑️] с confirmation
+- Удаление из tenant membership
+- Revoke доступа к tenant resources
 
 ---
 
-## 🤖 Models
+## 📈 Usage Statistics
 
-### Extended Model Cards
+`/usage` - Детальная аналитика
+
+### Filters
 
 ```
-┌──────────────────────────────────────┐
-│ qwen2.5-coder:7b           4.7 GB   │
-├──────────────────────────────────────┤
-│ Parameters:     7B                   │
-│ Family:         qwen2                │
-│ Quantization:   Q4_K_M               │
-│ Format:         GGUF                 │
-│ Modified:       04.10.2025           │
-├──────────────────────────────────────┤
-│ Digest: sha256:3c7c4d6a7b8e...      │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ Date Range: [Last 7 Days ▼]            │
+│ Tenant:     [All Tenants ▼]            │
+│ Model:      [All Models ▼]             │
+│                      [Apply Filters]    │
+└─────────────────────────────────────────┘
 ```
 
-### Информация о моделях
+### Usage Cards
 
-**Каждая карточка содержит:**
+```
+┌──────────────────────────────────────────────────┐
+│ Total Requests │ Total Tokens │ Avg Latency     │
+│    1,234       │   456.7K     │    2.3s         │
+└──────────────────────────────────────────────────┘
+```
 
-**Header:**
+### Usage Table
 
-- **Model Name**: имя модели в Ollama
-- **Size (GB)**: размер модели на диске
+```
+┌────────────┬───────┬────────┬─────────┬─────────┐
+│ Date       │ Model │ Tokens │ Requests│ Latency │
+├────────────┼───────┼────────┼─────────┼─────────┤
+│ 2025-10-14 │ llama3│ 12.5K  │   45    │  2.1s   │
+│ 2025-10-13 │ qwen  │ 8.3K   │   32    │  1.9s   │
+└────────────┴───────┴────────┴─────────┴─────────┘
+```
 
-**Details:**
+### Export
 
-- **Parameters**: количество параметров (7B, 30B, etc.)
-- **Family**: семейство модели (llama, qwen, mistral, etc.)
-- **Quantization**: уровень квантизации (Q4_K_M, Q8_0, etc.)
-- **Format**: формат файла (GGUF, GGML)
-- **Modified**: дата последнего изменения
-
-**Footer:**
-
-- **Digest**: SHA256 hash модели (сокращенный)
-
-### Hover эффекты
-
-При наведении на карточку:
-
-- ⬆️ Карточка поднимается (translateY)
-- 🔵 Border становится синим
-- ✨ Появляется box-shadow
-
-### Responsive Design
-
-Карточки автоматически адаптируются к ширине окна:
-
-- **Wide screen**: 3-4 карточки в ряд
-- **Medium**: 2 карточки в ряд
-- **Mobile**: 1 карточка в ряд
+- **📊 Export CSV** - вся таблица usage
+- **📄 Export JSON** - raw данные для анализа
 
 ---
 
-## ⚙️ Configuration
+## 🛡️ Admin Panel
 
-### Просмотр конфигурации
+`/admin` - Только для admin users (JWT проверка)
+
+### Navigation Tabs
 
 ```
-┌────────────────────────────────────────┐
-│ Configuration                          │
-├────────────────────────────────────────┤
-│ {                                      │
-│   "server": {                          │
-│     "host": "0.0.0.0",                 │
-│     "port": 8080,                      │
-│     "timeout": {                       │
-│       "read": 30000000000,             │
-│       "write": 30000000000             │
-│     }                                  │
-│   },                                   │
-│   "ollama": {                          │
-│     "url": "http://localhost:11434",   │
-│     "timeout": 300000000000            │
-│   },                                   │
-│   ...                                  │
-│ }                                      │
-└────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ [Models] [System] [Logs]                │
+└─────────────────────────────────────────┘
 ```
 
-### Секции конфигурации
+### Models Tab
 
-**Отображаются:**
+**Available Models:**
 
-- ✅ Server settings (host, port, timeouts)
-- ✅ Ollama settings (URL, timeout, retries)
-- ✅ Auth settings (enabled, storage type)
-- ✅ Logging settings (level, format, file)
-- ✅ Models (mappings, cache)
-- ✅ Tools (force usage, fallback model)
-- ✅ Metrics (enabled, prometheus)
-- ✅ TUI (enabled, refresh rate)
+```
+┌─────────────────────────────────────────┐
+│ Available Models      [🔄 Refresh]      │
+├─────────────────────────────────────────┤
+│ ▶ llama3.2:latest             3.2 GB   │
+│   Family: llama • Params: 3B            │
+│   Modified: 2025-10-12                  │
+│                                         │
+│ ▶ qwen2.5-coder:7b            4.7 GB   │
+│   Family: qwen2 • Params: 7B            │
+│   Modified: 2025-10-10                  │
+└─────────────────────────────────────────┘
+```
 
-**Скрыты (для безопасности):**
+### System Tab
 
-- 🔒 admin_key
-- 🔒 jwt_secret
-- 🔒 API keys
+**Performance Monitoring:**
 
-### JSON Formatting
+```
+┌─────────────────────────────────────────┐
+│ Quick Stats Cards                       │
+├─────────────────────────────────────────┤
+│ CPU Usage  │ Memory   │ Goroutines     │
+│   12.5%    │  1.2 GB  │     45         │
+└─────────────────────────────────────────┘
 
-Конфигурация отображается в **pretty-printed JSON** с:
+┌─────────────────────────────────────────┐
+│ NVIDIA GPU Metrics                      │
+├─────────────────────────────────────────┤
+│ GPU 0: RTX 3080                         │
+│ • Temp: 47°C  • Power: 104W             │
+│ • GPU Load: 3%  • VRAM: 3.6/10 GB      │
+│ • Clock: 1890 MHz  • Fan: 61%          │
+│                                         │
+│ GPU 1: RTX 3080                         │
+│ • Temp: 45°C  • Power: 98W              │
+│ • GPU Load: 2%  • VRAM: 2.1/10 GB      │
+│ • Clock: 1875 MHz  • Fan: 58%          │
+└─────────────────────────────────────────┘
 
-- 🎨 Syntax highlighting
-- 🔢 Line numbers
-- 📏 2-space indentation
-- 📜 Scrollable view
+[Open Advanced Dashboard →] (MoniGo :9091)
+```
+
+**Auto-refresh:** каждые 5 секунд
+
+**MoniGo Dashboard:**
+- Открывается на порту **9091**
+- Полные возможности real-time monitoring
+- CPU, Memory, Network, Disk, HTTP metrics
+
+**GPU Monitoring:**
+- Только Linux/macOS (Windows = stub)
+- Multi-GPU support (unified card)
+- Real-time через `nvidia-smi` CLI
+- Цветовые индикаторы температуры
+
+### Logs Tab
+
+**Real-time Log Streaming:**
+
+```
+┌─────────────────────────────────────────┐
+│ System Logs                [🔄 Refresh] │
+├─────────────────────────────────────────┤
+│ File: [proxy-dev.log ▼]                 │
+│ Level: [All ▼] [Error] [Warn] [Info]   │
+├─────────────────────────────────────────┤
+│ 🔵 14:32:15 INFO  Server started :8080  │
+│ 🔵 14:32:16 INFO  Request processed     │
+│ 🟠 14:32:20 WARN  Slow request 5.2s     │
+│ 🔴 14:32:25 ERROR Failed to connect     │
+└─────────────────────────────────────────┘
+```
+
+**Features:**
+- **SSE Streaming** - real-time через Server-Sent Events
+- **Syntax Highlighting** - цветовые уровни
+- **Filtering** - по level (All/Error/Warn/Info/Debug)
+- **File Selection** - выбор лог-файла
+- **Auto-scroll** - к последним записям
 
 ---
 
-## 📝 Logs Viewer
+## 📚 MCP Catalog
 
-### Real-time Logs
+`/mcp` - Справочник MCP серверов
 
-```
-┌──────────────────────────────────────────────┐
-│ Recent Logs  [All][Errors][Warnings][Info]  │
-│              [Debug]              [🔄]       │
-├──────────────────────────────────────────────┤
-│ 🔵 time="..." level=info msg="Server..."    │
-│ 🔵 time="..." level=info msg="Request..."   │
-│ 🟠 time="..." level=warning msg="Slow..."   │
-│ 🔴 time="..." level=error msg="Failed..."   │
-│ ⬛ time="..." level=debug msg="Details..."  │
-└──────────────────────────────────────────────┘
-```
-
-### Фильтры
-
-**5 кнопок-фильтров:**
-
-1. **All** - все логи (по умолчанию)
-2. **Errors** - только ошибки 🔴
-3. **Warnings** - только предупреждения 🟠
-4. **Info** - только информационные 🔵
-5. **Debug** - только отладочные ⬛
-
-**Active state:**
-
-- Активная кнопка подсвечивается цветом уровня
-- Остальные кнопки серые
-
-### Color Coding
-
-**По уровням:**
-
-- 🔴 **ERROR** - красный фон, красная граница
-- 🟠 **WARNING** - оранжевый фон, оранжевая граница
-- 🔵 **INFO** - синий фон, обычный текст
-- ⬛ **DEBUG** - серый фон, серый текст
-
-### Функции
-
-**Auto-scroll:**
-
-- При загрузке логов автоматически прокручивается к последним
-- `container.scrollTop = container.scrollHeight`
-
-**Refresh:**
-
-- Кнопка **[🔄 Refresh]** обновляет логи
-- Limit: 200 последних строк
-
-**API:**
+### Catalog View
 
 ```
-GET /api/logs?limit=200&level=error
+┌─────────────────────────────────────────────────┐
+│ MCP Servers Catalog         [Search...........]│
+├─────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────┐ │
+│ │ 🔧 Weather Service                          │ │
+│ │ Category: Utilities                         │ │
+│ │ Provides weather information via API       │ │
+│ │ [View Details]                              │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ 📊 Database Tools                           │ │
+│ │ Category: Development                       │ │
+│ │ SQL query execution and management         │ │
+│ │ [View Details]                              │ │
+│ └─────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────┘
 ```
+
+**Admin only:**
+- ➕ **Add MCP Server**
+- ✏️ **Edit** existing servers
+- 🗑️ **Delete** servers
+
+**All users:**
+- 👁️ **View** catalog
+- 🔍 **Search** servers
+- 📋 **Copy** connection details
 
 ---
 
-## 📤 Export Functions
+## 📖 About & Changelog
 
-### Dashboard Export
+`/about` - Информация о системе
 
-**Export CSV:**
-
-```csv
-Metric,Value
-Server Uptime,2h 15m 30s
-Total Requests,1234
-Success Requests,950
-...
-```
-
-**Export JSON:**
-
-```json
-{
-  "stats": {...},
-  "ollama": {...},
-  "api_keys": {...}
-}
-```
-
-### API Keys Export
-
-**Export CSV:**
-
-```csv
-Key ID,Name,Status,Rate Limit,Allowed Models,Created,Last Used
-ak_123,DevKey1,active,60,*,2025-10-01 10:00:00,2m ago
-...
-```
-
-### Именование файлов
-
-Файлы автоматически именуются с датой:
+### System Info
 
 ```
-ollama-proxy-stats-2025-10-05.csv
-ollama-proxy-stats-2025-10-05.json
-ollama-proxy-api-keys-2025-10-05.csv
+┌─────────────────────────────────────────┐
+│ Ollama-OpenAI Proxy                     │
+│ Version: 1.9.3                          │
+│ Build Date: 2025-10-14                  │
+│ Go Version: 1.25+                       │
+└─────────────────────────────────────────┘
 ```
 
-### Toast Notifications
+### Changelog History
 
-После экспорта появляется уведомление:
-
-```
-✅ Stats exported to CSV
-```
-
----
-
-## 🎨 Темы и настройки
-
-### Dark/Light Theme Toggle
-
-**Кнопка переключения тем:**
+**Accordion UI:**
 
 ```
-[🌙] - Dark mode (по умолчанию)
-[☀️] - Light mode
+┌─────────────────────────────────────────┐
+│ ▼ Version 1.9.3 - 2025-10-14            │
+├─────────────────────────────────────────┤
+│ ### Added                               │
+│ - MoniGo Performance Dashboard          │
+│ - NVIDIA GPU Monitoring                 │
+│ - Admin Panel Reorganization            │
+│                                         │
+│ ### Technical                           │
+│ - MoniGo integration on port 9091       │
+│ - GPU metrics through nvidia-smi        │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ▶ Version 1.9.2 - 2025-10-13            │
+│ ▶ Version 1.9.1 - 2025-10-13            │
+│ ▶ Version 1.6.3 - 2025-10-12            │
+└─────────────────────────────────────────┘
 ```
 
-**Расположение:** правый нижний угол
-
-### Сохранение темы
-
-Тема сохраняется в **localStorage**:
-
-```javascript
-localStorage.setItem('theme', 'dark');
-localStorage.setItem('theme', 'light');
-```
-
-### Цветовые схемы
-
-**Dark Theme:**
-
-```css
---bg-main: #1a1b26
---bg-secondary: #24283b
---bg-tertiary: #2f3549
---text-primary: #c0caf5
---primary: #7aa2f7
-```
-
-**Light Theme:**
-
-```css
---bg-main: #ffffff
---bg-secondary: #f5f5f5
---bg-tertiary: #e0e0e0
---text-primary: #333333
---primary: #2196f3
-```
-
-### Toast Notifications
-
-**4 типа уведомлений:**
-
-1. **Success** ✅
-   - Зеленый фон
-   - Галочка иконка
-   - Auto-dismiss через 3 секунды
-
-2. **Error** ❌
-   - Красный фон
-   - Крестик иконка
-   - Auto-dismiss через 5 секунд
-
-3. **Warning** ⚠️
-   - Оранжевый фон
-   - Предупреждение иконка
-   - Auto-dismiss через 4 секунды
-
-4. **Info** ℹ️
-   - Синий фон
-   - Info иконка
-   - Auto-dismiss через 3 секунды
-
-**Manual Close:**
-
-- Кнопка **[×]** для ручного закрытия
+**Features:**
+- Markdown rendering в каждой версии
+- Collapsible sections
+- Автоматическая загрузка из БД
+- API: `/api/system/changelogs`
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Проблема: Login Modal не появляется
+### Chat не отправляет сообщения
 
-**Причина:** SessionStorage уже содержит ключ
-
-**Решение:**
-
-1. Открыть DevTools (F12)
-2. Console → `sessionStorage.clear()`
-3. Перезагрузить страницу (F5)
-
----
-
-### Проблема: "Failed to load stats"
-
-**Причина:** Main Server недоступен
+**Причина:** Модель не выбрана
 
 **Решение:**
+1. Выберите модель из dropdown
+2. Проверьте что Ollama запущен
+3. Проверьте `/admin` → Models
 
-1. Проверить что server запущен:
+### Context tracking показывает 0%
 
-   ```bash
-   curl http://localhost:8080/health
-   ```
-
-2. Проверить `--server-url` в WebUI:
-
-   ```bash
-   .\bin\webui.exe --server-url http://localhost:8080
-   ```
-
----
-
-### Проблема: API Keys не загружаются
-
-**Причина:** Неверный admin key
+**Причина:** Token estimation не работает
 
 **Решение:**
+1. Проверьте логи сервера
+2. Обновите страницу
+3. Проверьте API `/api/chat/estimate`
 
-1. Logout из WebUI
-2. Проверить admin_key в `configs/dev.yaml`
-3. Login с правильным ключом
+### API Keys не создаются
 
----
-
-### Проблема: Models не отображаются
-
-**Причина:** Ollama недоступен
+**Причина:** Недостаточные права
 
 **Решение:**
+1. Для Tenant keys нужна роль Owner/Admin
+2. Проверьте роль в `/tenants`
+3. Используйте Personal keys вместо Tenant
 
-1. Запустить Ollama:
+### GPU Metrics не отображаются
 
-   ```bash
-   ollama serve
-   ```
-
-2. Проверить подключение:
-
-   ```bash
-   curl http://localhost:11434/api/tags
-   ```
-
----
-
-### Проблема: Logs не загружаются
-
-**Причина:** Файл логов не существует
+**Причина:** Windows или nvidia-smi недоступен
 
 **Решение:**
+1. GPU monitoring работает только в Linux/macOS
+2. Проверьте `nvidia-smi` в терминале
+3. Windows использует stub версию (disabled)
 
-1. Проверить `configs/dev.yaml`:
+### MoniGo Dashboard 404
 
+**Причина:** MoniGo не запущен
+
+**Решение:**
+1. Проверьте `configs/dev.yaml`:
    ```yaml
-   logging:
-     file_path: "logs/proxy-dev.log"
+   performance:
+     monigo:
+       enabled: true
+       port: 9091
    ```
-
-2. Убедиться что директория `logs/` существует
-3. Перезапустить server для создания файла
-
----
-
-### Проблема: Export не работает
-
-**Причина:** Popup blocker в браузере
-
-**Решение:**
-
-1. Разрешить popups для `localhost:8081`
-2. Попробовать снова
-
----
-
-### Проблема: Theme не сохраняется
-
-**Причина:** LocalStorage заблокирован
-
-**Решение:**
-
-1. Проверить настройки браузера
-2. Разрешить localStorage для сайта
-3. Проверить в DevTools:
-
-   ```javascript
-   localStorage.getItem('theme')
-   ```
-
----
-
-## 📚 Дополнительные ресурсы
-
-- [README.md](../README.md) - Общая информация о проекте
-- [TUI_GUIDE.md](TUI_GUIDE.md) - Руководство по Terminal UI
-- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - API документация
-- [CONFIGURATION.md](CONFIGURATION.md) - Конфигурация
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Решение проблем
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Архитектура проекта
+2. Restart server
+3. Откройте `http://localhost:9091`
 
 ---
 
@@ -796,42 +757,30 @@ localStorage.setItem('theme', 'light');
 
 ### Security
 
-1. **Never share your admin key publicly**
-2. **Use HTTPS in production**
-3. **Enable CORS only for trusted origins**
-4. **Regularly rotate admin keys**
-5. **Monitor API key usage**
+1. **Используйте сложные пароли** (минимум 8 символов)
+2. **Регулярно меняйте API keys** (особенно tenant keys)
+3. **Проверяйте members** организаций
+4. **Используйте HTTPS** в production
+5. **Не делитесь JWT tokens**
 
 ### Performance
 
-1. **Use reasonable refresh intervals** (default 5s)
-2. **Limit log viewer to 200 lines**
-3. **Export large datasets incrementally**
-4. **Close unused browser tabs**
+1. **Используйте context tracking** для оптимизации
+2. **Включайте auto-summarization** при 90%
+3. **Выбирайте подходящие presets** для задач
+4. **Мониторьте GPU** при больших нагрузках
+5. **Настройте rate limits** для API keys
 
 ### UX
 
-1. **Enable Dark mode for night work** 🌙
-2. **Use keyboard shortcuts** (Tab, Esc, Enter)
-3. **Check Toast notifications** for important messages
-4. **Export data regularly** for backup
+1. **Сохраняйте важные conversations** (export)
+2. **Используйте Markdown** в сообщениях
+3. **Настраивайте parameters** под задачу
+4. **Проверяйте usage statistics** регулярно
+5. **Используйте Quick Presets** для быстрой настройки
 
 ---
 
-## 🚀 Roadmap
-
-### Planned Features
-
-- [ ] WebSocket для real-time updates (Фаза 12.2)
-- [ ] Live request monitor с таблицей
-- [ ] Usage statistics графики
-- [ ] PDF export для отчетов
-- [ ] Scheduled exports
-- [ ] Multi-language support
-- [ ] Mobile app (React Native)
-
----
-
-**Version**: 1.0.0  
-**Last Updated**: 2025-10-05  
-**Author**: Ollama-OpenAI Proxy Team
+**Version:** 1.9.3  
+**Last Updated:** 2025-10-14  
+**Author:** Ollama-OpenAI Proxy Team

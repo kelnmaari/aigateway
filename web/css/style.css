@@ -574,10 +574,67 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
+/* Attached Files Preview (FILE-STORAGE-01: Phase 4) */
+.attached-files-preview {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.attached-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    margin: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    font-size: 0.875rem;
+}
+
+.attached-file-chip .file-icon {
+    font-size: 1.2rem;
+}
+
+.attached-file-chip .file-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attached-file-chip .remove-file {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+
+.attached-file-chip .remove-file:hover {
+    color: var(--danger);
+}
+
 .chat-form {
     display: flex;
     gap: 12px;
     align-items: flex-end;
+}
+
+.attach-btn {
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s, background 0.2s;
+}
+
+.attach-btn:hover {
+    opacity: 1;
+    background: var(--bg-tertiary);
 }
 
 .message-input {

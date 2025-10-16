@@ -5,6 +5,7 @@ class ChatManager {
         this.currentModel = null;
         this.messages = [];
         this.isStreaming = false;
+        this.attachedFiles = []; // FILE-STORAGE-01: Phase 4, v1.10.0+
         
         // Configure marked for markdown rendering
         marked.setOptions({
@@ -45,6 +46,15 @@ class ChatManager {
                 document.getElementById('chat-form').dispatchEvent(new Event('submit'));
             }
         });
+
+        // File attachment handlers (FILE-STORAGE-01: Phase 4)
+        const attachBtn = document.getElementById('attach-btn');
+        const fileInput = document.getElementById('file-input');
+        
+        if (attachBtn && fileInput) {
+            attachBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        }
     }
 
     // Start new conversation
@@ -61,6 +71,9 @@ class ChatManager {
         if (window.contextManager) {
             window.contextManager.clear();
         }
+
+        // Clear attached files (FILE-STORAGE-01: Phase 4)
+        this.clearAttachedFiles();
     }
 
     // Load conversation
@@ -113,7 +126,8 @@ class ChatManager {
         // Add user message
         const userMessage = {
             role: 'user',
-            content: content
+            content: content,
+            file_ids: this.attachedFiles.map(f => f.id) // FILE-STORAGE-01: Phase 4 (snake_case!)
         };
         
         this.messages.push(userMessage);
@@ -139,8 +153,12 @@ class ChatManager {
                 this.currentConversationId = conversation.id;
                 this.chatTitle.textContent = title;
                 
-                // Save user message
-                await api.createMessage(this.currentConversationId, 'user', content, this.currentModel);
+                // Save user message (with file_ids if any)
+                const fileIds = this.attachedFiles.map(f => f.id);
+                await api.createMessage(this.currentConversationId, 'user', content, this.currentModel, fileIds);
+                
+                // Clear attached files
+                this.clearAttachedFiles();
                 
                 // Update conversations list
                 if (window.app) {
@@ -151,9 +169,13 @@ class ChatManager {
                 this.showError('Failed to save conversation');
             }
         } else {
-            // Save user message
+            // Save user message (with file_ids if any)
             try {
-                await api.createMessage(this.currentConversationId, 'user', content, this.currentModel);
+                const fileIds = this.attachedFiles.map(f => f.id);
+                await api.createMessage(this.currentConversationId, 'user', content, this.currentModel, fileIds);
+                
+                // Clear attached files
+                this.clearAttachedFiles();
             } catch (error) {
                 console.error('Failed to save message:', error);
             }
@@ -241,8 +263,62 @@ class ChatManager {
         
         if (message.role === 'user') {
             contentDiv.textContent = message.content;
+            
+            // Show attached files if any (FILE-STORAGE-01: Phase 4)
+            if (message.file_ids && message.file_ids.length > 0) {
+                this.renderMessageFiles(messageDiv, message.file_ids);
+            }
         } else {
             contentDiv.innerHTML = marked.parse(message.content);
+        }
+    }
+
+    // Render files attached to message (FILE-STORAGE-01: Phase 4)
+    renderMessageFiles(messageDiv, fileIds) {
+        const filesContainer = document.createElement('div');
+        filesContainer.className = 'message-files';
+        filesContainer.style.cssText = 'margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px;';
+        
+        fileIds.forEach(fileId => {
+            // Find file in attachedFiles or create a placeholder
+            const file = this.attachedFiles.find(f => f.id === fileId) || { id: fileId, filename: 'Файл', mime_type: 'unknown' };
+            
+            const fileBadge = document.createElement('span');
+            fileBadge.className = 'message-file-badge';
+            fileBadge.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--bg-tertiary); border-radius: 12px; font-size: 0.75rem; cursor: pointer;';
+            fileBadge.innerHTML = `
+                <span>${this.getFileIcon(file.mime_type)}</span>
+                <span>${file.filename}</span>
+            `;
+            fileBadge.title = 'Просмотреть содержимое';
+            fileBadge.onclick = () => this.viewFileContent(file.id);
+            
+            filesContainer.appendChild(fileBadge);
+        });
+        
+        messageDiv.appendChild(filesContainer);
+    }
+
+    // View file content in modal (FILE-STORAGE-01: Phase 4)
+    async viewFileContent(fileId) {
+        try {
+            const response = await api.request(`${api.baseURL}/api/files/${fileId}/text`);
+            if (response.ok) {
+                const data = await response.json();
+                const text = data.text || '[Текст не извлечен]';
+                
+                // Use existing modal or alert
+                if (window.modal) {
+                    await window.modal.info(text, 'Содержимое файла');
+                } else {
+                    alert(text);
+                }
+            } else {
+                toast.error('Не удалось загрузить файл');
+            }
+        } catch (error) {
+            console.error('Failed to load file:', error);
+            toast.error('Ошибка загрузки файла');
         }
     }
 
@@ -297,6 +373,127 @@ class ChatManager {
         // Could implement a toast notification here
         console.error(message);
         toast.error(message);
+    }
+
+    // ========================================
+    // File Attachment Methods (FILE-STORAGE-01: Phase 4, v1.10.0+)
+    // ========================================
+
+    // Handle file selection
+    async handleFileSelect(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        for (const file of files) {
+            try {
+                // Upload file
+                const uploadedFile = await this.uploadFile(file);
+                this.attachedFiles.push(uploadedFile);
+                
+                // Show preview
+                this.renderAttachedFiles();
+                toast.success(`Uploaded: ${file.name}`);
+            } catch (error) {
+                console.error('Failed to upload file:', error);
+                toast.error(`Failed to upload ${file.name}`);
+            }
+        }
+
+        // Clear file input
+        event.target.value = '';
+    }
+
+    // Upload file to server
+    async uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Use access_token (not 'token')
+        const accessToken = localStorage.getItem('access_token');
+        const response = await fetch('/api/files/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: formData
+        });
+
+        // Handle 401 - try to refresh token
+        if (response.status === 401 && window.api) {
+            const refreshed = await window.api.refreshAccessToken();
+            if (refreshed) {
+                // Retry upload with new token
+                const newToken = localStorage.getItem('access_token');
+                const retryResponse = await fetch('/api/files/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${newToken}`
+                    },
+                    body: formData
+                });
+                
+                if (!retryResponse.ok) {
+                    throw new Error('Upload failed after token refresh');
+                }
+                
+                const data = await retryResponse.json();
+                // API returns file object directly (not wrapped in 'file' key)
+                return data;
+            }
+        }
+
+        if (!response.ok) {
+            throw new Error('Upload failed');
+        }
+
+        const data = await response.json();
+        // API returns file object directly (not wrapped in 'file' key)
+        return data;
+    }
+
+    // Render attached files preview
+    renderAttachedFiles() {
+        const preview = document.getElementById('attached-files-preview');
+        
+        if (this.attachedFiles.length === 0) {
+            preview.style.display = 'none';
+            return;
+        }
+
+        preview.style.display = 'block';
+        preview.innerHTML = this.attachedFiles.map((file, index) => `
+            <div class="attached-file-chip">
+                <span class="file-icon">${this.getFileIcon(file.mime_type)}</span>
+                <span class="file-name" title="${file.filename}">${file.filename}</span>
+                <button class="remove-file" onclick="chatManager.removeAttachedFile(${index})" type="button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M18 6L6 18M6 6l12 12" stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    // Remove attached file
+    removeAttachedFile(index) {
+        this.attachedFiles.splice(index, 1);
+        this.renderAttachedFiles();
+    }
+
+    // Get file icon emoji
+    getFileIcon(mimeType) {
+        if (mimeType.includes('pdf')) return '📕';
+        if (mimeType.includes('word')) return '📘';
+        if (mimeType.includes('csv')) return '📊';
+        if (mimeType.includes('sheet')) return '📗';
+        if (mimeType.includes('text')) return '📄';
+        return '📎';
+    }
+
+    // Clear attached files
+    clearAttachedFiles() {
+        this.attachedFiles = [];
+        this.renderAttachedFiles();
     }
 }
 

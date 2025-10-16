@@ -25,6 +25,7 @@
             <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
             <button class="tab-btn" data-tab="users">Users</button>
             <button class="tab-btn" data-tab="apikeys">API Keys</button>
+            <button class="tab-btn" data-tab="files">Files</button>
             <button class="tab-btn" data-tab="models">Models</button>
             <button class="tab-btn" data-tab="mcp">MCP Servers</button>
             <button class="tab-btn" data-tab="backups">Backups</button>
@@ -273,6 +274,91 @@
                         <h3>No Backups Found</h3>
                         <p>Create your first backup to protect your data</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Files Tab (v1.10.0) -->
+            <div id="files-tab" class="tab-pane">
+                <div class="section-header">
+                    <h2>📁 Files Management</h2>
+                    <button class="btn btn-secondary" id="files-refresh-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke-width="2"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid" style="margin-bottom: 2rem;">
+                    <div class="stat-card">
+                        <div>
+                            <div class="stat-value" id="admin-files-total">-</div>
+                            <div class="stat-label">Total Files</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div>
+                            <div class="stat-value" id="admin-files-size">-</div>
+                            <div class="stat-label">Total Size</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div>
+                            <div class="stat-value" id="admin-files-extracted">-</div>
+                            <div class="stat-label">Extracted</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div>
+                            <div class="stat-value" id="admin-files-pending">-</div>
+                            <div class="stat-label">Pending</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-bar" style="margin-bottom: 1.5rem; display: flex; gap: 1rem;">
+                    <input type="text" id="admin-files-search" class="form-input" placeholder="Search files..." style="flex: 1;">
+                    <select id="admin-files-type" class="form-input" style="width: 200px;">
+                        <option value="">All Types</option>
+                        <option value="text/plain">Text</option>
+                        <option value="application/pdf">PDF</option>
+                        <option value="text/csv">CSV</option>
+                        <option value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">DOCX</option>
+                    </select>
+                    <select id="admin-files-status" class="form-input" style="width: 200px;">
+                        <option value="">All Status</option>
+                        <option value="completed">Extracted</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+
+                <!-- Files Table -->
+                <div class="data-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Owner</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Status</th>
+                                <th>Words</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-files-table">
+                            <tr><td colspan="8" class="table-empty">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" id="admin-files-pagination" style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem;">
+                    <!-- Pagination will be added dynamically -->
                 </div>
             </div>
 
@@ -640,6 +726,7 @@
     <script src="/js/performance.js"></script>
     <script src="/js/gpu-monitor.js"></script>
     <script src="/js/admin.js"></script>
+    <script src="/js/admin-files.js"></script>
 </body>
 </html>
 

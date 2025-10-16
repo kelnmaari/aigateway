@@ -3,7 +3,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -99,6 +101,12 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 				"func_desc":  tool.Function.Description,
 			}).Debug("Tool definition received")
 		}
+	}
+
+	// Enrich messages with file content if file_ids present (FILE-STORAGE-01: Phase 4)
+	if err := h.enrichMessagesWithFiles(c.Request.Context(), &req); err != nil {
+		h.logger.WithError(err).Warn("Failed to enrich messages with files")
+		// Don't fail the request, just log the warning
 	}
 
 	// Проверка поддержки streaming
@@ -222,8 +230,87 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// enrichMessagesWithFiles обогащает сообщения содержимым прикрепленных файлов (FILE-STORAGE-01: Phase 4)
+func (h *ChatHandler) enrichMessagesWithFiles(ctx context.Context, req *models.ChatCompletionRequest) error {
+	if h.db == nil {
+		return nil // No database available
+	}
+
+	for i := range req.Messages {
+		msg := &req.Messages[i]
+
+		if len(msg.FileIDs) == 0 {
+			continue
+		}
+
+		// Get original content as string
+		originalContent := ""
+		switch v := msg.Content.(type) {
+		case string:
+			originalContent = v
+		default:
+			h.logger.Warn("Skipping file enrichment for non-string content")
+			continue
+		}
+
+		// Build enriched content with file texts
+		parts := []string{"📎 Прикрепленные файлы:"}
+
+		for _, fileID := range msg.FileIDs {
+			file, err := h.db.GetFileByID(ctx, fileID)
+			if err != nil {
+				h.logger.WithError(err).Warnf("Failed to load file %s", fileID)
+				parts = append(parts, fmt.Sprintf("\n\n--- Файл ID: %s ---", fileID))
+				parts = append(parts, "[Файл не найден]")
+				continue
+			}
+
+			parts = append(parts, fmt.Sprintf("\n\n--- Файл: %s (%s) ---", file.Filename, file.MimeType))
+
+			if file.ExtractedText != nil && *file.ExtractedText != "" {
+				// Limit content to avoid token overflow (max 10K chars per file)
+				text := *file.ExtractedText
+				maxLength := 10000
+				if len(text) > maxLength {
+					text = text[:maxLength] + "\n... (содержимое обрезано)"
+				}
+				parts = append(parts, text)
+			} else if file.ExtractionStatus == "failed" {
+				errMsg := "неизвестная ошибка"
+				if file.ExtractionError != nil {
+					errMsg = *file.ExtractionError
+				}
+				parts = append(parts, fmt.Sprintf("[Не удалось извлечь текст: %s]", errMsg))
+			} else if file.ExtractionStatus == "pending" {
+				parts = append(parts, "[Извлечение текста еще не завершено]")
+			} else {
+				parts = append(parts, "[Текст не извлечен]")
+			}
+		}
+
+		parts = append(parts, "\n\n--- Сообщение пользователя ---")
+		parts = append(parts, originalContent)
+
+		// Update message content
+		msg.Content = strings.Join(parts, "\n")
+
+		h.logger.WithFields(logrus.Fields{
+			"message_index": i,
+			"files_count":   len(msg.FileIDs),
+		}).Debug("Enriched message with file content")
+	}
+
+	return nil
+}
+
 // handleStreamingCompletion обрабатывает streaming запрос
 func (h *ChatHandler) handleStreamingCompletion(c *gin.Context, req *models.ChatCompletionRequest) {
+	// Enrich messages with file content for streaming too (FILE-STORAGE-01: Phase 4)
+	if err := h.enrichMessagesWithFiles(c.Request.Context(), req); err != nil {
+		h.logger.WithError(err).Warn("Failed to enrich streaming messages with files")
+		// Don't fail the request, just log the warning
+	}
+
 	// Создаем streaming handler
 	streamingHandler := NewStreamingChatHandler(h.config, h.logger, h.ollamaClient)
 

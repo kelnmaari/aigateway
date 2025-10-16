@@ -435,6 +435,21 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "update_changelog_v1_9_3_final",
 			SQL:     s.getUpdateChangelogV193FinalMigration(),
 		},
+		{
+			Version: 26,
+			Name:    "add_files_table",
+			SQL:     s.getFilesTableMigration(),
+		},
+		{
+			Version: 27,
+			Name:    "add_message_files_junction",
+			SQL:     s.getMessageFilesJunctionMigration(),
+		},
+		{
+			Version: 28,
+			Name:    "add_changelog_v1_10_0",
+			SQL:     s.getAddChangelogV1100Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -1982,6 +1997,164 @@ SET content = '## [1.9.3] - 2025-10-14
 - API proxy защищен Bearer token authentication
 - GPU metrics endpoint требует аутентификацию'
 WHERE version = '1.9.3';
+	`
+}
+
+// getFilesTableMigration returns SQL for creating files table (v1.10.0+)
+func (s *SQLiteDB) getFilesTableMigration() string {
+	return `
+-- ========================================
+-- Files Table (FILE-STORAGE-01: v1.10.0+)
+-- ========================================
+CREATE TABLE IF NOT EXISTS files (
+	id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+	user_id TEXT NOT NULL,
+	tenant_id TEXT, -- NULL для personal files
+	
+	-- File information
+	filename TEXT NOT NULL,
+	original_filename TEXT NOT NULL,
+	mime_type TEXT NOT NULL,
+	size_bytes INTEGER NOT NULL,
+	checksum_sha256 TEXT, -- For deduplication
+	
+	-- Storage
+	storage_backend TEXT NOT NULL, -- 'local', 's3'
+	storage_path TEXT NOT NULL, -- Path within backend
+	storage_bucket TEXT, -- S3 bucket name
+	
+	-- Extracted content (for simple chat integration)
+	extracted_text TEXT, -- Full text for simple use cases
+	extraction_status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'failed'
+	extraction_error TEXT,
+	
+	-- Metadata (JSON)
+	metadata TEXT, -- page_count, author, keywords, etc.
+	
+	-- Document info
+	page_count INTEGER,
+	word_count INTEGER,
+	language TEXT,
+	
+	-- Access control
+	is_public INTEGER DEFAULT 0, -- Boolean
+	shared_with TEXT, -- JSON array of user IDs
+	
+	-- Usage tracking
+	download_count INTEGER DEFAULT 0,
+	last_accessed_at TIMESTAMP,
+	
+	-- Timestamps
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	deleted_at TIMESTAMP, -- Soft delete
+	
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
+CREATE INDEX IF NOT EXISTS idx_files_tenant_id ON files(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_files_mime_type ON files(mime_type);
+CREATE INDEX IF NOT EXISTS idx_files_extraction_status ON files(extraction_status);
+CREATE INDEX IF NOT EXISTS idx_files_checksum ON files(checksum_sha256);
+CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_files_storage_backend ON files(storage_backend);
+
+-- ========================================
+-- File Access Logs Table (optional, для audit)
+-- ========================================
+CREATE TABLE IF NOT EXISTS file_access_logs (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	file_id TEXT NOT NULL,
+	user_id TEXT,
+	action TEXT NOT NULL, -- 'upload', 'download', 'delete', 'view'
+	ip_address TEXT,
+	user_agent TEXT,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	
+	FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_logs_file_id ON file_access_logs(file_id);
+CREATE INDEX IF NOT EXISTS idx_file_logs_user_id ON file_access_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_file_logs_created_at ON file_access_logs(created_at DESC);
+	`
+}
+
+// getMessageFilesJunctionMigration returns SQL for message_files junction table (v1.10.0+)
+func (s *SQLiteDB) getMessageFilesJunctionMigration() string {
+	return `
+-- ========================================
+-- Message Files Junction Table (FILE-STORAGE-01: Phase 4)
+-- ========================================
+-- Связь между сообщениями и прикрепленными файлами (many-to-many)
+CREATE TABLE IF NOT EXISTS message_files (
+	message_id TEXT NOT NULL,
+	file_id TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (message_id, file_id),
+	FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+	FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_files_message_id ON message_files(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_files_file_id ON message_files(file_id);
+	`
+}
+
+// getAddChangelogV1100Migration returns SQL for adding changelog v1.10.0 (v28 migration)
+func (s *SQLiteDB) getAddChangelogV1100Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.10.0', '2025-10-16', '## [1.10.0] - 2025-10-16
+
+### Added
+- **FILE-STORAGE-01: Universal File Storage & Processing System** ✅
+  - Storage Backends: Local filesystem и S3-compatible (MinIO)
+  - Document Extractors: PDF, DOCX, TXT, CSV с автоматическим определением кодировки
+  - Database Integration: Таблицы files, file_access_logs, message_files
+  - API Endpoints: /api/files/* для upload, download, delete, list
+  - WebUI: Страница Files для управления файлами
+  - Admin Panel: Новая вкладка Files для управления всеми файлами
+  - Chat Integration: Прикрепление файлов к сообщениям
+  - LLM Context Enrichment: Автоматическое включение содержимого файлов
+  - Path Traversal Prevention: Robust защита от path traversal
+  - Unicode Filenames: Полная поддержка Unicode (Cyrillic, Chinese, Emoji)
+
+- **Cross-Platform PDF Text Extraction** 🚀
+  - Pure Go Library: github.com/ledongthuc/pdf
+  - Automatic Fallback: pdftotext → go-pdf
+  - Three Methods: auto, pdftotext, go-pdf
+  - Docker-Ready: Работает без внешних зависимостей
+
+- **Advanced Text Encoding Detection** 🔍
+  - UTF-8 with BOM, UTF-16 LE/BE
+  - Windows-1251 Fallback для русского текста
+  - Cyrillic Detection
+  - Reasonable Text Validation
+
+- **Comprehensive Unit Tests** ✅
+  - Validator Tests: 13 тестов (100% pass)
+  - Local Storage Tests: 15 тестов (100% pass)
+  - Coverage: filestorage 46.7%, storage 29.6%
+
+### Changed
+- Chat Messages: Добавлено поле file_ids
+- Configuration: Секции file_storage и extractors
+
+### Fixed
+- File Upload Integrity: SkipContentValidation flag
+- Windows Path Separators: filepath.FromSlash()
+- File Deletion: Robust path traversal checks
+- Text Encoding: Windows-1251 heuristic detection
+
+### Technical
+- Dependencies: github.com/ledongthuc/pdf
+- Migrations: v26 files table, v27 message_files junction
+- Packages: internal/filestorage, internal/extractors
+- Tests: validator_test.go, local_test.go');
 	`
 }
 

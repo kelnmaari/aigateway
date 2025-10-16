@@ -24,6 +24,8 @@ type Config struct {
 	TUI           TUIConfig           `mapstructure:"tui"`
 	Development   DevelopmentConfig   `mapstructure:"development"`
 	Observability ObservabilityConfig `mapstructure:"observability"` // Version 1.6.0+: Tracing and monitoring
+	FileStorage   FileStorageConfig   `mapstructure:"file_storage"`  // Version 1.10.0+: File storage and processing
+	Extractors    ExtractorsConfig    `mapstructure:"extractors"`    // Version 1.10.0+: Document extractors
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -270,6 +272,72 @@ type PerformanceConfig struct {
 	GCPercentage         int    `mapstructure:"gc_percentage"`          // GOGC value (default: 100)
 	LeakDetection        bool   `mapstructure:"leak_detection"`         // Включить leak detection (default: true)
 	PprofEnabled         bool   `mapstructure:"pprof_enabled"`          // Включить pprof endpoints (default: true)
+}
+
+// FileStorageConfig конфигурация хранения файлов (Version 1.10.0+)
+type FileStorageConfig struct {
+	Backend string `mapstructure:"backend"` // "local" или "s3"
+
+	// Local filesystem storage
+	Local struct {
+		BasePath        string   `mapstructure:"base_path"`      // ./data/files
+		MaxFileSize     string   `mapstructure:"max_file_size"`  // 100MB
+		MaxTotalSize    string   `mapstructure:"max_total_size"` // 10GB per user
+		AllowedExts     []string `mapstructure:"allowed_extensions"`
+		ScanViruses     bool     `mapstructure:"scan_viruses"`     // ClamAV integration (future)
+		ValidateContent bool     `mapstructure:"validate_content"` // Magic number check
+	} `mapstructure:"local"`
+
+	// S3-compatible storage (MinIO)
+	S3 struct {
+		Endpoint        string `mapstructure:"endpoint"` // http://minio:9000
+		Bucket          string `mapstructure:"bucket"`   // user-files
+		AccessKey       string `mapstructure:"access_key"`
+		SecretKey       string `mapstructure:"secret_key"`
+		UseSSL          bool   `mapstructure:"use_ssl"`
+		Region          string `mapstructure:"region"`            // us-east-1
+		PublicBucket    string `mapstructure:"public_bucket"`     // For shared files
+		SignedURLExpiry string `mapstructure:"signed_url_expiry"` // 1h
+		MaxFileSize     string `mapstructure:"max_file_size"`     // 500MB
+	} `mapstructure:"s3"`
+}
+
+// ExtractorsConfig конфигурация извлечения текста из документов (Version 1.10.0+)
+type ExtractorsConfig struct {
+	// PDF extraction
+	PDF struct {
+		Method         string `mapstructure:"method"` // "pdftotext" или "go-fitz"
+		PreserveLayout bool   `mapstructure:"preserve_layout"`
+		ExtractImages  bool   `mapstructure:"extract_images"` // For future IMAGE-01
+		OCREnabled     bool   `mapstructure:"ocr_enabled"`    // For scanned PDFs (future)
+		MaxPages       int    `mapstructure:"max_pages"`
+	} `mapstructure:"pdf"`
+
+	// DOCX extraction
+	DOCX struct {
+		ExtractTables   bool `mapstructure:"extract_tables"`
+		ExtractImages   bool `mapstructure:"extract_images"`
+		ExtractComments bool `mapstructure:"extract_comments"`
+	} `mapstructure:"docx"`
+
+	// Text files
+	Text struct {
+		MaxSize           string   `mapstructure:"max_size"` // 10MB
+		Encoding          string   `mapstructure:"encoding"` // utf-8
+		FallbackEncodings []string `mapstructure:"fallback_encodings"`
+	} `mapstructure:"text"`
+
+	// CSV files
+	CSV struct {
+		Delimiter           string `mapstructure:"delimiter"` // ,
+		MaxRows             int    `mapstructure:"max_rows"`
+		Encoding            string `mapstructure:"encoding"`
+		AutoDetectDelimiter bool   `mapstructure:"auto_detect_delimiter"`
+	} `mapstructure:"csv"`
+
+	// General
+	Timeout         string `mapstructure:"timeout"`          // 30s per file
+	ParallelWorkers int    `mapstructure:"parallel_workers"` // 4 for batch processing
 }
 
 // Load загружает конфигурацию из файла и переменных окружения

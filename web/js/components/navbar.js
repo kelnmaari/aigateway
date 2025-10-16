@@ -9,6 +9,7 @@ class TopNavbar {
         const path = window.location.pathname;
         if (path.includes('chat.html')) return 'chat';
         if (path.includes('dashboard.html')) return 'dashboard';
+        if (path.includes('files.html')) return 'files';
         if (path.includes('admin.html')) return 'admin';
         if (path.includes('profile.html')) return 'profile';
         if (path.includes('tenants.html')) return 'tenants';
@@ -56,6 +57,13 @@ class TopNavbar {
                             <rect x="3" y="14" width="7" height="7" stroke-width="2"/>
                         </svg>
                         Dashboard
+                    </a>
+                    <a href="/files.html" class="nav-link ${this.currentPage === 'files' ? 'active' : ''}">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" stroke-width="2"/>
+                            <path d="M13 2v7h7" stroke-width="2"/>
+                        </svg>
+                        Files
                     </a>
                     ${this.currentUser && this.currentUser.is_admin ? `
                         <a href="/admin.html" class="nav-link ${this.currentPage === 'admin' ? 'active' : ''}">

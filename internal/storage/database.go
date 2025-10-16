@@ -292,6 +292,37 @@ type Database interface {
 	// GetEffectiveModelConfig возвращает effective конфигурацию с приоритетом:
 	// user config > tenant config > global config > defaults
 	GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error)
+
+	// ========================================
+	// Files (FILE-STORAGE-01: v1.10.0+)
+	// ========================================
+
+	// CreateFile создает новую запись о файле
+	CreateFile(ctx context.Context, req models.CreateFileRequest) (*models.File, error)
+
+	// GetFileByID получает файл по ID
+	GetFileByID(ctx context.Context, fileID string) (*models.File, error)
+
+	// UpdateFile обновляет информацию о файле
+	UpdateFile(ctx context.Context, fileID string, req models.UpdateFileRequest) (*models.File, error)
+
+	// DeleteFile удаляет файл (soft delete)
+	DeleteFile(ctx context.Context, fileID string) error
+
+	// ListFiles возвращает список файлов с фильтрацией и пагинацией
+	ListFiles(ctx context.Context, req models.ListFilesRequest) ([]*models.File, int, error)
+
+	// ListFilesWithUserInfo возвращает файлы с информацией о владельцах (для админки)
+	ListFilesWithUserInfo(ctx context.Context, req models.ListFilesRequest) ([]*models.FileWithUser, int, error)
+
+	// IncrementDownloadCount увеличивает счетчик скачиваний
+	IncrementDownloadCount(ctx context.Context, fileID string) error
+
+	// LogFileAccess записывает лог доступа к файлу
+	LogFileAccess(ctx context.Context, log models.FileAccessLog) error
+
+	// GetFileAccessLogs возвращает историю доступа к файлу
+	GetFileAccessLogs(ctx context.Context, fileID string, limit int) ([]*models.FileAccessLog, error)
 }
 
 // Tx представляет транзакцию БД

@@ -346,7 +346,32 @@ func (s *SQLiteDB) CreateMessage(ctx context.Context, msg *models.Message) error
 		return fmt.Errorf("failed to insert message: %w", err)
 	}
 
+	// Save file attachments if any (FILE-STORAGE-01: Phase 4)
+	if len(msg.FileIDs) > 0 {
+		if err := s.saveMessageFiles(ctx, msg.ID, msg.FileIDs); err != nil {
+			return fmt.Errorf("failed to save message files: %w", err)
+		}
+	}
+
 	s.logger.WithField("message_id", msg.ID).Info("Message created successfully")
+	return nil
+}
+
+// saveMessageFiles сохраняет связи message-files в junction table
+func (s *SQLiteDB) saveMessageFiles(ctx context.Context, messageID string, fileIDs []string) error {
+	if len(fileIDs) == 0 {
+		return nil
+	}
+
+	query := `INSERT INTO message_files (message_id, file_id) VALUES (?, ?)`
+
+	for _, fileID := range fileIDs {
+		_, err := s.db.ExecContext(ctx, query, messageID, fileID)
+		if err != nil {
+			return fmt.Errorf("failed to link file %s to message: %w", fileID, err)
+		}
+	}
+
 	return nil
 }
 
@@ -376,7 +401,38 @@ func (s *SQLiteDB) GetMessage(ctx context.Context, id string) (*models.Message, 
 		return nil, fmt.Errorf("failed to get message: %w", err)
 	}
 
+	// Load attached files (FILE-STORAGE-01: Phase 4)
+	fileIDs, err := s.loadMessageFiles(ctx, msg.ID)
+	if err != nil {
+		// Log error but don't fail the entire request
+		s.logger.WithError(err).Warn("Failed to load message files")
+	} else {
+		msg.FileIDs = fileIDs
+	}
+
 	return msg, nil
+}
+
+// loadMessageFiles загружает file_ids для сообщения из junction table
+func (s *SQLiteDB) loadMessageFiles(ctx context.Context, messageID string) ([]string, error) {
+	query := `SELECT file_id FROM message_files WHERE message_id = ? ORDER BY created_at`
+
+	rows, err := s.db.QueryContext(ctx, query, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query message files: %w", err)
+	}
+	defer rows.Close()
+
+	var fileIDs []string
+	for rows.Next() {
+		var fileID string
+		if err := rows.Scan(&fileID); err != nil {
+			return nil, fmt.Errorf("failed to scan file_id: %w", err)
+		}
+		fileIDs = append(fileIDs, fileID)
+	}
+
+	return fileIDs, rows.Err()
 }
 
 // ListConversationMessages возвращает список сообщений беседы
@@ -415,6 +471,17 @@ func (s *SQLiteDB) ListConversationMessages(ctx context.Context, convID string) 
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating messages: %w", err)
+	}
+
+	// Load attached files for each message (FILE-STORAGE-01: Phase 4)
+	for _, msg := range messages {
+		fileIDs, err := s.loadMessageFiles(ctx, msg.ID)
+		if err != nil {
+			// Log error but don't fail the entire request
+			s.logger.WithError(err).Warn("Failed to load message files")
+			continue
+		}
+		msg.FileIDs = fileIDs
 	}
 
 	s.logger.WithField("count", len(messages)).Debug("Listed conversation messages")

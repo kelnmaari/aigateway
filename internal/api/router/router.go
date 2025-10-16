@@ -22,6 +22,9 @@ import (
 	authService "ollama-openai-proxy/internal/auth/service"
 	"ollama-openai-proxy/internal/client/ollama"
 	"ollama-openai-proxy/internal/config"
+	"ollama-openai-proxy/internal/extractors"
+	"ollama-openai-proxy/internal/filestorage"
+	filestorageBackend "ollama-openai-proxy/internal/filestorage/storage"
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/request"
@@ -66,6 +69,7 @@ type Router struct {
 	embeddingsHandler     *handlers.EmbeddingsHandler
 	completionsHandler    *handlers.CompletionsHandler
 	adminHandler          *handlers.AdminHandler
+	adminFilesHandler     *handlers.AdminFilesHandler     // Admin files management (v1.10.0)
 	statsHandler          *handlers.StatsHandler          // Handler для TUI статистики
 	configHandler         *handlers.ConfigHandler         // Handler для конфигурации
 	logsHandler           *handlers.LogsHandler           // Handler для логов
@@ -75,6 +79,7 @@ type Router struct {
 	changelogHandler      *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
 	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
 	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
+	fileHandler           *handlers.FileHandler           // Handler для file operations (v1.10.0)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -306,8 +311,9 @@ func (r *Router) setupRoutes() {
 	r.setupWebUIRoutes()          // WebUI static files (Version 1.3.0+)
 	r.setupOpenAIRoutes()
 	r.setupAdminRoutes()
-	r.setupMCPRoutes() // MCP Servers Catalog (v1.4.5)
-	r.setupGPURoutes() // GPU Monitoring (v1.9.3)
+	r.setupMCPRoutes()  // MCP Servers Catalog (v1.4.5)
+	r.setupGPURoutes()  // GPU Monitoring (v1.9.3)
+	r.setupFileRoutes() // File Storage & Processing (v1.10.0)
 }
 
 // setupHealthRoutes настраивает эндпоинты проверки здоровья
@@ -409,6 +415,31 @@ func (r *Router) setupGPURoutes() {
 	}
 
 	r.logger.Info("✅ GPU monitoring routes registered")
+}
+
+// setupFileRoutes настраивает эндпоинты для работы с файлами (v1.10.0)
+func (r *Router) setupFileRoutes() {
+	if r.fileHandler == nil {
+		r.logger.Info("File storage disabled - handler not initialized")
+		return
+	}
+
+	// Файловые операции требуют аутентификации
+	api := r.engine.Group("/api/files")
+	if r.jwtManager != nil {
+		api.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+	{
+		api.POST("/upload", r.fileHandler.UploadFile)
+		api.GET("", r.fileHandler.ListFiles)
+		api.GET("/:id", r.fileHandler.GetFile)
+		api.GET("/:id/download", r.fileHandler.DownloadFile)
+		api.GET("/:id/text", r.fileHandler.GetFileText)
+		api.DELETE("/:id", r.fileHandler.DeleteFile)
+		api.POST("/search", r.fileHandler.SearchFiles)
+	}
+
+	r.logger.Info("✅ File storage routes registered (/api/files)")
 }
 
 // setupStatsRoutes настраивает эндпоинты статистики для TUI
@@ -620,6 +651,7 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/profile.html", "./web/profile.html")
 	r.engine.StaticFile("/tenants.html", "./web/tenants.html")
 	r.engine.StaticFile("/api-keys.html", "./web/api-keys.html")
+	r.engine.StaticFile("/files.html", "./web/files.html") // Files Management (v1.10.0)
 	r.engine.StaticFile("/usage.html", "./web/usage.html")
 	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
 	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
@@ -770,6 +802,14 @@ func (r *Router) setupAdminRoutes() {
 
 		// Models management (v1.4.4)
 		admin.GET("/models/:name/details", r.adminHandler.GetModelDetails)
+	}
+
+	// Files management (v1.10.0) - Admin can manage all files
+	if r.adminFilesHandler != nil {
+		r.logger.Info("Admin routes: Registering Files Management endpoints")
+		admin.GET("/files", r.adminFilesHandler.ListAllFiles)
+		admin.GET("/files/stats", r.adminFilesHandler.GetFileStats)
+		admin.DELETE("/files/:id", r.adminFilesHandler.DeleteFile)
 	}
 
 	// Backup & Restore endpoints (v1.5.14)
@@ -988,6 +1028,23 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		logger.Info("GPU handler initialized")
 	}
 
+	// File Storage & Handler (v1.10.0)
+	if r.db != nil {
+		r.setupFileStorage(cfg, logger)
+
+		// Admin files handler (v1.10.0) - после setupFileStorage
+		if r.fileHandler != nil {
+			storageBackend, err := filestorageBackend.NewStorageBackend(cfg.FileStorage)
+			if err == nil {
+				fileService := filestorage.NewService(storageBackend, cfg.FileStorage, logger)
+				r.adminFilesHandler = handlers.NewAdminFilesHandler(fileService, r.db, logger)
+				logger.Info("Admin files handler initialized")
+			}
+		}
+	} else {
+		logger.Warn("File storage NOT initialized: database is nil")
+	}
+
 	// Metrics Storage (Phase 12.1)
 	r.metricsStorage = metrics.NewMetricsStorage(metrics.DefaultStorageConfig(), logger)
 	r.metricsStorage.Start()
@@ -1025,6 +1082,35 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	r.metricsBroadcaster.Start()
 
 	logger.Info("WebSocket Hub and Metrics Storage initialized")
+}
+
+// setupFileStorage инициализирует file storage и extractors (v1.10.0)
+func (r *Router) setupFileStorage(cfg *config.Config, logger *logrus.Logger) {
+	// Создаем storage backend
+	storageBackend, err := filestorageBackend.NewStorageBackend(cfg.FileStorage)
+	if err != nil {
+		logger.WithError(err).Warn("Failed to create file storage backend")
+		return
+	}
+
+	// Создаем extractor registry
+	extractorRegistry, err := extractors.NewExtractorRegistry(cfg.Extractors, logger)
+	if err != nil {
+		logger.WithError(err).Warn("Failed to create extractor registry")
+		return
+	}
+
+	// Создаем file service
+	fileService := filestorage.NewService(storageBackend, cfg.FileStorage, logger)
+
+	// Создаем file handler
+	r.fileHandler = handlers.NewFileHandler(fileService, extractorRegistry, r.db, logger)
+
+	logger.WithFields(logrus.Fields{
+		"backend":       cfg.FileStorage.Backend,
+		"extractors":    len(extractorRegistry.SupportedTypes()),
+		"allowed_types": len(cfg.FileStorage.Local.AllowedExts),
+	}).Info("File storage initialized successfully")
 }
 
 // Shutdown gracefully останавливает все компоненты роутера

@@ -2,12 +2,15 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 
 	"ollama-openai-proxy/internal/models"
 	"ollama-openai-proxy/internal/storage"
@@ -15,13 +18,16 @@ import (
 
 // ConversationHandler handles conversation-related HTTP requests
 type ConversationHandler struct {
-	db storage.Database
+	db     storage.Database
+	logger *logrus.Logger
 }
 
 // NewConversationHandler creates a new conversation handler
 func NewConversationHandler(db storage.Database) *ConversationHandler {
+	logger := logrus.New()
 	return &ConversationHandler{
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 }
 
@@ -422,9 +428,10 @@ func (h *ConversationHandler) DeleteConversation(c *gin.Context) {
 
 // CreateMessageRequest represents a request to create a message
 type CreateMessageRequest struct {
-	Role    string `json:"role" binding:"required,oneof=user assistant system tool"`
-	Content string `json:"content" binding:"required"`
-	Model   string `json:"model,omitempty"`
+	Role    string   `json:"role" binding:"required,oneof=user assistant system tool"`
+	Content string   `json:"content" binding:"required"`
+	Model   string   `json:"model,omitempty"`
+	FileIDs []string `json:"file_ids,omitempty"` // FILE-STORAGE-01: Phase 4, v1.10.0+
 }
 
 // CreateMessage godoc
@@ -482,6 +489,7 @@ func (h *ConversationHandler) CreateMessage(c *gin.Context) {
 		Role:           models.MessageRole(req.Role),
 		Content:        req.Content,
 		Model:          req.Model,
+		FileIDs:        req.FileIDs, // FILE-STORAGE-01: Phase 4
 		CreatedAt:      now,
 	}
 
@@ -501,6 +509,42 @@ func (h *ConversationHandler) CreateMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, msg)
+}
+
+// buildMessageContextWithFiles добавляет содержимое файлов в контекст сообщения (FILE-STORAGE-01: Phase 4)
+func (h *ConversationHandler) buildMessageContextWithFiles(ctx context.Context, msg *models.Message) (string, error) {
+	if len(msg.FileIDs) == 0 {
+		return msg.Content, nil
+	}
+
+	var contextParts []string
+	contextParts = append(contextParts, "📎 Attached files:")
+
+	for _, fileID := range msg.FileIDs {
+		file, err := h.db.GetFileByID(ctx, fileID)
+		if err != nil {
+			h.logger.WithError(err).Warnf("Failed to load file %s", fileID)
+			continue
+		}
+
+		// Add file info
+		contextParts = append(contextParts, fmt.Sprintf("\n\n--- File: %s (%s) ---", file.Filename, file.MimeType))
+
+		// Include extracted text if available
+		if file.ExtractedText != nil && *file.ExtractedText != "" {
+			contextParts = append(contextParts, *file.ExtractedText)
+		} else if file.ExtractionStatus == "failed" {
+			contextParts = append(contextParts, fmt.Sprintf("[File content could not be extracted: %v]", file.ExtractionError))
+		} else {
+			contextParts = append(contextParts, "[File content extraction pending]")
+		}
+	}
+
+	// Add user's message after file context
+	contextParts = append(contextParts, "\n\n--- User message ---")
+	contextParts = append(contextParts, msg.Content)
+
+	return strings.Join(contextParts, "\n"), nil
 }
 
 // ListMessages godoc

@@ -195,6 +195,46 @@ func (db *PostgreSQLDB) ListChangelogs(ctx context.Context) ([]*models.Changelog
 }
 
 // ========================================
+// Files Methods (Stubs - v1.10.0+)
+// ========================================
+
+func (db *PostgreSQLDB) CreateFile(ctx context.Context, req models.CreateFileRequest) (*models.File, error) {
+	return nil, fmt.Errorf("CreateFile not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetFileByID(ctx context.Context, fileID string) (*models.File, error) {
+	return nil, fmt.Errorf("GetFileByID not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) UpdateFile(ctx context.Context, fileID string, req models.UpdateFileRequest) (*models.File, error) {
+	return nil, fmt.Errorf("UpdateFile not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) DeleteFile(ctx context.Context, fileID string) error {
+	return fmt.Errorf("DeleteFile not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) ListFiles(ctx context.Context, req models.ListFilesRequest) ([]*models.File, int, error) {
+	return nil, 0, fmt.Errorf("ListFiles not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) ListFilesWithUserInfo(ctx context.Context, req models.ListFilesRequest) ([]*models.FileWithUser, int, error) {
+	return nil, 0, fmt.Errorf("ListFilesWithUserInfo not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) IncrementDownloadCount(ctx context.Context, fileID string) error {
+	return fmt.Errorf("IncrementDownloadCount not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) LogFileAccess(ctx context.Context, log models.FileAccessLog) error {
+	return fmt.Errorf("LogFileAccess not implemented for PostgreSQL yet")
+}
+
+func (db *PostgreSQLDB) GetFileAccessLogs(ctx context.Context, fileID string, limit int) ([]*models.FileAccessLog, error) {
+	return nil, fmt.Errorf("GetFileAccessLogs not implemented for PostgreSQL yet")
+}
+
+// ========================================
 // Reports Statistics Methods (Stubs - v1.6.3)
 // ========================================
 

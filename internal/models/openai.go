@@ -38,6 +38,7 @@ type ChatMessage struct {
 	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`
 	ToolCallID   string        `json:"tool_call_id,omitempty"`
 	FunctionCall *FunctionCall `json:"function_call,omitempty"` // Deprecated
+	FileIDs      []string      `json:"file_ids,omitempty"`      // FILE-STORAGE-01: Phase 4, v1.10.0+
 }
 
 // Tool представляет инструмент доступный для модели

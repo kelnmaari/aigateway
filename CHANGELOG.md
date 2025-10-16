@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2025-10-16
+
+### Added
+
+- **FILE-STORAGE-01: Universal File Storage & Processing System** ✅ (Content Foundation)
+  - **Storage Backends**: Local filesystem и S3-compatible (MinIO) storage
+  - **Document Extractors**: PDF, DOCX, TXT, CSV с автоматическим определением кодировки
+  - **Database Integration**: Таблицы `files`, `file_access_logs`, `message_files`
+  - **API Endpoints**: `/api/files/*` для upload, download, delete, list
+  - **WebUI**: Страница Files для управления файлами пользователя
+  - **Admin Panel**: Новая вкладка Files для управления всеми файлами системы
+  - **Chat Integration**: Прикрепление файлов к сообщениям через junction table
+  - **LLM Context Enrichment**: Автоматическое включение содержимого файлов в контекст чата
+  - **Path Traversal Prevention**: Robust защита от path traversal атак
+  - **Unicode Filenames**: Полная поддержка Unicode имен файлов (Cyrillic, Chinese, Emoji)
+  - **Content Validation**: Magic number validation для безопасности
+
+- **Cross-Platform PDF Text Extraction** 🚀
+  - **Pure Go Library**: `github.com/ledongthuc/pdf` для работы без внешних зависимостей
+  - **Automatic Fallback**: `pdftotext` (если доступен) → `go-pdf` (всегда работает)
+  - **Three Extraction Methods**:
+    - `auto`: Автоматический выбор лучшего доступного метода
+    - `pdftotext`: Использует Poppler для высокого качества
+    - `go-pdf`: Чистый Go (работает на Windows, Linux, macOS без установки)
+  - **Docker-Ready**: Работает в контейнерах без дополнительных зависимостей
+  - **Metadata Extraction**: Автоматическое извлечение метаданных (title, author, pages)
+
+- **Advanced Text Encoding Detection** 🔍
+  - **UTF-8 with BOM**: Автоматическое определение и обработка UTF-8 BOM
+  - **UTF-16 LE/BE**: Поддержка UTF-16 Little/Big Endian с BOM detection
+  - **Windows-1251 Fallback**: Heuristic-based detection для русского текста
+  - **Cyrillic Detection**: Интеллектуальное определение кириллицы для правильной кодировки
+  - **Reasonable Text Validation**: Проверка что декодированный текст является валидным
+
+- **Comprehensive Unit Tests** ✅
+  - **Validator Tests**: 13 тестов (100% pass rate)
+    - File validation (PDF, size, extensions)
+    - Filename security (path traversal, special chars)
+    - MIME type validation
+    - Magic number checks
+    - Benchmark tests
+  - **Local Storage Tests**: 15 тестов (100% pass rate)
+    - Store/Retrieve/Delete operations
+    - Path traversal prevention
+    - Unicode filenames support
+    - Multi-user isolation
+    - Benchmark tests
+  - **Coverage**: filestorage 46.7%, storage 29.6%
+
+- **File Management UI**
+  - **User Files Page**: Drag & drop upload, grid view, filters, search, pagination
+  - **Admin Files Tab**: Управление всеми файлами с отображением email/username владельца
+  - **File Preview**: Modal для просмотра извлеченного текста
+  - **File Details**: Метаданные, размер, MIME type, extraction status
+  - **Statistics**: Total files, total size, по типам файлов
+
+- **Documentation** 📚
+  - **PDF_EXTRACTION.md**: Полная документация по PDF extraction
+  - **QUICK_START_PDF.md**: Быстрый старт для PDF
+  - Описание всех трех методов extraction
+  - Инструкции по установке Poppler для каждой ОС
+  - Docker integration guide
+
+### Changed
+
+- **Chat Messages**: Добавлено поле `file_ids` для хранения прикрепленных файлов
+  - Frontend отправляет `file_ids` массив при создании сообщения
+  - Backend enrichment: содержимое файлов автоматически добавляется в LLM prompt
+  - UI: File badges под сообщением с возможностью просмотра содержимого
+
+- **Configuration**:
+  - Добавлены секции `file_storage` и `extractors` в dev.yaml и production.yaml.example
+  - PDF extractor: `method: "auto"` по умолчанию для автоматического выбора
+
+### Fixed
+
+- **File Upload Integrity**: Исправлено отрезание начала файла из-за magic number validation
+  - Введен флаг `SkipContentValidation` для HTTP uploads
+- **Windows Path Separators**: Корректная обработка forward slashes на Windows
+  - Использование `filepath.FromSlash()` для кроссплатформенности
+- **File Deletion**: Исправлено физическое удаление файлов на Windows
+  - Robust path traversal checks с `filepath.Abs` и `strings.HasPrefix`
+- **Text Encoding**: Улучшенное определение Windows-1251 для русских текстов
+  - Heuristic-based fallback с проверкой Cyrillic символов
+
+### Technical
+
+- **New Dependencies**:
+  - `github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728` - Pure Go PDF parser
+- **Database Migrations**:
+  - Migration v26: `files` и `file_access_logs` таблицы
+  - Migration v27: `message_files` junction table для chat integration
+- **New Packages**:
+  - `internal/filestorage` - Universal storage abstraction
+  - `internal/filestorage/storage` - Local и S3 backends
+  - `internal/extractors` - Document extractors (PDF, DOCX, TXT, CSV)
+- **Test Files**:
+  - `internal/filestorage/validator_test.go` - 13 tests
+  - `internal/filestorage/storage/local_test.go` - 15 tests
+  - `internal/extractors/text_test.go` - Encoding tests (prepared)
+
 ## [1.9.3] - 2025-10-14
 
 ### Added

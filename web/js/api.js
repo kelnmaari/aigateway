@@ -253,14 +253,21 @@ class API {
         return response.json();
     }
 
-    async createMessage(conversationId, role, content, model) {
+    async createMessage(conversationId, role, content, model, fileIds = []) {
+        const body = {
+            role: role,
+            content: content,
+            model: model
+        };
+
+        // Add file_ids if any (FILE-STORAGE-01: Phase 4, v1.10.0+)
+        if (fileIds && fileIds.length > 0) {
+            body.file_ids = fileIds;
+        }
+
         const response = await this.request(`${this.baseURL}/api/conversations/${conversationId}/messages`, {
             method: 'POST',
-            body: JSON.stringify({
-                role: role,
-                content: content,
-                model: model
-            })
+            body: JSON.stringify(body)
         });
         
         if (!response.ok) throw new Error('Failed to create message');

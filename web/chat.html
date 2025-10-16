@@ -235,7 +235,24 @@
 
         <!-- Input Area -->
         <div class="input-area">
+            <!-- Attached Files Preview (FILE-STORAGE-01: Phase 4) -->
+            <div id="attached-files-preview" class="attached-files-preview" style="display: none;">
+                <!-- Attached files will be shown here -->
+            </div>
+
             <form id="chat-form" class="chat-form">
+                <input 
+                    type="file" 
+                    id="file-input" 
+                    accept=".txt,.pdf,.docx,.csv" 
+                    multiple 
+                    style="display: none;"
+                />
+                <button type="button" class="btn btn-icon attach-btn" id="attach-btn" title="Attach files">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
                 <textarea 
                     id="message-input" 
                     class="message-input"

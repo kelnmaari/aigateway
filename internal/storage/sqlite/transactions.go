@@ -379,3 +379,43 @@ func (tx *sqliteTx) GetChangelog(ctx context.Context, version string) (*models.C
 func (tx *sqliteTx) ListChangelogs(ctx context.Context) ([]*models.Changelog, error) {
 	return tx.db.ListChangelogs(ctx)
 }
+
+// ========================================
+// Files Methods (Delegation) (v1.10.0+)
+// ========================================
+
+func (tx *sqliteTx) CreateFile(ctx context.Context, req models.CreateFileRequest) (*models.File, error) {
+	return tx.db.CreateFile(ctx, req)
+}
+
+func (tx *sqliteTx) GetFileByID(ctx context.Context, fileID string) (*models.File, error) {
+	return tx.db.GetFileByID(ctx, fileID)
+}
+
+func (tx *sqliteTx) UpdateFile(ctx context.Context, fileID string, req models.UpdateFileRequest) (*models.File, error) {
+	return tx.db.UpdateFile(ctx, fileID, req)
+}
+
+func (tx *sqliteTx) DeleteFile(ctx context.Context, fileID string) error {
+	return tx.db.DeleteFile(ctx, fileID)
+}
+
+func (tx *sqliteTx) ListFiles(ctx context.Context, req models.ListFilesRequest) ([]*models.File, int, error) {
+	return tx.db.ListFiles(ctx, req)
+}
+
+func (tx *sqliteTx) ListFilesWithUserInfo(ctx context.Context, req models.ListFilesRequest) ([]*models.FileWithUser, int, error) {
+	return tx.db.ListFilesWithUserInfo(ctx, req)
+}
+
+func (tx *sqliteTx) IncrementDownloadCount(ctx context.Context, fileID string) error {
+	return tx.db.IncrementDownloadCount(ctx, fileID)
+}
+
+func (tx *sqliteTx) LogFileAccess(ctx context.Context, log models.FileAccessLog) error {
+	return tx.db.LogFileAccess(ctx, log)
+}
+
+func (tx *sqliteTx) GetFileAccessLogs(ctx context.Context, fileID string, limit int) ([]*models.FileAccessLog, error) {
+	return tx.db.GetFileAccessLogs(ctx, fileID, limit)
+}

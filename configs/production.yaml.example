@@ -217,6 +217,64 @@ performance:
     level: 6  # 1-9, где 9 = максимальное сжатие
     min_size: 1024  # Минимальный размер для сжатия
 
+# ══════════════════════════════════════════════════════════════════════════════
+# FILE STORAGE CONFIGURATION (Version 1.10.0+)
+# ══════════════════════════════════════════════════════════════════════════════
+file_storage:
+  backend: "s3"  # "local" или "s3" (рекомендуется S3 для production)
+  
+  local:
+    base_path: "/app/data/files"
+    max_file_size: "100MB"
+    max_total_size: "50GB"
+    allowed_extensions:
+      - ".pdf"
+      - ".docx"
+      - ".doc"
+      - ".txt"
+      - ".csv"
+      - ".xlsx"
+      - ".md"
+    validate_content: true
+  
+  s3:
+    endpoint: "${MINIO_ENDPOINT}"  # например: "s3.amazonaws.com"
+    bucket: "${MINIO_BUCKET}"
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
+    use_ssl: true
+    region: "us-east-1"
+    public_bucket: "public-files"
+    signed_url_expiry: "1h"
+    max_file_size: "500MB"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCUMENT EXTRACTORS CONFIGURATION (Version 1.10.0+)
+# ══════════════════════════════════════════════════════════════════════════════
+extractors:
+  pdf:
+    method: "auto"  # auto выбирает лучший доступный метод (pdftotext или go-pdf)
+    preserve_layout: false
+    extract_images: false
+    ocr_enabled: false
+    max_pages: 1000
+  
+  docx:
+    extract_images: false
+    preserve_formatting: false
+  
+  text:
+    max_file_size: "10MB"
+    detect_encoding: true
+  
+  csv:
+    delimiter: ","
+    auto_detect_delimiter: true
+    max_rows: 100000
+  
+  timeout: "30s"
+  parallel_workers: 4
+
 # Environment specific overrides
 # Переменные окружения имеют приоритет над файлом конфигурации
 # Пример: SERVER_PORT=8080, OLLAMA_URL=http://localhost:11434

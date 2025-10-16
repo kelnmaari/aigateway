@@ -1,7 +1,7 @@
 # Development Configuration для Ollama-OpenAI Proxy
 
 server:
-  port: 8080
+  port: 8085
   host: "0.0.0.0"
   read_timeout: "5m"      # 5 минут - для больших моделей
   write_timeout: "5m"     # 5 минут - для streaming с большими моделями
@@ -208,3 +208,76 @@ observability:
     gc_percentage: 100  # GOGC value (default: 100)
     leak_detection: true  # Включить leak detection
     pprof_enabled: true  # Включить pprof endpoints (/debug/pprof)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FILE STORAGE CONFIGURATION (Version 1.10.0+)
+# ══════════════════════════════════════════════════════════════════════════════
+file_storage:
+  backend: "local"  # "local" или "s3"
+  
+  # Local filesystem storage
+  local:
+    base_path: "./data/files"
+    max_file_size: "100MB"  # Максимальный размер одного файла
+    max_total_size: "10GB"   # Максимальный размер всех файлов пользователя
+    allowed_extensions:
+      - ".pdf"
+      - ".docx"
+      - ".doc"
+      - ".txt"
+      - ".csv"
+      - ".xlsx"
+      - ".xls"
+      - ".md"
+      - ".rtf"
+    scan_viruses: false  # ClamAV integration (future)
+    validate_content: true  # Проверка magic number
+  
+  # S3-compatible storage (MinIO) - для production
+  s3:
+    endpoint: "http://localhost:9000"
+    bucket: "user-files"
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
+    use_ssl: false
+    region: "us-east-1"
+    public_bucket: "public-files"
+    signed_url_expiry: "1h"
+    max_file_size: "500MB"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCUMENT EXTRACTORS CONFIGURATION (Version 1.10.0+)
+# ══════════════════════════════════════════════════════════════════════════════
+extractors:
+  # PDF extraction
+  pdf:
+    method: "auto"  # "auto", "pdftotext", "go-pdf" (auto выбирает лучший доступный)
+    preserve_layout: false
+    extract_images: false  # Для будущей IMAGE-01 интеграции
+    ocr_enabled: false     # Для отсканированных PDF (future)
+    max_pages: 1000
+  
+  # DOCX extraction
+  docx:
+    extract_tables: true
+    extract_images: false
+    extract_comments: false
+  
+  # Text files
+  text:
+    max_size: "10MB"
+    encoding: "utf-8"
+    fallback_encodings:
+      - "windows-1251"
+      - "iso-8859-1"
+  
+  # CSV files
+  csv:
+    delimiter: ","
+    max_rows: 100000
+    encoding: "utf-8"
+    auto_detect_delimiter: true
+  
+  # General settings
+  timeout: "30s"  # Таймаут на extraction одного файла
+  parallel_workers: 4  # Количество воркеров для batch processing

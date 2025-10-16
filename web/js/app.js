@@ -89,6 +89,12 @@ class App {
     // Render models dropdown
     renderModels() {
         const modelSelect = document.getElementById('model-select');
+        
+        // Check if element exists (not all pages have model-select)
+        if (!modelSelect) {
+            return;
+        }
+        
         modelSelect.innerHTML = '';
         
         if (this.models.length === 0) {

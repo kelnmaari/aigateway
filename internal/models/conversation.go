@@ -75,6 +75,9 @@ type Message struct {
 
 	// Metadata
 	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+
+	// Attached files (FILE-STORAGE-01: Phase 4, v1.10.0+)
+	FileIDs []string `json:"file_ids,omitempty" db:"-"` // Not stored in messages table, loaded from junction
 }
 
 // MessageRole представляет роль автора сообщения

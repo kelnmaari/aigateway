@@ -103,7 +103,8 @@
 
 **Оставшиеся задачи перенесены:**
 
-- QUOTA-01, MODEL-02, METRICS-01, RATE-02 → **v1.12.0 (Model Management Pro II)**
+- METRICS-01, QUOTA-01 → **v1.11.0 (Enterprise Suite)** - для полной observability
+- MODEL-02, RATE-02 → **v1.12.0 (UX & Performance)** - оптимизация производительности
 
 ---
 
@@ -111,9 +112,9 @@
 
 **Фокус:** Foundation layer для работы с контентом (подготовка к RAG v1.13)  
 **Приоритет:** HIGH  
-**Оценка времени:** 38-52 часа  
-**Статус:** 📋 Запланировано (0/5 задач)  
-**Версионирование:** v1.10.1-v1.10.5
+**Оценка времени:** 32-44 часа  
+**Статус:** 📋 Запланировано (0/4 задач)  
+**Версионирование:** v1.10.1-v1.10.4
 
 **Стратегия:** Реализуем базовые компоненты работы с файлами, изображениями и веб-контентом с заделом на RAG систему (v1.13.0). Все extractors и storage будут переиспользованы в RAG.
 
@@ -137,29 +138,24 @@
   - **Примечание:** OCR engine будет расширен для RAG
   - **Оценка:** 8-10 часов
 
-- [ ] **WEB-FETCH-01** Web Content Fetcher → [BACKLOG/WEB-FETCH-01_content_fetcher.md](BACKLOG/WEB-FETCH-01_content_fetcher.md) → **v1.10.3**
+- [ ] **WS-01** WebSocket Real-time Updates → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.10.3**
+  - Real-time updates вместо polling
+  - Live chat streaming
+  - System notifications push
+  - Auto-reconnect logic
+  - Progress updates для file processing 🔄 *Нужно для RAG и следующих фич*
+  - **Примечание:** Перенесена раньше для поддержки async operations
+  - **Оценка:** 8-12 часов
+
+- [ ] **WEB-FETCH-01** Web Content Fetcher → [BACKLOG/WEB-FETCH-01_content_fetcher.md](BACKLOG/WEB-FETCH-01_content_fetcher.md) → **v1.10.4**
   - HTTP client + HTML parser (goquery) 🔄 *Будет web source в RAG*
   - Text extraction и metadata
   - URL validation и security checks
   - Rate limiting
   - Basic summarization через LLM
+  - WebSocket progress для fetch operations (использует WS-01)
   - **Примечание:** Будет основой для web data sources в RAG
   - **Оценка:** 6-8 часов
-
-- [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.10.4**
-  - Export to JSON, Markdown, PDF
-  - Bulk export для всех conversations
-  - Import для восстановления истории
-  - Date range filtering
-  - **Оценка:** 4-6 часов
-
-- [ ] **WS-01** WebSocket Real-time Updates → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.10.5**
-  - Real-time updates вместо polling
-  - Live chat streaming
-  - System notifications push
-  - Auto-reconnect logic
-  - Progress updates для file processing 🔄 *Нужно для RAG*
-  - **Оценка:** 8-12 часов
 
 ### 🎯 Связь с v1.13.0 (RAG System)
 
@@ -182,13 +178,15 @@
 
 ---
 
-## 🔐 Version 1.11.0 - Enterprise Auth
+## 🔐 Version 1.11.0 - Enterprise Suite
 
-**Фокус:** Корпоративная аутентификация  
+**Фокус:** Полноценная корпоративная платформа (Auth + Observability + Quotas)  
 **Приоритет:** HIGH  
-**Оценка времени:** 58-78 часов  
-**Статус:** 📋 Запланировано (0/5 задач)  
-**Версионирование:** v1.11.1-v1.11.5
+**Оценка времени:** 72-100 часов  
+**Статус:** 📋 Запланировано (0/7 задач)  
+**Versioning:** v1.11.1-v1.11.7
+
+**Стратегия:** Объединяем корпоративную аутентификацию, мониторинг и контроль ресурсов в единый enterprise-ready релиз.
 
 ### Задачи
 
@@ -230,47 +228,105 @@
   - Admin UI для role management
   - **Оценка:** 10-14 часов
 
----
+- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.11.6**
+  - Metrics endpoint `/metrics`
+  - Request counters, latency histograms
+  - Model usage statistics
+  - Auth events metrics (login attempts, failures)
+  - Quota usage metrics
+  - Grafana dashboard template
+  - **Примечание:** Перенесена из v1.12 для полной enterprise observability
+  - **Оценка:** 4-6 часов
 
-## ⚡ Version 1.12.0 - Model Management Pro II
-
-**Фокус:** Расширенное управление моделями (продолжение v1.9.0)  
-**Приоритет:** MEDIUM  
-**Оценка времени:** 28-38 часов  
-**Статус:** 📋 Запланировано (0/4 задач)  
-**Версионирование:** v1.12.1-v1.12.4
-
-### Задачи
-
-- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.12.1**
+- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.11.7**
   - Per-tenant/per-user limits
   - Token-based quotas
   - Request quotas (daily, monthly)
-  - Storage quotas
-  - Quota monitoring & alerts
+  - Storage quotas (для files/images)
+  - Quota monitoring & alerts (интеграция с METRICS-01)
+  - WebUI quota dashboard
+  - **Примечание:** Перенесена из v1.12 для единой enterprise access control
   - **Оценка:** 10-14 часов
 
-- [ ] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.12.2**
+### 🎯 Enterprise Features Complete
+
+После v1.11.0 платформа будет иметь:
+
+✅ **Authentication & Authorization:**
+
+- SSO (Keycloak/OIDC)
+- LDAP/Active Directory
+- Custom RBAC
+- Auto-provisioning
+
+✅ **Observability & Compliance:**
+
+- Audit logging
+- Prometheus metrics
+- Security events tracking
+- Export capabilities
+
+✅ **Resource Management:**
+
+- Token quotas
+- Request rate limits
+- Storage quotas
+- Quota alerts
+
+---
+
+## ⚡ Version 1.12.0 - User Experience & Performance
+
+**Фокус:** Улучшение UX и производительности системы  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 18-28 часов  
+**Статус:** 📋 Запланировано (0/3 задач)  
+**Versioning:** v1.12.1-v1.12.3
+
+**Стратегия:** Компактный релиз фокусирующийся на user experience, экспорте данных и оптимизации производительности.
+
+### Задачи
+
+- [ ] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.12.1**
   - Keep models in memory
   - Configurable warm-up strategy
   - Health checks для loaded models
   - Automatic unload of unused models
+  - Priority-based preloading
   - **Оценка:** 6-8 часов
 
-- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.12.3**
-  - Metrics endpoint `/metrics`
-  - Request counters, latency histograms
-  - Model usage statistics
-  - Quota metrics
-  - Grafana dashboard template
-  - **Оценка:** 4-6 часов
-
-- [ ] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.12.4**
+- [ ] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.12.2**
   - Per tenant, per model limits
   - Sliding window algorithm
   - Rate limit headers в response
   - Burst allowance
+  - Integration с QUOTA-01 (из v1.11)
   - **Оценка:** 8-10 часов
+
+- [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.12.3**
+  - Export to JSON, Markdown, PDF
+  - Bulk export для всех conversations
+  - Import для восстановления истории
+  - Date range filtering
+  - Export с RAG metadata (если v1.13 установлена)
+  - **Примечание:** Перенесена из v1.10 для логической группировки с UX
+  - **Оценка:** 4-6 часов
+
+### 🎯 Performance & UX Improvements
+
+После v1.12.0:
+
+✅ **Performance:**
+
+- Model preloading для faster responses
+- Advanced rate limiting для stability
+- Optimized resource usage
+
+✅ **User Experience:**
+
+- Conversation export/import
+- Better data portability
+- History backup & restore
 
 ---
 
@@ -444,12 +500,12 @@
 | **v1.2-v1.5** | 26 | ~150 | - | ✅ Завершено | См. CHANGELOG |
 | **v1.6.0** | 3 | 22-28 | MEDIUM | ✅ Завершено | - |
 | **v1.9.0** | 3 | 20-28 | HIGH | ✅ Завершено | - |
-| **v1.10.0** | 5 | 38-52 | HIGH | 📋 Запланировано | Foundation для RAG |
-| **v1.11.0** | 5 | 58-78 | HIGH | 📋 Запланировано | - |
-| **v1.12.0** | 4 | 28-38 | MEDIUM | 📋 Запланировано | - |
+| **v1.10.0** | 4 | 32-44 | HIGH | 📋 Запланировано | Foundation для RAG |
+| **v1.11.0** | 7 | 72-100 | HIGH | 📋 Запланировано | Enterprise Suite |
+| **v1.12.0** | 3 | 18-28 | MEDIUM | 📋 Запланировано | UX & Performance |
 | **v1.13.0** | 5 | 54-72 | HIGH | 📋 Запланировано | ⚠️ Требует v1.10.0 |
 | **Future** | 9+ | TBD | DEFERRED | 📋 Отложено | - |
-| **ИТОГО** | **22** | **198-268** | - | - | Экономия 6-8ч |
+| **ИТОГО** | **22** | **196-272** | - | - | Оптимизирован |
 
 **Прогресс:** ✅ 2 major версии завершены (v1.6, v1.9) | 📋 4 запланированы (v1.10-v1.13)
 
@@ -499,6 +555,204 @@
 
 ---
 
-**Последнее обновление:** 2025-01-15  
-**Версия Roadmap:** 2.1  
+## 🔨 Декомпозиция сложных задач
+
+### OIDC-01: Keycloak SSO Integration (16-24ч) → v1.11.1
+
+**Phase 1: OAuth2 Flow Implementation (6-8ч)**
+
+- OAuth2 authorization code flow
+- Token endpoint integration
+- PKCE support для security
+- State parameter validation
+
+**Phase 2: Token Management (4-6ч)**
+
+- JWT token validation (signature, expiry)
+- Refresh token flow
+- Token revocation
+- Session management
+
+**Phase 3: User Provisioning (3-4ч)**
+
+- Auto-create users from OIDC claims
+- User attribute mapping (email, name, picture)
+- Tenant auto-assignment
+- Fallback to local auth
+
+**Phase 4: Admin UI (3-6ч)**
+
+- OIDC provider configuration page
+- Client ID/Secret management
+- Endpoint URL configuration
+- Test connection button
+- Enable/disable toggle
+
+---
+
+### LDAP-01: LDAP/Active Directory Integration (12-16ч) → v1.11.3
+
+**Phase 1: LDAP Connection (3-4ч)**
+
+- LDAP bind (simple auth + SASL)
+- Connection pooling
+- TLS/LDAPS support
+- Health check & reconnect logic
+
+**Phase 2: User Search & Sync (4-5ч)**
+
+- LDAP search filters
+- User attribute mapping (CN, mail, memberOf)
+- Incremental sync (track changes)
+- Pagination для больших directories
+
+**Phase 3: Group Management (2-3ч)**
+
+- Group search & parsing
+- User-group membership resolution
+- Nested groups support
+- Group-to-tenant mapping
+
+**Phase 4: Admin UI & Testing (3-4ч)**
+
+- LDAP configuration form
+- Test connection/search
+- Manual sync trigger
+- Scheduled sync configuration
+- Sync status dashboard
+
+---
+
+### QUOTA-01: Usage Quotas System (10-14ч) → v1.11.7
+
+**Phase 1: Quota Storage & Models (2-3ч)**
+
+- Database schema (quota_configs, quota_usage)
+- Quota models (token, request, storage limits)
+- Per-tenant & per-user quotas
+- Time-based quotas (daily, monthly)
+
+**Phase 2: Quota Enforcement (3-4ч)**
+
+- Middleware для quota checks
+- Token counting (before/after request)
+- Request counting
+- Storage size tracking
+- Quota exceeded error handling
+
+**Phase 3: Quota Monitoring (2-3ч)**
+
+- Usage calculation & aggregation
+- Near-limit warnings (80%, 90%, 95%)
+- Quota reset logic (daily/monthly)
+- Usage history tracking
+
+**Phase 4: Admin UI & Alerts (3-4ч)**
+
+- Quota configuration page
+- Per-tenant quota dashboard
+- Usage charts (integration с METRICS-01)
+- Email/webhook alerts для quota violations
+- Quota templates (starter, pro, enterprise)
+
+---
+
+### FILE-STORAGE-01: Universal File Storage (10-14ч) → v1.10.1
+
+**Phase 1: Storage Foundation (3-4ч)**
+
+- StorageBackend interface
+- Local filesystem implementation
+- S3/MinIO client setup
+- Configuration loading
+
+**Phase 2: Document Extractors (4-5ч)**
+
+- PDF extractor (pdftotext or go-fitz)
+- DOCX extractor (ZIP + XML parsing)
+- TXT extractor (encoding detection)
+- CSV parser
+- Extractor registry pattern
+
+**Phase 3: Database Integration (2-3ч)**
+
+- Files table migration
+- Metadata CRUD operations
+- Full-text search index
+- Access control checks
+
+**Phase 4: API & Chat Integration (1-2ч)**
+
+- Upload/download endpoints
+- File listing API
+- Chat integration (file → context)
+- WebUI file picker
+
+---
+
+### RAG-04: External Data Sources (10-14ч) → v1.13.4
+
+**Phase 1: REST API Source (4-5ч)**
+
+- HTTP client с auth (Bearer, Basic, API Key)
+- Request template engine (Jinja-like)
+- Response parsing (JSON, XML)
+- Pagination support
+- Rate limiting per source
+
+**Phase 2: PostgreSQL Source (3-4ч)**
+
+- Connection pool management
+- Parameterized query execution
+- Row-based chunking
+- Column selection для embedding
+- Query result caching
+
+**Phase 3: Credentials Management (2-3ч)**
+
+- AES-256 encryption для credentials
+- Secure key storage (env var or secret manager)
+- Credential rotation support
+- Connection string parsing
+
+**Phase 4: Sync & Scheduling (1-2ч)**
+
+- Manual sync trigger
+- Scheduled sync (cron-like)
+- Incremental sync detection
+- Sync status tracking
+- Error retry logic
+
+---
+
+## 📋 Рекомендации по имплементации
+
+### Порядок разработки для v1.11.0 (Enterprise Suite)
+
+1. **Start with OIDC-01** - базовая SSO функциональность
+2. **Then RBAC-01** - установить permission framework
+3. **Then LDAP-01** - второй auth provider
+4. **Then AUDIT-01** - логирование для compliance
+5. **Then METRICS-01** - observability для всего выше
+6. **Finally QUOTA-01** - resource control с метриками
+
+### Критические зависимости
+
+- **OIDC-02** зависит от **OIDC-01** (need claims parsing)
+- **QUOTA-01** зависит от **METRICS-01** (need usage tracking)
+- **RATE-02** (v1.12) зависит от **QUOTA-01** (shared enforcement logic)
+- **RAG-02** зависит от **FILE-STORAGE-01** (need extractors)
+- **RAG-05** зависит от **WS-01** (need progress updates)
+
+### Performance considerations
+
+- **OIDC token validation**: Cache public keys (60min TTL)
+- **LDAP sync**: Use incremental sync, не full sync каждый раз
+- **Quota checks**: Redis cache для fast lookups
+- **File extraction**: Async processing, не блокировать upload
+
+---
+
+**Последнее обновление:** 2025-01-16  
+**Версия Roadmap:** 2.2  
 **Статус:** Active Development 🚀 (Version 1.9.0 ✅ Complete! → Planning v1.10.0-v1.13.0)

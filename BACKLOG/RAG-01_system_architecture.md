@@ -2,9 +2,17 @@
 
 **Version:** 1.13.0  
 **Priority:** HIGH  
-**Estimated Time:** 60-80 hours  
+**Estimated Time:** 54-72 hours (экономия 6-8ч благодаря v1.10.0)  
 **Status:** 📋 Planned  
-**Dependencies:** v1.10.0 (FILE-01, VISION-01), PostgreSQL, Ollama
+**Dependencies:** ⚠️ **Требует v1.10.0** (FILE-STORAGE-01, IMAGE-01, WEB-FETCH-01), PostgreSQL, Ollama
+
+**Стратегия переиспользования:**
+
+- ✅ File Storage (Local + S3) из v1.10.0 FILE-STORAGE-01
+- ✅ Document Extractors (PDF, DOCX, CSV, TXT) из v1.10.0 FILE-STORAGE-01
+- ✅ Image OCR из v1.10.0 IMAGE-01
+- ✅ Web Parser из v1.10.0 WEB-FETCH-01
+- ✅ WebSocket progress updates из v1.10.0 WS-01
 
 ---
 
@@ -696,40 +704,44 @@ internal/rag/
 
 ## 🎯 Implementation Plan
 
-### Phase 1: Foundation (15-20 hours) → v1.13.1
+### Phase 1: Foundation (12-16 hours) → v1.13.1
 
 **Tasks:**
 
-- ✅ Database migrations (tables)
-- ✅ Basic data sources CRUD API
-- ✅ File storage (Local + S3)
+- ✅ Database migrations (RAG-specific tables)
+- ✅ Data sources CRUD API
+- ~~File storage (Local + S3)~~ ✅ **Переиспользуем из v1.10.0 FILE-STORAGE-01**
 - ✅ Simple in-memory queue
 - ✅ WebUI: Data Sources management page
 
 **Deliverables:**
 
 - Можно создавать/редактировать источники через UI
-- Файлы сохраняются в Local/S3
+- Файлы сохраняются используя существующий storage из v1.10.0
 - Basic API endpoints работают
+
+**Time saved:** 3-4 часа (file storage уже готов)
 
 ---
 
-### Phase 2: Document Processing (15-20 hours) → v1.13.2
+### Phase 2: Document Processing (12-16 hours) → v1.13.2
 
 **Tasks:**
 
-- ✅ PDF extractor (pypdf2 или pdfplumber через exec)
-- ✅ DOCX extractor (docx library)
-- ✅ CSV parser
-- ✅ Semantic chunker
+- ~~PDF extractor~~ ✅ **Переиспользуем из v1.10.0 FILE-STORAGE-01**
+- ~~DOCX extractor~~ ✅ **Переиспользуем из v1.10.0 FILE-STORAGE-01**
+- ~~CSV parser~~ ✅ **Переиспользуем из v1.10.0 FILE-STORAGE-01**
+- ✅ Semantic chunker (новый компонент)
 - ✅ Async job queue (PostgreSQL)
 - ✅ Worker pool implementation
 
 **Deliverables:**
 
-- Загрузка файлов → автоматическая обработка
-- Файлы разбиваются на чанки
-- Прогресс видно в UI
+- Загрузка файлов → автоматическая обработка (используя extractors из v1.10.0)
+- Файлы разбиваются на чанки (новый semantic chunker)
+- Прогресс видно в UI (используя WebSocket из v1.10.0)
+
+**Time saved:** 3-4 часа (extractors уже готовы)
 
 ---
 
@@ -921,6 +933,76 @@ func BenchmarkVectorSearch(b *testing.B) {
 
 ---
 
+## 🔗 Зависимости от v1.10.0
+
+### Переиспользуемые компоненты
+
+| v1.10.0 Компонент | Файл/Пакет | Использование в RAG |
+|-------------------|------------|---------------------|
+| **FILE-STORAGE-01** | `internal/filestorage/` | File Storage Layer (Local + S3) |
+| **FILE-STORAGE-01** | `internal/extractors/` | PDF, DOCX, TXT, CSV extractors |
+| **IMAGE-01** | `internal/vision/` | Image OCR для RAG документов |
+| **WEB-FETCH-01** | `internal/webfetch/` | HTML parser для web sources |
+| **WS-01** | `internal/websocket/` | Progress updates для RAG jobs |
+
+### Архитектура интеграции
+
+```
+v1.10.0 Foundation                    v1.13.0 RAG Extension
+━━━━━━━━━━━━━━━━━━━                    ━━━━━━━━━━━━━━━━━━━━━
+
+internal/filestorage/  ──────────────> internal/rag/storage/
+  ├── local.go                           └── wrapper.go (reuse)
+  └── s3.go
+
+internal/extractors/   ──────────────> internal/rag/extractors/
+  ├── pdf.go                             ├── pdf.go (import)
+  ├── docx.go                            ├── docx.go (import)
+  └── csv.go                             └── enhanced.go (extend)
+
+internal/vision/       ──────────────> internal/rag/extractors/
+  └── ocr.go                             └── image.go (import)
+
+internal/webfetch/     ──────────────> internal/rag/sources/
+  └── fetcher.go                         └── web.go (import)
+
+internal/websocket/    ──────────────> internal/rag/processor/
+  └── hub.go                             └── progress.go (import)
+
+
+NEW in v1.13.0:
+internal/rag/
+  ├── chunker/           # NEW: Semantic chunking
+  ├── embeddings/        # NEW: Ollama embeddings
+  ├── vector/            # NEW: pgvector search
+  ├── queue/             # NEW: Job queue
+  └── orchestrator/      # NEW: RAG orchestration
+```
+
+### Преимущества подхода
+
+✅ **Избегаем дублирования кода**
+
+- Не нужно писать extractors заново
+- File storage уже протестирован и работает
+
+✅ **Постепенная миграция**
+
+- v1.10.0 дает immediate value (чат с файлами)
+- v1.13.0 добавляет RAG capabilities
+
+✅ **Модульность**
+
+- Можно использовать extractors без RAG
+- Можно использовать RAG с другими sources
+
+✅ **Экономия времени**
+
+- 6-8 часов development time
+- Меньше тестирования (extractors уже протестированы)
+
+---
+
 **Created:** 2025-01-15  
-**Last Updated:** 2025-01-15  
-**Status:** Ready for Implementation
+**Last Updated:** 2025-01-16  
+**Status:** Ready for Implementation (после v1.10.0)

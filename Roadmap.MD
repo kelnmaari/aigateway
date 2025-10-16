@@ -4,7 +4,7 @@
 > **План развития:** Version 1.9.0 - 1.13.0+  
 > **Статус:** Active Development (Version 1.9.0 Complete! - 3/3 задачи)  
 > **Последнее обновление:** 2025-01-15  
-> **Новое:** 🧠 Добавлена v1.13.0 - RAG System! Roadmap: v1.10 (Smart Chat), v1.11 (Enterprise Auth), v1.12 (Model Pro II), v1.13 (RAG)
+> **Новое:** 🧠 v1.13.0 RAG System добавлена! v1.10.0 реорганизована как Foundation layer для RAG. Roadmap: v1.10 (Content Foundation) → v1.11 (Enterprise Auth) → v1.12 (Model Pro II) → v1.13 (RAG)
 
 ---
 
@@ -107,53 +107,78 @@
 
 ---
 
-## 📱 Version 1.10.0 - Smart Chat & Content
+## 📱 Version 1.10.0 - Content Foundation (RAG Prerequisites)
 
-**Фокус:** Улучшенный чат и работа с контентом  
+**Фокус:** Foundation layer для работы с контентом (подготовка к RAG v1.13)  
 **Приоритет:** HIGH  
 **Оценка времени:** 38-52 часа  
 **Статус:** 📋 Запланировано (0/5 задач)  
 **Версионирование:** v1.10.1-v1.10.5
 
+**Стратегия:** Реализуем базовые компоненты работы с файлами, изображениями и веб-контентом с заделом на RAG систему (v1.13.0). Все extractors и storage будут переиспользованы в RAG.
+
 ### Задачи
 
-- [ ] **VISION-01** Vision OCR Service (Multimodal Chat) → [BACKLOG/VISION-01_ocr_multimodal_chat.md](BACKLOG/VISION-01_ocr_multimodal_chat.md) → **v1.10.1**
-  - Multimodal models через Ollama (LLaVA, BakLLaVA)
-  - Upload изображений в чат + drag&drop
-  - Распознавание текста → контекст для LLM
-  - Image storage & management
+- [ ] **FILE-STORAGE-01** Universal File Storage & Document Processing → [BACKLOG/FILE-STORAGE-01_universal_storage.md](BACKLOG/FILE-STORAGE-01_universal_storage.md) → **v1.10.1**
+  - **Universal Storage Layer** (Local FS + S3/MinIO) 🔄 *Будет использован в RAG*
+  - **Document Extractors** (PDF, DOCX, TXT, CSV) 🔄 *Основа для RAG processing*
+  - File metadata management в PostgreSQL
+  - Upload API + validation (size, type)
+  - Basic integration с чатом (загрузка → extraction → контекст)
+  - **Примечание:** Архитектура спроектирована для RAG (v1.13)
+  - **Оценка:** 10-14 часов
+
+- [ ] **IMAGE-01** Image Upload & OCR Processing → [BACKLOG/IMAGE-01_image_processing.md](BACKLOG/IMAGE-01_image_processing.md) → **v1.10.2**
+  - Image storage (переиспользует FILE-STORAGE-01) 🔄 *Будет в RAG*
+  - Multimodal OCR через Ollama (LLaVA, BakLLaVA) 🔄 *Будет в RAG*
+  - Drag & drop upload в чат
   - Thumbnail generation
-  - **Оценка:** 8-12 часов
-
-- [ ] **WEB-01** Web Content Fetcher & Summarization → [BACKLOG/WEB-01_content_fetcher.md](BACKLOG/WEB-01_content_fetcher.md) → **v1.10.2**
-  - HTTP client + goquery для парсинга HTML
-  - Извлечение текста, metadata
-  - Summarization через LLM
-  - URL validation и security
-  - Rate limiting для web fetches
-  - **Оценка:** 6-10 часов
-
-- [ ] **FILE-01** File Upload Support (PDF, DOCX, TXT) → [BACKLOG/FILE-01_file_upload_support.md](BACKLOG/FILE-01_file_upload_support.md) → **v1.10.3**
-  - PDF, DOCX, TXT text extraction
-  - Интеграция с чатом (file → context)
-  - File storage & management
-  - Validation и size limits
+  - Image → text extraction для контекста
+  - **Примечание:** OCR engine будет расширен для RAG
   - **Оценка:** 8-10 часов
 
+- [ ] **WEB-FETCH-01** Web Content Fetcher → [BACKLOG/WEB-FETCH-01_content_fetcher.md](BACKLOG/WEB-FETCH-01_content_fetcher.md) → **v1.10.3**
+  - HTTP client + HTML parser (goquery) 🔄 *Будет web source в RAG*
+  - Text extraction и metadata
+  - URL validation и security checks
+  - Rate limiting
+  - Basic summarization через LLM
+  - **Примечание:** Будет основой для web data sources в RAG
+  - **Оценка:** 6-8 часов
+
 - [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.10.4**
-  - Export to JSON, Markdown
+  - Export to JSON, Markdown, PDF
   - Bulk export для всех conversations
   - Import для восстановления истории
   - Date range filtering
   - **Оценка:** 4-6 часов
 
-- [ ] **WS-01** WebSocket Real-time Updates (WebUI only) → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.10.5**
+- [ ] **WS-01** WebSocket Real-time Updates → [BACKLOG/WS-01_websocket_realtime.md](BACKLOG/WS-01_websocket_realtime.md) → **v1.10.5**
   - Real-time updates вместо polling
   - Live chat streaming
   - System notifications push
   - Auto-reconnect logic
-  - **Примечание:** TUI development остановлена, фокус на WebUI
+  - Progress updates для file processing 🔄 *Нужно для RAG*
   - **Оценка:** 8-12 часов
+
+### 🎯 Связь с v1.13.0 (RAG System)
+
+Компоненты из v1.10.0 которые будут переиспользованы в RAG:
+
+| v1.10.0 Компонент | Использование в v1.13.0 RAG |
+|-------------------|----------------------------|
+| **FILE-STORAGE-01**: Storage Layer | → `internal/rag/storage/` (Local + S3) |
+| **FILE-STORAGE-01**: Extractors | → `internal/rag/extractors/` (PDF, DOCX, CSV) |
+| **IMAGE-01**: OCR Engine | → `internal/rag/extractors/image.go` |
+| **WEB-FETCH-01**: HTML Parser | → `internal/rag/sources/web.go` |
+| **WS-01**: Progress Updates | → Real-time RAG job status |
+
+**Преимущества:**
+
+- ✅ Избегаем дублирования кода
+- ✅ v1.10.0 дает immediate value (чат с файлами)
+- ✅ v1.13.0 расширяет существующую инфраструктуру
+- ✅ Постепенная миграция (можно начать с v1.10, потом добавить RAG)
 
 ---
 
@@ -253,27 +278,30 @@
 
 **Фокус:** Полноценная RAG (Retrieval-Augmented Generation) система  
 **Приоритет:** HIGH  
-**Оценка времени:** 60-80 часов  
+**Оценка времени:** 54-72 часа (экономия 6-8ч благодаря v1.10.0)  
 **Статус:** 📋 Запланировано (0/5 задач)  
-**Версионирование:** v1.13.1-v1.13.5
+**Версионирование:** v1.13.1-v1.13.5  
+**Dependencies:** ⚠️ Требует v1.10.0 (FILE-STORAGE-01, IMAGE-01, WEB-FETCH-01)
+
+**Стратегия:** Расширяем существующие компоненты из v1.10.0 добавляя векторный поиск, chunking, embeddings и orchestration. Переиспользуем file storage, extractors и web fetcher.
 
 ### Задачи
 
 - [ ] **RAG-01** Foundation & Data Sources Management → [BACKLOG/RAG-01_system_architecture.md](BACKLOG/RAG-01_system_architecture.md) → **v1.13.1**
   - Database schema (sources, documents, chunks, jobs)
   - Data sources CRUD API
-  - File storage (Local + S3/MinIO)
+  - ~~File storage (Local + S3/MinIO)~~ ✅ *Переиспользуем из v1.10.0*
   - WebUI: Data Sources management
   - Basic in-memory queue
-  - **Оценка:** 15-20 часов
+  - **Оценка:** 12-16 часов (меньше т.к. storage готов)
 
 - [ ] **RAG-02** Document Processing Pipeline → **v1.13.2**
-  - PDF/DOCX/CSV extractors
-  - Semantic chunking engine
-  - PostgreSQL job queue
+  - ~~PDF/DOCX/CSV extractors~~ ✅ *Переиспользуем из v1.10.0*
+  - Semantic chunking engine (новое)
+  - PostgreSQL job queue (новое)
   - Worker pool (async processing)
-  - Progress tracking UI
-  - **Оценка:** 15-20 часов
+  - Progress tracking UI (WebSocket из v1.10.0)
+  - **Оценка:** 12-16 часов (меньше т.к. extractors готовы)
 
 - [ ] **RAG-03** Embeddings & Vector Search → **v1.13.3**
   - Ollama embeddings integration (nomic-embed-text, bge-m3)
@@ -411,17 +439,17 @@
 
 ## 📊 Краткая статистика Roadmap
 
-| Version | Задач | Время (ч) | Приоритет | Статус |
-|---------|-------|-----------|-----------|--------|
-| **v1.2-v1.5** | 26 | ~150 | - | ✅ Завершено (см. CHANGELOG) |
-| **v1.6.0** | 3 | 22-28 | MEDIUM | ✅ Завершено |
-| **v1.9.0** | 3 | 20-28 | HIGH | ✅ Завершено |
-| **v1.10.0** | 5 | 38-52 | HIGH | 📋 Запланировано |
-| **v1.11.0** | 5 | 58-78 | HIGH | 📋 Запланировано |
-| **v1.12.0** | 4 | 28-38 | MEDIUM | 📋 Запланировано |
-| **v1.13.0** | 5 | 60-80 | HIGH | 📋 Запланировано |
-| **Future** | 9+ | TBD | DEFERRED | 📋 Отложено |
-| **ИТОГО** | **22** | **204-276** | - | - |
+| Version | Задач | Время (ч) | Приоритет | Статус | Заметки |
+|---------|-------|-----------|-----------|--------|---------|
+| **v1.2-v1.5** | 26 | ~150 | - | ✅ Завершено | См. CHANGELOG |
+| **v1.6.0** | 3 | 22-28 | MEDIUM | ✅ Завершено | - |
+| **v1.9.0** | 3 | 20-28 | HIGH | ✅ Завершено | - |
+| **v1.10.0** | 5 | 38-52 | HIGH | 📋 Запланировано | Foundation для RAG |
+| **v1.11.0** | 5 | 58-78 | HIGH | 📋 Запланировано | - |
+| **v1.12.0** | 4 | 28-38 | MEDIUM | 📋 Запланировано | - |
+| **v1.13.0** | 5 | 54-72 | HIGH | 📋 Запланировано | ⚠️ Требует v1.10.0 |
+| **Future** | 9+ | TBD | DEFERRED | 📋 Отложено | - |
+| **ИТОГО** | **22** | **198-268** | - | - | Экономия 6-8ч |
 
 **Прогресс:** ✅ 2 major версии завершены (v1.6, v1.9) | 📋 4 запланированы (v1.10-v1.13)
 

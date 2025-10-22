@@ -47,7 +47,7 @@ Thumbs.db
 *.env.production
 config-local.yaml
 config-production.yaml
-.ai-review.yaml  # AI Review config (может содержать API ключи)
+#.ai-review.yaml  # AI Review config (может содержать API ключи)
 
 # SQLite databases
 *.db

@@ -3,14 +3,14 @@
 server:
   port: 8085
   host: "0.0.0.0"
-  read_timeout: "5m"      # 5 минут - для больших моделей
-  write_timeout: "5m"     # 5 минут - для streaming с большими моделями
+  read_timeout: "30m"     # 15 минут - для AI review с большими моделями
+  write_timeout: "30m"    # 15 минут - для streaming с большими моделями
   idle_timeout: "120s"    # 2 минуты
   max_header_bytes: 1048576  # 1MB
 
 ollama:
   url: "http://localhost:11434"
-  timeout: "5m"           # 5 минут - первая загрузка модели может быть долгой
+  timeout: "30m"          # 10 минут - для больших моделей и большого контекста
   retry_attempts: 3
   retry_delay: "2s"       # Увеличено с 1s до 2s
   connection_pool_size: 10
@@ -185,7 +185,7 @@ development:
 observability:
   # OpenTelemetry Distributed Tracing
   tracing:
-    enabled: true  # Отключено по умолчанию, требует Jaeger/Zipkin
+    enabled: false  # Отключено - Jaeger недоступен
     provider: "jaeger"  # Поддержка: "jaeger" или "zipkin"
     service_name: "ollama-proxy"
     sampling_rate: 1.0  # 1.0 = 100% traces, 0.1 = 10% traces

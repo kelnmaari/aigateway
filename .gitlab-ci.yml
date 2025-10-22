@@ -71,7 +71,7 @@ ai-review:inline:
   extends: ai-review:full
   script:
     - ai-review run-inline
-  timeout: 20m
+  timeout: 30m
 
 # ============================================================================
 # Только Summary Review (общий комментарий)
@@ -80,7 +80,7 @@ ai-review:summary:
   extends: ai-review:full
   script:
     - ai-review run-summary
-  timeout: 15m
+  timeout: 30m
 
 # ============================================================================
 # Context Review (анализ архитектуры и контекста)
@@ -89,7 +89,7 @@ ai-review:context:
   extends: ai-review:full
   script:
     - ai-review run-context
-  timeout: 20m
+  timeout: 30m
 
 # ============================================================================
 # Reply Review (ответ на существующие комментарии)
@@ -98,13 +98,13 @@ ai-review:inline-reply:
   extends: ai-review:full
   script:
     - ai-review run-inline-reply
-  timeout: 10m
+  timeout: 30m
 
 ai-review:summary-reply:
   extends: ai-review:full
   script:
     - ai-review run-summary-reply
-  timeout: 10m
+  timeout: 30m
 
 # ============================================================================
 # NOTES:

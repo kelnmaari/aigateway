@@ -23,10 +23,10 @@ llm:
     # - qwen2.5-coder:7b     (оптимальный баланс скорость/качество)
     # - deepseek-coder:6.7b  (хорошее качество)
     # - deepseek-coder:33b   (максимальное качество, медленно)
-    model: qwen2.5-coder:7b
+    model: qdeepseek-coder:33b
     
     # Параметры генерации
-    max_tokens: 15000      # Достаточно для большинства MR
+    max_tokens: 128000      # Достаточно для большинства MR
     temperature: 0.3       # Низкая temperature = более детерминированный output
     
     # Опционально: дополнительные параметры Ollama
@@ -41,14 +41,14 @@ llm:
     #   - http://10.0.0.5:8080/v1
     #   - http://ollama-proxy.internal:8080/v1
     #   - https://ollama.company.com/v1
-    api_url: ${LLM_API_URL:-http://localhost:8080/v1}
+    api_url: ${LLM_API_URL:-http://176.53.180.178:8085/v1}
     
     # API ключ для proxy (создайте в WebUI)
     # Используйте env variable для безопасности
     api_token: ${OLLAMA_PROXY_API_KEY}
     
     # Таймаут (увеличен для локальных моделей)
-    timeout: 300  # 5 минут
+    timeout: 3000  # 50 минут
 
 # ------------------------------------------------------------------------------
 # VCS Configuration - GitLab
@@ -62,7 +62,7 @@ vcs:
     merge_request_id: ${CI_MERGE_REQUEST_IID}
   
   http_client:
-    api_url: ${CI_SERVER_URL:-https://gitlab.com}
+    api_url: ${CI_SERVER_URL:-https://gitlab.alexue4.dev}
     api_token: ${CI_JOB_TOKEN}
     timeout: 120
 

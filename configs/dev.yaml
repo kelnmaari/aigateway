@@ -116,17 +116,17 @@ tools:
   #   - Запрос С tools → используется fallback_model ниже
   #
   # Оставьте пустым "" чтобы отключить автопереключение
-  fallback_model: "gpt-oss-c32k:latest"  # ⬅️ Уже с 32k контекстом, reasoning помогает с tools
+  fallback_model: ""  # ⬅️ Уже с 32k контекстом, reasoning помогает с tools
   
     # 🎯 SMART PROMPT OPTIMIZER - адаптация сложных промптов для локальных моделей
   optimizer:
     # Включить оптимизацию промптов (рекомендуется для IDE с большими system messages)
-    enabled: true  # ⬅️ ВКЛЮЧЕНО
+    enabled: false  # ⬅️ ВКЛЮЧЕНО
     
     # Упрощать system message убирая избыточные инструкции
     # Сохраняются только критичные секции: Tool Use, Communication
     # РЕЗУЛЬТАТ: Сокращение на 80% (6370 → 1219 символов)
-    simplify_system_message: true
+    simplify_system_message: false
     
     # Умная фильтрация tools по релевантности к запросу пользователя
     # ⚠️ ОТКЛЮЧЕНО: Плохо работает с русскими запросами, выбирает не те tools

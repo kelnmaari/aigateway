@@ -46,15 +46,19 @@ ai-review:full:
     # ⚠️ ВАЖНО: AI-review требует модели с хорошей JSON поддержкой!
     # 
     # Рекомендуемые модели (проверены с AI-review):
-    #   ✅ deepseek-coder:6.7b    - Хороший JSON, быстрый
-    #   ✅ deepseek-coder:33b     - Отличный JSON, медленный (ТЕКУЩАЯ)
-    #   ✅ qwen2.5-coder:7b       - Хороший JSON, средний
+    #   🏆 qwen2.5-coder:7b       - ЛУЧШИЙ для inline review (чистый JSON)
+    #   ✅ deepseek-coder:33b     - Отличный JSON, но медленный
     #   ✅ qwen2.5-coder:14b      - Отличный JSON, медленный
+    #   ⚠️ deepseek-coder:6.7b    - Возвращает ТЕКСТ вместо JSON (только для summary!)
     #   ⚠️ llama3.2:latest        - Иногда оборачивает JSON в markdown
     #   ❌ НЕ используйте:        - devstral, mistral (markdown wrapper)
     # 
+    # ВАЖНО для inline review:
+    #   - qwen2.5-coder:7b - стабильный JSON output
+    #   - deepseek-coder:6.7b - НЕ работает (возвращает текст, а не JSON)
+    # 
     # См. docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md для деталей
-    LLM__META__MODEL: "deepseek-coder:6.7b"
+    LLM__META__MODEL: "qwen2.5-coder:7b"
     
     # Параметры генерации
     LLM__META__MAX_TOKENS: "15000"

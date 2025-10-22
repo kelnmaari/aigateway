@@ -1,0 +1,133 @@
+# AI Review через Ollama-OpenAI Proxy
+# Документация: https://github.com/Nikita-Filonov/ai-review
+
+stages:
+  - review
+
+# ============================================================================
+# Полный AI Review (inline + summary)
+# ============================================================================
+ai-review:full:
+  stage: review
+  image: nikitafilonov/ai-review:latest
+  when: manual
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+  script:
+    - ai-review run
+  variables:
+    # --- LLM Configuration (Ollama через ваш Proxy) ---
+    LLM__PROVIDER: "OPENAI"  # Proxy совместим с OpenAI API
+    
+    # НАСТРОЙТЕ: URL вашего Ollama-OpenAI Proxy
+    # Примеры:
+    #   - http://proxy.example.com:8080/v1
+    #   - https://ollama-proxy.internal/v1
+    #   - http://10.0.0.5:8080/v1
+    LLM__HTTP_CLIENT__API_URL: "http://176.53.180.178:8085/v1"
+    
+    # НАСТРОЙТЕ: API ключ для вашего proxy
+    # Создайте переменную в GitLab: Settings → CI/CD → Variables
+    LLM__HTTP_CLIENT__API_TOKEN: "$OLLAMA_PROXY_API_KEY"
+    
+    # НАСТРОЙТЕ: Модель из Ollama
+    # Доступные модели зависят от вашего Ollama сервера
+    # Примеры:
+    #   - llama3.2:latest
+    #   - codellama:13b
+    #   - deepseek-coder:6.7b
+    #   - qwen2.5-coder:7b
+    #   - mistral:latest
+    LLM__META__MODEL: "devstral-tuned:latest"
+    
+    # Параметры генерации
+    LLM__META__MAX_TOKENS: "15000"
+    LLM__META__TEMPERATURE: "0.3"
+    
+    # Таймауты (увеличены для локальных моделей)
+    LLM__HTTP_CLIENT__TIMEOUT: "300"  # 5 минут на запрос
+    
+    # --- GitLab VCS Configuration ---
+    VCS__PROVIDER: "GITLAB"
+    VCS__PIPELINE__PROJECT_ID: "$CI_PROJECT_ID"
+    VCS__PIPELINE__MERGE_REQUEST_ID: "$CI_MERGE_REQUEST_IID"
+    VCS__HTTP_CLIENT__API_URL: "$CI_SERVER_URL"
+    VCS__HTTP_CLIENT__API_TOKEN: "$CI_JOB_TOKEN"
+    VCS__HTTP_CLIENT__TIMEOUT: "120"
+  allow_failure: true
+  timeout: 30m  # Увеличенный таймаут для больших MR
+
+# ============================================================================
+# Только Inline Review (построчные комментарии)
+# ============================================================================
+ai-review:inline:
+  extends: ai-review:full
+  script:
+    - ai-review run-inline
+  timeout: 20m
+
+# ============================================================================
+# Только Summary Review (общий комментарий)
+# ============================================================================
+ai-review:summary:
+  extends: ai-review:full
+  script:
+    - ai-review run-summary
+  timeout: 15m
+
+# ============================================================================
+# Context Review (анализ архитектуры и контекста)
+# ============================================================================
+ai-review:context:
+  extends: ai-review:full
+  script:
+    - ai-review run-context
+  timeout: 20m
+
+# ============================================================================
+# Reply Review (ответ на существующие комментарии)
+# ============================================================================
+ai-review:inline-reply:
+  extends: ai-review:full
+  script:
+    - ai-review run-inline-reply
+  timeout: 10m
+
+ai-review:summary-reply:
+  extends: ai-review:full
+  script:
+    - ai-review run-summary-reply
+  timeout: 10m
+
+# ============================================================================
+# NOTES:
+# ============================================================================
+# 
+# 1. ОБЯЗАТЕЛЬНО создайте GitLab CI/CD переменную:
+#    Settings → CI/CD → Variables → Add Variable
+#    Key: OLLAMA_PROXY_API_KEY
+#    Value: ваш API ключ из proxy (создается в WebUI)
+#    Flags: [✓] Mask variable (скрыть в логах)
+#
+# 2. Проверьте доступность proxy из GitLab Runner:
+#    - Если proxy на localhost - не будет работать (runner в контейнере)
+#    - Используйте внешний IP или DNS имя
+#    - Убедитесь что firewall разрешает доступ
+#
+# 3. Доступные модели Ollama можно посмотреть:
+#    curl http://YOUR_PROXY_HOST:8080/v1/models \
+#      -H "Authorization: Bearer $API_KEY"
+#
+# 4. Для быстрого тестирования используйте маленькие модели:
+#    - qwen2.5-coder:1.5b (быстрая, хорошая для кода)
+#    - llama3.2:3b (универсальная)
+#
+# 5. Для production используйте большие модели:
+#    - deepseek-coder:33b (лучшая для кода)
+#    - qwen2.5-coder:32b (отличная альтернатива)
+#
+# 6. Jobs запускаются вручную (when: manual)
+#    Запуск: MR → Pipelines → ▶️ Play на нужном job
+#
+# ============================================================================
+

@@ -523,6 +523,64 @@ nvidia-smi
 
 ---
 
+## 🤖 AI Code Review (GitLab CI/CD)
+
+Интегрируйте AI code review в ваш GitLab CI/CD pipeline используя Ollama-OpenAI Proxy!
+
+### ✨ Возможности
+
+- 🔍 **Inline Review** - Построчные комментарии к проблемным местам
+- 📝 **Summary Review** - Общий обзор изменений MR
+- 🏗️ **Context Review** - Архитектурный анализ
+- 💬 **Reply Mode** - Ответы на существующие комментарии
+- 🔐 **Self-Hosted** - AI работает через ваш proxy, данные не утекают
+
+### 🚀 Быстрый старт
+
+1. Создайте API ключ в WebUI вашего proxy
+2. Добавьте ключ в GitLab CI/CD Variables
+3. Настройте `.gitlab-ci.yml`
+
+**Пример:**
+
+```yaml
+ai-review:
+  stage: review
+  image: nikitafilonov/ai-review:latest
+  when: manual
+  script:
+    - ai-review run
+  variables:
+    # Ваш Ollama-OpenAI Proxy
+    LLM__PROVIDER: "OPENAI"
+    LLM__HTTP_CLIENT__API_URL: "http://your-proxy:8080/v1"
+    LLM__HTTP_CLIENT__API_TOKEN: "$OLLAMA_PROXY_API_KEY"
+    LLM__META__MODEL: "qwen2.5-coder:7b"
+    
+    # GitLab VCS
+    VCS__PROVIDER: "GITLAB"
+    VCS__PIPELINE__PROJECT_ID: "$CI_PROJECT_ID"
+    VCS__PIPELINE__MERGE_REQUEST_ID: "$CI_MERGE_REQUEST_IID"
+    VCS__HTTP_CLIENT__API_URL: "$CI_SERVER_URL"
+    VCS__HTTP_CLIENT__API_TOKEN: "$CI_JOB_TOKEN"
+```
+
+### 📖 Документация
+
+- 📘 [AI Review Quick Start](docs/AI_REVIEW_QUICKSTART.md) - 3 шага до первого review
+- 📖 [AI Review Setup](docs/AI_REVIEW_SETUP.md) - Полная инструкция
+- 🎨 [AI Review Go Prompts](docs/AI_REVIEW_GO_PROMPTS.md) - Кастомные промпты
+
+### 🎯 Рекомендуемые модели
+
+- **qwen2.5-coder:7b** - Оптимальный баланс скорость/качество
+- **deepseek-coder:6.7b** - Хорошее качество review
+- **deepseek-coder:33b** - Максимальное качество (медленно)
+
+**Инструмент:** [github.com/Nikita-Filonov/ai-review](https://github.com/Nikita-Filonov/ai-review)
+
+---
+
 ## 📦 Структура проекта
 
 ```

@@ -80,6 +80,28 @@
 
 ---
 
+## 🤖 AI Code Review Integration
+
+9. **[AI Review Setup](AI_REVIEW_SETUP.md)**
+   - GitLab CI/CD интеграция
+   - AI code review через Ollama-OpenAI Proxy
+   - Настройка и конфигурация
+   - Режимы работы (inline, summary, context)
+   - Troubleshooting
+
+10. **[AI Review Quick Start](AI_REVIEW_QUICKSTART.md)** ⭐
+    - 3 шага до первого AI review
+    - Быстрая настройка
+    - Базовые команды
+
+11. **[AI Review Go Prompts](AI_REVIEW_GO_PROMPTS.md)**
+    - Кастомные промпты для Go кода
+    - Security & Performance фокус
+    - Concurrency & Error handling
+    - Обучающие промпты
+
+---
+
 ## 📊 Feature Documentation
 
 ### Version 1.9.3 (Current)
@@ -126,6 +148,8 @@ See [Roadmap.MD](../Roadmap.MD) for full plan.
 | Setup Production | [Configuration](CONFIGURATION.md) | Production Config |
 | Monitor Performance | [WebUI Guide](WEBUI_GUIDE.md) | Admin Panel |
 | Fix Issues | [Troubleshooting](TROUBLESHOOTING.md) | All Sections |
+| Setup AI Review | [AI Review Quick Start](AI_REVIEW_QUICKSTART.md) | Quick Start |
+| Configure AI Review | [AI Review Setup](AI_REVIEW_SETUP.md) | Configuration |
 
 ### API Quick Links
 

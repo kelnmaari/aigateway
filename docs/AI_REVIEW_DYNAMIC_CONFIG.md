@@ -418,6 +418,79 @@ ai-review:test:
 
 ## Troubleshooting
 
+### Проблема: "Input should be a valid URL" для `${CI_SERVER_URL}`
+
+```
+pydantic_core._pydantic_core.ValidationError: 1 validation error for Settings
+vcs.GITLAB.http_client.api_url
+  Input should be a valid URL [type=url_parsing, input_value='${CI_SERVER_URL}', input_type=str]
+```
+
+**Причина:** Переменные GitLab CI не установлены или не подставляются.
+
+**Решение 1:** Проверьте переменные environment:
+
+```bash
+# Перед запуском ai-review
+echo "CI_SERVER_URL: $CI_SERVER_URL"
+echo "CI_PROJECT_ID: $CI_PROJECT_ID"
+echo "CI_MERGE_REQUEST_IID: $CI_MERGE_REQUEST_IID"
+echo "GITLAB_API_TOKEN: ${GITLAB_API_TOKEN:0:10}..."
+```
+
+**Решение 2:** Установите переменные локально:
+
+```bash
+export CI_SERVER_URL="https://gitlab.alexue4.dev"
+export CI_PROJECT_ID="146"
+export CI_MERGE_REQUEST_IID="1"
+export GITLAB_API_TOKEN="glpat-your-token"
+
+# Перегенерируйте конфигурацию
+bash scripts/generate-ai-review-config.sh
+```
+
+**Решение 3:** Проверьте сгенерированный файл:
+
+```bash
+cat .ai-review.yaml | grep -A5 "vcs:"
+
+# Должно быть (STRING в кавычках):
+# vcs:
+#   provider: GITLAB
+#   pipeline:
+#     project_id: "146"        # ← Строка в кавычках!
+#     merge_request_id: "1"    # ← Строка в кавычках!
+#   http_client:
+#     api_url: https://gitlab.alexue4.dev
+#
+# НЕ должно быть:
+#   project_id: 146            # ← Число без кавычек - ОШИБКА!
+#   api_url: ${CI_SERVER_URL}  # ← Литерал - ОШИБКА!
+```
+
+### Проблема: "ERROR: Required variable not set"
+
+```
+ERROR: CI_PROJECT_ID is required
+```
+
+**Решение:**
+
+В GitLab CI эти переменные устанавливаются автоматически. Локально:
+
+```bash
+# Узнайте значения из GitLab:
+# Project: https://gitlab.com/user/project
+#   → CI_PROJECT_ID="123" (из Settings → General)
+# MR: https://gitlab.com/user/project/-/merge_requests/5
+#   → CI_MERGE_REQUEST_IID="5"
+
+export CI_SERVER_URL="https://gitlab.alexue4.dev"
+export CI_PROJECT_ID="146"
+export CI_MERGE_REQUEST_IID="1"
+```
+
 ### Проблема: Скрипт генерации не найден
 
 ```

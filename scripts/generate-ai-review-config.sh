@@ -121,8 +121,8 @@ vcs:
   provider: GITLAB
   
   pipeline:
-    project_id: ${CI_PROJECT_ID}
-    merge_request_id: ${CI_MERGE_REQUEST_IID}
+    project_id: "${CI_PROJECT_ID}"
+    merge_request_id: "${CI_MERGE_REQUEST_IID}"
   
   http_client:
     api_url: ${CI_SERVER_URL}

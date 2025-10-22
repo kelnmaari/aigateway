@@ -573,9 +573,14 @@ ai-review:
 
 ### 🎯 Рекомендуемые модели
 
-- **qwen2.5-coder:7b** - Оптимальный баланс скорость/качество
-- **deepseek-coder:6.7b** - Хорошее качество review
-- **deepseek-coder:33b** - Максимальное качество (медленно)
+| Модель | JSON Support | Context | AI Review |
+|--------|--------------|---------|-----------|
+| **deepseek-coder:6.7b** | ✅ Отличный | 16K | ⭐⭐⭐⭐⭐ |
+| **qwen2.5-coder:7b** | ✅ Хороший | 32K | ⭐⭐⭐⭐ |
+| **qwen2.5-coder:14b** | ✅ Отличный | 32K | ⭐⭐⭐⭐⭐ |
+| llama3.2:70b | ⚠️ Средний | 128K | ⭐⭐⭐ |
+
+**⚠️ Важно:** Используйте модели с хорошей JSON поддержкой. AI-review требует строгий JSON формат без markdown wrapper.
 
 **Инструмент:** [github.com/Nikita-Filonov/ai-review](https://github.com/Nikita-Filonov/ai-review)
 

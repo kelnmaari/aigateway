@@ -31,14 +31,19 @@ ai-review:full:
     LLM__HTTP_CLIENT__API_TOKEN: "$OLLAMA_PROXY_API_KEY"
     
     # НАСТРОЙТЕ: Модель из Ollama
-    # Доступные модели зависят от вашего Ollama сервера
-    # Примеры:
-    #   - llama3.2:latest
-    #   - codellama:13b
-    #   - deepseek-coder:6.7b
-    #   - qwen2.5-coder:7b
-    #   - mistral:latest
-    LLM__META__MODEL: "devstral-tuned:latest"
+    # 
+    # ⚠️ ВАЖНО: AI-review требует модели с хорошей JSON поддержкой!
+    # 
+    # Рекомендуемые модели (проверены с AI-review):
+    #   ✅ deepseek-coder:6.7b    - Хороший JSON, быстрый
+    #   ✅ deepseek-coder:33b     - Отличный JSON, медленный (ТЕКУЩАЯ)
+    #   ✅ qwen2.5-coder:7b       - Хороший JSON, средний
+    #   ✅ qwen2.5-coder:14b      - Отличный JSON, медленный
+    #   ⚠️ llama3.2:latest        - Иногда оборачивает JSON в markdown
+    #   ❌ НЕ используйте:        - devstral, mistral (markdown wrapper)
+    # 
+    # См. docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md для деталей
+    LLM__META__MODEL: "deepseek-coder:33b"
     
     # Параметры генерации
     LLM__META__MAX_TOKENS: "15000"

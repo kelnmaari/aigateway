@@ -510,6 +510,117 @@ git diff origin/main | wc -c
 ai-review run-summary  # Меньше токенов
 ```
 
+### Проблема: Модель возвращает Markdown вместо JSON
+
+**Симптомы**:
+```
+ERROR | LLM_JSON_PARSER | No valid JSON found in output
+Invalid JSON: expected value at line 1 column 1 [type=json_invalid, input_value='```'
+```
+
+**Причина**: Модель возвращает markdown code block:
+```
+```json
+[{"file": "..."}]
+```
+```
+
+Вместо чистого JSON:
+```json
+[{"file": "..."}]
+```
+
+**Решения:**
+
+1. **Используйте модели обученные на JSON**:
+   
+   | Модель | JSON Support | Рекомендация |
+   |--------|--------------|--------------|
+   | `qwen2.5-coder:7b` | ✅ Хороший | Рекомендуется |
+   | `deepseek-coder:6.7b` | ✅ Отличный | Лучший для JSON |
+   | `llama3.2:70b` | ⚠️ Средний | Может оборачивать в markdown |
+   | `devstral-tuned:latest` | ❌ Плохой | Не рекомендуется |
+
+2. **Настройте строгий JSON промпт** в `.ai-review.yaml`:
+   ```yaml
+   prompts:
+     inline: |
+       You MUST return ONLY valid JSON array. No markdown, no code blocks, no explanations.
+       
+       Format (EXACTLY):
+       [
+         {
+           "file": "path/to/file.go",
+           "line": 10,
+           "comment": "Issue description"
+         }
+       ]
+       
+       DO NOT wrap in ```json or any other formatting.
+       Return ONLY the JSON array starting with [ and ending with ].
+       
+       Review this Go code for:
+       - Bugs and errors
+       - Security issues
+       - Performance problems
+   ```
+
+3. **Используйте `format: "json"` параметр** (если поддерживается):
+   ```yaml
+   # .ai-review.yaml
+   llm:
+     meta:
+       # Некоторые модели поддерживают принудительный JSON output
+       response_format:
+         type: "json_object"
+   ```
+
+4. **Попробуйте другую модель**:
+   ```yaml
+   # .gitlab-ci.yml
+   variables:
+     # Вместо devstral-tuned:latest
+     LLM__META__MODEL: "deepseek-coder:6.7b"
+   ```
+
+5. **Используйте summary review** (не требует JSON):
+   ```bash
+   # Summary review более терпим к формату
+   ai-review run-summary
+   ```
+
+**Проверка модели на JSON**:
+```bash
+curl http://176.53.180.178:8085/v1/chat/completions \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-coder:6.7b",
+    "messages": [{
+      "role": "system",
+      "content": "Return ONLY JSON array: [{\"number\": 1}]"
+    }, {
+      "role": "user",
+      "content": "Give me JSON"
+    }]
+  }' | jq -r '.choices[0].message.content'
+```
+
+Ожидается: `[{"number": 1}]`  
+НЕ: ` ```json\n[{"number": 1}]\n``` `
+
+**Временный workaround**:
+
+Если модель упорно оборачивает JSON в markdown, создайте wrapper скрипт:
+
+```bash
+# ai-review-wrapper.sh
+#!/bin/bash
+ai-review "$@" 2>&1 | sed 's/```json//g' | sed 's/```//g'
+```
+
+Но лучше использовать правильную модель.
+
 ---
 
 ## Best Practices

@@ -123,16 +123,120 @@ PASS: completion_tokens всегда присутствует в JSON
 
 ---
 
-## Вторая проблема: Модель не генерирует ответ
+## Вторая проблема: Модель возвращает Markdown вместо JSON
 
 ### Контекст
 
 В логах AI-review:
 ```
+2025-10-22 22:17:58 | ERROR | LLM_JSON_PARSER | No valid JSON found in output
+Invalid JSON: expected value at line 1 column 1 [type=json_invalid, input_value='```'
+```
+
+Модель `devstral-tuned:latest` возвращает JSON обернутый в markdown code block:
+
+**Модель возвращает:**
+```
+```json
+[
+  {"file": "internal/webfetch/parser.go", "line": 10, "comment": "..."}
+]
+```
+```
+
+**AI-review ожидает чистый JSON:**
+```json
+[
+  {"file": "internal/webfetch/parser.go", "line": 10, "comment": "..."}
+]
+```
+
+### Причины
+
+1. **Модель обучена** возвращать markdown formatted code
+2. **AI-review парсит** строго JSON без markdown wrapper
+3. **devstral-tuned:latest** не подходит для структурированного JSON output
+
+### Решение
+
+#### Вариант 1: Смените модель (рекомендуется)
+
+Используйте модели с хорошей JSON поддержкой:
+
+```yaml
+# .gitlab-ci.yml
+variables:
+  LLM__META__MODEL: "deepseek-coder:6.7b"  # Лучший JSON support
+  # или
+  LLM__META__MODEL: "qwen2.5-coder:7b"     # Хороший JSON support
+```
+
+**Таблица совместимости:**
+
+| Модель | JSON Output | Context | AI Review |
+|--------|-------------|---------|-----------|
+| `deepseek-coder:6.7b` | ✅ Чистый JSON | 16K | ✅ Отлично |
+| `qwen2.5-coder:7b` | ✅ Чистый JSON | 32K | ✅ Хорошо |
+| `qwen2.5-coder:14b` | ✅ Чистый JSON | 32K | ✅ Отлично |
+| `llama3.2:70b` | ⚠️ Иногда markdown | 128K | ⚠️ Работает 50/50 |
+| `devstral-tuned:latest` | ❌ Markdown wrapper | ? | ❌ Не работает |
+
+#### Вариант 2: Настройте строгий промпт
+
+Создайте `.ai-review.yaml`:
+
+```yaml
+prompts:
+  inline: |
+    You MUST return ONLY valid JSON array. 
+    NO markdown code blocks, NO explanations, NO formatting.
+    
+    Return EXACTLY this format:
+    [{"file": "path.go", "line": 10, "comment": "issue"}]
+    
+    Start response with [ and end with ].
+    DO NOT use ```json wrapper.
+```
+
+#### Вариант 3: Используйте summary review
+
+Summary review не требует JSON парсинга:
+
+```bash
+# Вместо context/inline review:
+ai-review run-summary
+```
+
+### Также: 503 Service Unavailable
+
+В логах видны retry с 503 ошибкой:
+```
+2025-10-22 22:16:49 | WARNING | Attempt 1/5 failed with status=503
+2025-10-22 22:17:56 | WARNING | Attempt 2/5 failed with status=503
+```
+
+**Причины:**
+- Ollama перегружен (17 файлов = много токенов)
+- Модель долго генерирует ответ
+- Превышен timeout
+
+**Решение:**
+1. Уменьшите количество файлов в MR
+2. Используйте меньшую модель
+3. Увеличьте timeout в proxy config
+
+---
+
+## Третья проблема: Модель не генерирует ответ
+
+### Контекст
+
+В более ранних логах:
+```
 2025-10-22 22:05:35 | WARNING | INLINE_COMMENT_SERVICE | LLM returned empty string for inline review
 ```
 
-Модель `devstral-tuned:latest` вернула **пустой ответ** при **33973 tokens** в prompt.
+Модель `devstral-tuned:latest` вернула **пустой ответ** при **33973 tokens** в prompt (22 файла).
 
 ### Причины
 

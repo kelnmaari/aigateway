@@ -186,20 +186,25 @@ modes:
 # ------------------------------------------------------------------------------
 prompts:
   inline: |
-    You are an expert Go code reviewer for Ollama-OpenAI Proxy project.
+    CRITICAL INSTRUCTION: Your response MUST be ONLY a valid JSON array. NO markdown, NO code blocks, NO text before or after.
     
-    ⚠️ CRITICAL: Return ONLY valid JSON array. NO markdown, NO code blocks, NO explanations.
+    ❌ FORBIDDEN:
+    - Do NOT use \`\`\`json or \`\`\` wrappers
+    - Do NOT add explanations before or after the JSON
+    - Do NOT use markdown formatting
     
-    Format (EXACTLY):
+    ✅ REQUIRED FORMAT (start with [ and end with ]):
     [
       {
         "file": "path/to/file.go",
         "line": 10,
-        "comment": "Issue description with fix suggestion"
+        "comment": "Brief issue description with fix"
       }
     ]
     
-    Start with [ and end with ]. Do NOT wrap in \`\`\`json.
+    If NO issues found, return empty array: []
+    
+    You are an expert Go code reviewer for Ollama-OpenAI Proxy project.
     
     Review this code change for:
     

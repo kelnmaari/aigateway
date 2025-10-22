@@ -263,6 +263,146 @@ wsClient.on('error', (event) => {
     }
 });
 
+// ========================================
+// Chat Streaming Events (WS-01 v1.10.2)
+// ========================================
+
+wsClient.on('chat_stream_start', (event) => {
+    console.log('[WebSocket] Chat stream started:', event.data.conversation_id);
+    if (typeof onChatStreamStart === 'function') {
+        onChatStreamStart(event.data);
+    }
+});
+
+wsClient.on('chat_stream_chunk', (event) => {
+    console.debug('[WebSocket] Chat chunk received');
+    if (typeof onChatStreamChunk === 'function') {
+        onChatStreamChunk(event.data);
+    }
+});
+
+wsClient.on('chat_stream_end', (event) => {
+    console.log('[WebSocket] Chat stream ended:', event.data.message_id);
+    if (typeof onChatStreamEnd === 'function') {
+        onChatStreamEnd(event.data);
+    }
+});
+
+wsClient.on('chat_stream_error', (event) => {
+    console.error('[WebSocket] Chat stream error:', event.data.error);
+    if (typeof onChatStreamError === 'function') {
+        onChatStreamError(event.data);
+    }
+    if (typeof Toast !== 'undefined') {
+        Toast.error(`Chat error: ${event.data.error}`);
+    }
+});
+
+// ========================================
+// File Processing Events (WS-01 v1.10.2)
+// ========================================
+
+wsClient.on('file_upload_start', (event) => {
+    console.log('[WebSocket] File upload started:', event.data.filename);
+    if (typeof onFileUploadStart === 'function') {
+        onFileUploadStart(event.data);
+    }
+});
+
+wsClient.on('file_upload_progress', (event) => {
+    console.debug('[WebSocket] File upload progress:', event.data.percent + '%');
+    if (typeof onFileUploadProgress === 'function') {
+        onFileUploadProgress(event.data);
+    }
+});
+
+wsClient.on('file_upload_complete', (event) => {
+    console.log('[WebSocket] File upload complete:', event.data.filename);
+    if (typeof onFileUploadComplete === 'function') {
+        onFileUploadComplete(event.data);
+    }
+    if (typeof Toast !== 'undefined') {
+        Toast.success(`File uploaded: ${event.data.filename}`);
+    }
+});
+
+wsClient.on('file_upload_error', (event) => {
+    console.error('[WebSocket] File upload error:', event.data.error);
+    if (typeof onFileUploadError === 'function') {
+        onFileUploadError(event.data);
+    }
+    if (typeof Toast !== 'undefined') {
+        Toast.error(`Upload failed: ${event.data.error}`);
+    }
+});
+
+wsClient.on('file_processing_start', (event) => {
+    console.log('[WebSocket] File processing started:', event.data.processing_type);
+    if (typeof onFileProcessingStart === 'function') {
+        onFileProcessingStart(event.data);
+    }
+});
+
+wsClient.on('file_processing_progress', (event) => {
+    console.debug('[WebSocket] File processing:', event.data.stage, event.data.percent + '%');
+    if (typeof onFileProcessingProgress === 'function') {
+        onFileProcessingProgress(event.data);
+    }
+});
+
+wsClient.on('file_processing_complete', (event) => {
+    console.log('[WebSocket] File processing complete:', event.data.file_id);
+    if (typeof onFileProcessingComplete === 'function') {
+        onFileProcessingComplete(event.data);
+    }
+    if (typeof Toast !== 'undefined') {
+        Toast.success('File processed successfully');
+    }
+});
+
+wsClient.on('file_processing_error', (event) => {
+    console.error('[WebSocket] File processing error:', event.data.error);
+    if (typeof onFileProcessingError === 'function') {
+        onFileProcessingError(event.data);
+    }
+    if (typeof Toast !== 'undefined') {
+        Toast.error(`Processing failed: ${event.data.error}`);
+    }
+});
+
+// ========================================
+// Notification Events (WS-01 v1.10.2)
+// ========================================
+
+wsClient.on('notification', (event) => {
+    console.log('[WebSocket] Notification:', event.data.level, event.data.title);
+    
+    // Display notification via Toast
+    if (typeof Toast !== 'undefined') {
+        const { level, title, message, action } = event.data;
+        const fullMessage = title + (message ? ': ' + message : '');
+        
+        switch (level) {
+            case 'success':
+                Toast.success(fullMessage);
+                break;
+            case 'warning':
+                Toast.warning(fullMessage);
+                break;
+            case 'error':
+                Toast.error(fullMessage);
+                break;
+            default:
+                Toast.info(fullMessage);
+        }
+    }
+    
+    // Call custom handler
+    if (typeof onNotification === 'function') {
+        onNotification(event.data);
+    }
+});
+
 // Экспортируем для использования в других скриптах
 window.wsClient = wsClient;
 

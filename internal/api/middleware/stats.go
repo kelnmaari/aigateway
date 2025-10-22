@@ -36,7 +36,9 @@ func StatsMiddleware() gin.HandlerFunc {
 
 		// Обновляем статистику на основе результата
 		duration := time.Since(start)
-		handlers.GlobalStats.TotalDuration += duration
+
+		// Version 1.7.0: GlobalStats теперь *StatsOptimized с методом AddDuration
+		handlers.GlobalStats.AddDuration(duration)
 
 		if c.Writer.Status() >= 400 {
 			handlers.GlobalStats.IncrementErrorRequests()

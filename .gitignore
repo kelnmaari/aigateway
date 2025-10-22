@@ -68,3 +68,5 @@ docker-compose.override.yml
 /ollama-lib/
 /zed/
 /data/
+/kilocode/
+/continue/

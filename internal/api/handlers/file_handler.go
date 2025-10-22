@@ -23,6 +23,19 @@ type FileHandler struct {
 	extractorRegistry *extractors.Registry
 	db                storage.Database
 	logger            *logrus.Logger
+	wsBroadcaster     FileWSBroadcaster // WS-01 v1.10.2: WebSocket events
+}
+
+// FileWSBroadcaster интерфейс для file processing WebSocket events
+type FileWSBroadcaster interface {
+	BroadcastFileUploadStart(fileID, filename string, size int64) error
+	BroadcastFileUploadProgress(fileID string, bytesUploaded, totalBytes int64, percent float64) error
+	BroadcastFileUploadComplete(fileID, filename string, downloadURL string) error
+	BroadcastFileUploadError(fileID, filename string, errorMsg string) error
+	BroadcastFileProcessingStart(fileID, filename string, processingType string) error
+	BroadcastFileProcessingProgress(fileID string, stage string, percent float64) error
+	BroadcastFileProcessingComplete(fileID string, result map[string]interface{}) error
+	BroadcastFileProcessingError(fileID string, errorMsg string) error
 }
 
 // NewFileHandler создает новый file handler
@@ -37,7 +50,13 @@ func NewFileHandler(
 		extractorRegistry: extractorRegistry,
 		db:                db,
 		logger:            logger,
+		wsBroadcaster:     nil, // Optional WebSocket support
 	}
+}
+
+// SetWSBroadcaster устанавливает WebSocket broadcaster (WS-01 v1.10.2)
+func (h *FileHandler) SetWSBroadcaster(broadcaster FileWSBroadcaster) {
+	h.wsBroadcaster = broadcaster
 }
 
 // UploadFile обрабатывает загрузку файла
@@ -186,6 +205,32 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		IPAddress: stringPtr(c.ClientIP()),
 		UserAgent: stringPtr(c.Request.UserAgent()),
 	})
+
+	// WS-01 v1.10.2: Уведомляем о завершении загрузки и обработки
+	if h.wsBroadcaster != nil {
+		downloadURL := fmt.Sprintf("/api/files/%s/download", dbFile.ID)
+		if err := h.wsBroadcaster.BroadcastFileUploadComplete(dbFile.ID, header.Filename, downloadURL); err != nil {
+			h.logger.WithError(err).Debug("Failed to broadcast upload complete")
+		}
+
+		// Если файл обрабатывался, отправляем результат
+		if extract && extractionStatus == "completed" {
+			processingResult := map[string]interface{}{
+				"extracted_text_length": len(stringValue(extractedText)),
+				"word_count":            intValue(wordCount),
+				"language":              stringValue(language),
+				"page_count":            intValue(pageCount),
+			}
+			if err := h.wsBroadcaster.BroadcastFileProcessingComplete(dbFile.ID, processingResult); err != nil {
+				h.logger.WithError(err).Debug("Failed to broadcast processing complete")
+			}
+		} else if extract {
+			// Если extraction не удалось
+			if err := h.wsBroadcaster.BroadcastFileProcessingError(dbFile.ID, "extraction failed or not supported"); err != nil {
+				h.logger.WithError(err).Debug("Failed to broadcast processing error")
+			}
+		}
+	}
 
 	h.logger.WithFields(logrus.Fields{
 		"file_id":  dbFile.ID,
@@ -456,6 +501,43 @@ func intValue(i *int) int {
 		return 0
 	}
 	return *i
+}
+
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// detectMimeType определяет MIME-тип по расширению файла
+// detectProcessingType определяет тип обработки файла (WS-01 v1.10.2)
+func detectProcessingType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	processingTypes := map[string]string{
+		".pdf":  "pdf_extract",
+		".docx": "docx_extract",
+		".doc":  "doc_extract",
+		".csv":  "csv_parse",
+		".xlsx": "xlsx_parse",
+		".txt":  "text_extract",
+		".md":   "markdown_parse",
+		".rtf":  "rtf_extract",
+		".png":  "ocr",
+		".jpg":  "ocr",
+		".jpeg": "ocr",
+		".gif":  "ocr",
+		".webp": "ocr",
+		".bmp":  "ocr",
+		".tiff": "ocr",
+	}
+
+	if procType, ok := processingTypes[ext]; ok {
+		return procType
+	}
+
+	return "unknown"
 }
 
 // detectMimeType определяет MIME-тип по расширению файла

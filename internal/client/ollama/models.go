@@ -44,6 +44,7 @@ type ChatMessage struct {
 	Thinking  string     `json:"thinking,omitempty"`   // Для gpt-oss моделей с reasoning
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"` // Вызовы инструментов от модели
 	ToolName  string     `json:"tool_name,omitempty"`  // Имя инструмента для role="tool"
+	Images    [][]byte   `json:"images,omitempty"`     // Изображения для vision models (raw bytes)
 }
 
 // Tool представляет инструмент доступный для модели

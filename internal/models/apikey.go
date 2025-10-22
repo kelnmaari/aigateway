@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -250,18 +251,27 @@ func (k *APIKey) UpdateLastUsed() {
 }
 
 // IncrementUsage увеличивает счетчики использования
+// Version 1.7.0: Fixed race condition - использует atomic operations для счетчиков
+//
+// ВАЖНО: Map operations (ModelUsage, EndpointUsage, DailyUsage) НЕ thread-safe!
+// Для production с высокой конкурентностью используйте APIKeyUsageHot из apikey_optimized.go
 func (k *APIKey) IncrementUsage(model, endpoint string, tokens int64, success bool) {
-	if success {
-		k.Usage.SuccessfulRequests++
-	} else {
-		k.Usage.FailedRequests++
-	}
+	// Atomic operations для основных счетчиков (CRITICAL FIX)
+	atomic.AddInt64(&k.Usage.TotalRequests, 1)
+	atomic.AddInt64(&k.Usage.TotalTokens, tokens)
 
-	k.Usage.TotalRequests++
-	k.Usage.TotalTokens += tokens
+	if success {
+		atomic.AddInt64(&k.Usage.SuccessfulRequests, 1)
+	} else {
+		atomic.AddInt64(&k.Usage.FailedRequests, 1)
+	}
 
 	now := time.Now()
 	k.Usage.LastRequestAt = &now
+
+	// NOTE: Map operations ниже НЕ thread-safe и могут вызвать race condition
+	// при высокой конкурентности. Для production используйте sync.Mutex или
+	// мигрируйте на APIKeyUsageHot с отдельным холодным хранилищем для maps.
 
 	// Статистика по моделям
 	if k.Usage.ModelUsage == nil {

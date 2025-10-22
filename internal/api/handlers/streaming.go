@@ -24,6 +24,15 @@ type StreamingChatHandler struct {
 	ollamaClient    OllamaClientInterface
 	converter       *converter.SimpleConverter
 	streamConverter *converter.StreamConverter
+	wsBroadcaster   WSBroadcaster // WS-01 v1.10.2: WebSocket events
+}
+
+// WSBroadcaster интерфейс для WebSocket broadcasting (для тестирования)
+type WSBroadcaster interface {
+	BroadcastChatStreamStart(conversationID, requestID string, model string) error
+	BroadcastChatStreamChunk(conversationID, requestID string, chunk map[string]interface{}) error
+	BroadcastChatStreamEnd(conversationID, requestID string, messageID string, totalTokens int) error
+	BroadcastChatStreamError(conversationID, requestID string, errorMsg string) error
 }
 
 // NewStreamingChatHandler создает новый streaming handler
@@ -34,7 +43,13 @@ func NewStreamingChatHandler(cfg *config.Config, logger *logrus.Logger, ollamaCl
 		ollamaClient:    ollamaClient,
 		converter:       converter.NewSimpleConverter(cfg, logger),
 		streamConverter: converter.NewStreamConverter(cfg, logger),
+		wsBroadcaster:   nil, // Optional WebSocket support
 	}
+}
+
+// SetWSBroadcaster устанавливает WebSocket broadcaster (WS-01 v1.10.2)
+func (h *StreamingChatHandler) SetWSBroadcaster(broadcaster WSBroadcaster) {
+	h.wsBroadcaster = broadcaster
 }
 
 // HandleStreamingCompletion обрабатывает streaming chat completion
@@ -164,6 +179,14 @@ func (h *StreamingChatHandler) processStreamingResponse(
 
 	chunksProcessed := 0
 	totalTokens := 0
+	conversationID := c.GetString("conversation_id") // может быть пустым для non-conversation requests
+
+	// WS-01 v1.10.2: Уведомляем о начале streaming
+	if h.wsBroadcaster != nil {
+		if err := h.wsBroadcaster.BroadcastChatStreamStart(conversationID, requestID, originalReq.Model); err != nil {
+			h.logger.WithError(err).Warn("Failed to broadcast stream start")
+		}
+	}
 
 	for {
 		select {
@@ -184,6 +207,14 @@ func (h *StreamingChatHandler) processStreamingResponse(
 				c.Set("completion_tokens", totalTokens)
 				c.Set("total_tokens", totalTokens)
 				// prompt_tokens для streaming определить сложно, оставляем 0
+
+				// WS-01 v1.10.2: Уведомляем о завершении streaming
+				if h.wsBroadcaster != nil {
+					messageID := fmt.Sprintf("msg_%s", requestID)
+					if err := h.wsBroadcaster.BroadcastChatStreamEnd(conversationID, requestID, messageID, totalTokens); err != nil {
+						h.logger.WithError(err).Warn("Failed to broadcast stream end")
+					}
+				}
 
 				metrics.Finalize(true, nil)
 				return
@@ -218,6 +249,20 @@ func (h *StreamingChatHandler) processStreamingResponse(
 			chunksProcessed++
 			totalTokens += chunkTokens
 
+			// WS-01 v1.10.2: Отправляем chunk через WebSocket
+			if h.wsBroadcaster != nil {
+				chunkData := map[string]interface{}{
+					"content":      ollamaChunk.Message.Content,
+					"role":         ollamaChunk.Message.Role,
+					"done":         ollamaChunk.Done,
+					"chunk_index":  chunksProcessed,
+					"chunk_tokens": chunkTokens,
+				}
+				if err := h.wsBroadcaster.BroadcastChatStreamChunk(conversationID, requestID, chunkData); err != nil {
+					h.logger.WithError(err).Debug("Failed to broadcast stream chunk")
+				}
+			}
+
 			h.logger.WithFields(logrus.Fields{
 				"request_id":   requestID,
 				"chunk_index":  chunksProcessed,
@@ -242,6 +287,13 @@ func (h *StreamingChatHandler) processStreamingResponse(
 			if totalTokens > 0 {
 				c.Set("completion_tokens", totalTokens)
 				c.Set("total_tokens", totalTokens)
+			}
+
+			// WS-01 v1.10.2: Уведомляем об ошибке streaming
+			if h.wsBroadcaster != nil {
+				if wsErr := h.wsBroadcaster.BroadcastChatStreamError(conversationID, requestID, err.Error()); wsErr != nil {
+					h.logger.WithError(wsErr).Warn("Failed to broadcast stream error")
+				}
 			}
 
 			metrics.Finalize(false, err)

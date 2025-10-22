@@ -17,9 +17,8 @@ import (
 )
 
 // GlobalStats хранит глобальную статистику приложения
-var GlobalStats = &Stats{
-	StartTime: time.Now(),
-}
+// Version 1.7.0: Migrated to StatsOptimized (cache-friendly with padding)
+var GlobalStats = NewStatsOptimized()
 
 // Stats содержит статистику работы прокси
 type Stats struct {
@@ -89,6 +88,19 @@ func (s *Stats) Snapshot() gin.H {
 	}
 }
 
+// SnapshotToGinH конвертирует StatsOptimized.Snapshot() в gin.H
+func SnapshotToGinH(snapshot StatsSnapshot) gin.H {
+	return gin.H{
+		"uptime_seconds":   snapshot.UptimeSeconds,
+		"uptime":           snapshot.Uptime,
+		"total_requests":   snapshot.TotalRequests,
+		"active_requests":  snapshot.ActiveRequests,
+		"success_requests": snapshot.SuccessRequests,
+		"error_requests":   snapshot.ErrorRequests,
+		"average_duration": snapshot.AverageDuration,
+	}
+}
+
 // APIKeyManager определяет интерфейс для работы с API ключами
 type APIKeyManager interface {
 	ListAPIKeys(ctx context.Context, req models.ListAPIKeysRequest) (*models.ListAPIKeysResponse, error)
@@ -99,14 +111,24 @@ type MetricsStorageInterface interface {
 	GetStats(metricType metrics.MetricType) metrics.AggregatedStats
 }
 
+// StatsInterface определяет интерфейс для статистики (для совместимости Stats и StatsOptimized)
+type StatsInterface interface {
+	IncrementTotalRequests()
+	IncrementActiveRequests()
+	DecrementActiveRequests()
+	IncrementSuccessRequests()
+	IncrementErrorRequests()
+	GetUptime() time.Duration
+}
+
 // StatsHandler обрабатывает эндпоинт статистики для TUI
 type StatsHandler struct {
 	config         *config.Config
 	logger         *logrus.Logger
 	ollamaClient   OllamaClientInterface
-	keyManager     APIKeyManager    // Legacy JSON storage (deprecated)
-	db             storage.Database // Database for API keys (Version 1.3.0+)
-	stats          *Stats
+	keyManager     APIKeyManager           // Legacy JSON storage (deprecated)
+	db             storage.Database        // Database for API keys (Version 1.3.0+)
+	stats          StatsInterface          // Поддерживает и Stats, и StatsOptimized
 	version        string                  // Версия сервера
 	metricsStorage MetricsStorageInterface // Для latency данных
 }
@@ -119,7 +141,7 @@ func NewStatsHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient Oll
 		ollamaClient:   ollamaClient,
 		keyManager:     keyMgr,
 		db:             db,
-		stats:          GlobalStats,
+		stats:          GlobalStats, // GlobalStats теперь *StatsOptimized, реализует StatsInterface
 		version:        version,
 		metricsStorage: metricsStorage,
 	}
@@ -219,6 +241,19 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 		latencyInfo["p99"] = int(latencyStats.P99)
 	}
 
+	// Получаем snapshot (работает и для Stats, и для StatsOptimized)
+	var statsData gin.H
+	if optimizedStats, ok := h.stats.(*StatsOptimized); ok {
+		// Используем оптимизированную версию
+		statsData = SnapshotToGinH(optimizedStats.Snapshot())
+	} else if legacyStats, ok := h.stats.(*Stats); ok {
+		// Fallback на legacy версию
+		statsData = legacyStats.Snapshot()
+	} else {
+		// Неизвестный тип
+		statsData = gin.H{}
+	}
+
 	response := gin.H{
 		"server": gin.H{
 			"status":  "running",
@@ -233,7 +268,7 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 			"models_count": modelsCount,
 			"models":       modelsList,
 		},
-		"stats":    h.stats.Snapshot(),
+		"stats":    statsData,
 		"latency":  latencyInfo,
 		"api_keys": apiKeysInfo,
 	}

@@ -54,7 +54,7 @@ ai-review:full:
     #   ❌ НЕ используйте:        - devstral, mistral (markdown wrapper)
     # 
     # См. docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md для деталей
-    LLM__META__MODEL: "deepseek-coder:33b"
+    LLM__META__MODEL: "deepseek-coder:6.7b"
     
     # Параметры генерации
     LLM__META__MAX_TOKENS: "15000"

@@ -469,6 +469,42 @@ cat .ai-review.yaml | grep -A5 "vcs:"
 #   api_url: ${CI_SERVER_URL}  # ← Литерал - ОШИБКА!
 ```
 
+### Проблема: "Input should be a valid string" для project_id
+
+```
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for Settings
+vcs.GITLAB.pipeline.project_id
+  Input should be a valid string [type=string_type, input_value=146, input_type=int]
+vcs.GITLAB.pipeline.merge_request_id
+  Input should be a valid string [type=string_type, input_value=1, input_type=int]
+```
+
+**Причина:** В YAML числа без кавычек парсятся как integers, а `ai-review` ожидает strings.
+
+**Решение:** Проверьте сгенерированный `.ai-review.yaml`:
+
+```bash
+cat .ai-review.yaml | grep -A3 "pipeline:"
+
+# ПРАВИЛЬНО (с кавычками):
+# pipeline:
+#   project_id: "146"
+#   merge_request_id: "1"
+
+# НЕПРАВИЛЬНО (без кавычек):
+# pipeline:
+#   project_id: 146    # ← Integer, не String!
+#   merge_request_id: 1
+```
+
+**Фикс:** Скрипт должен генерировать значения в кавычках:
+
+```bash
+# В scripts/generate-ai-review-config.sh
+project_id: "${CI_PROJECT_ID}"          # ← С кавычками
+merge_request_id: "${CI_MERGE_REQUEST_IID}"  # ← С кавычками
+```
+
 ### Проблема: "ERROR: Required variable not set"
 
 ```

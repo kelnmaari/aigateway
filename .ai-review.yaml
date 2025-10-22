@@ -41,7 +41,7 @@ llm:
     #   - http://10.0.0.5:8080/v1
     #   - http://ollama-proxy.internal:8080/v1
     #   - https://ollama.company.com/v1
-    api_url: ${LLM_API_URL:-http://176.53.180.178:8085/v1}
+    api_url: http://176.53.180.178:8085/v1
     
     # API ключ для proxy (создайте в WebUI)
     # Используйте env variable для безопасности

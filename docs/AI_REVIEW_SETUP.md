@@ -430,24 +430,124 @@ modes:
     max_comments: 15  # Уменьшить для меньшего кол-ва
 ```
 
+### Проблема: Модель возвращает пустой ответ (LLM returned empty string)
+
+**Симптомы**:
+```
+WARNING | INLINE_COMMENT_SERVICE | LLM returned empty string for inline review
+```
+
+**Причины**:
+
+1. **Переполнение контекста** - слишком много токенов в prompt
+   - Пример: 33973 tokens для 22 файлов
+   - Модель не может обработать такой объем
+
+2. **Модель не справляется** с большим контекстом
+   - `devstral-tuned:latest` может иметь меньший context window
+   - Локальные модели имеют ограничения по памяти
+
+**Решение:**
+
+1. **Уменьшите размер MR**:
+   ```yaml
+   # .ai-review.yaml
+   policy:
+     max_files: 15
+     max_file_size: 30000  # 30 KB
+   ```
+
+2. **Используйте summary вместо context**:
+   ```bash
+   # Вместо:
+   ai-review run-context  # Анализирует все файлы целиком
+   
+   # Используйте:
+   ai-review run-summary  # Только краткий обзор
+   ```
+
+3. **Разбейте review на части**:
+   ```yaml
+   # Review только critical файлов
+   policy:
+     include:
+       - "internal/api/**/*.go"
+   ```
+
+4. **Используйте модель с большим context window**:
+   
+   | Модель | Context | Для MR |
+   |--------|---------|--------|
+   | `qwen2.5-coder:7b` | 32K | < 15 файлов |
+   | `llama3.2:70b` | 128K | < 50 файлов |
+   | `deepseek-coder:33b` | 64K | < 30 файлов |
+
+5. **Настройте автоматический выбор режима** в зависимости от размера MR:
+   ```yaml
+   # .gitlab-ci.yml
+   ai-review:auto:
+     script:
+       - |
+         if [ "$CI_MERGE_REQUEST_CHANGES" -lt 10 ]; then
+           ai-review run-context
+         else
+           ai-review run-summary
+         fi
+   ```
+
+**Диагностика**:
+```bash
+# Проверьте сколько файлов в MR
+git diff --name-only origin/main | wc -l
+
+# Проверьте размер diff
+git diff origin/main | wc -c
+```
+
+**Быстрый workaround**:
+```bash
+# Используйте только summary для больших MR
+ai-review run-summary  # Меньше токенов
+```
+
 ---
 
 ## Best Practices
 
-### 1. Используйте разные модели для разных целей
+### 1. Используйте разные модели для разных размеров MR
 
 ```yaml
 # .gitlab-ci.yml
-ai-review:quick:
-  variables:
-    LLM__META__MODEL: "qwen2.5-coder:1.5b"
-  # Быстрая проверка при каждом push
 
-ai-review:thorough:
+# Маленькие MR (< 10 файлов)
+ai-review:small:
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+      changes: { count: { min: 1, max: 10 } }
   variables:
-    LLM__META__MODEL: "deepseek-coder:33b"
+    LLM__META__MODEL: "qwen2.5-coder:7b"
+    LLM__META__MAX_TOKENS: "8000"
+
+# Средние MR (10-30 файлов)
+ai-review:medium:
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+      changes: { count: { min: 11, max: 30 } }
+  variables:
+    LLM__META__MODEL: "qwen2.5-coder:14b"
+    LLM__META__MAX_TOKENS: "15000"
   when: manual
-  # Детальный анализ перед merge
+
+# Большие MR (> 30 файлов) - только summary
+ai-review:large:
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+      changes: { count: { min: 31 } }
+  variables:
+    LLM__META__MODEL: "llama3.2:70b"
+  script:
+    - ai-review run-summary  # Только общий обзор
+  when: manual
 ```
 
 ### 2. Настройте include/exclude patterns

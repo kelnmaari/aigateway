@@ -239,7 +239,7 @@ type Embedding struct {
 // Usage представляет информацию об использовании токенов
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens"` // ОБЯЗАТЕЛЬНО для OpenAI API совместимости
 	TotalTokens      int `json:"total_tokens"`
 }
 

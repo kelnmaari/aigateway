@@ -111,16 +111,38 @@ http://your-proxy-host:8080
 # → Copy key
 ```
 
-### Шаг 2: Добавьте в GitLab CI Variables
+### Шаг 2: Создайте GitLab Access Token
 ```bash
-GitLab → Settings → CI/CD → Variables → Add Variable
+# Project Access Token (рекомендуется):
+Settings → Access Tokens → Add new token
 
-Key:   OLLAMA_PROXY_API_KEY
-Value: (вставьте скопированный ключ)
-Flags: ✓ Mask variable
+Name:   ai-review-token
+Role:   Developer
+Scopes: ✓ api, ✓ read_api, ✓ write_repository
+
+→ Create token
+→ Copy token
 ```
 
-### Шаг 3: Отредактируйте `.gitlab-ci.yml`
+**⚠️ ВАЖНО:** `CI_JOB_TOKEN` не работает! Обязательно создайте отдельный Access Token.
+
+### Шаг 3: Добавьте переменные в GitLab CI Variables
+```bash
+GitLab → Settings → CI/CD → Variables
+
+# 1) API ключ для Ollama-OpenAI Proxy
+Key:   OLLAMA_PROXY_API_KEY
+Value: (ключ из шага 1)
+Flags: ✓ Mask variable
+
+# 2) GitLab Access Token
+Key:   GITLAB_API_TOKEN
+Value: (токен из шага 2)
+Flags: ✓ Mask variable
+       ✓ Protect variable
+```
+
+### Шаг 4: Отредактируйте `.gitlab-ci.yml`
 ```yaml
 variables:
   # Замените на URL вашего proxy
@@ -130,7 +152,7 @@ variables:
   LLM__META__MODEL: "llama3.2:latest"
 ```
 
-### Шаг 4: Запустите AI Review
+### Шаг 5: Запустите AI Review
 1. Создайте Merge Request
 2. Pipelines → ▶️ Play на `ai-review:full`
 3. Дождитесь комментариев AI

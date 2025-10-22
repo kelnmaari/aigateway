@@ -12,19 +12,60 @@
    - **Rate Limit**: рекомендуется 100-300 req/hour
 4. Скопируйте сгенерированный ключ
 
-### 2. Добавьте ключ в GitLab CI/CD Variables
+### 2. Создайте GitLab Access Token
+
+**⚠️ ВАЖНО:** `CI_JOB_TOKEN` имеет ограниченные права и не работает с MR discussions!
+
+#### Вариант A: Project Access Token (рекомендуется)
+
+1. **Settings** → **Access Tokens** → **Add new token**
+2. Заполните:
+   - **Name**: `ai-review-token`
+   - **Role**: `Developer` (минимум) или `Maintainer`
+   - **Scopes**:
+     - ✓ `api` - полный доступ к API
+     - ✓ `read_api` - чтение данных
+     - ✓ `write_repository` - создание комментариев
+3. **Create project access token**
+4. **Скопируйте токен** (показывается только один раз!)
+
+#### Вариант B: Personal Access Token
+
+1. **User Settings** → **Access Tokens** → **Add new token**
+2. Заполните:
+   - **Name**: `ai-review-pat`
+   - **Scopes**:
+     - ✓ `api`
+     - ✓ `read_api`
+     - ✓ `write_repository`
+3. **Create personal access token**
+4. **Скопируйте токен**
+
+### 3. Добавьте переменные в GitLab CI/CD Variables
 
 1. Откройте ваш проект в GitLab
 2. **Settings** → **CI/CD** → **Variables** → **Add Variable**
+
+#### Переменная 1: OLLAMA_PROXY_API_KEY
+
 3. Заполните:
    - **Key**: `OLLAMA_PROXY_API_KEY`
-   - **Value**: скопированный API ключ
+   - **Value**: API ключ из WebUI proxy (шаг 1)
    - **Type**: Variable
    - **Flags**: 
      - ✓ Mask variable (скрыть в логах)
+
+#### Переменная 2: GITLAB_API_TOKEN
+
+4. **Add Variable** → Заполните:
+   - **Key**: `GITLAB_API_TOKEN`
+   - **Value**: Access Token из шага 2
+   - **Type**: Variable
+   - **Flags**:
+     - ✓ Mask variable (скрыть в логах)
      - ✓ Protect variable (только для protected branches)
 
-### 3. Настройте `.gitlab-ci.yml`
+### 4. Настройте `.gitlab-ci.yml`
 
 Отредактируйте параметры в `.gitlab-ci.yml`:
 
@@ -42,7 +83,7 @@ variables:
 - Docker Compose: `http://ollama-proxy:8080/v1`
 - Доменное имя: `https://ollama.company.com/v1`
 
-### 4. Проверьте доступность proxy
+### 5. Проверьте доступность proxy
 
 На GitLab Runner должен быть доступ к вашему proxy. Проверьте:
 
@@ -54,7 +95,7 @@ curl http://YOUR_PROXY_HOST:8080/v1/models \
 
 Должен вернуться список моделей.
 
-### 5. Запустите AI Review
+### 6. Запустите AI Review
 
 1. Создайте Merge Request
 2. Перейдите в **Pipelines**
@@ -281,6 +322,49 @@ src/handler.go:45
 ---
 
 ## Troubleshooting
+
+### Проблема: "401 Unauthorized" при обращении к GitLab API
+
+**Ошибка:**
+```
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://gitlab.../api/v4/projects/.../merge_requests/.../discussions'
+```
+
+**Причина**: `CI_JOB_TOKEN` имеет ограниченные права доступа и не может читать MR discussions.
+
+**Решение:**
+
+1. **Создайте Project Access Token** (рекомендуется):
+   ```
+   Settings → Access Tokens → Add new token
+   Name: ai-review-token
+   Role: Developer
+   Scopes: ✓ api, ✓ read_api, ✓ write_repository
+   ```
+
+2. **Добавьте в GitLab CI Variables**:
+   ```
+   Settings → CI/CD → Variables → Add Variable
+   Key: GITLAB_API_TOKEN
+   Value: (скопированный токен)
+   Flags: ✓ Mask variable, ✓ Protect variable
+   ```
+
+3. **Обновите `.gitlab-ci.yml`**:
+   ```yaml
+   variables:
+     VCS__HTTP_CLIENT__API_TOKEN: "$GITLAB_API_TOKEN"  # Вместо CI_JOB_TOKEN
+   ```
+
+4. **Проверьте права токена**:
+   ```bash
+   curl -H "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
+     https://gitlab.your-domain.com/api/v4/projects/$PROJECT_ID/merge_requests/$MR_IID
+   ```
+
+**Альтернатива**: Используйте Personal Access Token (PAT) вместо Project Access Token.
+
+---
 
 ### Проблема: Job fails с "Connection refused"
 

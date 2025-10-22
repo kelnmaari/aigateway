@@ -52,7 +52,9 @@ ai-review:full:
     VCS__PIPELINE__PROJECT_ID: "$CI_PROJECT_ID"
     VCS__PIPELINE__MERGE_REQUEST_ID: "$CI_MERGE_REQUEST_IID"
     VCS__HTTP_CLIENT__API_URL: "$CI_SERVER_URL"
-    VCS__HTTP_CLIENT__API_TOKEN: "$CI_JOB_TOKEN"
+    # ВАЖНО: CI_JOB_TOKEN имеет ограниченные права!
+    # Используйте Project/Personal Access Token с scope 'api'
+    VCS__HTTP_CLIENT__API_TOKEN: "$GITLAB_API_TOKEN"
     VCS__HTTP_CLIENT__TIMEOUT: "120"
   allow_failure: true
   timeout: 30m  # Увеличенный таймаут для больших MR
@@ -103,11 +105,31 @@ ai-review:summary-reply:
 # NOTES:
 # ============================================================================
 # 
-# 1. ОБЯЗАТЕЛЬНО создайте GitLab CI/CD переменную:
-#    Settings → CI/CD → Variables → Add Variable
-#    Key: OLLAMA_PROXY_API_KEY
-#    Value: ваш API ключ из proxy (создается в WebUI)
-#    Flags: [✓] Mask variable (скрыть в логах)
+# 1. ОБЯЗАТЕЛЬНО создайте GitLab CI/CD переменные:
+#
+#    a) OLLAMA_PROXY_API_KEY (для LLM):
+#       Settings → CI/CD → Variables → Add Variable
+#       Key: OLLAMA_PROXY_API_KEY
+#       Value: ваш API ключ из proxy (создается в WebUI)
+#       Flags: [✓] Mask variable
+#
+#    b) GITLAB_API_TOKEN (для GitLab API):
+#       Сначала создайте Access Token:
+#       - Project Access Token (рекомендуется):
+#         Settings → Access Tokens → Add new token
+#         Name: ai-review-token
+#         Role: Developer (минимум)
+#         Scopes: [✓] api, [✓] read_api, [✓] write_repository
+#       
+#       - ИЛИ Personal Access Token:
+#         User Settings → Access Tokens
+#         Name: ai-review-pat
+#         Scopes: [✓] api, [✓] read_api, [✓] write_repository
+#       
+#       Затем добавьте в CI/CD Variables:
+#       Key: GITLAB_API_TOKEN
+#       Value: (скопированный токен)
+#       Flags: [✓] Mask variable, [✓] Protect variable
 #
 # 2. Проверьте доступность proxy из GitLab Runner:
 #    - Если proxy на localhost - не будет работать (runner в контейнере)

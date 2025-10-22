@@ -41,17 +41,47 @@ if [ -z "$OLLAMA_PROXY_API_KEY" ]; then
     exit 1
 fi
 
+if [ -z "$GITLAB_API_TOKEN" ]; then
+    echo -e "${RED}ERROR: GITLAB_API_TOKEN is required${NC}"
+    exit 1
+fi
+
+if [ -z "$CI_PROJECT_ID" ]; then
+    echo -e "${RED}ERROR: CI_PROJECT_ID is required${NC}"
+    exit 1
+fi
+
+if [ -z "$CI_MERGE_REQUEST_IID" ]; then
+    echo -e "${RED}ERROR: CI_MERGE_REQUEST_IID is required${NC}"
+    exit 1
+fi
+
+if [ -z "$CI_SERVER_URL" ]; then
+    echo -e "${RED}ERROR: CI_SERVER_URL is required (should be set by GitLab CI)${NC}"
+    exit 1
+fi
+
 if [ -z "$LLM__META__MODEL" ]; then
     echo -e "${YELLOW}WARNING: LLM__META__MODEL not set, using default: deepseek-coder:6.7b${NC}"
     LLM__META__MODEL="deepseek-coder:6.7b"
 fi
 
 echo -e "${GREEN}Generating .ai-review.yaml with configuration:${NC}"
+echo ""
+echo "LLM Settings:"
+echo "  API URL: $LLM__HTTP_CLIENT__API_URL"
 echo "  Model: $LLM__META__MODEL"
-echo "  Max Files: $MAX_FILES"
-echo "  Max File Size: $MAX_FILE_SIZE bytes"
 echo "  Max Tokens: $MAX_TOKENS"
 echo "  Temperature: $TEMPERATURE"
+echo ""
+echo "GitLab Settings:"
+echo "  Server: $CI_SERVER_URL"
+echo "  Project: $CI_PROJECT_ID"
+echo "  MR: $CI_MERGE_REQUEST_IID"
+echo ""
+echo "Review Policy:"
+echo "  Max Files: $MAX_FILES"
+echo "  Max File Size: $MAX_FILE_SIZE bytes"
 echo "  Max Comments: $MAX_COMMENTS"
 echo ""
 
@@ -91,12 +121,12 @@ vcs:
   provider: GITLAB
   
   pipeline:
-    project_id: \${CI_PROJECT_ID}
-    merge_request_id: \${CI_MERGE_REQUEST_IID}
+    project_id: ${CI_PROJECT_ID}
+    merge_request_id: ${CI_MERGE_REQUEST_IID}
   
   http_client:
-    api_url: \${CI_SERVER_URL}
-    api_token: \${GITLAB_API_TOKEN}
+    api_url: ${CI_SERVER_URL}
+    api_token: ${GITLAB_API_TOKEN}
     timeout: 120
 
 # ------------------------------------------------------------------------------

@@ -106,6 +106,12 @@
     - Примеры для разных сценариев
     - Best practices и troubleshooting
 
+13. **[BUGFIX: Streaming omitempty](BUGFIX_STREAMING_OMITEMPTY.md)** 🔴 CRITICAL
+    - Исправление critical бага с partial responses
+    - Проблема: omitempty на Stream field
+    - Симптомы: One-word responses from LLM
+    - Решение: Removed omitempty tag
+
 ---
 
 ## 📊 Feature Documentation

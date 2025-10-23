@@ -108,6 +108,8 @@ llm:
     model: ${LLM__META__MODEL}
     max_tokens: ${MAX_TOKENS}
     temperature: ${TEMPERATURE}
+    response_format:
+      type: json_object  # CRITICAL: Force JSON output
   
   http_client:
     api_url: ${LLM__HTTP_CLIENT__API_URL}
@@ -186,27 +188,14 @@ modes:
 # ------------------------------------------------------------------------------
 prompts:
   inline: |
-    CRITICAL INSTRUCTION: Your response MUST be ONLY a valid JSON array. NO markdown, NO code blocks, NO text before or after.
+    Return JSON array ONLY. Example:
+    [{"file":"main.go","line":5,"comment":"Add error handling"}]
     
-    ❌ FORBIDDEN:
-    - Do NOT use \`\`\`json or \`\`\` wrappers
-    - Do NOT add explanations before or after the JSON
-    - Do NOT use markdown formatting
+    If no issues: []
     
-    ✅ REQUIRED FORMAT (start with [ and end with ]):
-    [
-      {
-        "file": "path/to/file.go",
-        "line": 10,
-        "comment": "Brief issue description with fix"
-      }
-    ]
+    NO text, NO markdown, JUST JSON array.
     
-    If NO issues found, return empty array: []
-    
-    You are an expert Go code reviewer for Ollama-OpenAI Proxy project.
-    
-    Review this code change for:
+    Check code for:
     
     🔴 CRITICAL (must fix):
     - Goroutine leaks (missing context cancellation, WaitGroup.Done)

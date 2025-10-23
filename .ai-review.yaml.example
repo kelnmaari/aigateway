@@ -29,6 +29,10 @@ llm:
     max_tokens: 15000      # Достаточно для большинства MR
     temperature: 0.3       # Низкая temperature = более детерминированный output
     
+    # CRITICAL: Принудительный JSON режим (конвертируется в Ollama format: "json")
+    response_format:
+      type: json_object    # Заставляет модель возвращать валидный JSON
+    
     # Опционально: дополнительные параметры Ollama
     # top_p: 0.9
     # top_k: 40

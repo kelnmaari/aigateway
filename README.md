@@ -159,6 +159,7 @@ http://localhost:8080/login
 - **Max Tokens** - Максимум токенов в ответе
 
 **Quick Presets:**
+
 - 🎨 Creative (temp: 1.2, top_p: 0.95)
 - ⚖️ Balanced (temp: 0.7, top_p: 0.9)
 - 🎯 Precise (temp: 0.3, top_p: 0.5)
@@ -205,6 +206,7 @@ curl -H "Authorization: Bearer sk-your-personal-key" \
 ```
 
 Каждый ключ имеет:
+
 - ✅ Список разрешенных моделей
 - ⏱️ Rate limits (requests/min, requests/hour)
 - 📅 Expiration date
@@ -223,6 +225,7 @@ http://localhost:9091
 ```
 
 **Quick Stats Cards** (интегрированы в Admin → System):
+
 - 💻 **CPU Usage** - Real-time загрузка процессора
 - 🧠 **Memory Usage** - Использование RAM
 - 🔄 **Goroutines** - Активные горутины
@@ -233,6 +236,7 @@ http://localhost:9091
 **Multi-GPU поддержка** через `nvidia-smi` (Linux/macOS only):
 
 Метрики на каждую GPU:
+
 - 🌡️ **Temperature** (с цветовыми индикаторами)
 - ⚡ **Power Usage** (W / % от лимита)
 - 📊 **GPU Load** (utilization %)
@@ -451,6 +455,7 @@ go test -race ./...
 ```
 
 **Категории тестов:**
+
 - ✅ Unit Tests (auth, converter, client)
 - ✅ Integration Tests (API handlers, middleware)
 - ✅ Security Tests (timing attacks, brute force)
@@ -510,6 +515,7 @@ ollama serve
 ### GPU monitoring не работает
 
 **Linux/macOS:**
+
 ```bash
 # Проверьте nvidia-smi
 nvidia-smi
@@ -639,6 +645,7 @@ ollama-openai-proxy/
 ### 📋 Запланировано
 
 **v1.10.0 - Smart Chat & Content**
+
 - Vision OCR (Multimodal Chat)
 - Web Content Fetcher & Summarization
 - File Upload (PDF, DOCX, TXT)
@@ -646,12 +653,14 @@ ollama-openai-proxy/
 - WebSocket Real-time Updates
 
 **v1.11.0 - Enterprise Auth**
+
 - Keycloak SSO Integration
 - LDAP/Active Directory
 - Enhanced Audit Logging
 - Custom Roles & Permissions
 
 **v1.12.0 - Model Management Pro II**
+
 - Usage Quotas System
 - Model Preloading & Warming
 - Prometheus Metrics Export
@@ -673,6 +682,7 @@ ollama-openai-proxy/
 6. Откройте Pull Request
 
 **Code Standards:**
+
 - Go 1.25+ idioms
 - 100% coverage критических компонентов
 - Structured logging (logrus)
@@ -704,17 +714,20 @@ MIT License - см. [LICENSE](LICENSE)
 ## 🐛 Критические исправления
 
 ### SSE Content-Type для Spring AI (v1.10.1)
+
 - **[BUGFIX: SSE Content-Type Header](docs/BUGFIX_SSE_CONTENT_TYPE.md)** - Исправлен `Content-Type` для Server-Sent Events
   - **Проблема:** Spring AI плагины (JetBrains IDE) падали с `JsonParseException`
   - **Решение:** Изменен заголовок с `text/plain` на `text/event-stream`
   - **Impact:** ✅ Spring AI работает, ✅ обратная совместимость сохранена
 
 ### AI Review совместимость (v1.6.1)
+
 - **[BUGFIX: AI Review Compatibility](docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md)** - OpenAI API совместимость
   - Исправлен `completion_tokens` в `usage` объекте
   - Исправлен streaming bug с `omitempty` на `Stream` field
 
 ### Streaming omitempty (v1.6.0)
+
 - **[BUGFIX: Streaming omitempty](docs/BUGFIX_STREAMING_OMITEMPTY.md)** - Критический bug в streaming
   - Ollama возвращал только первое слово вместо полного ответа
   - Убран `omitempty` с `Stream` field в `ChatRequest`

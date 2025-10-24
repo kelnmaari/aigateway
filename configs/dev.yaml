@@ -292,3 +292,24 @@ extractors:
   # General settings
   timeout: "30s"  # Таймаут на extraction одного файла
   parallel_workers: 4  # Количество воркеров для batch processing
+
+# ================================================================================
+# Web Fetch Configuration (Version 1.10.4+)
+# ================================================================================
+web_fetch:
+  enabled: true
+  timeout: "30s"
+  
+  # Security (SSRF protection)
+  block_private_ips: true
+  block_localhost: true
+  allowed_domains: []  # Empty = all domains allowed
+  blocked_domains: []  # Blacklist specific domains
+  
+  # Rate limiting
+  rate_limit_enabled: true
+  default_requests_per_min: 10
+  
+  # Cache
+  cache_enabled: true
+  cache_ttl: "1h"  # How long to cache fetched pages

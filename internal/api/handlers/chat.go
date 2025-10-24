@@ -15,15 +15,17 @@ import (
 	"ollama-openai-proxy/internal/converter"
 	"ollama-openai-proxy/internal/models"
 	"ollama-openai-proxy/internal/storage"
+	"ollama-openai-proxy/internal/webfetch"
 )
 
 // ChatHandler обрабатывает chat completions эндпоинт с упрощенными конвертерами
 type ChatHandler struct {
-	config       *config.Config
-	logger       *logrus.Logger
-	ollamaClient OllamaClientInterface
-	converter    *converter.SimpleConverter
-	db           storage.Database // для model configs (v1.9.1+)
+	config              *config.Config
+	logger              *logrus.Logger
+	ollamaClient        OllamaClientInterface
+	converter           *converter.SimpleConverter
+	db                  storage.Database          // для model configs (v1.9.1+)
+	webfetchIntegration *webfetch.ChatIntegration // для автоматического fetch web content (v1.10.4+)
 }
 
 // NewChatHandler создает новый chat handler с упрощенными конвертерами
@@ -39,12 +41,21 @@ func NewChatHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient Olla
 
 // NewChatHandlerWithDB создает новый chat handler с database для model configs
 func NewChatHandlerWithDB(cfg *config.Config, logger *logrus.Logger, ollamaClient OllamaClientInterface, db storage.Database) *ChatHandler {
+	// Create web fetch integration if enabled
+	var webfetchIntegration *webfetch.ChatIntegration
+	if cfg.WebFetch.Enabled && db != nil {
+		webfetchConfig := convertWebFetchConfig(cfg.WebFetch)
+		webfetchService := webfetch.NewService(webfetchConfig, db, logger)
+		webfetchIntegration = webfetch.NewChatIntegration(webfetchService, logger)
+	}
+
 	return &ChatHandler{
-		config:       cfg,
-		logger:       logger,
-		ollamaClient: ollamaClient,
-		converter:    converter.NewSimpleConverter(cfg, logger),
-		db:           db,
+		config:              cfg,
+		logger:              logger,
+		ollamaClient:        ollamaClient,
+		converter:           converter.NewSimpleConverter(cfg, logger),
+		db:                  db,
+		webfetchIntegration: webfetchIntegration,
 	}
 }
 
@@ -106,6 +117,12 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 	// Enrich messages with file content if file_ids present (FILE-STORAGE-01: Phase 4)
 	if err := h.enrichMessagesWithFiles(c.Request.Context(), &req); err != nil {
 		h.logger.WithError(err).Warn("Failed to enrich messages with files")
+		// Don't fail the request, just log the warning
+	}
+
+	// Enrich messages with web content if URLs detected (WEB-FETCH-01: v1.10.4)
+	if err := h.enrichMessagesWithWebContent(c.Request.Context(), &req); err != nil {
+		h.logger.WithError(err).Warn("Failed to enrich messages with web content")
 		// Don't fail the request, just log the warning
 	}
 
@@ -303,11 +320,72 @@ func (h *ChatHandler) enrichMessagesWithFiles(ctx context.Context, req *models.C
 	return nil
 }
 
+// enrichMessagesWithWebContent обогащает сообщения содержимым веб-страниц (WEB-FETCH-01: v1.10.4)
+func (h *ChatHandler) enrichMessagesWithWebContent(ctx context.Context, req *models.ChatCompletionRequest) error {
+	// Check if webfetch integration is available
+	if h.webfetchIntegration == nil {
+		return nil // WebFetch not enabled
+	}
+
+	for i := range req.Messages {
+		msg := &req.Messages[i]
+
+		// Only process user messages
+		if msg.Role != "user" {
+			continue
+		}
+
+		// Get original content as string
+		originalContent := ""
+		switch v := msg.Content.(type) {
+		case string:
+			originalContent = v
+		default:
+			h.logger.Warn("Skipping web content enrichment for non-string content")
+			continue
+		}
+
+		// Process message to detect and fetch URLs
+		processed, err := h.webfetchIntegration.ProcessMessage(ctx, originalContent, webfetch.ProcessMessageOptions{
+			AutoFetch:   true,
+			MaxURLs:     2, // Limit to 2 URLs per message to avoid context overflow
+			IncludeHTML: false,
+			Summarize:   false,
+			Timeout:     15 * time.Second, // Quick fetch timeout
+		})
+
+		if err != nil {
+			h.logger.WithError(err).Warn("Failed to process message for web content")
+			continue
+		}
+
+		// If web content was fetched, update message
+		if processed.HasWebContent {
+			msg.Content = processed.EnhancedMessage
+
+			h.logger.WithFields(logrus.Fields{
+				"message_index": i,
+				"urls_detected": len(processed.DetectedURLs),
+				"urls_fetched":  len(processed.FetchedPages),
+				"urls_failed":   len(processed.FetchErrors),
+			}).Info("Enriched message with web content")
+		}
+	}
+
+	return nil
+}
+
 // handleStreamingCompletion обрабатывает streaming запрос
 func (h *ChatHandler) handleStreamingCompletion(c *gin.Context, req *models.ChatCompletionRequest) {
 	// Enrich messages with file content for streaming too (FILE-STORAGE-01: Phase 4)
 	if err := h.enrichMessagesWithFiles(c.Request.Context(), req); err != nil {
 		h.logger.WithError(err).Warn("Failed to enrich streaming messages with files")
+		// Don't fail the request, just log the warning
+	}
+
+	// Enrich messages with web content for streaming too (WEB-FETCH-01: v1.10.4)
+	if err := h.enrichMessagesWithWebContent(c.Request.Context(), req); err != nil {
+		h.logger.WithError(err).Warn("Failed to enrich streaming messages with web content")
 		// Don't fail the request, just log the warning
 	}
 

@@ -20,6 +20,7 @@
 - ✅ **Full OpenAI API** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, `/v1/completions`
 - 🔥 **Real-time Streaming** - Server-Sent Events (SSE) для живых ответов
 - 🛠️ **Function Calling** - Инструменты в стиле OpenAI с автомаршрутизацией моделей
+- 🧬 **Embeddings with Default Model** - Настраиваемая дефолтная модель для векторных представлений
 - 💬 **ChatGPT-like WebUI** - Полноценный чат-интерфейс с историей разговоров
 
 #### 🔐 Enterprise Security
@@ -738,6 +739,7 @@ MIT License - см. [LICENSE](LICENSE)
 
 - **[API Documentation](docs/API_DOCUMENTATION.md)** - Полный API reference
 - **[Configuration](docs/CONFIGURATION.md)** - Все параметры конфигурации
+- **[Embeddings Configuration](docs/EMBEDDINGS_CONFIGURATION.md)** - Настройка дефолтной модели для embeddings
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Решение проблем
 - **[Architecture](docs/ARCHITECTURE.md)** - Архитектура системы
 - **[Performance](docs/PERFORMANCE.md)** - Performance tuning

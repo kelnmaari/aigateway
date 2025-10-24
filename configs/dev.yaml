@@ -75,6 +75,17 @@ logging:
   compress: true   # Сжимать старые логи (gzip)
 
 models:
+  # Модель по умолчанию для embeddings
+  # Используется когда:
+  # - Не указана модель в запросе
+  # - Указана OpenAI модель (text-embedding-*)
+  #
+  # Рекомендуемые модели:
+  # - nomic-embed-text:latest (768 dimensions, высокое качество)
+  # - mxbai-embed-large:latest (1024 dimensions, лучшее качество)
+  # - all-minilm:latest (384 dimensions, быстрая)
+  default_embedding_model: "mxbai-embed-large:latest"
+  
   # Настройки кеширования списка моделей
   cache:
     enabled: true

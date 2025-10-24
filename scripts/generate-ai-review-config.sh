@@ -266,8 +266,8 @@ artifacts:
 logging:
   level: INFO
   format: structured
-  log_llm_requests: false
-  log_llm_responses: false
+  log_llm_requests: true
+  log_llm_responses: true
 
 # ==============================================================================
 # End of Generated Configuration

@@ -143,22 +143,24 @@ policy:
     - "Dockerfile"
     - "go.mod"
   
-  # Exclude tests, vendor, generated code
+  # Исключить тесты, vendor, generated код
   exclude:
-    - "**/*_test.go"
-    - "**/vendor/**"
-    - "**/testdata/**"
-    - "**/*.pb.go"
-    - "**/*_gen.go"
-    - "**/bin/**"
-    - "**/dist/**"
-    - "**/data/**"
-    - "**/logs/**"
-    - "**/.git/**"
-    - "**/node_modules/**"
-    - "**/web/assets/**"
-    - "**/docs/**"
-    - "**/BACKLOG/**"
+    - "**/*_test.go"           # Тесты
+    - "**/vendor/**"           # Vendor зависимости
+    - "**/testdata/**"         # Test fixtures
+    - "**/*.pb.go"             # Protobuf generated
+    - "**/*_gen.go"            # Generated code
+    - "**/bin/**"              # Binaries
+    - "**/dist/**"             # Distribution
+    - "**/data/**"             # Data files
+    - "**/logs/**"             # Log files
+    - "**/.git/**"             # Git files
+    - "**/node_modules/**"     # Node (для WebUI если есть)
+    - "**/web/assets/**"       # Static assets
+    - "**/docs/**"             # Документация (опционально)
+    - "**/BACKLOG/**"          # Backlog документы
+    - "*.md"
+    - "**/*.md"
   
   # Limits (configured via CI variables)
   max_file_size: ${MAX_FILE_SIZE}  # ${MAX_FILE_SIZE} bytes

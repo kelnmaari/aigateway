@@ -701,6 +701,26 @@ MIT License - см. [LICENSE](LICENSE)
 
 ---
 
+## 🐛 Критические исправления
+
+### SSE Content-Type для Spring AI (v1.10.1)
+- **[BUGFIX: SSE Content-Type Header](docs/BUGFIX_SSE_CONTENT_TYPE.md)** - Исправлен `Content-Type` для Server-Sent Events
+  - **Проблема:** Spring AI плагины (JetBrains IDE) падали с `JsonParseException`
+  - **Решение:** Изменен заголовок с `text/plain` на `text/event-stream`
+  - **Impact:** ✅ Spring AI работает, ✅ обратная совместимость сохранена
+
+### AI Review совместимость (v1.6.1)
+- **[BUGFIX: AI Review Compatibility](docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md)** - OpenAI API совместимость
+  - Исправлен `completion_tokens` в `usage` объекте
+  - Исправлен streaming bug с `omitempty` на `Stream` field
+
+### Streaming omitempty (v1.6.0)
+- **[BUGFIX: Streaming omitempty](docs/BUGFIX_STREAMING_OMITEMPTY.md)** - Критический bug в streaming
+  - Ollama возвращал только первое слово вместо полного ответа
+  - Убран `omitempty` с `Stream` field в `ChatRequest`
+
+---
+
 ## 📚 Документация
 
 - **[API Documentation](docs/API_DOCUMENTATION.md)** - Полный API reference

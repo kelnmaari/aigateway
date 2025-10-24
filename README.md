@@ -20,6 +20,7 @@
 - ✅ **Full OpenAI API** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, `/v1/completions`
 - 🔥 **Real-time Streaming** - Server-Sent Events (SSE) для живых ответов
 - 🛠️ **Function Calling** - Инструменты в стиле OpenAI с автомаршрутизацией моделей
+- 🧬 **Embeddings with Default Model** - Настраиваемая дефолтная модель для векторных представлений
 - 💬 **ChatGPT-like WebUI** - Полноценный чат-интерфейс с историей разговоров
 
 #### 🔐 Enterprise Security
@@ -159,6 +160,7 @@ http://localhost:8080/login
 - **Max Tokens** - Максимум токенов в ответе
 
 **Quick Presets:**
+
 - 🎨 Creative (temp: 1.2, top_p: 0.95)
 - ⚖️ Balanced (temp: 0.7, top_p: 0.9)
 - 🎯 Precise (temp: 0.3, top_p: 0.5)
@@ -205,6 +207,7 @@ curl -H "Authorization: Bearer sk-your-personal-key" \
 ```
 
 Каждый ключ имеет:
+
 - ✅ Список разрешенных моделей
 - ⏱️ Rate limits (requests/min, requests/hour)
 - 📅 Expiration date
@@ -223,6 +226,7 @@ http://localhost:9091
 ```
 
 **Quick Stats Cards** (интегрированы в Admin → System):
+
 - 💻 **CPU Usage** - Real-time загрузка процессора
 - 🧠 **Memory Usage** - Использование RAM
 - 🔄 **Goroutines** - Активные горутины
@@ -233,6 +237,7 @@ http://localhost:9091
 **Multi-GPU поддержка** через `nvidia-smi` (Linux/macOS only):
 
 Метрики на каждую GPU:
+
 - 🌡️ **Temperature** (с цветовыми индикаторами)
 - ⚡ **Power Usage** (W / % от лимита)
 - 📊 **GPU Load** (utilization %)
@@ -451,6 +456,7 @@ go test -race ./...
 ```
 
 **Категории тестов:**
+
 - ✅ Unit Tests (auth, converter, client)
 - ✅ Integration Tests (API handlers, middleware)
 - ✅ Security Tests (timing attacks, brute force)
@@ -510,6 +516,7 @@ ollama serve
 ### GPU monitoring не работает
 
 **Linux/macOS:**
+
 ```bash
 # Проверьте nvidia-smi
 nvidia-smi
@@ -520,6 +527,69 @@ nvidia-smi
 **Windows:** GPU monitoring не поддерживается (используется stub).
 
 Полное руководство: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+---
+
+## 🤖 AI Code Review (GitLab CI/CD)
+
+Интегрируйте AI code review в ваш GitLab CI/CD pipeline используя Ollama-OpenAI Proxy!
+
+### ✨ Возможности
+
+- 🔍 **Inline Review** - Построчные комментарии к проблемным местам
+- 📝 **Summary Review** - Общий обзор изменений MR
+- 🏗️ **Context Review** - Архитектурный анализ
+- 💬 **Reply Mode** - Ответы на существующие комментарии
+- 🔐 **Self-Hosted** - AI работает через ваш proxy, данные не утекают
+
+### 🚀 Быстрый старт
+
+1. Создайте API ключ в WebUI вашего proxy
+2. Добавьте ключ в GitLab CI/CD Variables
+3. Настройте `.gitlab-ci.yml`
+
+**Пример:**
+
+```yaml
+ai-review:
+  stage: review
+  image: nikitafilonov/ai-review:latest
+  when: manual
+  script:
+    - ai-review run
+  variables:
+    # Ваш Ollama-OpenAI Proxy
+    LLM__PROVIDER: "OPENAI"
+    LLM__HTTP_CLIENT__API_URL: "http://your-proxy:8080/v1"
+    LLM__HTTP_CLIENT__API_TOKEN: "$OLLAMA_PROXY_API_KEY"
+    LLM__META__MODEL: "qwen2.5-coder:7b"
+    
+    # GitLab VCS
+    VCS__PROVIDER: "GITLAB"
+    VCS__PIPELINE__PROJECT_ID: "$CI_PROJECT_ID"
+    VCS__PIPELINE__MERGE_REQUEST_ID: "$CI_MERGE_REQUEST_IID"
+    VCS__HTTP_CLIENT__API_URL: "$CI_SERVER_URL"
+    VCS__HTTP_CLIENT__API_TOKEN: "$CI_JOB_TOKEN"
+```
+
+### 📖 Документация
+
+- 📘 [AI Review Quick Start](docs/AI_REVIEW_QUICKSTART.md) - 3 шага до первого review
+- 📖 [AI Review Setup](docs/AI_REVIEW_SETUP.md) - Полная инструкция
+- 🎨 [AI Review Go Prompts](docs/AI_REVIEW_GO_PROMPTS.md) - Кастомные промпты
+
+### 🎯 Рекомендуемые модели
+
+| Модель | JSON Support | Context | AI Review |
+|--------|--------------|---------|-----------|
+| **deepseek-coder:6.7b** | ✅ Отличный | 16K | ⭐⭐⭐⭐⭐ |
+| **qwen2.5-coder:7b** | ✅ Хороший | 32K | ⭐⭐⭐⭐ |
+| **qwen2.5-coder:14b** | ✅ Отличный | 32K | ⭐⭐⭐⭐⭐ |
+| llama3.2:70b | ⚠️ Средний | 128K | ⭐⭐⭐ |
+
+**⚠️ Важно:** Используйте модели с хорошей JSON поддержкой. AI-review требует строгий JSON формат без markdown wrapper.
+
+**Инструмент:** [github.com/Nikita-Filonov/ai-review](https://github.com/Nikita-Filonov/ai-review)
 
 ---
 
@@ -576,6 +646,7 @@ ollama-openai-proxy/
 ### 📋 Запланировано
 
 **v1.10.0 - Smart Chat & Content**
+
 - Vision OCR (Multimodal Chat)
 - Web Content Fetcher & Summarization
 - File Upload (PDF, DOCX, TXT)
@@ -583,12 +654,14 @@ ollama-openai-proxy/
 - WebSocket Real-time Updates
 
 **v1.11.0 - Enterprise Auth**
+
 - Keycloak SSO Integration
 - LDAP/Active Directory
 - Enhanced Audit Logging
 - Custom Roles & Permissions
 
 **v1.12.0 - Model Management Pro II**
+
 - Usage Quotas System
 - Model Preloading & Warming
 - Prometheus Metrics Export
@@ -610,6 +683,7 @@ ollama-openai-proxy/
 6. Откройте Pull Request
 
 **Code Standards:**
+
 - Go 1.25+ idioms
 - 100% coverage критических компонентов
 - Structured logging (logrus)
@@ -638,10 +712,34 @@ MIT License - см. [LICENSE](LICENSE)
 
 ---
 
+## 🐛 Критические исправления
+
+### SSE Content-Type для Spring AI (v1.10.1)
+
+- **[BUGFIX: SSE Content-Type Header](docs/BUGFIX_SSE_CONTENT_TYPE.md)** - Исправлен `Content-Type` для Server-Sent Events
+  - **Проблема:** Spring AI плагины (JetBrains IDE) падали с `JsonParseException`
+  - **Решение:** Изменен заголовок с `text/plain` на `text/event-stream`
+  - **Impact:** ✅ Spring AI работает, ✅ обратная совместимость сохранена
+
+### AI Review совместимость (v1.6.1)
+
+- **[BUGFIX: AI Review Compatibility](docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md)** - OpenAI API совместимость
+  - Исправлен `completion_tokens` в `usage` объекте
+  - Исправлен streaming bug с `omitempty` на `Stream` field
+
+### Streaming omitempty (v1.6.0)
+
+- **[BUGFIX: Streaming omitempty](docs/BUGFIX_STREAMING_OMITEMPTY.md)** - Критический bug в streaming
+  - Ollama возвращал только первое слово вместо полного ответа
+  - Убран `omitempty` с `Stream` field в `ChatRequest`
+
+---
+
 ## 📚 Документация
 
 - **[API Documentation](docs/API_DOCUMENTATION.md)** - Полный API reference
 - **[Configuration](docs/CONFIGURATION.md)** - Все параметры конфигурации
+- **[Embeddings Configuration](docs/EMBEDDINGS_CONFIGURATION.md)** - Настройка дефолтной модели для embeddings
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Решение проблем
 - **[Architecture](docs/ARCHITECTURE.md)** - Архитектура системы
 - **[Performance](docs/PERFORMANCE.md)** - Performance tuning

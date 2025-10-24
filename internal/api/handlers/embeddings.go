@@ -46,12 +46,13 @@ func (h *EmbeddingsHandler) HandleEmbeddings(c *gin.Context) {
 	}
 
 	h.logger.WithFields(logrus.Fields{
-		"model": req.Model,
-		"user":  req.User,
+		"model":         req.Model,
+		"user":          req.User,
+		"default_model": h.config.Models.DefaultEmbeddingModel,
 	}).Debug("Processing embeddings request")
 
-	// Конвертируем в Ollama format
-	ollamaReq, err := converter.ConvertEmbeddingRequest(&req)
+	// Конвертируем в Ollama format с поддержкой дефолтной модели
+	ollamaReq, err := converter.ConvertEmbeddingRequest(&req, h.config.Models.DefaultEmbeddingModel)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to convert embedding request")
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{

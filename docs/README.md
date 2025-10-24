@@ -80,11 +80,46 @@
 
 ---
 
+## 🤖 AI Code Review Integration
+
+9. **[AI Review Setup](AI_REVIEW_SETUP.md)**
+   - GitLab CI/CD интеграция
+   - AI code review через Ollama-OpenAI Proxy
+   - Настройка и конфигурация
+   - Режимы работы (inline, summary, context)
+   - Troubleshooting
+
+10. **[AI Review Quick Start](AI_REVIEW_QUICKSTART.md)** ⭐
+    - 3 шага до первого AI review
+    - Быстрая настройка
+    - Базовые команды
+
+11. **[AI Review Go Prompts](AI_REVIEW_GO_PROMPTS.md)**
+    - Кастомные промпты для Go кода
+    - Security & Performance фокус
+    - Concurrency & Error handling
+    - Обучающие промпты
+
+12. **[AI Review Dynamic Config](AI_REVIEW_DYNAMIC_CONFIG.md)** ⭐
+    - Автогенерация .ai-review.yaml в CI
+    - Динамические параметры для разных MR
+    - Примеры для разных сценариев
+    - Best practices и troubleshooting
+
+13. **[BUGFIX: Streaming omitempty](BUGFIX_STREAMING_OMITEMPTY.md)** 🔴 CRITICAL
+    - Исправление critical бага с partial responses
+    - Проблема: omitempty на Stream field
+    - Симптомы: One-word responses from LLM
+    - Решение: Removed omitempty tag
+
+---
+
 ## 📊 Feature Documentation
 
 ### Version 1.9.3 (Current)
 
 **Key Features:**
+
 - ✅ ChatGPT-like WebUI
 - ✅ Multi-Tenancy with RBAC
 - ✅ Dynamic Model Parameters
@@ -94,6 +129,7 @@
 - ✅ OpenTelemetry Distributed Tracing
 
 **Documentation:**
+
 - [WebUI Guide](WEBUI_GUIDE.md) - Sections: Chat, Parameters, Context
 - [Configuration](CONFIGURATION.md) - Sections: Performance, GPU Monitoring
 - [Quick Start](QUICK_START.md) - Section: First Chat
@@ -101,6 +137,7 @@
 ### Upcoming Features
 
 **v1.10.0 - Smart Chat & Content**
+
 - Vision OCR (Multimodal Chat)
 - Web Content Fetcher
 - File Upload (PDF, DOCX, TXT)
@@ -126,6 +163,8 @@ See [Roadmap.MD](../Roadmap.MD) for full plan.
 | Setup Production | [Configuration](CONFIGURATION.md) | Production Config |
 | Monitor Performance | [WebUI Guide](WEBUI_GUIDE.md) | Admin Panel |
 | Fix Issues | [Troubleshooting](TROUBLESHOOTING.md) | All Sections |
+| Setup AI Review | [AI Review Quick Start](AI_REVIEW_QUICKSTART.md) | Quick Start |
+| Configure AI Review | [AI Review Setup](AI_REVIEW_SETUP.md) | Configuration |
 
 ### API Quick Links
 
@@ -150,6 +189,7 @@ See [Roadmap.MD](../Roadmap.MD) for full plan.
 ### Structure
 
 All documentation follows this structure:
+
 ```markdown
 # 📄 Title - Version
 
@@ -187,15 +227,15 @@ Brief description
 
 ### Official Links
 
-- **GitHub Repository:** https://github.com/yourusername/ollama-openai-proxy
-- **Issue Tracker:** https://github.com/yourusername/ollama-openai-proxy/issues
-- **Discussions:** https://github.com/yourusername/ollama-openai-proxy/discussions
+- **GitHub Repository:** <https://github.com/yourusername/ollama-openai-proxy>
+- **Issue Tracker:** <https://github.com/yourusername/ollama-openai-proxy/issues>
+- **Discussions:** <https://github.com/yourusername/ollama-openai-proxy/discussions>
 
 ### Related Projects
 
-- **Ollama:** https://ollama.ai/ - Local LLM platform
-- **OpenAI API:** https://platform.openai.com/docs - API standard
-- **MoniGo:** https://github.com/iyashjayesh/monigo - Performance monitoring
+- **Ollama:** <https://ollama.ai/> - Local LLM platform
+- **OpenAI API:** <https://platform.openai.com/docs> - API standard
+- **MoniGo:** <https://github.com/iyashjayesh/monigo> - Performance monitoring
 
 ### Community
 
@@ -217,6 +257,7 @@ Brief description
 ### Reporting Bugs
 
 When reporting issues, include:
+
 - Version: `cat VERSION`
 - OS: `uname -a` or `ver`
 - Config snippet (без секретов!)
@@ -226,6 +267,7 @@ When reporting issues, include:
 ### Feature Requests
 
 Use GitHub Discussions:
+
 - Describe use case
 - Explain benefits
 - Suggest implementation (optional)
@@ -248,6 +290,7 @@ Want to improve documentation?
 ## 📜 License
 
 Documentation is part of Ollama-OpenAI Proxy project:
+
 - **License:** MIT
 - **See:** [LICENSE](../LICENSE)
 
@@ -266,4 +309,3 @@ Documentation is part of Ollama-OpenAI Proxy project:
 Made with ❤️ for the Open Source Community
 
 </div>
-

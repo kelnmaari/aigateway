@@ -13,58 +13,83 @@ import (
 func TestConvertEmbeddingRequest(t *testing.T) {
 	t.Run("valid request with string input", func(t *testing.T) {
 		openaiReq := &models.EmbeddingRequest{
+			Model: "nomic-embed-text",
+			Input: "Hello, world!",
+		}
+
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "")
+		require.NoError(t, err)
+		assert.NotNil(t, ollamaReq)
+		assert.Equal(t, "nomic-embed-text", ollamaReq.Model)
+		assert.Equal(t, "Hello, world!", ollamaReq.Input)
+	})
+
+	t.Run("OpenAI model with default", func(t *testing.T) {
+		openaiReq := &models.EmbeddingRequest{
 			Model: "text-embedding-ada-002",
 			Input: "Hello, world!",
 		}
 
-		ollamaReq, err := ConvertEmbeddingRequest(openaiReq)
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "nomic-embed-text")
 		require.NoError(t, err)
 		assert.NotNil(t, ollamaReq)
-		assert.Equal(t, "text-embedding-ada-002", ollamaReq.Model)
+		assert.Equal(t, "nomic-embed-text", ollamaReq.Model, "Should use default model for OpenAI models")
 		assert.Equal(t, "Hello, world!", ollamaReq.Input)
+	})
+
+	t.Run("empty model with default", func(t *testing.T) {
+		openaiReq := &models.EmbeddingRequest{
+			Model: "",
+			Input: "Hello, world!",
+		}
+
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "nomic-embed-text")
+		require.NoError(t, err)
+		assert.NotNil(t, ollamaReq)
+		assert.Equal(t, "nomic-embed-text", ollamaReq.Model, "Should use default model when not specified")
 	})
 
 	t.Run("valid request with string array input", func(t *testing.T) {
 		openaiReq := &models.EmbeddingRequest{
-			Model: "text-embedding-ada-002",
+			Model: "nomic-embed-text",
 			Input: []string{"Hello", "World"},
 		}
 
-		ollamaReq, err := ConvertEmbeddingRequest(openaiReq)
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "")
 		require.NoError(t, err)
 		assert.NotNil(t, ollamaReq)
-		assert.Equal(t, "text-embedding-ada-002", ollamaReq.Model)
+		assert.Equal(t, "nomic-embed-text", ollamaReq.Model)
 		assert.Equal(t, []string{"Hello", "World"}, ollamaReq.Input)
 	})
 
 	t.Run("valid request with dimensions", func(t *testing.T) {
 		dimensions := 512
 		openaiReq := &models.EmbeddingRequest{
-			Model:      "text-embedding-ada-002",
+			Model:      "nomic-embed-text",
 			Input:      "Hello, world!",
 			Dimensions: &dimensions,
 		}
 
-		ollamaReq, err := ConvertEmbeddingRequest(openaiReq)
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "")
 		require.NoError(t, err)
 		assert.NotNil(t, ollamaReq)
 		assert.Equal(t, 512, ollamaReq.Dimensions)
 	})
 
 	t.Run("nil request", func(t *testing.T) {
-		ollamaReq, err := ConvertEmbeddingRequest(nil)
+		ollamaReq, err := ConvertEmbeddingRequest(nil, "")
 		assert.Error(t, err)
 		assert.Nil(t, ollamaReq)
 		assert.Contains(t, err.Error(), "nil")
 	})
 
-	t.Run("empty model", func(t *testing.T) {
+	t.Run("empty model without default", func(t *testing.T) {
 		openaiReq := &models.EmbeddingRequest{
 			Model: "",
 			Input: "Hello, world!",
 		}
 
-		ollamaReq, err := ConvertEmbeddingRequest(openaiReq)
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "")
 		assert.Error(t, err)
 		assert.Nil(t, ollamaReq)
 		assert.Contains(t, err.Error(), "model is required")
@@ -72,11 +97,11 @@ func TestConvertEmbeddingRequest(t *testing.T) {
 
 	t.Run("nil input", func(t *testing.T) {
 		openaiReq := &models.EmbeddingRequest{
-			Model: "text-embedding-ada-002",
+			Model: "nomic-embed-text",
 			Input: nil,
 		}
 
-		ollamaReq, err := ConvertEmbeddingRequest(openaiReq)
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "")
 		assert.Error(t, err)
 		assert.Nil(t, ollamaReq)
 		assert.Contains(t, err.Error(), "input is required")
@@ -85,12 +110,12 @@ func TestConvertEmbeddingRequest(t *testing.T) {
 	t.Run("zero dimensions should not be set", func(t *testing.T) {
 		dimensions := 0
 		openaiReq := &models.EmbeddingRequest{
-			Model:      "text-embedding-ada-002",
+			Model:      "nomic-embed-text",
 			Input:      "Hello, world!",
 			Dimensions: &dimensions,
 		}
 
-		ollamaReq, err := ConvertEmbeddingRequest(openaiReq)
+		ollamaReq, err := ConvertEmbeddingRequest(openaiReq, "")
 		require.NoError(t, err)
 		assert.NotNil(t, ollamaReq)
 		assert.Equal(t, 0, ollamaReq.Dimensions) // Zero dimensions не устанавливаются
@@ -271,13 +296,13 @@ func TestNormalizeInput(t *testing.T) {
 // Benchmark тесты
 func BenchmarkConvertEmbeddingRequest(b *testing.B) {
 	openaiReq := &models.EmbeddingRequest{
-		Model: "text-embedding-ada-002",
+		Model: "nomic-embed-text",
 		Input: "Hello, world! This is a benchmark test.",
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = ConvertEmbeddingRequest(openaiReq)
+		_, _ = ConvertEmbeddingRequest(openaiReq, "")
 	}
 }
 

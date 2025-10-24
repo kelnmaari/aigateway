@@ -113,6 +113,17 @@ logging:
     environment: "production"
 
 models:
+  # Модель по умолчанию для embeddings
+  # Используется когда:
+  # - Не указана модель в запросе
+  # - Указана OpenAI модель (text-embedding-*)
+  #
+  # Рекомендуемые модели для production:
+  # - nomic-embed-text:latest (768 dimensions, оптимальное соотношение качество/скорость)
+  # - mxbai-embed-large:latest (1024 dimensions, высокое качество)
+  # - all-minilm:latest (384 dimensions, максимальная скорость)
+  default_embedding_model: "nomic-embed-text:latest"
+  
   # Маппинг имен моделей
   mapping:
     "gpt-3.5-turbo": "llama2:7b"

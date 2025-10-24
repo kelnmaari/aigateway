@@ -135,6 +135,12 @@ type ModelsConfig struct {
 	// Скрытые модели (не показывать в /v1/models)
 	Hidden []string `mapstructure:"hidden"`
 
+	// DefaultEmbeddingModel модель по умолчанию для embeddings
+	// Если в запросе не указана модель или указана OpenAI модель (text-embedding-*),
+	// будет использована эта модель
+	// Рекомендуемые модели: nomic-embed-text, mxbai-embed-large, all-minilm
+	DefaultEmbeddingModel string `mapstructure:"default_embedding_model"`
+
 	// Настройки кеширования
 	Cache struct {
 		Enabled         bool          `mapstructure:"enabled"`

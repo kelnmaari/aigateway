@@ -30,7 +30,7 @@ type Details struct {
 type ChatRequest struct {
 	Model    string        `json:"model"`
 	Messages []ChatMessage `json:"messages"`
-	Stream   bool          `json:"stream,omitempty"`
+	Stream   bool          `json:"stream"`           // КРИТИЧНО: Без omitempty - всегда отправляем явно stream:false
 	Format   string        `json:"format,omitempty"` // "json" for structured output
 	Options  *ChatOptions  `json:"options,omitempty"`
 	Think    *bool         `json:"think,omitempty"` // Для thinking моделей: включить/выключить рассуждения

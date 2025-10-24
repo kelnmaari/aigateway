@@ -332,7 +332,15 @@ func (r *ResponseConverter) estimatePromptTokens(messages []models.ChatMessage) 
 // estimateCompletionTokens оценивает количество токенов в ответе
 func (r *ResponseConverter) estimateCompletionTokens(content string) int {
 	// Приблизительно 4 символа = 1 токен
-	return (len(content) + 3) / 4
+	tokens := (len(content) + 3) / 4
+
+	// КРИТИЧНО: Минимум 1 токен для OpenAI API совместимости
+	// Даже пустой ответ требует inference и должен быть учтен
+	if tokens == 0 {
+		tokens = 1
+	}
+
+	return tokens
 }
 
 // ConvertErrorResponse конвертирует ошибку Ollama в OpenAI формат

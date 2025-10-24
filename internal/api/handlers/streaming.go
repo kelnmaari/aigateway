@@ -141,7 +141,7 @@ func (h *StreamingChatHandler) HandleStreamingCompletion(c *gin.Context, req *mo
 
 // setupSSEHeaders настраивает заголовки для Server-Sent Events
 func (h *StreamingChatHandler) setupSSEHeaders(c *gin.Context) {
-	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no") // Отключаем buffering в nginx

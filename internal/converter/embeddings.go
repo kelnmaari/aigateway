@@ -9,21 +9,21 @@ import (
 )
 
 // ConvertEmbeddingRequest конвертирует OpenAI embedding request в Ollama format
-func ConvertEmbeddingRequest(openaiReq *models.EmbeddingRequest) (*ollamaapi.EmbedRequest, error) {
+// defaultModel - модель по умолчанию из конфига (может быть пустой)
+func ConvertEmbeddingRequest(openaiReq *models.EmbeddingRequest, defaultModel string) (*ollamaapi.EmbedRequest, error) {
 	if openaiReq == nil {
 		return nil, fmt.Errorf("embedding request is nil")
-	}
-
-	if openaiReq.Model == "" {
-		return nil, fmt.Errorf("model is required")
 	}
 
 	if openaiReq.Input == nil {
 		return nil, fmt.Errorf("input is required")
 	}
 
-	// Используем модель напрямую (без маппинга)
-	model := openaiReq.Model
+	// Определяем модель для использования
+	model := resolveEmbeddingModel(openaiReq.Model, defaultModel)
+	if model == "" {
+		return nil, fmt.Errorf("model is required (not specified in request and no default model configured)")
+	}
 
 	// Подготавливаем input
 	// OpenAI поддерживает: string, []string, []int, [][]int
@@ -91,6 +91,31 @@ func ConvertEmbeddingResponse(ollamaResp *ollamaapi.EmbedResponse, model string)
 	}
 
 	return response, nil
+}
+
+// resolveEmbeddingModel определяет модель для embeddings
+// Логика:
+// 1. Если requestModel пустой -> используем defaultModel
+// 2. Если requestModel начинается с "text-embedding-" (OpenAI модель) -> используем defaultModel
+// 3. Иначе используем requestModel (это Ollama модель)
+func resolveEmbeddingModel(requestModel, defaultModel string) string {
+	// Если модель не указана в запросе, используем дефолтную
+	if requestModel == "" {
+		return defaultModel
+	}
+
+	// Если указана OpenAI модель (text-embedding-*), заменяем на дефолтную
+	// OpenAI модели: text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large
+	if len(requestModel) >= 15 && requestModel[:15] == "text-embedding-" {
+		if defaultModel != "" {
+			return defaultModel
+		}
+		// Если дефолтной нет, оставляем как есть (может быть маппинг где-то еще)
+		return requestModel
+	}
+
+	// Это Ollama модель, используем как есть
+	return requestModel
 }
 
 // normalizeInput нормализует input к массиву строк

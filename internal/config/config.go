@@ -108,6 +108,72 @@ type AuthConfig struct {
 		AccessTokenExpiry  time.Duration `mapstructure:"access_token_expiry"`
 		RefreshTokenExpiry time.Duration `mapstructure:"refresh_token_expiry"`
 	} `mapstructure:"jwt"`
+
+	// OIDC настройки (Version 1.11.1+: Keycloak SSO Integration)
+	OIDC OIDCConfig `mapstructure:"oidc"`
+}
+
+// OIDCConfig конфигурация OpenID Connect для SSO
+type OIDCConfig struct {
+	// Enabled включить OIDC авториз ацию
+	Enabled bool `mapstructure:"enabled"`
+
+	// Provider провайдер OIDC (keycloak, google, azure, okta)
+	Provider string `mapstructure:"provider"`
+
+	// Issuer URL OIDC issuer (e.g., https://keycloak.example.com/realms/myrealm)
+	Issuer string `mapstructure:"issuer" validate:"required_if=Enabled true,url"`
+
+	// ClientID OIDC client ID
+	ClientID string `mapstructure:"client_id" validate:"required_if=Enabled true"`
+
+	// ClientSecret OIDC client secret
+	ClientSecret string `mapstructure:"client_secret" validate:"required_if=Enabled true"`
+
+	// RedirectURI redirect URI after authentication (e.g., https://proxy.example.com/auth/oidc/callback)
+	RedirectURI string `mapstructure:"redirect_uri" validate:"required_if=Enabled true,url"`
+
+	// Scopes OIDC scopes (default: openid, profile, email)
+	Scopes []string `mapstructure:"scopes"`
+
+	// Claims mapping конфигурация маппинга claims
+	Claims ClaimsMapping `mapstructure:"claims"`
+
+	// AutoCreateUser автоматически создавать пользователя при первом логине
+	AutoCreateUser bool `mapstructure:"auto_create_user"`
+
+	// AutoUpdateUser автоматически обновлять информацию о пользователе при каждом логине
+	AutoUpdateUser bool `mapstructure:"auto_update_user"`
+
+	// DefaultRole роль по умолчанию для новых пользователей (user, admin)
+	DefaultRole string `mapstructure:"default_role"`
+
+	// SessionStore хранилище сессий для state parameter (memory, redis)
+	SessionStore string `mapstructure:"session_store"`
+
+	// SessionTTL время жизни сессии для OIDC flow
+	SessionTTL time.Duration `mapstructure:"session_ttl"`
+}
+
+// ClaimsMapping маппинг OIDC claims на поля пользователя
+type ClaimsMapping struct {
+	// UserID claim для user ID (default: "sub")
+	UserID string `mapstructure:"user_id"`
+
+	// Username claim для username (default: "preferred_username")
+	Username string `mapstructure:"username"`
+
+	// Email claim для email (default: "email")
+	Email string `mapstructure:"email"`
+
+	// Name claim для full name (default: "name")
+	Name string `mapstructure:"name"`
+
+	// Groups claim для групп (default: "groups")
+	Groups string `mapstructure:"groups"`
+
+	// Roles claim для ролей (optional)
+	Roles string `mapstructure:"roles"`
 }
 
 // LoggingConfig конфигурация логирования

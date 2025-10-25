@@ -69,7 +69,44 @@ auth:
   # JWT settings для внутренних токенов
   jwt:
     secret: "CHANGE_ME_JWT_SECRET_KEY_456"
-    expiry: "24h"
+    access_token_expiry: "15m"
+    refresh_token_expiry: "168h"
+
+  # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
+  oidc:
+    enabled: false  # Включите для корпоративного SSO
+    provider: "keycloak"  # keycloak, google, azure, okta
+    
+    # Keycloak Configuration
+    issuer: "https://keycloak.yourdomain.com/realms/production"
+    client_id: "ollama-proxy-prod"
+    client_secret: "${OIDC_CLIENT_SECRET}"  # ОБЯЗАТЕЛЬНО задайте через environment variable!
+    redirect_uri: "https://proxy.yourdomain.com/auth/oidc/callback"
+    
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+      - roles  # для role-based access control
+    
+    # Claims mapping (настройте под ваш Keycloak realm)
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+      name: "name"
+      groups: "groups"
+      roles: "realm_roles"
+    
+    # User provisioning
+    auto_create_user: true   # Автоматически создавать пользователя при первом логине
+    auto_update_user: true   # Обновлять email/name при каждом логине
+    default_role: "user"     # Роль по умолчанию для новых пользователей (user или admin)
+    
+    # Session management
+    session_store: "redis"   # Используйте redis для distributed sessions в production
+    session_ttl: "10m"       # 10 минут на завершение OIDC flow
 
 # 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
 database:

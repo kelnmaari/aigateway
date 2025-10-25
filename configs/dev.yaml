@@ -40,6 +40,38 @@ auth:
     access_token_expiry: "15m"    # Access token живет 15 минут
     refresh_token_expiry: "168h"  # Refresh token живет 7 дней
 
+  # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
+  oidc:
+    enabled: false  # Отключено по умолчанию в dev (требует Keycloak сервер)
+    provider: "keycloak"
+    issuer: "https://keycloak.example.com/realms/myrealm"
+    client_id: "ollama-proxy"
+    client_secret: "${OIDC_CLIENT_SECRET}"  # Из environment variable
+    redirect_uri: "http://localhost:8085/auth/oidc/callback"
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+    
+    # Claims mapping (default values)
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+      name: "name"
+      groups: "groups"
+      roles: "realm_roles"
+    
+    # User provisioning
+    auto_create_user: true   # Автоматически создавать пользователя при первом логине
+    auto_update_user: true   # Автоматически обновлять данные при каждом логине
+    default_role: "user"     # Роль по умолчанию для новых пользователей
+    
+    # Session management
+    session_store: "memory"  # memory или redis
+    session_ttl: "10m"       # 10 минут на OIDC flow
+
 # 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
 database:
   # Database type: sqlite or postgresql

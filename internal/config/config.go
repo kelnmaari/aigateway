@@ -26,6 +26,7 @@ type Config struct {
 	Observability ObservabilityConfig `mapstructure:"observability"` // Version 1.6.0+: Tracing and monitoring
 	FileStorage   FileStorageConfig   `mapstructure:"file_storage"`  // Version 1.10.0+: File storage and processing
 	Extractors    ExtractorsConfig    `mapstructure:"extractors"`    // Version 1.10.0+: Document extractors
+	WebFetch      WebFetchConfig      `mapstructure:"web_fetch"`     // Version 1.10.4+: Web content fetching
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -538,6 +539,26 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// WebFetchConfig конфигурация web content fetcher (Version 1.10.4+)
+type WebFetchConfig struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Timeout string `mapstructure:"timeout"` // e.g., "30s"
+
+	// Security settings
+	BlockPrivateIPs bool     `mapstructure:"block_private_ips"`
+	BlockLocalhost  bool     `mapstructure:"block_localhost"`
+	AllowedDomains  []string `mapstructure:"allowed_domains"`
+	BlockedDomains  []string `mapstructure:"blocked_domains"`
+
+	// Rate limiting
+	RateLimitEnabled      bool `mapstructure:"rate_limit_enabled"`
+	DefaultRequestsPerMin int  `mapstructure:"default_requests_per_min"`
+
+	// Cache
+	CacheEnabled bool   `mapstructure:"cache_enabled"`
+	CacheTTL     string `mapstructure:"cache_ttl"` // e.g., "1h"
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

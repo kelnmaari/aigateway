@@ -27,11 +27,12 @@ func NewChatIntegration(service *Service, logger *logrus.Logger) *ChatIntegratio
 
 // ProcessMessageOptions опции обработки сообщения
 type ProcessMessageOptions struct {
-	AutoFetch   bool          // Автоматически fetch URLs
-	MaxURLs     int           // Максимум URLs для fetch (default: 3)
-	IncludeHTML bool          // Включать HTML контент
-	Summarize   bool          // Генерировать summary через LLM
-	Timeout     time.Duration // Timeout для fetch (default: 30s)
+	AutoFetch      bool          // Автоматически fetch URLs
+	MaxURLs        int           // Максимум URLs для fetch (default: 3)
+	IncludeHTML    bool          // Включать HTML контент
+	Summarize      bool          // Генерировать summary через LLM
+	Timeout        time.Duration // Timeout для fetch (default: 30s)
+	TruncateLength int           // Максимальная длина контента на страницу (0 = без ограничений)
 }
 
 // ProcessedMessage результат обработки сообщения
@@ -109,7 +110,7 @@ func (ci *ChatIntegration) ProcessMessage(ctx context.Context, message string, o
 
 	// Enhance message with web content
 	if result.HasWebContent {
-		result.EnhancedMessage = ci.buildEnhancedMessage(message, result.FetchedPages, opts.IncludeHTML)
+		result.EnhancedMessage = ci.buildEnhancedMessage(message, result.FetchedPages, opts)
 	}
 
 	ci.logger.WithFields(logrus.Fields{
@@ -122,7 +123,7 @@ func (ci *ChatIntegration) ProcessMessage(ctx context.Context, message string, o
 }
 
 // buildEnhancedMessage создает улучшенное сообщение с web контентом
-func (ci *ChatIntegration) buildEnhancedMessage(originalMessage string, pages []*WebPage, includeHTML bool) string {
+func (ci *ChatIntegration) buildEnhancedMessage(originalMessage string, pages []*WebPage, opts ProcessMessageOptions) string {
 	var builder strings.Builder
 
 	// Original user message
@@ -143,10 +144,15 @@ func (ci *ChatIntegration) buildEnhancedMessage(originalMessage string, pages []
 
 		builder.WriteString("\n**Content:**\n")
 
-		// Limit content length (max 3000 chars per page)
+		// Применяем truncation только если TruncateLength > 0
 		content := page.Content
-		if len(content) > 3000 {
-			content = content[:3000] + "... [truncated]"
+		if opts.TruncateLength > 0 && len(content) > opts.TruncateLength {
+			content = content[:opts.TruncateLength] + fmt.Sprintf("... [truncated, original length: %d chars]", len(page.Content))
+			ci.logger.WithFields(logrus.Fields{
+				"url":             page.URL,
+				"original_length": len(page.Content),
+				"truncated_to":    opts.TruncateLength,
+			}).Debug("Web content truncated for context limits")
 		}
 
 		builder.WriteString(content)
@@ -154,6 +160,12 @@ func (ci *ChatIntegration) buildEnhancedMessage(originalMessage string, pages []
 
 		if page.Summary != "" {
 			builder.WriteString(fmt.Sprintf("**Summary:** %s\n\n", page.Summary))
+		}
+
+		// Показываем статистику если контент большой
+		if len(page.Content) > 10000 {
+			builder.WriteString(fmt.Sprintf("*[Full content length: %d chars, %d words]*\n\n", 
+				len(page.Content), page.WordCount))
 		}
 
 		builder.WriteString("---\n\n")
@@ -167,7 +179,8 @@ func (ci *ChatIntegration) buildEnhancedMessage(originalMessage string, pages []
 }
 
 // FormatWebContentAsSystemMessage форматирует web контент как system message
-func (ci *ChatIntegration) FormatWebContentAsSystemMessage(pages []*WebPage) string {
+// truncateLength: максимальная длина контента на страницу (0 = без ограничений)
+func (ci *ChatIntegration) FormatWebContentAsSystemMessage(pages []*WebPage, truncateLength int) string {
 	var builder strings.Builder
 
 	builder.WriteString("You have access to the following web pages:\n\n")
@@ -176,10 +189,10 @@ func (ci *ChatIntegration) FormatWebContentAsSystemMessage(pages []*WebPage) str
 		builder.WriteString(fmt.Sprintf("Page %d: %s\n", i+1, page.Title))
 		builder.WriteString(fmt.Sprintf("URL: %s\n", page.URL))
 
-		// Truncate content
+		// Применяем truncation только если задано
 		content := page.Content
-		if len(content) > 2000 {
-			content = content[:2000] + "... [truncated for context limit]"
+		if truncateLength > 0 && len(content) > truncateLength {
+			content = content[:truncateLength] + fmt.Sprintf("... [truncated, full length: %d chars]", len(page.Content))
 		}
 
 		builder.WriteString(fmt.Sprintf("Content:\n%s\n\n", content))

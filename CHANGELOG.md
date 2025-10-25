@@ -5,6 +5,137 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.5] - 2025-10-25
+
+### Changed
+
+- **WEB-FETCH-01: Full Content Processing** 🚀
+  - **BREAKING CHANGE**: Web fetcher теперь передает **полное содержимое страницы** модели без обрезания
+  - Удален hardcoded truncation до 3000 символов
+  - Добавлен параметр `TruncateLength` в `ProcessMessageOptions` для гибкого контроля
+  - Default: `TruncateLength: 0` (без ограничений) - оптимально для моделей с большим контекстом (128K+)
+  - Добавлены поля `WordCount` и `Language` в `WebPage` для статистики
+  - Логирование truncation когда применяется
+
+### Technical
+
+- **Структуры данных**:
+  - `WebPage`: добавлены `WordCount int` и `Language string`
+  - `ParsedContent`: добавлено `Language string`
+  - `ProcessMessageOptions`: добавлено `TruncateLength int` (0 = без ограничений)
+- **Поведение по умолчанию**:
+  - Chat Integration: `TruncateLength: 0` - полный контент для LLM
+  - Старое поведение можно вернуть: `TruncateLength: 3000`
+- **Улучшения**:
+  - Показ статистики для больших страниц (>10K chars)
+  - Детальное логирование при truncation
+  - Language detection из HTML metadata
+
+### Use Cases
+
+**Работа с большими документами:**
+```
+User: Summarize https://docs.python.org/3/library/asyncio.html
+→ Fetches full 50K+ chars documentation
+→ LLM gets complete context for accurate summary
+```
+
+**Сравнение длинных статей:**
+```
+User: Compare https://example.com/article1 vs https://example.com/article2
+→ Both articles fetched in full
+→ No loss of important details
+```
+
+---
+
+## [1.10.4] - 2025-10-24
+
+### Added
+
+- **WEB-FETCH-01: Web Content Fetcher & Chat Integration** 🌐
+  - **Web Fetch Infrastructure** (`internal/webfetch/`)
+    - HTTP client с retry logic (exponential backoff, 3 attempts)
+    - URL validator с SSRF protection (блокирует private IPs, localhost)
+    - Rate limiter для доменов (10 req/min default, configurable per domain)
+    - HTML parser на базе goquery (text extraction, metadata)
+    - Metadata extraction: Open Graph, Twitter Card, JSON-LD, author, language
+  - **Chat Integration** ✨ **MAJOR FEATURE**
+    - URL auto-detection в сообщениях (regex detector)
+    - Automatic fetch при детектировании URL в user message
+    - Context enrichment: добавление web content в контекст для LLM
+    - Работает в streaming и non-streaming режимах
+    - Max 2 URLs per message (context overflow protection)
+    - 15s timeout per URL для быстрого fetch
+    - Truncate до 3000 символов на страницу
+  - **API Endpoints** (`internal/api/handlers/webfetch.go`)
+    - POST `/api/web/fetch` - Fetch single URL
+    - POST `/api/web/fetch/batch` - Batch fetch до 10 URLs
+  - **Database Migration v31**
+    - `web_fetches` table: url, title, content, metadata, links, cache
+    - `web_fetch_rate_limits` table: per-domain rate limiting
+    - Indexes для url_hash, user, tenant, domain, expires_at
+  - **Configuration** (`configs/dev.yaml`)
+    - `web_fetch.enabled: true` - включает автоматическую интеграцию с чатом
+    - SSRF protection settings (block_private_ips, block_localhost)
+    - Rate limiting settings (default_requests_per_min)
+    - Cache settings (cache_enabled, cache_ttl)
+
+### Changed
+
+- **ChatHandler** (`internal/api/handlers/chat.go`)
+  - Добавлен `webfetchIntegration` field
+  - Новый метод `enrichMessagesWithWebContent()` для auto-fetch
+  - Применяется в streaming и non-streaming режимах
+  - Работает параллельно с file enrichment (FILE-STORAGE-01)
+
+### Technical
+
+- **Testing**:
+  - `internal/webfetch/detector_test.go` - URL detection tests (12 test cases)
+  - `internal/webfetch/validator_test.go` - URL validation, SSRF tests (10 test cases)
+  - All tests passing ✅
+- **Dependencies**:
+  - `github.com/PuerkitoBio/goquery v1.10.3` - HTML parsing library
+  - `golang.org/x/time/rate` - Rate limiting
+- **Security Features**:
+  - ✅ SSRF protection (блокирует 10.x, 192.168.x, 172.16-31.x, 127.x, link-local)
+  - ✅ DNS resolution check перед запросом
+  - ✅ Per-domain rate limiting с burst support
+  - ✅ Content size limits (10MB max)
+  - ✅ Redirect limits (max 5)
+- **Performance**:
+  - Cache с TTL (default 1 hour)
+  - Connection pooling для HTTP client
+  - Truncation для контекста (3000 chars per page)
+  - Parallel fetch для batch requests
+- **Documentation**:
+  - `docs/WEB_FETCH_QUICKSTART.md` - Complete guide with examples
+  - `BACKLOG/WEB-FETCH-01_content_fetcher.md` - Detailed specification
+
+### Use Cases
+
+```
+User: Summarize https://example.com/article
+→ Proxy auto-detects URL → fetches content → adds to context → LLM responds
+
+User: Compare https://example.com/page1 vs https://example.com/page2
+→ Fetches both pages → LLM compares based on actual content
+
+User: Explain https://docs.python.org/3/library/asyncio.html
+→ Fetches documentation → LLM explains based on real docs
+```
+
+### RAG Integration Ready
+
+Все компоненты WEB-FETCH-01 спроектированы для переиспользования в RAG v1.13.0:
+- HTML parser → web sources для RAG
+- SSRF protection → secure crawling
+- Rate limiting → respectful fetching
+- Metadata extraction → document enrichment
+
+---
+
 ## [1.10.3] - 2025-10-20
 
 ### Added

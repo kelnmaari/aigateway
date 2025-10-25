@@ -347,11 +347,12 @@ func (h *ChatHandler) enrichMessagesWithWebContent(ctx context.Context, req *mod
 
 		// Process message to detect and fetch URLs
 		processed, err := h.webfetchIntegration.ProcessMessage(ctx, originalContent, webfetch.ProcessMessageOptions{
-			AutoFetch:   true,
-			MaxURLs:     2, // Limit to 2 URLs per message to avoid context overflow
-			IncludeHTML: false,
-			Summarize:   false,
-			Timeout:     15 * time.Second, // Quick fetch timeout
+			AutoFetch:      true,
+			MaxURLs:        2,                // Limit to 2 URLs per message to avoid context overflow
+			IncludeHTML:    false,
+			Summarize:      false,
+			Timeout:        15 * time.Second, // Quick fetch timeout
+			TruncateLength: 0,                // 0 = без обрезания контента, отдаем полное содержимое страницы
 		})
 
 		if err != nil {

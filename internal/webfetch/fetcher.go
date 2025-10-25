@@ -142,6 +142,8 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string, opts FetchOptions) (
 		FetchTimeMS: fetchTimeMS,
 		FetchedAt:   time.Now(),
 		Cached:      false,
+		WordCount:   parsed.WordCount,
+		Language:    parsed.Language,
 	}, nil
 }
 

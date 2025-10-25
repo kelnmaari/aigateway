@@ -143,8 +143,8 @@
 **Фокус:** Foundation layer для работы с контентом (подготовка к RAG v1.13)  
 **Приоритет:** HIGH  
 **Оценка времени:** 32-44 часа  
-**Фактическое время:** ~30 часов (3 из 4 задач)  
-**Статус:** 🚀 В разработке (3/4 задач) - Осталась WEB-FETCH-01  
+**Фактическое время:** ~38 часов (все 4 задачи завершены!)  
+**Статус:** 🎉 ЗАВЕРШЕНО 100% (4/4 задач)  
 **Версионирование:** v1.10.0-v1.10.4
 
 **Стратегия:** Реализуем базовые компоненты работы с файлами, изображениями и веб-контентом с заделом на RAG систему (v1.13.0). Все extractors и storage будут переиспользованы в RAG.
@@ -180,15 +180,18 @@
   - **Примечание:** OCR engine готов для расширения в RAG v1.13.0
   - **Оценка:** 8-10 часов → **Выполнено (~8 часов)**
 
-- [ ] **WEB-FETCH-01** Web Content Fetcher → [BACKLOG/WEB-FETCH-01_content_fetcher.md](BACKLOG/WEB-FETCH-01_content_fetcher.md) → **v1.10.4**
-  - HTTP client + HTML parser (goquery) 🔄 *Будет web source в RAG*
-  - Text extraction и metadata
-  - URL validation и security checks
-  - Rate limiting
-  - Basic summarization через LLM
-  - WebSocket progress для fetch operations (использует WS-01)
+- [x] **WEB-FETCH-01** Web Content Fetcher → [BACKLOG/WEB-FETCH-01_content_fetcher.md](BACKLOG/WEB-FETCH-01_content_fetcher.md) → **v1.10.4** ✅
+  - ✅ HTTP client + HTML parser (goquery) 🔄 *Будет web source в RAG*
+  - ✅ Text extraction и metadata (Open Graph, Twitter Card)
+  - ✅ URL validation и SSRF security checks
+  - ✅ Rate limiting per domain
+  - ✅ **Chat Integration** - автодетектирование URLs в сообщениях
+  - ✅ **Auto-fetch** - автоматическое извлечение контента для LLM
+  - ✅ Context enrichment для streaming и non-streaming режимов
+  - ✅ Database migration v31 (web_fetches, web_fetch_rate_limits)
+  - ✅ Unit tests + benchmarks (all passing)
   - **Примечание:** Будет основой для web data sources в RAG
-  - **Оценка:** 6-8 часов
+  - **Оценка:** 6-8 часов → **Выполнено (~8 часов)**
 
 ### 🎯 Связь с v1.13.0 (RAG System)
 

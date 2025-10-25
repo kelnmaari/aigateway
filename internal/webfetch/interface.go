@@ -42,6 +42,8 @@ type WebPage struct {
 	FetchedAt   time.Time
 	ExpiresAt   time.Time
 	Cached      bool
+	WordCount   int    // Number of words in content
+	Language    string // Detected language
 }
 
 // PageMetadata метаданные страницы
@@ -75,4 +77,5 @@ type ParsedContent struct {
 	Metadata  *PageMetadata
 	Links     []string
 	WordCount int
+	Language  string // Detected language code (e.g., "en", "ru")
 }

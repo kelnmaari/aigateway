@@ -465,6 +465,16 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_web_fetches_table",
 			SQL:     s.getWebFetchesMigration(),
 		},
+		{
+			Version: 32,
+			Name:    "add_changelog_v1_10_4",
+			SQL:     s.getAddChangelogV1104Migration(),
+		},
+		{
+			Version: 33,
+			Name:    "add_changelog_v1_10_5",
+			SQL:     s.getAddChangelogV1105Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2344,6 +2354,54 @@ CREATE TABLE IF NOT EXISTS web_fetch_rate_limits (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_limits_domain ON web_fetch_rate_limits(domain);
+	`
+}
+
+// getAddChangelogV1104Migration returns SQL for adding changelog v1.10.4 (v32 migration)
+func (s *SQLiteDB) getAddChangelogV1104Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.10.4', '2025-10-24', '## [1.10.4] - 2025-10-24
+
+### Added
+- **WEB-FETCH-01: Web Content Fetcher & Chat Integration** 🌐
+  - Web Fetch Infrastructure (internal/webfetch/): HTTP client с retry logic, URL validator с SSRF protection, Rate limiter для доменов, HTML parser (goquery), Metadata extraction (Open Graph, Twitter Card)
+  - **Chat Integration** ✨ MAJOR FEATURE: URL auto-detection в сообщениях, Automatic fetch при детектировании URL, Context enrichment для LLM, Работает в streaming и non-streaming режимах, Max 2 URLs per message, 15s timeout per URL
+  - API Endpoints: POST /api/web/fetch, POST /api/web/fetch/batch (до 10 URLs)
+  - Database Migration v31: web_fetches table, web_fetch_rate_limits table
+  - Configuration: web_fetch.enabled, SSRF protection, Rate limiting, Cache settings
+
+### Changed
+- ChatHandler: Добавлен webfetchIntegration field, Новый метод enrichMessagesWithWebContent() для auto-fetch, Работает параллельно с file enrichment
+
+### Technical
+- Testing: URL detection tests (12 cases), URL validation tests (10 cases), All tests passing ✅
+- Dependencies: github.com/PuerkitoBio/goquery v1.10.3, golang.org/x/time/rate
+- Security: SSRF protection (блокирует private IPs, localhost), DNS resolution check, Per-domain rate limiting, Content size limits (10MB)
+- Performance: Cache с TTL (1 hour), Connection pooling, Truncation для контекста (3000 chars), Parallel fetch
+- Documentation: docs/WEB_FETCH_QUICKSTART.md');
+	`
+}
+
+// getAddChangelogV1105Migration returns SQL for adding changelog v1.10.5 (v33 migration)
+func (s *SQLiteDB) getAddChangelogV1105Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.10.5', '2025-10-25', '## [1.10.5] - 2025-10-25
+
+### Changed
+- **WEB-FETCH-01: Full Content Processing** 🚀
+  - **BREAKING CHANGE**: Web fetcher теперь передает полное содержимое страницы модели без обрезания
+  - Удален hardcoded truncation до 3000 символов
+  - Добавлен параметр TruncateLength в ProcessMessageOptions для гибкого контроля
+  - Default: TruncateLength: 0 (без ограничений) - оптимально для моделей с большим контекстом (128K+)
+  - Добавлены поля WordCount и Language в WebPage для статистики
+  - Логирование truncation когда применяется
+
+### Technical
+- Структуры данных: WebPage добавлены WordCount int и Language string, ParsedContent добавлено Language string, ProcessMessageOptions добавлено TruncateLength int (0 = без ограничений)
+- Поведение по умолчанию: Chat Integration TruncateLength: 0 - полный контент для LLM, Старое поведение можно вернуть: TruncateLength: 3000
+- Улучшения: Показ статистики для больших страниц (>10K chars), Детальное логирование при truncation, Language detection из HTML metadata');
 	`
 }
 

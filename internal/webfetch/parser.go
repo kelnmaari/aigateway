@@ -77,12 +77,20 @@ func (p *HTMLParser) Parse(html io.Reader) (*ParsedContent, error) {
 	// Count words
 	wordCount := len(strings.Fields(content))
 
+	// Detect language from metadata or content
+	language := ""
+	if metadata != nil && metadata.Language != "" {
+		language = metadata.Language
+	}
+	// TODO: Implement content-based language detection using lingua-go or similar
+
 	return &ParsedContent{
 		Title:     title,
 		Content:   content,
 		Metadata:  metadata,
 		Links:     links,
 		WordCount: wordCount,
+		Language:  language,
 	}, nil
 }
 

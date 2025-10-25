@@ -5,7 +5,7 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.9.3-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.10.5-brightgreen.svg)](VERSION)
 
 ---
 
@@ -644,20 +644,23 @@ ollama-openai-proxy/
 - ✅ **OpenTelemetry** distributed tracing
 - ✅ **Backup & Restore** system
 
+### ✅ Завершено (v1.10.4)
+
+**v1.10.0 - Content Foundation (RAG Prerequisites)** 🎉
+
+- ✅ **FILE-STORAGE-01** - Universal File Storage (Local FS + S3/MinIO) + Document Extractors (PDF, DOCX, TXT, CSV)
+- ✅ **WS-01** - WebSocket Real-time Updates для file processing и system notifications
+- ✅ **IMAGE-01** - Image Upload & OCR Processing (LLaVA, BakLLaVA, Llama3.2-Vision)
+- ✅ **WEB-FETCH-01** - Web Content Fetcher с Chat Integration (URL auto-detection + auto-fetch)
+
 ### 📋 Запланировано
 
-**v1.10.0 - Smart Chat & Content**
-
-- Vision OCR (Multimodal Chat)
-- Web Content Fetcher & Summarization
-- File Upload (PDF, DOCX, TXT)
-- Conversation Export/Import
-- WebSocket Real-time Updates
-
-**v1.11.0 - Enterprise Auth**
+**v1.11.0 - Enterprise Suite**
 
 - Keycloak SSO Integration
-- LDAP/Active Directory
+- LDAP/AD Authentication
+- Advanced Metrics & Observability
+- Quota Management
 - Enhanced Audit Logging
 - Custom Roles & Permissions
 

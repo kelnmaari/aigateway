@@ -120,6 +120,32 @@ func (s *SQLiteDB) GetTenantBySlug(ctx context.Context, slug string) (*models.Te
 	return tenant, nil
 }
 
+// GetTenantByName получает tenant по имени (Version 1.11.2+: для OIDC auto-provisioning)
+func (s *SQLiteDB) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			id, name, slug, type, description, owner_id,
+			status, is_active, created_at, updated_at,
+			settings, metadata
+		FROM tenants
+		WHERE name = ?
+	`
+
+	tenant, err := s.scanTenant(s.db.QueryRowContext(ctx, query, name))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("tenant not found: %s", name)
+		}
+		return nil, fmt.Errorf("failed to get tenant by name: %w", err)
+	}
+
+	return tenant, nil
+}
+
 // UpdateTenant обновляет данные tenant
 func (s *SQLiteDB) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {
 	if s.db == nil {

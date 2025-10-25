@@ -114,6 +114,10 @@ func (tx *sqliteTx) GetUserByEmail(ctx context.Context, email string) (*models.U
 	return tx.db.GetUserByEmail(ctx, email)
 }
 
+func (tx *sqliteTx) GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error) {
+	return tx.db.GetUserByOIDCSubject(ctx, issuer, subject)
+}
+
 func (tx *sqliteTx) UpdateUser(ctx context.Context, user *models.User) error {
 	return tx.db.UpdateUser(ctx, user)
 }
@@ -177,6 +181,10 @@ func (tx *sqliteTx) GetTenant(ctx context.Context, id string) (*models.Tenant, e
 
 func (tx *sqliteTx) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	return tx.db.GetTenantBySlug(ctx, slug)
+}
+
+func (tx *sqliteTx) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
+	return tx.db.GetTenantByName(ctx, name)
 }
 
 func (tx *sqliteTx) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {

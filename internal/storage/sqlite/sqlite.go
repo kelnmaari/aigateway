@@ -475,6 +475,21 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_10_5",
 			SQL:     s.getAddChangelogV1105Migration(),
 		},
+		{
+			Version: 34,
+			Name:    "add_oidc_fields_to_users",
+			SQL:     s.getAddOIDCFieldsMigration(),
+		},
+		{
+			Version: 35,
+			Name:    "add_changelog_v1_11_1",
+			SQL:     s.getAddChangelogV1111Migration(),
+		},
+		{
+			Version: 36,
+			Name:    "add_unique_index_tenants_name",
+			SQL:     s.getAddUniqueIndexTenantsNameMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2402,6 +2417,84 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - Структуры данных: WebPage добавлены WordCount int и Language string, ParsedContent добавлено Language string, ProcessMessageOptions добавлено TruncateLength int (0 = без ограничений)
 - Поведение по умолчанию: Chat Integration TruncateLength: 0 - полный контент для LLM, Старое поведение можно вернуть: TruncateLength: 3000
 - Улучшения: Показ статистики для больших страниц (>10K chars), Детальное логирование при truncation, Language detection из HTML metadata');
+	`
+}
+
+// getAddOIDCFieldsMigration returns SQL for adding OIDC fields to users table (v34 migration)
+func (s *SQLiteDB) getAddOIDCFieldsMigration() string {
+	return `
+-- Add OIDC authentication fields to users table (Version 1.11.1+: Keycloak SSO Integration)
+
+-- auth_provider: Authentication provider type ('local', 'oidc', 'ldap')
+ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local' NOT NULL;
+
+-- oidc_subject: OIDC 'sub' claim (unique identifier from OIDC provider)
+ALTER TABLE users ADD COLUMN oidc_subject TEXT;
+
+-- oidc_issuer: OIDC issuer URL (e.g., https://keycloak.example.com/realms/myrealm)
+ALTER TABLE users ADD COLUMN oidc_issuer TEXT;
+
+-- Create index for fast lookup by OIDC subject
+CREATE INDEX IF NOT EXISTS idx_users_oidc_subject ON users(oidc_subject) WHERE oidc_subject IS NOT NULL;
+
+-- Create index for filtering by auth provider
+CREATE INDEX IF NOT EXISTS idx_users_auth_provider ON users(auth_provider);
+
+-- Create composite index for OIDC issuer + subject (for multi-provider scenarios)
+CREATE INDEX IF NOT EXISTS idx_users_oidc_issuer_subject ON users(oidc_issuer, oidc_subject) 
+    WHERE oidc_issuer IS NOT NULL AND oidc_subject IS NOT NULL;
+
+-- Add unique constraint for OIDC subject (within same issuer)
+-- Note: SQLite doesn't support adding unique constraints to existing columns directly,
+-- so we create a unique index instead
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_unique ON users(oidc_issuer, oidc_subject) 
+    WHERE oidc_issuer IS NOT NULL AND oidc_subject IS NOT NULL;
+	`
+}
+
+// getAddChangelogV1111Migration returns SQL for adding changelog v1.11.1 (v35 migration)
+func (s *SQLiteDB) getAddChangelogV1111Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.1', '2025-10-25', '## [1.11.1] - 2025-10-25
+
+### Added
+- **OIDC-01: Keycloak SSO Integration** 🔐
+  - OpenID Connect (OIDC) аутентификация для корпоративного Single Sign-On (SSO)
+  - Интеграция с Keycloak и другими OIDC providers (Google, Azure AD, Okta)
+  - Authorization Code Flow с PKCE для безопасной аутентификации
+  - Автоматическое user provisioning при первом входе через SSO
+  - Гибкий claims mapping для разных OIDC providers
+  - Role-based access control из OIDC groups/roles
+  - Session management для OIDC state с защитой от CSRF
+  - HTTP endpoints: /api/auth/oidc/login, /api/auth/oidc/callback, /api/auth/oidc/logout
+
+### Technical
+- Новые модули: internal/auth/oidc/provider.go - OIDC provider wrapper, internal/auth/oidc/claims.go - OIDC claims structures, internal/api/handlers/oidc.go - HTTP handlers
+- Конфигурация: auth.oidc.enabled, auth.oidc.issuer, auth.oidc.client_id, auth.oidc.client_secret, auth.oidc.scopes, auth.oidc.claims mapping, auth.oidc.auto_create_user, auth.oidc.auto_update_user, auth.oidc.default_role
+- База данных (Migration v34): users.auth_provider, users.oidc_subject, users.oidc_issuer, индексы для OIDC, unique constraint (issuer, subject)
+- Зависимости: coreos/go-oidc v3, golang.org/x/oauth2, gin-contrib/sessions
+- Тестирование: 10 unit tests PASS, 5 SKIP (mock OIDC required)
+
+### Security
+- CSRF Protection - random state parameter в OAuth2 flow
+- ID Token Verification - проверка подписи и claims через coreos/go-oidc
+- Session Security - HttpOnly cookies, SameSite=Lax, secure encryption
+- Claims Validation - проверка issuer, audience, expiration');
+	`
+}
+
+// getAddUniqueIndexTenantsNameMigration returns SQL for adding unique index on tenants.name (v36 migration)
+// Version 1.11.2+: Auto-tenant Provisioning from OIDC Groups
+func (s *SQLiteDB) getAddUniqueIndexTenantsNameMigration() string {
+	return `
+-- Add unique index on tenants.name for OIDC auto-provisioning (Version 1.11.2+)
+-- This ensures tenant names are unique and speeds up GetTenantByName lookups
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_name_unique ON tenants(name);
+
+-- Also create a regular index on tenants.slug if not already exists (for completeness)
+CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
 	`
 }
 

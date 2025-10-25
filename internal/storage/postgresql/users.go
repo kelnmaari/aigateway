@@ -430,3 +430,36 @@ func (p *PostgreSQLDB) scanUser(row scanner) (*models.User, error) {
 
 	return &user, nil
 }
+
+// GetUserByOIDCSubject получает пользователя по OIDC subject и issuer (Version 1.11.1+)
+func (p *PostgreSQLDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error) {
+	if p.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	p.logger.WithFields(map[string]interface{}{
+		"issuer":  issuer,
+		"subject": subject,
+	}).Debug("Getting user by OIDC subject")
+
+	query := `
+		SELECT 
+			id, username, email, full_name, password_hash,
+			status, is_admin, is_active, verified, verified_at,
+			created_at, updated_at, last_login,
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer
+		FROM users
+		WHERE oidc_issuer = $1 AND oidc_subject = $2
+	`
+
+	user, err := p.scanUser(p.db.QueryRowContext(ctx, query, issuer, subject))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found for OIDC issuer=%s subject=%s", issuer, subject)
+		}
+		return nil, fmt.Errorf("failed to get user by OIDC subject: %w", err)
+	}
+
+	return user, nil
+}

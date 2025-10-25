@@ -26,6 +26,10 @@ func (db *PostgreSQLDB) GetTenantBySlug(ctx context.Context, slug string) (*mode
 	return nil, fmt.Errorf("GetTenantBySlug not implemented yet")
 }
 
+func (db *PostgreSQLDB) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
+	return nil, fmt.Errorf("GetTenantByName not implemented yet (Version 1.11.2+)")
+}
+
 func (db *PostgreSQLDB) DeleteTenant(ctx context.Context, id string) error {
 	return fmt.Errorf("DeleteTenant not implemented yet")
 }

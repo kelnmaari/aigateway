@@ -153,6 +153,9 @@ type OIDCConfig struct {
 
 	// SessionTTL время жизни сессии для OIDC flow
 	SessionTTL time.Duration `mapstructure:"session_ttl"`
+
+	// TenantProvisioning конфигурация автоматического provisioning tenants из groups (Version 1.11.2+)
+	TenantProvisioning TenantProvisioningConfig `mapstructure:"tenant_provisioning"`
 }
 
 // ClaimsMapping маппинг OIDC claims на поля пользователя
@@ -174,6 +177,37 @@ type ClaimsMapping struct {
 
 	// Roles claim для ролей (optional)
 	Roles string `mapstructure:"roles"`
+}
+
+// TenantProvisioningConfig конфигурация автоматического создания tenants из OIDC groups (Version 1.11.2+)
+type TenantProvisioningConfig struct {
+	// Enabled включить tenant provisioning
+	Enabled bool `mapstructure:"enabled"`
+
+	// AutoCreateTenants автоматически создавать tenants из groups
+	AutoCreateTenants bool `mapstructure:"auto_create_tenants"`
+
+	// GroupMapping правила маппинга groups → tenants
+	GroupMapping GroupMappingConfig `mapstructure:"group_mapping"`
+
+	// SyncOnLogin синхронизировать tenants при каждом логине
+	SyncOnLogin bool `mapstructure:"sync_on_login"`
+
+	// RemoveOrphanedMemberships удалять membership если группа удалена из OIDC
+	RemoveOrphanedMemberships bool `mapstructure:"remove_orphaned_memberships"`
+}
+
+// GroupMappingConfig правила маппинга OIDC groups на tenants
+type GroupMappingConfig struct {
+	// Mode режим маппинга: "direct" (1:1) или "prefix" (extract after prefix)
+	Mode string `mapstructure:"mode" validate:"oneof=direct prefix"`
+
+	// Prefix префикс для prefix mode (e.g., "/engineering/")
+	// Group: "/engineering/backend" → Tenant: "backend"
+	Prefix string `mapstructure:"prefix"`
+
+	// AdminGroups список групп, которые дают admin роль в tenant
+	AdminGroups []string `mapstructure:"admin_groups"`
 }
 
 // LoggingConfig конфигурация логирования

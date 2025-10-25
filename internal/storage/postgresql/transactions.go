@@ -64,6 +64,10 @@ func (tx *postgresqlTx) GetUserByEmail(ctx context.Context, email string) (*mode
 	return tx.db.GetUserByEmail(ctx, email)
 }
 
+func (tx *postgresqlTx) GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error) {
+	return tx.db.GetUserByOIDCSubject(ctx, issuer, subject)
+}
+
 func (tx *postgresqlTx) UpdateUser(ctx context.Context, user *models.User) error {
 	return tx.db.UpdateUser(ctx, user)
 }
@@ -94,6 +98,10 @@ func (tx *postgresqlTx) GetTenant(ctx context.Context, id string) (*models.Tenan
 
 func (tx *postgresqlTx) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	return tx.db.GetTenantBySlug(ctx, slug)
+}
+
+func (tx *postgresqlTx) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
+	return tx.db.GetTenantByName(ctx, name)
 }
 
 func (tx *postgresqlTx) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {

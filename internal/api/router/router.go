@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -18,6 +20,7 @@ import (
 	"ollama-openai-proxy/internal/auth/apikey"
 	"ollama-openai-proxy/internal/auth/jwt"
 	authMiddleware "ollama-openai-proxy/internal/auth/middleware"
+	oidcauth "ollama-openai-proxy/internal/auth/oidc"
 	"ollama-openai-proxy/internal/auth/ratelimit"
 	authService "ollama-openai-proxy/internal/auth/service"
 	"ollama-openai-proxy/internal/client/ollama"
@@ -80,6 +83,7 @@ type Router struct {
 	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
 	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
 	fileHandler           *handlers.FileHandler           // Handler для file operations (v1.10.0)
+	oidcHandler           *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -246,6 +250,25 @@ func (r *Router) setupMiddleware() {
 		r.engine.Use(middleware.TracingMiddleware(r.tracer))
 		r.logger.Info("OpenTelemetry tracing middleware enabled")
 	}
+
+	// Session middleware для OIDC authentication (Version 1.11.1+)
+	// Используем cookie-based session store
+	sessionSecret := []byte(r.config.Auth.JWT.Secret) // Используем JWT secret для session encryption
+	if len(sessionSecret) < 32 {
+		// Ensure session secret is at least 32 bytes for security
+		sessionSecret = []byte("ollama-proxy-session-secret-change-this-in-production!")
+		r.logger.Warn("Using default session secret - please configure a secure JWT secret")
+	}
+	store := cookie.NewStore(sessionSecret)
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   3600,    // 1 hour
+		HttpOnly: true,    // Protect against XSS
+		Secure:   false,   // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+	})
+	r.engine.Use(sessions.Sessions("ollama_session", store))
+	r.logger.Info("Session middleware enabled for OIDC authentication")
 
 	// Slow request logging middleware (v1.6.2) - после tracing
 	if r.config.Observability.Performance.Enabled {
@@ -534,6 +557,17 @@ func (r *Router) setupAuthRoutes() {
 		authPublic.POST("/register", r.authHandler.Register)
 		authPublic.POST("/login", r.authHandler.Login)
 		authPublic.POST("/refresh", r.authHandler.RefreshToken)
+	}
+
+	// OIDC authentication endpoints (Version 1.11.1+: Keycloak SSO Integration)
+	if r.oidcHandler != nil {
+		oidcPublic := r.engine.Group("/api/auth/oidc")
+		{
+			oidcPublic.GET("/login", r.oidcHandler.HandleLogin)
+			oidcPublic.GET("/callback", r.oidcHandler.HandleCallback)
+			oidcPublic.POST("/logout", r.oidcHandler.HandleLogout)
+		}
+		r.logger.Info("OIDC authentication routes registered")
 	}
 
 	// Protected authentication endpoints (require JWT)
@@ -974,6 +1008,28 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		r.adminUserHandler = handlers.NewAdminUserHandler(r.db, logger)
 		r.usageHandler = handlers.NewUsageHandler(r.db, logger)
 		logger.Info("User authentication handlers initialized")
+	}
+
+	// OIDC/Keycloak SSO handler (Version 1.11.1+: Enterprise Suite)
+	if cfg.Auth.OIDC.Enabled && r.db != nil && r.jwtManager != nil {
+		logger.Info("Initializing OIDC provider...")
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		oidcProvider, err := oidcauth.NewOIDCProvider(ctx, &cfg.Auth.OIDC, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize OIDC provider")
+			logger.Warn("OIDC authentication will be unavailable")
+		} else {
+			r.oidcHandler = handlers.NewOIDCHandler(cfg, oidcProvider, r.db, r.jwtManager, logger)
+			logger.WithFields(logrus.Fields{
+				"provider": cfg.Auth.OIDC.Provider,
+				"issuer":   cfg.Auth.OIDC.Issuer,
+			}).Info("OIDC handler initialized successfully")
+		}
+	} else if cfg.Auth.OIDC.Enabled {
+		logger.Warn("OIDC is enabled but required components (database or JWT manager) are not available")
 	}
 
 	logger.Info("DEBUG: BEFORE AdminHandler creation block")

@@ -81,6 +81,9 @@ type Database interface {
 	// GetUserByEmail получает пользователя по email
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 
+	// GetUserByOIDCSubject получает пользователя по OIDC subject и issuer (Version 1.11.1+)
+	GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error)
+
 	// UpdateUser обновляет данные пользователя
 	UpdateUser(ctx context.Context, user *models.User) error
 
@@ -105,6 +108,9 @@ type Database interface {
 
 	// GetTenantBySlug получает tenant по slug
 	GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error)
+
+	// GetTenantByName получает tenant по имени (Version 1.11.2+: для OIDC auto-provisioning)
+	GetTenantByName(ctx context.Context, name string) (*models.Tenant, error)
 
 	// UpdateTenant обновляет данные tenant
 	UpdateTenant(ctx context.Context, tenant *models.Tenant) error

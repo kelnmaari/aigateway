@@ -5,6 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2025-10-25
+
+### Added
+
+- **OIDC-01: Keycloak SSO Integration** 🔐
+  - **OpenID Connect (OIDC)** аутентификация для корпоративного Single Sign-On (SSO)
+  - Интеграция с **Keycloak** и другими OIDC providers (Google, Azure AD, Okta)
+  - **Authorization Code Flow** с PKCE для безопасной аутентификации
+  - Автоматическое **user provisioning** при первом входе через SSO
+  - Гибкий **claims mapping** для разных OIDC providers
+  - **Role-based access control** из OIDC groups/roles
+  - Session management для OIDC state с защитой от CSRF
+  - HTTP endpoints: `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/oidc/logout`
+
+### Technical
+
+- **Новые модули**:
+  - `internal/auth/oidc/provider.go` - OIDC provider wrapper на базе `coreos/go-oidc`
+  - `internal/auth/oidc/claims.go` - структуры для OIDC claims (Standard, Keycloak, Generic)
+  - `internal/api/handlers/oidc.go` - HTTP handlers для OIDC flow
+- **Конфигурация**:
+  - `auth.oidc.enabled` - включение/выключение OIDC
+  - `auth.oidc.issuer` - URL OIDC провайдера (e.g., Keycloak realm)
+  - `auth.oidc.client_id`, `auth.oidc.client_secret` - OIDC client credentials
+  - `auth.oidc.redirect_uri` - callback URL
+  - `auth.oidc.scopes` - запрашиваемые scopes (openid, profile, email, groups, roles)
+  - `auth.oidc.claims.*` - mapping OIDC claims на поля пользователя
+  - `auth.oidc.auto_create_user`, `auth.oidc.auto_update_user` - auto-provisioning
+  - `auth.oidc.default_role` - роль по умолчанию для новых пользователей
+  - `auth.oidc.session_store` - memory или redis для session storage
+  - `auth.oidc.session_ttl` - время жизни OIDC session state
+- **База данных (Migration v34)**:
+  - `users.auth_provider` - тип провайдера (local, oidc, ldap)
+  - `users.oidc_subject` - OIDC 'sub' claim (уникальный идентификатор)
+  - `users.oidc_issuer` - OIDC issuer URL
+  - Индексы для быстрого поиска по OIDC subject
+  - Unique constraint для пары (issuer, subject)
+- **Зависимости**:
+  - `github.com/coreos/go-oidc/v3/oidc` - OIDC client library
+  - `golang.org/x/oauth2` - OAuth2 flow
+  - `github.com/gin-contrib/sessions` - session middleware
+  - `github.com/gin-contrib/sessions/cookie` - cookie-based session store
+- **Тестирование**:
+  - Unit tests для OIDC provider (валидация конфигурации, discovery)
+  - Unit tests для OIDC handlers (login, callback, logout)
+  - Unit tests для helper functions (generateUsername, isAdminRole)
+  - 10 тестов PASS, 5 SKIP (требуют mock OIDC provider)
+
+### Security
+
+- **CSRF Protection** - random state parameter в OAuth2 flow
+- **ID Token Verification** - проверка подписи и claims через `coreos/go-oidc`
+- **Session Security** - HttpOnly cookies, SameSite=Lax, secure encryption
+- **Claims Validation** - проверка issuer, audience, expiration
+- **Auto-Logout** - на expired/invalid tokens
+
+### Configuration Examples
+
+**Development (Keycloak):**
+```yaml
+auth:
+  oidc:
+    enabled: true
+    provider: "keycloak"
+    issuer: "https://keycloak.example.com/realms/myrealm"
+    client_id: "ollama-proxy"
+    client_secret: "${OIDC_CLIENT_SECRET}"
+    redirect_uri: "http://localhost:8085/auth/oidc/callback"
+    scopes: [openid, profile, email, groups, roles]
+    auto_create_user: true
+    auto_update_user: true
+    default_role: "user"
+```
+
+**Production (Azure AD):**
+```yaml
+auth:
+  oidc:
+    enabled: true
+    provider: "azure"
+    issuer: "https://login.microsoftonline.com/{tenant-id}/v2.0"
+    client_id: "your-client-id"
+    client_secret: "${OIDC_CLIENT_SECRET}"
+    redirect_uri: "https://proxy.yourdomain.com/auth/oidc/callback"
+    scopes: [openid, profile, email]
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+```
+
+---
+
 ## [1.10.5] - 2025-10-25
 
 ### Changed

@@ -198,6 +198,40 @@ func (a *testDBAdapter) GetEffectiveModelConfig(ctx context.Context, modelName, 
 	return nil, nil
 }
 
+// File methods (Version 1.10.5+: WEB-FETCH-01)
+func (a *testDBAdapter) CreateFile(ctx context.Context, req models.CreateFileRequest) (*models.File, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetFileByID(ctx context.Context, fileID string) (*models.File, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateFile(ctx context.Context, fileID string, req models.UpdateFileRequest) (*models.File, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) DeleteFile(ctx context.Context, fileID string) error {
+	return nil
+}
+func (a *testDBAdapter) ListFiles(ctx context.Context, req models.ListFilesRequest) ([]*models.File, int, error) {
+	return nil, 0, nil
+}
+func (a *testDBAdapter) ListFilesWithUserInfo(ctx context.Context, req models.ListFilesRequest) ([]*models.FileWithUser, int, error) {
+	return nil, 0, nil
+}
+func (a *testDBAdapter) IncrementDownloadCount(ctx context.Context, fileID string) error {
+	return nil
+}
+func (a *testDBAdapter) LogFileAccess(ctx context.Context, log models.FileAccessLog) error {
+	return nil
+}
+func (a *testDBAdapter) GetFileAccessLogs(ctx context.Context, fileID string, limit int) ([]*models.FileAccessLog, error) {
+	return nil, nil
+}
+
+// OIDC methods (Version 1.11.1+: Keycloak SSO Integration)
+func (a *testDBAdapter) GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error) {
+	return nil, nil
+}
+
 // setupAdminTest создает тестовое окружение для admin handler
 func setupAdminTest(t *testing.T) (*AdminHandler, *storage.MemoryStorage) {
 	gin.SetMode(gin.TestMode)

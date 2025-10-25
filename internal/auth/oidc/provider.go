@@ -154,7 +154,7 @@ func (p *OIDCProvider) VerifyIDToken(ctx context.Context, rawIDToken string) (*o
 		"subject":   idToken.Subject,
 		"issuer":    idToken.Issuer,
 		"audience":  idToken.Audience,
-		"issued_at": time.Unix(idToken.IssuedAt, 0).Format(time.RFC3339),
+		"issued_at": idToken.IssuedAt.Format(time.RFC3339),
 		"expires":   idToken.Expiry.Format(time.RFC3339),
 	}).Debug("ID token verified successfully")
 

@@ -153,6 +153,39 @@ func (s *SQLiteDB) GetUserByEmail(ctx context.Context, email string) (*models.Us
 	return user, nil
 }
 
+// GetUserByOIDCSubject получает пользователя по OIDC subject и issuer (Version 1.11.1+)
+func (s *SQLiteDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"issuer":  issuer,
+		"subject": subject,
+	}).Debug("Getting user by OIDC subject")
+
+	query := `
+		SELECT 
+			id, username, email, full_name, password_hash,
+			status, is_admin, is_active, verified, verified_at,
+			created_at, updated_at, last_login,
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer
+		FROM users
+		WHERE oidc_issuer = ? AND oidc_subject = ?
+	`
+
+	user, err := s.scanUser(s.db.QueryRowContext(ctx, query, issuer, subject))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found for OIDC issuer=%s subject=%s", issuer, subject)
+		}
+		return nil, fmt.Errorf("failed to get user by OIDC subject: %w", err)
+	}
+
+	return user, nil
+}
+
 // UpdateUser обновляет данные пользователя
 func (s *SQLiteDB) UpdateUser(ctx context.Context, user *models.User) error {
 	if s.db == nil {

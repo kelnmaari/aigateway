@@ -29,6 +29,7 @@
             <button class="tab-btn" data-tab="models">Models</button>
             <button class="tab-btn" data-tab="mcp">MCP Servers</button>
             <button class="tab-btn" data-tab="backups">Backups</button>
+            <button class="tab-btn" data-tab="audit">Audit</button>
             <button class="tab-btn" data-tab="logs">Logs</button>
             <button class="tab-btn" data-tab="system">System</button>
         </div>
@@ -273,6 +274,86 @@
                         <i class="fas fa-folder-open"></i>
                         <h3>No Backups Found</h3>
                         <p>Create your first backup to protect your data</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Tab (v1.11.4) -->
+            <div id="audit-tab" class="tab-pane">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>🔐 Audit Log</h2>
+                        <a href="/web/admin-audit.html" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-external-link-alt"></i> Open Full Audit Log
+                        </a>
+                    </div>
+                    
+                    <div class="info-card">
+                        <i class="fas fa-shield-alt"></i>
+                        <div>
+                            <strong>Security & Compliance Monitoring</strong>
+                            <p>Track all security-critical events including authentication, permissions, and administrative actions. Full filtering and export available in dedicated audit page.</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="stats-grid" style="margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value" id="audit-stat-total">-</div>
+                                <div class="stat-label">Total Events (24h)</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white;">
+                            <div>
+                                <div class="stat-value" id="audit-stat-critical">-</div>
+                                <div class="stat-label">Critical</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%);">
+                            <div>
+                                <div class="stat-value" id="audit-stat-warning">-</div>
+                                <div class="stat-label">Warnings</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #48dbfb 0%, #0abde3 100%); color: white;">
+                            <div>
+                                <div class="stat-value" id="audit-stat-failed-logins">-</div>
+                                <div class="stat-label">Failed Logins</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Events Preview -->
+                    <h3 style="margin-bottom: 1rem;">Recent Events (Last 20)</h3>
+                    <div id="audit-loading" class="loading-placeholder">
+                        Loading audit events...
+                    </div>
+
+                    <div id="audit-events-list" style="display: none;">
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Event</th>
+                                        <th>Severity</th>
+                                        <th>Actor</th>
+                                        <th>Action</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-events-tbody">
+                                    <!-- Events will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="no-audit-events" style="display: none;" class="empty-state">
+                        <i class="fas fa-clipboard-check"></i>
+                        <h3>No Audit Events</h3>
+                        <p>Audit events will appear here as system activity occurs</p>
                     </div>
                 </div>
             </div>

@@ -89,6 +89,53 @@ auth:
           - "engineering-admins"
           - "tenant-admins"
           - "/admins"
+  
+  # LDAP/Active Directory (Version 1.11.3+: Enterprise Suite)
+  ldap:
+    enabled: false  # Отключено по умолчанию (требует LDAP сервер)
+    
+    # LDAP Server
+    url: "ldap://ldap.example.com:389"  # или ldaps://ldap.example.com:636 для TLS
+    bind_dn: "cn=admin,dc=example,dc=com"
+    bind_password: "${LDAP_BIND_PASSWORD}"  # Из environment variable
+    
+    # User Search
+    user_base_dn: "ou=users,dc=example,dc=com"
+    user_filter: "(uid={username})"  # OpenLDAP; для AD: "(sAMAccountName={username})"
+    user_id_attribute: "uid"  # для AD: "sAMAccountName"
+    user_email_attribute: "mail"
+    user_name_attribute: "cn"
+    
+    # Group Search (optional)
+    group_base_dn: "ou=groups,dc=example,dc=com"
+    group_filter: "(member={userdn})"  # для AD: "(memberOf={userdn})"
+    group_name_attribute: "cn"
+    
+    # TLS/SSL
+    start_tls: false  # Использовать StartTLS для ldap:// connections
+    skip_verify: false  # НЕ ВКЛЮЧАЙТЕ в production!
+    ca_cert_file: ""  # Путь к CA certificate (optional)
+    
+    # User Provisioning
+    auto_create_user: true  # Создавать пользователя при первом логине
+    auto_update_user: true  # Обновлять email/name при каждом логине
+    
+    # Tenant Provisioning from LDAP Groups (reuse OIDC-02 logic)
+    tenant_provisioning:
+      enabled: true
+      auto_create_tenants: true
+      sync_on_login: true
+      remove_orphaned_memberships: false
+      
+      group_mapping:
+        mode: "direct"  # или "prefix"
+        prefix: ""  # Для prefix mode
+        admin_groups:
+          - "Domain Admins"
+          - "Administrators"
+    
+    # Timeout
+    timeout: "30s"
 
 # 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
 database:

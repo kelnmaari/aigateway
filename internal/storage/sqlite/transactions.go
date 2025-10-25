@@ -187,6 +187,23 @@ func (tx *sqliteTx) GetTenantByName(ctx context.Context, name string) (*models.T
 	return tx.db.GetTenantByName(ctx, name)
 }
 
+func (tx *sqliteTx) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	return tx.db.GetUserByLDAPDN(ctx, ldapDN)
+}
+
+// Audit Events (Version 1.11.4+: Enhanced Audit Logging)
+func (tx *sqliteTx) CreateAuditEvent(ctx context.Context, event *models.AuditEvent) error {
+	return tx.db.CreateAuditEvent(ctx, event)
+}
+
+func (tx *sqliteTx) GetAuditEvents(ctx context.Context, filters storage.AuditFilters) ([]*models.AuditEvent, int, error) {
+	return tx.db.GetAuditEvents(ctx, filters)
+}
+
+func (tx *sqliteTx) DeleteOldAuditEvents(ctx context.Context, olderThan time.Time) (int, error) {
+	return tx.db.DeleteOldAuditEvents(ctx, olderThan)
+}
+
 func (tx *sqliteTx) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {
 	return tx.db.UpdateTenant(ctx, tenant)
 }

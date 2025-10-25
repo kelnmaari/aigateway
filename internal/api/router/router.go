@@ -19,6 +19,7 @@ import (
 	"ollama-openai-proxy/internal/api/middleware"
 	"ollama-openai-proxy/internal/auth/apikey"
 	"ollama-openai-proxy/internal/auth/jwt"
+	ldapauth "ollama-openai-proxy/internal/auth/ldap"
 	authMiddleware "ollama-openai-proxy/internal/auth/middleware"
 	oidcauth "ollama-openai-proxy/internal/auth/oidc"
 	"ollama-openai-proxy/internal/auth/ratelimit"
@@ -31,6 +32,7 @@ import (
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/request"
+	"ollama-openai-proxy/internal/services/audit"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/websocket"
 
@@ -84,6 +86,8 @@ type Router struct {
 	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
 	fileHandler           *handlers.FileHandler           // Handler для file operations (v1.10.0)
 	oidcHandler           *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
+	ldapHandler           *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
+	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -107,6 +111,10 @@ type Router struct {
 	// GPU Monitoring (v1.9.3)
 	gpuMonitor *metrics.GPUMonitor
 	gpuHandler *handlers.GPUHandler
+
+	// Audit Logging (v1.11.4)
+	auditLogger         *audit.AuditLogger
+	auditRetentionPolicy *audit.RetentionPolicy
 }
 
 // NewOptions содержит опции для создания роутера
@@ -570,6 +578,26 @@ func (r *Router) setupAuthRoutes() {
 		r.logger.Info("OIDC authentication routes registered")
 	}
 
+	// LDAP/Active Directory authentication endpoints (Version 1.11.3+: LDAP Integration)
+	if r.ldapHandler != nil {
+		ldapPublic := r.engine.Group("/api/auth/ldap")
+		{
+			ldapPublic.POST("/login", r.ldapHandler.HandleLogin)
+		}
+
+		// Admin endpoints (requires admin authentication)
+		if r.jwtManager != nil && r.db != nil {
+			ldapAdmin := r.engine.Group("/api/auth/ldap")
+			ldapAdmin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+			ldapAdmin.Use(middleware.RequireAdmin(r.db, r.logger))
+			{
+				ldapAdmin.GET("/test", r.ldapHandler.HandleTestConnection)
+			}
+		}
+
+		r.logger.Info("LDAP authentication routes registered")
+	}
+
 	// Protected authentication endpoints (require JWT)
 	if r.jwtManager != nil {
 		authProtected := r.engine.Group("/api/auth")
@@ -856,6 +884,14 @@ func (r *Router) setupAdminRoutes() {
 		admin.DELETE("/backup/:filename", r.backupHandler.DeleteBackup)
 	}
 
+	// Audit Logging endpoints (v1.11.4)
+	if r.auditHandler != nil {
+		r.logger.Info("Admin routes: Registering Audit Logging endpoints")
+		admin.GET("/audit", r.auditHandler.GetAuditEvents)
+		admin.GET("/audit/stats", r.auditHandler.GetAuditStats)
+		admin.GET("/audit/export", r.auditHandler.ExportAuditEvents)
+	}
+
 	// System endpoints
 	admin.GET("/stats", func(c *gin.Context) {
 		if r.keyManager != nil {
@@ -1001,7 +1037,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	}
 
 	if r.authService != nil && r.db != nil {
-		r.authHandler = handlers.NewAuthHandler(r.authService, logger)
+		r.authHandler = handlers.NewAuthHandler(r.authService, logger, r.auditLogger)
 		r.userHandler = handlers.NewUserHandler(r.db, logger)
 		r.tenantHandler = handlers.NewTenantHandler(r.db, logger)
 		r.conversationHandler = handlers.NewConversationHandler(r.db)
@@ -1030,6 +1066,45 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		}
 	} else if cfg.Auth.OIDC.Enabled {
 		logger.Warn("OIDC is enabled but required components (database or JWT manager) are not available")
+	}
+
+	// LDAP/Active Directory handler (Version 1.11.3+: Enterprise Suite)
+	if cfg.Auth.LDAP.Enabled && r.db != nil && r.jwtManager != nil {
+		logger.Info("Initializing LDAP client...")
+		
+		ldapClient, err := ldapauth.NewClient(&cfg.Auth.LDAP, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize LDAP client")
+			logger.Warn("LDAP authentication will be unavailable")
+		} else {
+			r.ldapHandler = handlers.NewLDAPHandler(cfg, ldapClient, r.db, r.jwtManager, logger)
+			logger.WithFields(logrus.Fields{
+				"url":          cfg.Auth.LDAP.URL,
+				"user_base_dn": cfg.Auth.LDAP.UserBaseDN,
+			}).Info("LDAP handler initialized successfully")
+		}
+	} else if cfg.Auth.LDAP.Enabled {
+		logger.Warn("LDAP is enabled but required components (database or JWT manager) are not available")
+	}
+
+	// Audit Logger initialization (Version 1.11.4+: Enhanced Audit Logging)
+	if r.db != nil {
+		logger.Info("Initializing Audit logger...")
+		r.auditLogger = audit.NewAuditLogger(r.db, logger)
+		logger.Info("Audit logger initialized successfully")
+
+		// Audit Handler initialization
+		r.auditHandler = handlers.NewAuditHandler(cfg, r.db, logger)
+		logger.Info("Audit handler initialized successfully")
+
+		// Audit Retention Policy initialization
+		r.auditRetentionPolicy = audit.NewRetentionPolicy(r.db, logger).
+			WithRetentionPeriod(90 * 24 * time.Hour).  // 90 days retention
+			WithCleanupInterval(24 * time.Hour)         // Daily cleanup
+		r.auditRetentionPolicy.Start()
+		logger.Info("Audit retention policy started (90 days retention, daily cleanup)")
+	} else {
+		logger.Warn("Audit logging unavailable (database not configured)")
 	}
 
 	logger.Info("DEBUG: BEFORE AdminHandler creation block")

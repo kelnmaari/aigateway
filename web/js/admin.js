@@ -145,6 +145,9 @@ class AdminPanel {
             case 'backups':
                 await this.loadBackups();
                 break;
+            case 'audit':
+                await this.loadAudit();
+                break;
             case 'system':
                 await this.loadSystem();
                 break;
@@ -546,6 +549,82 @@ class AdminPanel {
             console.error('Failed to delete backup:', error);
             toast.error(`Failed to delete backup: ${error.message}`);
         }
+    }
+
+    // ==================== AUDIT ====================
+
+    // Load Audit Events (v1.11.4+)
+    async loadAudit() {
+        const loadingEl = document.getElementById('audit-loading');
+        const listEl = document.getElementById('audit-events-list');
+        const noEventsEl = document.getElementById('no-audit-events');
+
+        loadingEl.style.display = 'block';
+        listEl.style.display = 'none';
+        noEventsEl.style.display = 'none';
+
+        try {
+            // Load stats
+            const statsResp = await api.request(`${api.baseURL}/api/admin/audit/stats`);
+            if (statsResp.ok) {
+                const statsData = await statsResp.json();
+                document.getElementById('audit-stat-total').textContent = statsData.stats.total || 0;
+                document.getElementById('audit-stat-critical').textContent = statsData.stats.by_severity.critical || 0;
+                document.getElementById('audit-stat-warning').textContent = statsData.stats.by_severity.warning || 0;
+                document.getElementById('audit-stat-failed-logins').textContent = statsData.stats.security_events.failed_logins || 0;
+            }
+
+            // Load recent events (last 20)
+            const eventsResp = await api.request(`${api.baseURL}/api/admin/audit?limit=20&offset=0`);
+            if (eventsResp.ok) {
+                const eventsData = await eventsResp.json();
+                
+                if (eventsData.events && eventsData.events.length > 0) {
+                    this.renderAuditEvents(eventsData.events);
+                    listEl.style.display = 'block';
+                } else {
+                    noEventsEl.style.display = 'block';
+                }
+            } else {
+                throw new Error('Failed to load audit events');
+            }
+        } catch (error) {
+            console.error('Failed to load audit:', error);
+            listEl.innerHTML = `<div class="error-message">Failed to load audit events: ${error.message}</div>`;
+            listEl.style.display = 'block';
+        } finally {
+            loadingEl.style.display = 'none';
+        }
+    }
+
+    renderAuditEvents(events) {
+        const tbody = document.getElementById('audit-events-tbody');
+        
+        const getSeverityClass = (severity) => {
+            switch(severity) {
+                case 'critical': return 'severity-critical';
+                case 'warning': return 'severity-warning';
+                case 'info': return 'severity-info';
+                default: return '';
+            }
+        };
+
+        const getStatusClass = (status) => {
+            return status === 'success' ? 'status-success' : 'status-failure';
+        };
+
+        const html = events.map(event => `
+            <tr>
+                <td>${new Date(event.timestamp).toLocaleString()}</td>
+                <td><span class="badge">${event.event_type}</span></td>
+                <td><span class="badge ${getSeverityClass(event.severity)}">${event.severity}</span></td>
+                <td title="${event.actor_id}"><code>${event.actor_id.substring(0, 8)}...</code></td>
+                <td>${event.action}</td>
+                <td><span class="badge ${getStatusClass(event.status)}">${event.status}</span></td>
+            </tr>
+        `).join('');
+        
+        tbody.innerHTML = html;
     }
 
     // ==================== SYSTEM ====================

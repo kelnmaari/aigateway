@@ -20,6 +20,9 @@ type User struct {
 	AuthProvider string  `json:"auth_provider" db:"auth_provider"` // Authentication provider: 'local', 'oidc', 'ldap'
 	OIDCSubject  *string `json:"oidc_subject,omitempty" db:"oidc_subject"`   // OIDC 'sub' claim (unique identifier)
 	OIDCIssuer   *string `json:"oidc_issuer,omitempty" db:"oidc_issuer"`     // OIDC issuer URL
+	
+	// LDAP аутентификация (Version 1.11.3+: LDAP/AD Integration)
+	LDAPDN *string `json:"ldap_dn,omitempty" db:"ldap_dn"` // LDAP Distinguished Name
 
 	// Статус
 	Status     UserStatus `json:"status" db:"status"`       // Статус пользователя

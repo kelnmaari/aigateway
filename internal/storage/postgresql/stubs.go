@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ollama-openai-proxy/internal/models"
+	"ollama-openai-proxy/internal/storage"
 )
 
 // ========================================
@@ -28,6 +29,23 @@ func (db *PostgreSQLDB) GetTenantBySlug(ctx context.Context, slug string) (*mode
 
 func (db *PostgreSQLDB) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
 	return nil, fmt.Errorf("GetTenantByName not implemented yet (Version 1.11.2+)")
+}
+
+func (db *PostgreSQLDB) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	return nil, fmt.Errorf("GetUserByLDAPDN not implemented yet (Version 1.11.3+)")
+}
+
+// Audit Events (Version 1.11.4+: Enhanced Audit Logging)
+func (db *PostgreSQLDB) CreateAuditEvent(ctx context.Context, event *models.AuditEvent) error {
+	return fmt.Errorf("CreateAuditEvent not implemented yet (Version 1.11.4+)")
+}
+
+func (db *PostgreSQLDB) GetAuditEvents(ctx context.Context, filters storage.AuditFilters) ([]*models.AuditEvent, int, error) {
+	return nil, 0, fmt.Errorf("GetAuditEvents not implemented yet (Version 1.11.4+)")
+}
+
+func (db *PostgreSQLDB) DeleteOldAuditEvents(ctx context.Context, olderThan time.Time) (int, error) {
+	return 0, fmt.Errorf("DeleteOldAuditEvents not implemented yet (Version 1.11.4+)")
 }
 
 func (db *PostgreSQLDB) DeleteTenant(ctx context.Context, id string) error {

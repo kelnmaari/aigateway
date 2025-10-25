@@ -10,19 +10,22 @@ import (
 	"ollama-openai-proxy/internal/auth/middleware"
 	"ollama-openai-proxy/internal/auth/password"
 	"ollama-openai-proxy/internal/auth/service"
+	auditService "ollama-openai-proxy/internal/services/audit"
 )
 
 // AuthHandler обрабатывает authentication запросы
 type AuthHandler struct {
 	authService *service.AuthService
 	logger      *logrus.Logger
+	auditLogger *auditService.AuditLogger // Version 1.11.4+: Audit Logging
 }
 
 // NewAuthHandler создает новый Auth Handler
-func NewAuthHandler(authService *service.AuthService, logger *logrus.Logger) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, logger *logrus.Logger, auditLogger *auditService.AuditLogger) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		logger:      logger,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -79,6 +82,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Login user
 	resp, err := h.authService.Login(c.Request.Context(), req)
 	if err != nil {
+		// Audit log failed login
+		errMsg := err.Error()
+		userAgent := c.Request.UserAgent()
+		if h.auditLogger != nil {
+			h.auditLogger.LogLogin(c.Request.Context(), req.Username, c.ClientIP(), userAgent, false, errMsg)
+		}
+
 		// Check if validation error
 		if valErr, ok := err.(password.ValidationError); ok {
 			h.logger.WithFields(map[string]interface{}{
@@ -99,6 +109,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"error": "Failed to login",
 		})
 		return
+	}
+
+	// Audit log successful login
+	if h.auditLogger != nil {
+		userAgent := c.Request.UserAgent()
+		h.auditLogger.LogLogin(c.Request.Context(), resp.User.ID, c.ClientIP(), userAgent, true, "")
 	}
 
 	h.logger.WithField("user_id", resp.User.ID).Info("User logged in successfully")

@@ -219,42 +219,47 @@
 **Фокус:** Полноценная корпоративная платформа (Auth + Observability + Quotas)  
 **Приоритет:** HIGH  
 **Оценка времени:** 72-100 часов  
-**Статус:** 📋 Запланировано (0/7 задач)  
+**Статус:** 🚧 В работе (4/7 задач завершено)  
 **Versioning:** v1.11.1-v1.11.7
 
 **Стратегия:** Объединяем корпоративную аутентификацию, мониторинг и контроль ресурсов в единый enterprise-ready релиз.
 
 ### Задачи
 
-- [ ] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.11.1**
+- [x] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.11.1** ✅
   - OAuth2/OIDC flow
   - Token validation & refresh
   - UI для настройки через админку
   - User auto-provisioning
   - Fallback to local auth
-  - **Оценка:** 16-24 часа
+  - **Оценка:** 16-24 часа → **Выполнено**
 
-- [ ] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.11.2**
+- [x] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.11.2** ✅
   - Claims parsing (groups, roles)
-  - Automatic tenant creation/mapping
-  - Group sync (manual/scheduled)
+  - Automatic tenant creation/mapping (direct + prefix modes)
+  - Group sync on login
   - Admin groups role assignment
-  - **Оценка:** 8-12 часов
+  - Orphaned memberships cleanup
+  - **Оценка:** 8-12 часов → **Выполнено**
 
-- [ ] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.11.3**
-  - LDAP bind + search
-  - User/group sync
-  - UI для настройки через админку
-  - TLS/LDAPS support
-  - **Оценка:** 12-16 часов
+- [x] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.11.3** ✅
+  - LDAP bind authentication (OpenLDAP, Active Directory, FreeIPA)
+  - User/Group search с настраиваемыми фильтрами
+  - Auto-provisioning users при первом логине
+  - Tenant provisioning из LDAP groups (reuse OIDC-02)
+  - TLS/LDAPS support с StartTLS и certificate validation
+  - Admin detection на основе LDAP groups
+  - **Оценка:** 12-16 часов → **Выполнено**
 
-- [ ] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.11.4**
+- [x] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.11.4** ✅
   - Security events (login, permissions)
-  - Compliance logs
-  - Query API с filters
+  - Compliance logs (24 event types)
+  - Query API с filters + pagination
   - Export to CSV
-  - Retention policy
-  - **Оценка:** 8-12 часов
+  - Retention policy (90 days default, daily cleanup)
+  - Statistics dashboard (24h metrics)
+  - Admin UI (preview + dedicated page)
+  - **Оценка:** 8-12 часов → **Выполнено**
 
 - [ ] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.11.5**
   - Fine-grained permissions

@@ -125,6 +125,54 @@ auth:
           - "administrators"
           - "tenant-owners"
           - "/admins"
+  
+  # LDAP/Active Directory (Version 1.11.3+: Enterprise Suite)
+  ldap:
+    enabled: false  # Включите для LDAP/AD аутентификации
+    
+    # LDAP Server (используйте ldaps:// для production!)
+    url: "ldaps://ldap.yourdomain.com:636"  # LDAPS для безопасности
+    bind_dn: "cn=service-account,dc=yourdomain,dc=com"
+    bind_password: "${LDAP_BIND_PASSWORD}"  # ОБЯЗАТЕЛЬНО через environment variable!
+    
+    # User Search
+    user_base_dn: "ou=users,dc=yourdomain,dc=com"
+    user_filter: "(sAMAccountName={username})"  # Active Directory format
+    user_id_attribute: "sAMAccountName"
+    user_email_attribute: "mail"
+    user_name_attribute: "displayName"
+    
+    # Group Search
+    group_base_dn: "ou=groups,dc=yourdomain,dc=com"
+    group_filter: "(member={userdn})"
+    group_name_attribute: "cn"
+    
+    # TLS/SSL (КРИТИЧНО для production!)
+    start_tls: false  # Не нужен если используется ldaps://
+    skip_verify: false  # НИКОГДА не включайте в production!
+    ca_cert_file: "/etc/ssl/certs/ldap-ca.crt"  # Путь к CA certificate
+    
+    # User Provisioning
+    auto_create_user: true
+    auto_update_user: true
+    
+    # Tenant Provisioning from AD Groups
+    tenant_provisioning:
+      enabled: true
+      auto_create_tenants: true
+      sync_on_login: true
+      remove_orphaned_memberships: false  # Осторожно с удалением!
+      
+      group_mapping:
+        mode: "prefix"
+        prefix: "CN=APP-"  # AD groups: CN=APP-Engineering,OU=groups,DC=...
+        admin_groups:
+          - "Domain Admins"
+          - "Enterprise Admins"
+          - "APP-Admins"
+    
+    # Timeout
+    timeout: "30s"
 
 # 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
 database:

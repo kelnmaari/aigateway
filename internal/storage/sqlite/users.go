@@ -42,8 +42,9 @@ func (s *SQLiteDB) CreateUser(ctx context.Context, user *models.User) error {
 			id, username, email, full_name, password_hash,
 			status, is_admin, is_active, verified, verified_at,
 			created_at, updated_at, last_login,
-			preferences, metadata
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = s.db.ExecContext(ctx, query,
@@ -62,6 +63,10 @@ func (s *SQLiteDB) CreateUser(ctx context.Context, user *models.User) error {
 		user.LastLogin,
 		preferencesJSON,
 		metadataJSON,
+		user.AuthProvider,
+		user.OIDCSubject,
+		user.OIDCIssuer,
+		user.LDAPDN,
 	)
 
 	if err != nil {
@@ -83,7 +88,8 @@ func (s *SQLiteDB) GetUser(ctx context.Context, id string) (*models.User, error)
 			id, username, email, full_name, password_hash,
 			status, is_admin, is_active, verified, verified_at,
 			created_at, updated_at, last_login,
-			preferences, metadata
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
 		FROM users
 		WHERE id = ?
 	`
@@ -110,7 +116,8 @@ func (s *SQLiteDB) GetUserByUsername(ctx context.Context, username string) (*mod
 			id, username, email, full_name, password_hash,
 			status, is_admin, is_active, verified, verified_at,
 			created_at, updated_at, last_login,
-			preferences, metadata
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
 		FROM users
 		WHERE username = ?
 	`
@@ -137,7 +144,8 @@ func (s *SQLiteDB) GetUserByEmail(ctx context.Context, email string) (*models.Us
 			id, username, email, full_name, password_hash,
 			status, is_admin, is_active, verified, verified_at,
 			created_at, updated_at, last_login,
-			preferences, metadata
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
 		FROM users
 		WHERE email = ?
 	`
@@ -170,7 +178,7 @@ func (s *SQLiteDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject str
 			status, is_admin, is_active, verified, verified_at,
 			created_at, updated_at, last_login,
 			preferences, metadata,
-			auth_provider, oidc_subject, oidc_issuer
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
 		FROM users
 		WHERE oidc_issuer = ? AND oidc_subject = ?
 	`
@@ -181,6 +189,36 @@ func (s *SQLiteDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject str
 			return nil, fmt.Errorf("user not found for OIDC issuer=%s subject=%s", issuer, subject)
 		}
 		return nil, fmt.Errorf("failed to get user by OIDC subject: %w", err)
+	}
+
+	return user, nil
+}
+
+// GetUserByLDAPDN получает пользователя по LDAP DN (Version 1.11.3+: LDAP Integration)
+func (s *SQLiteDB) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	s.logger.WithField("ldap_dn", ldapDN).Debug("Getting user by LDAP DN")
+
+	query := `
+		SELECT 
+			id, username, email, full_name, password_hash,
+			status, is_admin, is_active, verified, verified_at,
+			created_at, updated_at, last_login,
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
+		FROM users
+		WHERE ldap_dn = ?
+	`
+
+	user, err := s.scanUser(s.db.QueryRowContext(ctx, query, ldapDN))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found for LDAP DN=%s", ldapDN)
+		}
+		return nil, fmt.Errorf("failed to get user by LDAP DN: %w", err)
 	}
 
 	return user, nil
@@ -223,7 +261,11 @@ func (s *SQLiteDB) UpdateUser(ctx context.Context, user *models.User) error {
 			updated_at = ?,
 			last_login = ?,
 			preferences = ?,
-			metadata = ?
+			metadata = ?,
+			auth_provider = ?,
+			oidc_subject = ?,
+			oidc_issuer = ?,
+			ldap_dn = ?
 		WHERE id = ?
 	`
 
@@ -241,6 +283,10 @@ func (s *SQLiteDB) UpdateUser(ctx context.Context, user *models.User) error {
 		user.LastLogin,
 		preferencesJSON,
 		metadataJSON,
+		user.AuthProvider,
+		user.OIDCSubject,
+		user.OIDCIssuer,
+		user.LDAPDN,
 		user.ID,
 	)
 
@@ -339,7 +385,8 @@ func (s *SQLiteDB) ListUsers(ctx context.Context, filters models.UserFilters) ([
 			id, username, email, full_name, password_hash,
 			status, is_admin, is_active, verified, verified_at,
 			created_at, updated_at, last_login,
-			preferences, metadata
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
 		FROM users
 		WHERE 1=1
 	`
@@ -436,6 +483,10 @@ func (s *SQLiteDB) scanUser(row scanner) (*models.User, error) {
 		&user.LastLogin,
 		&preferencesJSON,
 		&metadataJSON,
+		&user.AuthProvider,
+		&user.OIDCSubject,
+		&user.OIDCIssuer,
+		&user.LDAPDN,
 	)
 
 	if err != nil {

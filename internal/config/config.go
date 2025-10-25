@@ -111,6 +111,9 @@ type AuthConfig struct {
 
 	// OIDC настройки (Version 1.11.1+: Keycloak SSO Integration)
 	OIDC OIDCConfig `mapstructure:"oidc"`
+
+	// LDAP настройки (Version 1.11.3+: LDAP/Active Directory Integration)
+	LDAP LDAPConfig `mapstructure:"ldap"`
 }
 
 // OIDCConfig конфигурация OpenID Connect для SSO
@@ -208,6 +211,48 @@ type GroupMappingConfig struct {
 
 	// AdminGroups список групп, которые дают admin роль в tenant
 	AdminGroups []string `mapstructure:"admin_groups"`
+}
+
+// LDAPConfig конфигурация LDAP/Active Directory аутентификации (Version 1.11.3+)
+type LDAPConfig struct {
+	// Enabled включить LDAP аутентификацию
+	Enabled bool `mapstructure:"enabled"`
+
+	// URL LDAP сервера (ldap:// или ldaps://)
+	URL string `mapstructure:"url" validate:"required_if=Enabled true"`
+
+	// BindDN DN для bind (service account)
+	BindDN string `mapstructure:"bind_dn" validate:"required_if=Enabled true"`
+
+	// BindPassword пароль для bind
+	BindPassword string `mapstructure:"bind_password" validate:"required_if=Enabled true"`
+
+	// User Search настройки
+	UserBaseDN        string `mapstructure:"user_base_dn" validate:"required_if=Enabled true"`
+	UserFilter        string `mapstructure:"user_filter"`        // default: "(uid={username})"
+	UserIDAttribute   string `mapstructure:"user_id_attribute"`  // default: "uid"
+	UserEmailAttribute string `mapstructure:"user_email_attribute"` // default: "mail"
+	UserNameAttribute string `mapstructure:"user_name_attribute"` // default: "cn"
+
+	// Group Search настройки (optional)
+	GroupBaseDN        string `mapstructure:"group_base_dn"`
+	GroupFilter        string `mapstructure:"group_filter"`        // default: "(member={userdn})"
+	GroupNameAttribute string `mapstructure:"group_name_attribute"` // default: "cn"
+
+	// TLS/SSL настройки
+	StartTLS   bool   `mapstructure:"start_tls"`   // Использовать StartTLS
+	SkipVerify bool   `mapstructure:"skip_verify"` // НЕБЕЗОПАСНО: пропустить проверку сертификата
+	CACertFile string `mapstructure:"ca_cert_file"` // Путь к CA certificate
+
+	// User provisioning
+	AutoCreateUser bool `mapstructure:"auto_create_user"` // Создавать пользователя при первом логине
+	AutoUpdateUser bool `mapstructure:"auto_update_user"` // Обновлять данные при каждом логине
+
+	// Group → Tenant mapping (reuse from OIDC-02)
+	TenantProvisioning TenantProvisioningConfig `mapstructure:"tenant_provisioning"`
+
+	// Timeout для LDAP операций
+	Timeout time.Duration `mapstructure:"timeout"` // default: "30s"
 }
 
 // LoggingConfig конфигурация логирования

@@ -104,6 +104,23 @@ func (tx *postgresqlTx) GetTenantByName(ctx context.Context, name string) (*mode
 	return tx.db.GetTenantByName(ctx, name)
 }
 
+func (tx *postgresqlTx) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	return tx.db.GetUserByLDAPDN(ctx, ldapDN)
+}
+
+// Audit Events (Version 1.11.4+: Enhanced Audit Logging)
+func (tx *postgresqlTx) CreateAuditEvent(ctx context.Context, event *models.AuditEvent) error {
+	return tx.db.CreateAuditEvent(ctx, event)
+}
+
+func (tx *postgresqlTx) GetAuditEvents(ctx context.Context, filters storage.AuditFilters) ([]*models.AuditEvent, int, error) {
+	return tx.db.GetAuditEvents(ctx, filters)
+}
+
+func (tx *postgresqlTx) DeleteOldAuditEvents(ctx context.Context, olderThan time.Time) (int, error) {
+	return tx.db.DeleteOldAuditEvents(ctx, olderThan)
+}
+
 func (tx *postgresqlTx) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {
 	return tx.db.UpdateTenant(ctx, tenant)
 }

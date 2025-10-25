@@ -232,6 +232,16 @@ func (a *testDBAdapter) GetUserByOIDCSubject(ctx context.Context, issuer, subjec
 	return nil, nil
 }
 
+// LDAP methods (Version 1.11.3+: LDAP Integration)
+func (a *testDBAdapter) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	return nil, nil
+}
+
+// Tenant methods (Version 1.11.2+: Auto-tenant Provisioning)
+func (a *testDBAdapter) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
+	return nil, nil
+}
+
 // setupAdminTest создает тестовое окружение для admin handler
 func setupAdminTest(t *testing.T) (*AdminHandler, *storage.MemoryStorage) {
 	gin.SetMode(gin.TestMode)

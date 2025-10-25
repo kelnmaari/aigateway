@@ -490,6 +490,36 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_unique_index_tenants_name",
 			SQL:     s.getAddUniqueIndexTenantsNameMigration(),
 		},
+		{
+			Version: 37,
+			Name:    "add_changelog_v1_11_2",
+			SQL:     s.getAddChangelogV1112Migration(),
+		},
+		{
+			Version: 38,
+			Name:    "add_ldap_dn_to_users",
+			SQL:     s.getAddLDAPDNToUsersMigration(),
+		},
+		{
+			Version: 39,
+			Name:    "add_changelog_v1_11_3",
+			SQL:     s.getAddChangelogV1113Migration(),
+		},
+		{
+			Version: 40,
+			Name:    "create_audit_events_table",
+			SQL:     s.getCreateAuditEventsTableMigration(),
+		},
+		{
+			Version: 41,
+			Name:    "add_changelog_v1_11_4",
+			SQL:     s.getAddChangelogV1114Migration(),
+		},
+		{
+			Version: 42,
+			Name:    "create_rbac_tables",
+			SQL:     s.getCreateRBACTablesMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2495,6 +2525,210 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_name_unique ON tenants(name);
 
 -- Also create a regular index on tenants.slug if not already exists (for completeness)
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
+	`
+}
+
+// getAddChangelogV1112Migration returns SQL for adding changelog v1.11.2 (v37 migration)
+func (s *SQLiteDB) getAddChangelogV1112Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.2', '2025-10-25', '## [1.11.2] - 2025-10-25
+
+### Added
+- **OIDC-02: Auto-tenant Provisioning from OIDC Groups** 🏢
+  - Автоматическое создание tenants из OIDC groups claims (Keycloak, Google, Azure AD)
+  - Group → Tenant mapping с двумя режимами: Direct (1:1) и Prefix (path extraction)
+  - Auto-provisioning: создание tenants и добавление пользователей при первом логине
+  - Role assignment: admin/member роли из OIDC groups
+  - Orphaned memberships cleanup (опционально)
+  - Tenant name normalization
+
+### Technical
+- Модули: internal/auth/oidc/tenants.go (parsing), internal/auth/oidc/provisioner.go (provisioner)
+- Configuration: auth.oidc.tenant_provisioning (enabled, auto_create_tenants, sync_on_login, group_mapping)
+- Database (Migration v36): UNIQUE INDEX на tenants.name, GetTenantByName method
+- Integration: OIDC callback с tenant provisioning, JWT с tenant IDs
+- Tests: 16 unit tests (ParseGroups, mapping, normalization)');
+	`
+}
+
+// getAddLDAPDNToUsersMigration returns SQL for adding ldap_dn column to users (v38 migration)
+// Version 1.11.3+: LDAP/Active Directory Integration
+func (s *SQLiteDB) getAddLDAPDNToUsersMigration() string {
+	return `
+-- Add LDAP DN column for LDAP/Active Directory authentication (Version 1.11.3+)
+-- ldap_dn stores the LDAP Distinguished Name of the user
+
+ALTER TABLE users ADD COLUMN ldap_dn TEXT UNIQUE;
+
+-- Create index for faster lookups by LDAP DN
+CREATE INDEX IF NOT EXISTS idx_users_ldap_dn ON users(ldap_dn) WHERE ldap_dn IS NOT NULL;
+	`
+}
+
+// getAddChangelogV1113Migration returns SQL for adding changelog v1.11.3 (v39 migration)
+func (s *SQLiteDB) getAddChangelogV1113Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.3', '2025-10-25', '## [1.11.3] - 2025-10-25
+
+### Added
+- **LDAP-01: LDAP/Active Directory Integration** 🔐
+  - LDAP Bind Authentication для корпоративных LDAP/AD серверов
+  - User/Group Search с настраиваемыми фильтрами (OpenLDAP, Active Directory)
+  - Auto-provisioning users при первом логине
+  - Auto-update users синхронизация email/full name
+  - Tenant provisioning из LDAP groups (reuse OIDC-02 logic)
+  - TLS/LDAPS support с StartTLS и certificate validation
+  - Admin detection на основе LDAP groups
+  - Test connection endpoint для admin (/api/auth/ldap/test)
+
+### Technical
+- Модули: internal/auth/ldap/client.go (LDAP client), internal/api/handlers/ldap.go (handler)
+- Configuration: auth.ldap (URL, bind credentials, user/group search, TLS, provisioning)
+- Database (Migration v38): ALTER TABLE users ADD COLUMN ldap_dn TEXT UNIQUE
+- API Routes: POST /api/auth/ldap/login (public), GET /api/auth/ldap/test (admin)
+- Integration: JWT с tenant IDs, tenant provisioner из OIDC-02
+- Tests: 17 unit tests (config, authentication, isAdminGroup)
+- Support: OpenLDAP, Active Directory, FreeIPA');
+	`
+}
+
+// getCreateAuditEventsTableMigration returns SQL for creating audit_events table (v40 migration)
+// Version 1.11.4+: Enhanced Audit Logging
+func (s *SQLiteDB) getCreateAuditEventsTableMigration() string {
+	return `
+-- Create audit_events table for comprehensive security and compliance logging (Version 1.11.4+)
+CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info',
+    
+    -- Actor (who performed the action)
+    actor_id TEXT NOT NULL,
+    actor_type TEXT NOT NULL DEFAULT 'user',
+    
+    -- Target (what was affected)
+    target_id TEXT,
+    target_type TEXT,
+    
+    -- Context
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error_msg TEXT,
+    metadata TEXT, -- JSON
+    
+    -- Request info
+    ip_address TEXT NOT NULL,
+    user_agent TEXT,
+    
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_events_actor_id ON audit_events(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_events_severity ON audit_events(severity);
+CREATE INDEX IF NOT EXISTS idx_audit_events_resource ON audit_events(resource);
+CREATE INDEX IF NOT EXISTS idx_audit_events_target_id ON audit_events(target_id) WHERE target_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_audit_events_status ON audit_events(status);
+	`
+}
+
+// getAddChangelogV1114Migration returns SQL for adding changelog v1.11.4 (v41 migration)
+// Version 1.11.4+: Enhanced Audit Logging
+func (s *SQLiteDB) getAddChangelogV1114Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.4', '2025-10-25', '## [1.11.4] - 2025-10-25
+
+### Added
+- **AUDIT-01: Enhanced Audit Logging** 🔐
+  - Comprehensive Security Events Logging для всех критичных операций
+  - Structured Audit Events с полной трассировкой actor/target/action
+  - Event Types (24 типа): LOGIN, API_KEY, TENANT, USER, BACKUP, PERMISSIONS
+  - Severity Levels: info, warning, critical
+  - Query API с фильтрами (event_type, severity, resource, date range)
+  - CSV Export для compliance reporting
+  - Statistics Dashboard с real-time метриками (24h)
+  - Admin UI в WebUI с preview + full audit page
+  - Retention Policy с auto-cleanup (90 days default, daily schedule)
+
+### Technical
+- Модули: models/audit.go, services/audit (logger, retention), handlers/audit.go, storage/sqlite/audit.go
+- Database (Migration v40): CREATE TABLE audit_events (id, event_type, severity, actor, target, action, resource, status, metadata)
+- 7 индексов для эффективных запросов
+- API Routes: GET /api/admin/audit (query), /stats (metrics), /export (CSV)
+- WebUI: web/admin-audit.html (dedicated page), web/admin.html (Audit tab)
+- Convenience Methods: LogLogin, LogOIDCLogin, LogLDAPLogin, LogAPIKeyCreated, LogTenantMemberAdded, LogPermissionDenied
+- Integration: AuthHandler с audit logging (LOGIN_SUCCESS, LOGIN_FAILED)');
+	`
+}
+
+// getCreateRBACTablesMigration returns SQL for creating RBAC tables (v42 migration)
+// Version 1.11.5+: Custom Roles & Permissions
+func (s *SQLiteDB) getCreateRBACTablesMigration() string {
+	return `
+-- Create RBAC tables for Role-Based Access Control (Version 1.11.5+)
+
+-- Permissions table
+CREATE TABLE IF NOT EXISTS permissions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    resource TEXT NOT NULL,
+    action TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'global', -- 'global', 'tenant', 'personal'
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Roles table
+CREATE TABLE IF NOT EXISTS roles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'custom', -- 'system', 'custom'
+    scope TEXT NOT NULL DEFAULT 'global', -- 'global', 'tenant'
+    tenant_id TEXT, -- null for global roles
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    UNIQUE(name, tenant_id) -- Unique name per tenant (or global if tenant_id is null)
+);
+
+-- Role-Permission mapping (many-to-many)
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id TEXT NOT NULL,
+    permission_id TEXT NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+);
+
+-- User-Role assignments (many-to-many)
+CREATE TABLE IF NOT EXISTS user_roles (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    tenant_id TEXT, -- null for global role assignment
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    UNIQUE(user_id, role_id, tenant_id) -- Can't assign same role twice
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_roles_tenant_id ON roles(tenant_id) WHERE tenant_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_roles_name ON roles(name);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_permissions_resource ON permissions(resource);
+CREATE INDEX IF NOT EXISTS idx_permissions_name ON permissions(name);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions(role_id);
 	`
 }
 

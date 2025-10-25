@@ -5,6 +5,255 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.4] - 2025-10-25
+
+### Added
+
+- **AUDIT-01: Enhanced Audit Logging** 🔐
+  - **Comprehensive Security Events Logging** для всех критичных операций
+  - **Structured Audit Events** с полной трассировкой actor/target/action
+  - **Event Types** (24 типа): LOGIN, API_KEY, TENANT, USER, BACKUP, PERMISSIONS
+  - **Severity Levels**: info, warning, critical для приоритизации
+  - **Metadata Support** для хранения произвольных данных в JSON
+  - **Query API** с мощными фильтрами (event_type, severity, resource, date range)
+  - **CSV Export** для compliance reporting и external analysis
+  - **Statistics Dashboard** с real-time метриками (24h window)
+  - **Admin UI** в WebUI с preview последних 20 событий + полнофункциональная страница
+  - **Retention Policy** с автоматической очисткой старых событий (90 days default)
+  - **Automatic Cleanup** (daily schedule) для управления размером БД
+
+### Changed
+
+- **AuthHandler** интегрирован с audit logging (LOGIN_SUCCESS, LOGIN_FAILED events)
+- **Database Interface** расширен методами для audit events (CreateAuditEvent, GetAuditEvents, DeleteOldAuditEvents)
+
+### Technical
+
+- **Новые модули**:
+  - `internal/models/audit.go` - AuditEvent data model с 24 event types
+  - `internal/services/audit/logger.go` - AuditLogger service с convenience methods
+  - `internal/services/audit/retention.go` - RetentionPolicy для auto-cleanup
+  - `internal/api/handlers/audit.go` - HTTP handlers для query/export/stats
+  - `internal/storage/sqlite/audit.go` - SQLite CRUD для audit events
+- **Database** (Migration v40):
+  - `CREATE TABLE audit_events` с полями:
+    - `id, event_type, severity, actor_id, actor_type, target_id, target_type`
+    - `action, resource, status, error_msg, metadata (JSON)`
+    - `ip_address, user_agent, timestamp`
+  - **7 индексов** для эффективных запросов:
+    - `idx_audit_events_timestamp` (DESC для recent events)
+    - `idx_audit_events_actor_id, idx_audit_events_event_type`
+    - `idx_audit_events_severity, idx_audit_events_resource`
+    - `idx_audit_events_target_id, idx_audit_events_status`
+- **API Routes** (Admin-only):
+  - `GET /api/admin/audit` - Query audit events с pagination/filters
+  - `GET /api/admin/audit/stats` - Real-time statistics (24h)
+  - `GET /api/admin/audit/export` - CSV export с filters
+- **WebUI**:
+  - `web/admin-audit.html` - Dedicated audit log viewer с:
+    - Stats cards (critical/warning/info/failed logins)
+    - Filters panel (event type, severity, resource, status, date range, actor)
+    - Pagination (50 events per page)
+    - CSV export button
+  - `web/admin.html` - New "Audit" tab с preview последних 20 событий
+  - `web/js/admin.js` - `loadAudit()` method для загрузки audit data
+- **Convenience Methods** в AuditLogger:
+  - `LogLogin(userID, ipAddress, success, errMsg)` - LOGIN events
+  - `LogOIDCLogin(userID, issuer, ipAddress, success)` - OIDC events
+  - `LogLDAPLogin(userID, server, ipAddress, success)` - LDAP events
+  - `LogAPIKeyCreated(actorID, keyID, ipAddress)` - API key events
+  - `LogTenantMemberAdded(actorID, tenantID, memberID, ipAddress)` - Tenant events
+  - `LogPermissionDenied(userID, resource, ipAddress)` - Authorization events
+- **Retention Policy**:
+  - Default: 90 days retention
+  - Daily cleanup schedule (configurable)
+  - Manual trigger via `RunOnce()` method
+  - Graceful shutdown support
+
+### Use Cases
+
+1. **Security Monitoring**: Track failed login attempts, permission denied events
+2. **Compliance Reporting**: Export audit log для SOC2, ISO27001 compliance
+3. **Incident Investigation**: Full trace с actor/target/action/IP/timestamp
+4. **User Activity Tracking**: Кто и когда выполнял операции
+5. **Administrative Auditing**: Все изменения (users, API keys, tenants)
+6. **Trend Analysis**: Statistics dashboard для выявления аномалий
+
+### Configuration Example
+
+```yaml
+# Retention policy настраивается в коде (future: yaml config)
+# Default: 90 days retention, daily cleanup
+# WithRetentionPeriod(duration) - custom retention period
+# WithCleanupInterval(duration) - custom cleanup interval
+```
+
+### Notes
+
+- Audit events хранятся в отдельной таблице `audit_events` для изоляции
+- Автоматическая очистка запускается при старте сервера
+- WebUI показывает последние 20 событий + full audit page для детального анализа
+- CSV export поддерживает все filters для targeted reporting
+- Integration в handlers требует добавления `auditLogger.Log*()` calls
+
+### Future Enhancements (Phase 2)
+
+- SIEM integration (Syslog, Splunk, ELK)
+- Real-time alerting для critical events
+- Advanced analytics и dashboards
+- Audit event replay для forensics
+- Encryption at rest для sensitive audit data
+
+## [1.11.3] - 2025-10-25
+
+### Added
+
+- **LDAP-01: LDAP/Active Directory Integration** 🔐
+  - **LDAP Bind Authentication** для корпоративных LDAP/AD серверов
+  - **User Search** с настраиваемыми фильтрами (OpenLDAP, Active Directory)
+  - **Group Search** для извлечения LDAP groups
+  - **Auto-provisioning users** при первом логине через LDAP
+  - **Auto-update users** синхронизация email/full name при каждом логине
+  - **Tenant provisioning** из LDAP groups (reuse OIDC-02 logic)
+  - **TLS/LDAPS support** с StartTLS и certificate validation
+  - **Admin detection** на основе LDAP groups
+  - **Test connection endpoint** для admin (`/api/auth/ldap/test`)
+
+### Technical
+
+- **Новые модули**:
+  - `internal/auth/ldap/client.go` - LDAP client с bind auth, user/group search, TLS
+  - `internal/api/handlers/ldap.go` - LDAP login handler с user provisioning
+  - 17 unit tests (config validation, authentication, isAdminGroup logic)
+- **Configuration** (Version 1.11.3+):
+  - `auth.ldap.enabled` - включение LDAP аутентификации
+  - `auth.ldap.url` - LDAP server URL (ldap:// или ldaps://)
+  - `auth.ldap.bind_dn` - Service account DN для bind
+  - `auth.ldap.bind_password` - Пароль для bind
+  - `auth.ldap.user_base_dn`, `user_filter`, `user_id_attribute` - user search
+  - `auth.ldap.group_base_dn`, `group_filter`, `group_name_attribute` - group search
+  - `auth.ldap.start_tls`, `skip_verify`, `ca_cert_file` - TLS настройки
+  - `auth.ldap.auto_create_user`, `auto_update_user` - user provisioning
+  - `auth.ldap.tenant_provisioning` - tenant provisioning from groups
+  - `auth.ldap.timeout` - timeout для LDAP операций
+- **Database** (Migration v38):
+  - `ALTER TABLE users ADD COLUMN ldap_dn TEXT UNIQUE` - LDAP Distinguished Name
+  - `CREATE INDEX idx_users_ldap_dn` - быстрый поиск по LDAP DN
+  - `GetUserByLDAPDN(ctx, ldapDN)` - новый метод для LDAP lookup
+- **API Routes**:
+  - `POST /api/auth/ldap/login` - LDAP login endpoint (public)
+  - `GET /api/auth/ldap/test` - Test LDAP connection (admin only)
+- **Integration**:
+  - JWT tokens с tenant IDs из LDAP groups
+  - Reuse tenant provisioner из OIDC-02 (direct/prefix mapping modes)
+  - Support OpenLDAP, Active Directory, FreeIPA
+
+### Use Cases
+
+**OpenLDAP Authentication:**
+```yaml
+auth:
+  ldap:
+    enabled: true
+    url: "ldap://ldap.company.com:389"
+    bind_dn: "cn=admin,dc=company,dc=com"
+    bind_password: "${LDAP_BIND_PASSWORD}"
+    user_base_dn: "ou=users,dc=company,dc=com"
+    user_filter: "(uid={username})"
+    group_base_dn: "ou=groups,dc=company,dc=com"
+# → Users логинятся с LDAP credentials, auto-created
+```
+
+**Active Directory:**
+```yaml
+auth:
+  ldap:
+    enabled: true
+    url: "ldaps://ad.company.com:636"  # LDAPS для security
+    bind_dn: "cn=service-account,dc=company,dc=com"
+    bind_password: "${AD_SERVICE_PASSWORD}"
+    user_base_dn: "ou=users,dc=company,dc=com"
+    user_filter: "(sAMAccountName={username})"  # AD format
+    user_id_attribute: "sAMAccountName"
+    user_name_attribute: "displayName"
+    tenant_provisioning:
+      enabled: true
+      group_mapping:
+        mode: "prefix"
+        prefix: "CN=APP-"  # APP-Engineering → engineering
+        admin_groups: ["Domain Admins", "APP-Admins"]
+# → AD users логинятся, tenants создаются из APP-* groups
+```
+
+---
+
+## [1.11.2] - 2025-10-25
+
+### Added
+
+- **OIDC-02: Auto-tenant Provisioning from OIDC Groups** 🏢
+  - **Автоматическое создание tenants** из OIDC groups claims (Keycloak, Google, Azure AD)
+  - **Group → Tenant mapping** с двумя режимами:
+    - **Direct mode**: 1:1 mapping (group name = tenant name)
+    - **Prefix mode**: извлечение tenant из path (`/organizations/acme` → `acme`)
+  - **Auto-provisioning**: создание tenants и добавление пользователей при первом логине
+  - **Role assignment**: автоматическое назначение admin/member ролей из OIDC groups
+  - **Orphaned memberships cleanup**: удаление доступа при удалении из группы (опционально)
+  - **Tenant name normalization**: lowercase, hyphens, deduplication
+
+### Technical
+
+- **Новые модули**:
+  - `internal/auth/oidc/tenants.go` - Group parsing и mapping logic
+  - `internal/auth/oidc/provisioner.go` - Tenant provisioner service
+  - 16 unit tests (ParseGroups, mapping modes, admin roles, normalization)
+- **Configuration** (Version 1.11.2+):
+  - `auth.oidc.tenant_provisioning.enabled` - включение tenant provisioning
+  - `auth.oidc.tenant_provisioning.auto_create_tenants` - автосоздание tenants
+  - `auth.oidc.tenant_provisioning.sync_on_login` - синхронизация при каждом логине
+  - `auth.oidc.tenant_provisioning.remove_orphaned_memberships` - удаление orphaned memberships
+  - `auth.oidc.tenant_provisioning.group_mapping.mode` - direct или prefix
+  - `auth.oidc.tenant_provisioning.group_mapping.prefix` - префикс для prefix mode
+  - `auth.oidc.tenant_provisioning.group_mapping.admin_groups` - список admin groups
+- **Database** (Migration v36):
+  - `CREATE UNIQUE INDEX idx_tenants_name_unique ON tenants(name)` - быстрый поиск tenants
+  - `GetTenantByName(ctx, name)` - новый метод для OIDC provisioning
+- **Integration**:
+  - OIDC callback flow обновлен для tenant provisioning
+  - JWT tokens теперь включают tenant IDs пользователя
+  - Graceful error handling (login продолжается даже при ошибках provisioning)
+
+### Use Cases
+
+**Enterprise Keycloak Integration:**
+```yaml
+# Keycloak groups: /organizations/acme, /organizations/acme/engineering
+auth:
+  oidc:
+    tenant_provisioning:
+      enabled: true
+      auto_create_tenants: true
+      group_mapping:
+        mode: "prefix"
+        prefix: "/organizations/"
+        admin_groups: ["/admins", "tenant-owners"]
+# → User автоматически добавляется в tenant "acme" при логине
+```
+
+**Direct Group Mapping:**
+```yaml
+# Keycloak groups: engineering, sales, support
+auth:
+  oidc:
+    tenant_provisioning:
+      group_mapping:
+        mode: "direct"
+        admin_groups: ["engineering-admins"]
+# → Каждая группа = отдельный tenant
+```
+
+---
+
 ## [1.11.1] - 2025-10-25
 
 ### Added

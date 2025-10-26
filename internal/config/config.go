@@ -324,6 +324,9 @@ type ModelPreloadConfig struct {
 
 	// UnloadAfter выгрузить модель если не использовалась N времени (0 = never)
 	UnloadAfter time.Duration `mapstructure:"unload_after"`
+
+	// LoadTimeout timeout для загрузки одной модели (default: 5m для больших моделей)
+	LoadTimeout time.Duration `mapstructure:"load_timeout"`
 }
 
 // ToolsConfig конфигурация обработки tools (function calling)

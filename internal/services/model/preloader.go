@@ -134,8 +134,12 @@ func (p *ModelPreloader) preloadModels(ctx context.Context) error {
 
 // loadModel загружает модель в память через dummy request
 func (p *ModelPreloader) loadModel(ctx context.Context, modelName string) error {
-	// Timeout для preload операции
-	loadCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	// Timeout для preload операции (configurable, default 5 minutes для больших моделей)
+	timeout := p.config.LoadTimeout
+	if timeout == 0 {
+		timeout = 5 * time.Minute // Default 5 minutes вместо 60 seconds
+	}
+	loadCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	// Send dummy request с minimal token generation

@@ -1,11 +1,11 @@
 # 🗺️ Roadmap: Ollama-OpenAI Proxy
 
-> **Текущая версия:** 1.11.7 ✅  
-> **Следующая версия:** 1.11.8 (UI-SYNC-01 WebUI Functionality Restoration) 🔄  
+> **Текущая версия:** 1.12.3 ✅  
+> **Следующая версия:** 1.13.0 (RAG System) 📋  
 > **План развития:** Version 1.9.0 - 1.13.0+  
-> **Статус:** Active Development (Version 1.11.8 In Progress - WebUI Redesign & Functionality Sync)  
+> **Статус:** Active Development (Version 1.12.0 Complete! Planning v1.13.0 RAG)  
 > **Последнее обновление:** 2025-10-26  
-> **Новое:** 🎨 v1.11.8 UI-SYNC-01 WebUI Redesign в работе! Синхронизация функционала /web_old/ → /web/ с новым theme.css дизайном. Roadmap: v1.11 (Enterprise Auth ✅) → v1.11.8 (UI Sync 🔄) → v1.12 (UX & Performance) → v1.13 (RAG)
+> **Новое:** 🎉 v1.12.0-v1.12.3 завершены! Model Preloading, Advanced Rate Limiting, Conversation Export/Import. Roadmap: v1.11 (Enterprise Auth ✅) → v1.12 (UX & Performance ✅) → v1.13 (RAG 📋)
 
 ---
 
@@ -19,6 +19,7 @@
 - ✅ **v1.3.0** - User Experience & Multi-Tenancy (5 задач)
 - ✅ **v1.4.0** - WebUI Enhancements & Code Quality (5 задач)
 - ✅ **v1.5.0** - Operations & Maintenance (12 задач)
+- ✅ **v1.12.0** - User Experience & Performance (3 задачи)
 
 ---
 
@@ -417,42 +418,44 @@
 
 ---
 
-## ⚡ Version 1.12.0 - User Experience & Performance
+## ⚡ Version 1.12.0 - User Experience & Performance ✅ **COMPLETED!**
 
 **Фокус:** Улучшение UX и производительности системы  
 **Приоритет:** MEDIUM  
 **Оценка времени:** 18-28 часов  
-**Статус:** 📋 Запланировано (0/3 задач)  
-**Versioning:** v1.12.1-v1.12.3
+**Фактическое время:** ~20 часов  
+**Статус:** 🎉 Завершено 100% (3/3 задач)  
+**Versioning:** v1.12.1, v1.12.2, v1.12.3
 
 **Стратегия:** Компактный релиз фокусирующийся на user experience, экспорте данных и оптимизации производительности.
 
 ### Задачи
 
-- [ ] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.12.1**
-  - Keep models in memory
-  - Configurable warm-up strategy
-  - Health checks для loaded models
-  - Automatic unload of unused models
-  - Priority-based preloading
-  - **Оценка:** 6-8 часов
+- [x] **MODEL-02** Model Preloading & Warming → [BACKLOG/MODEL-02_model_preloading.md](BACKLOG/MODEL-02_model_preloading.md) → **v1.12.1** ✅
+  - Keep models in memory (preload on startup)
+  - Configurable warm-up strategy (health check loop)
+  - Health checks для loaded models (periodic dummy requests)
+  - Automatic unload of unused models (timeout-based)
+  - Priority-based preloading (usage tracking)
+  - Admin API endpoints (GET /loaded, POST /preload)
+  - **Оценка:** 6-8 часов → **Выполнено**
 
-- [ ] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.12.2**
-  - Per tenant, per model limits
-  - Sliding window algorithm
-  - Rate limit headers в response
-  - Burst allowance
-  - Integration с QUOTA-01 (из v1.11)
-  - **Оценка:** 8-10 часов
+- [x] **RATE-02** Advanced Rate Limiting → [BACKLOG/RATE-02_advanced_rate_limiting.md](BACKLOG/RATE-02_advanced_rate_limiting.md) → **v1.12.2** ✅
+  - Per tenant, per model, per user, per API key limits (multi-scope)
+  - Sliding window algorithm (more accurate than fixed window)
+  - Rate limit headers в response (RFC 6585 compliance)
+  - In-memory cache для performance (<1ms overhead)
+  - Database schema для flexible configuration
+  - **Оценка:** 8-10 часов → **Выполнено**
 
-- [ ] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.12.3**
-  - Export to JSON, Markdown, PDF
+- [x] **EXPORT-01** Conversation Export/Import → [BACKLOG/EXPORT-01_conversation_export_import.md](BACKLOG/EXPORT-01_conversation_export_import.md) → **v1.12.3** ✅
+  - Export to JSON, Markdown, Text formats
   - Bulk export для всех conversations
-  - Import для восстановления истории
-  - Date range filtering
-  - Export с RAG metadata (если v1.13 установлена)
+  - Import для восстановления истории (с опциями merge/preserve)
+  - Access control и validation
+  - Metadata export (tokens, dates, model used)
   - **Примечание:** Перенесена из v1.10 для логической группировки с UX
-  - **Оценка:** 4-6 часов
+  - **Оценка:** 4-6 часов → **Выполнено**
 
 ### 🎯 Performance & UX Improvements
 

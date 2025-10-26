@@ -560,11 +560,6 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_12_3",
 			SQL:     s.getAddChangelogV1123Migration(),
 		},
-		{
-			Version: 51,
-			Name:    "add_changelog_v1_12_4",
-			SQL:     s.getAddChangelogV1124Migration(),
-		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -3116,31 +3111,6 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 ### Security
 - **Access Control**: Verify conversation ownership при export/import
 - **User Isolation**: Импорт только в свой tenant/user scope');
-    `
-}
-
-// getAddChangelogV1124Migration returns SQL for adding changelog v1.12.4 (v51 migration)
-func (s *SQLiteDB) getAddChangelogV1124Migration() string {
-	return `
-INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
-('1.12.4', '2025-10-26', '## [1.12.4] - 2025-10-26
-
-### Added
-- **MCP Servers Catalog**: Полноценный каталог популярных MCP серверов
-  - Красивая WebUI страница web/mcp-catalog.html с современным дизайном
-  - 10+ предустановленных серверов (Filesystem, PostgreSQL, GitHub, Slack, etc.)
-  - Category filtering, Search, Sorting
-  - Server cards с полной информацией (status, stars, downloads, features)
-  - One-click installation: Copy config или direct install через Admin API
-  - Responsive design для всех устройств
-
-### Technical
-- JavaScript модуль web/js/mcp-catalog.js: Catalog data, filtering, search, install modal
-- HTML template web/mcp-catalog.html: Gradient purple design, card-based layout
-
-### Featured MCP Servers
-- Official: Filesystem, PostgreSQL, GitHub, Brave Search, Slack, Puppeteer, SQLite, Git
-- Community: Google Drive, Docker');
     `
 }
 

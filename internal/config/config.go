@@ -108,6 +108,151 @@ type AuthConfig struct {
 		AccessTokenExpiry  time.Duration `mapstructure:"access_token_expiry"`
 		RefreshTokenExpiry time.Duration `mapstructure:"refresh_token_expiry"`
 	} `mapstructure:"jwt"`
+
+	// OIDC настройки (Version 1.11.1+: Keycloak SSO Integration)
+	OIDC OIDCConfig `mapstructure:"oidc"`
+
+	// LDAP настройки (Version 1.11.3+: LDAP/Active Directory Integration)
+	LDAP LDAPConfig `mapstructure:"ldap"`
+}
+
+// OIDCConfig конфигурация OpenID Connect для SSO
+type OIDCConfig struct {
+	// Enabled включить OIDC авториз ацию
+	Enabled bool `mapstructure:"enabled"`
+
+	// Provider провайдер OIDC (keycloak, google, azure, okta)
+	Provider string `mapstructure:"provider"`
+
+	// Issuer URL OIDC issuer (e.g., https://keycloak.example.com/realms/myrealm)
+	Issuer string `mapstructure:"issuer" validate:"required_if=Enabled true,url"`
+
+	// ClientID OIDC client ID
+	ClientID string `mapstructure:"client_id" validate:"required_if=Enabled true"`
+
+	// ClientSecret OIDC client secret
+	ClientSecret string `mapstructure:"client_secret" validate:"required_if=Enabled true"`
+
+	// RedirectURI redirect URI after authentication (e.g., https://proxy.example.com/auth/oidc/callback)
+	RedirectURI string `mapstructure:"redirect_uri" validate:"required_if=Enabled true,url"`
+
+	// Scopes OIDC scopes (default: openid, profile, email)
+	Scopes []string `mapstructure:"scopes"`
+
+	// Claims mapping конфигурация маппинга claims
+	Claims ClaimsMapping `mapstructure:"claims"`
+
+	// AutoCreateUser автоматически создавать пользователя при первом логине
+	AutoCreateUser bool `mapstructure:"auto_create_user"`
+
+	// AutoUpdateUser автоматически обновлять информацию о пользователе при каждом логине
+	AutoUpdateUser bool `mapstructure:"auto_update_user"`
+
+	// DefaultRole роль по умолчанию для новых пользователей (user, admin)
+	DefaultRole string `mapstructure:"default_role"`
+
+	// SessionStore хранилище сессий для state parameter (memory, redis)
+	SessionStore string `mapstructure:"session_store"`
+
+	// SessionTTL время жизни сессии для OIDC flow
+	SessionTTL time.Duration `mapstructure:"session_ttl"`
+
+	// TenantProvisioning конфигурация автоматического provisioning tenants из groups (Version 1.11.2+)
+	TenantProvisioning TenantProvisioningConfig `mapstructure:"tenant_provisioning"`
+}
+
+// ClaimsMapping маппинг OIDC claims на поля пользователя
+type ClaimsMapping struct {
+	// UserID claim для user ID (default: "sub")
+	UserID string `mapstructure:"user_id"`
+
+	// Username claim для username (default: "preferred_username")
+	Username string `mapstructure:"username"`
+
+	// Email claim для email (default: "email")
+	Email string `mapstructure:"email"`
+
+	// Name claim для full name (default: "name")
+	Name string `mapstructure:"name"`
+
+	// Groups claim для групп (default: "groups")
+	Groups string `mapstructure:"groups"`
+
+	// Roles claim для ролей (optional)
+	Roles string `mapstructure:"roles"`
+}
+
+// TenantProvisioningConfig конфигурация автоматического создания tenants из OIDC groups (Version 1.11.2+)
+type TenantProvisioningConfig struct {
+	// Enabled включить tenant provisioning
+	Enabled bool `mapstructure:"enabled"`
+
+	// AutoCreateTenants автоматически создавать tenants из groups
+	AutoCreateTenants bool `mapstructure:"auto_create_tenants"`
+
+	// GroupMapping правила маппинга groups → tenants
+	GroupMapping GroupMappingConfig `mapstructure:"group_mapping"`
+
+	// SyncOnLogin синхронизировать tenants при каждом логине
+	SyncOnLogin bool `mapstructure:"sync_on_login"`
+
+	// RemoveOrphanedMemberships удалять membership если группа удалена из OIDC
+	RemoveOrphanedMemberships bool `mapstructure:"remove_orphaned_memberships"`
+}
+
+// GroupMappingConfig правила маппинга OIDC groups на tenants
+type GroupMappingConfig struct {
+	// Mode режим маппинга: "direct" (1:1) или "prefix" (extract after prefix)
+	Mode string `mapstructure:"mode" validate:"oneof=direct prefix"`
+
+	// Prefix префикс для prefix mode (e.g., "/engineering/")
+	// Group: "/engineering/backend" → Tenant: "backend"
+	Prefix string `mapstructure:"prefix"`
+
+	// AdminGroups список групп, которые дают admin роль в tenant
+	AdminGroups []string `mapstructure:"admin_groups"`
+}
+
+// LDAPConfig конфигурация LDAP/Active Directory аутентификации (Version 1.11.3+)
+type LDAPConfig struct {
+	// Enabled включить LDAP аутентификацию
+	Enabled bool `mapstructure:"enabled"`
+
+	// URL LDAP сервера (ldap:// или ldaps://)
+	URL string `mapstructure:"url" validate:"required_if=Enabled true"`
+
+	// BindDN DN для bind (service account)
+	BindDN string `mapstructure:"bind_dn" validate:"required_if=Enabled true"`
+
+	// BindPassword пароль для bind
+	BindPassword string `mapstructure:"bind_password" validate:"required_if=Enabled true"`
+
+	// User Search настройки
+	UserBaseDN        string `mapstructure:"user_base_dn" validate:"required_if=Enabled true"`
+	UserFilter        string `mapstructure:"user_filter"`        // default: "(uid={username})"
+	UserIDAttribute   string `mapstructure:"user_id_attribute"`  // default: "uid"
+	UserEmailAttribute string `mapstructure:"user_email_attribute"` // default: "mail"
+	UserNameAttribute string `mapstructure:"user_name_attribute"` // default: "cn"
+
+	// Group Search настройки (optional)
+	GroupBaseDN        string `mapstructure:"group_base_dn"`
+	GroupFilter        string `mapstructure:"group_filter"`        // default: "(member={userdn})"
+	GroupNameAttribute string `mapstructure:"group_name_attribute"` // default: "cn"
+
+	// TLS/SSL настройки
+	StartTLS   bool   `mapstructure:"start_tls"`   // Использовать StartTLS
+	SkipVerify bool   `mapstructure:"skip_verify"` // НЕБЕЗОПАСНО: пропустить проверку сертификата
+	CACertFile string `mapstructure:"ca_cert_file"` // Путь к CA certificate
+
+	// User provisioning
+	AutoCreateUser bool `mapstructure:"auto_create_user"` // Создавать пользователя при первом логине
+	AutoUpdateUser bool `mapstructure:"auto_update_user"` // Обновлять данные при каждом логине
+
+	// Group → Tenant mapping (reuse from OIDC-02)
+	TenantProvisioning TenantProvisioningConfig `mapstructure:"tenant_provisioning"`
+
+	// Timeout для LDAP операций
+	Timeout time.Duration `mapstructure:"timeout"` // default: "30s"
 }
 
 // LoggingConfig конфигурация логирования

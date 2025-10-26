@@ -69,7 +69,110 @@ auth:
   # JWT settings для внутренних токенов
   jwt:
     secret: "CHANGE_ME_JWT_SECRET_KEY_456"
-    expiry: "24h"
+    access_token_expiry: "15m"
+    refresh_token_expiry: "168h"
+
+  # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
+  oidc:
+    enabled: false  # Включите для корпоративного SSO
+    provider: "keycloak"  # keycloak, google, azure, okta
+    
+    # Keycloak Configuration
+    issuer: "https://keycloak.yourdomain.com/realms/production"
+    client_id: "ollama-proxy-prod"
+    client_secret: "${OIDC_CLIENT_SECRET}"  # ОБЯЗАТЕЛЬНО задайте через environment variable!
+    redirect_uri: "https://proxy.yourdomain.com/auth/oidc/callback"
+    
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+      - roles  # для role-based access control
+    
+    # Claims mapping (настройте под ваш Keycloak realm)
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+      name: "name"
+      groups: "groups"
+      roles: "realm_roles"
+    
+    # User provisioning
+    auto_create_user: true   # Автоматически создавать пользователя при первом логине
+    auto_update_user: true   # Обновлять email/name при каждом логине
+    default_role: "user"     # Роль по умолчанию для новых пользователей (user или admin)
+    
+    # Session management
+    session_store: "redis"   # Используйте redis для distributed sessions в production
+    session_ttl: "10m"       # 10 минут на завершение OIDC flow
+    
+    # Tenant provisioning from OIDC groups (Version 1.11.2+: Auto-tenant Provisioning)
+    tenant_provisioning:
+      enabled: true  # Автоматическое создание tenants из OIDC groups
+      auto_create_tenants: true  # Создавать tenants если они не существуют
+      sync_on_login: true  # Синхронизировать tenants при каждом логине
+      remove_orphaned_memberships: false  # Осторожно! Может удалить доступ у пользователей
+      
+      # Group → Tenant mapping rules
+      group_mapping:
+        mode: "prefix"  # "direct" (1:1) или "prefix" (extract after prefix)
+        prefix: "/organizations/"  # Для prefix mode: "/organizations/acme" → "acme"
+        
+        # Groups которые дают admin роль в tenant
+        admin_groups:
+          - "administrators"
+          - "tenant-owners"
+          - "/admins"
+  
+  # LDAP/Active Directory (Version 1.11.3+: Enterprise Suite)
+  ldap:
+    enabled: false  # Включите для LDAP/AD аутентификации
+    
+    # LDAP Server (используйте ldaps:// для production!)
+    url: "ldaps://ldap.yourdomain.com:636"  # LDAPS для безопасности
+    bind_dn: "cn=service-account,dc=yourdomain,dc=com"
+    bind_password: "${LDAP_BIND_PASSWORD}"  # ОБЯЗАТЕЛЬНО через environment variable!
+    
+    # User Search
+    user_base_dn: "ou=users,dc=yourdomain,dc=com"
+    user_filter: "(sAMAccountName={username})"  # Active Directory format
+    user_id_attribute: "sAMAccountName"
+    user_email_attribute: "mail"
+    user_name_attribute: "displayName"
+    
+    # Group Search
+    group_base_dn: "ou=groups,dc=yourdomain,dc=com"
+    group_filter: "(member={userdn})"
+    group_name_attribute: "cn"
+    
+    # TLS/SSL (КРИТИЧНО для production!)
+    start_tls: false  # Не нужен если используется ldaps://
+    skip_verify: false  # НИКОГДА не включайте в production!
+    ca_cert_file: "/etc/ssl/certs/ldap-ca.crt"  # Путь к CA certificate
+    
+    # User Provisioning
+    auto_create_user: true
+    auto_update_user: true
+    
+    # Tenant Provisioning from AD Groups
+    tenant_provisioning:
+      enabled: true
+      auto_create_tenants: true
+      sync_on_login: true
+      remove_orphaned_memberships: false  # Осторожно с удалением!
+      
+      group_mapping:
+        mode: "prefix"
+        prefix: "CN=APP-"  # AD groups: CN=APP-Engineering,OU=groups,DC=...
+        admin_groups:
+          - "Domain Admins"
+          - "Enterprise Admins"
+          - "APP-Admins"
+    
+    # Timeout
+    timeout: "30s"
 
 # 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
 database:

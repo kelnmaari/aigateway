@@ -475,6 +475,71 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_10_5",
 			SQL:     s.getAddChangelogV1105Migration(),
 		},
+		{
+			Version: 34,
+			Name:    "add_oidc_fields_to_users",
+			SQL:     s.getAddOIDCFieldsMigration(),
+		},
+		{
+			Version: 35,
+			Name:    "add_changelog_v1_11_1",
+			SQL:     s.getAddChangelogV1111Migration(),
+		},
+		{
+			Version: 36,
+			Name:    "add_unique_index_tenants_name",
+			SQL:     s.getAddUniqueIndexTenantsNameMigration(),
+		},
+		{
+			Version: 37,
+			Name:    "add_changelog_v1_11_2",
+			SQL:     s.getAddChangelogV1112Migration(),
+		},
+		{
+			Version: 38,
+			Name:    "add_ldap_dn_to_users",
+			SQL:     s.getAddLDAPDNToUsersMigration(),
+		},
+		{
+			Version: 39,
+			Name:    "add_changelog_v1_11_3",
+			SQL:     s.getAddChangelogV1113Migration(),
+		},
+		{
+			Version: 40,
+			Name:    "create_audit_events_table",
+			SQL:     s.getCreateAuditEventsTableMigration(),
+		},
+		{
+			Version: 41,
+			Name:    "add_changelog_v1_11_4",
+			SQL:     s.getAddChangelogV1114Migration(),
+		},
+		{
+			Version: 42,
+			Name:    "create_rbac_tables",
+			SQL:     s.getCreateRBACTablesMigration(),
+		},
+		{
+			Version: 43,
+			Name:    "create_quotas_tables",
+			SQL:     s.getCreateQuotasTablesMigration(),
+		},
+		{
+			Version: 44,
+			Name:    "add_changelog_v1_11_7",
+			SQL:     s.getAddChangelogV1117Migration(),
+		},
+		{
+			Version: 45,
+			Name:    "add_changelog_v1_11_8",
+			SQL:     s.getAddChangelogV1118Migration(),
+		},
+		{
+			Version: 46,
+			Name:    "add_changelog_v1_11_9",
+			SQL:     s.getAddChangelogV1119Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2403,6 +2468,470 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - Поведение по умолчанию: Chat Integration TruncateLength: 0 - полный контент для LLM, Старое поведение можно вернуть: TruncateLength: 3000
 - Улучшения: Показ статистики для больших страниц (>10K chars), Детальное логирование при truncation, Language detection из HTML metadata');
 	`
+}
+
+// getAddOIDCFieldsMigration returns SQL for adding OIDC fields to users table (v34 migration)
+func (s *SQLiteDB) getAddOIDCFieldsMigration() string {
+	return `
+-- Add OIDC authentication fields to users table (Version 1.11.1+: Keycloak SSO Integration)
+
+-- auth_provider: Authentication provider type ('local', 'oidc', 'ldap')
+ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local' NOT NULL;
+
+-- oidc_subject: OIDC 'sub' claim (unique identifier from OIDC provider)
+ALTER TABLE users ADD COLUMN oidc_subject TEXT;
+
+-- oidc_issuer: OIDC issuer URL (e.g., https://keycloak.example.com/realms/myrealm)
+ALTER TABLE users ADD COLUMN oidc_issuer TEXT;
+
+-- Create index for fast lookup by OIDC subject
+CREATE INDEX IF NOT EXISTS idx_users_oidc_subject ON users(oidc_subject) WHERE oidc_subject IS NOT NULL;
+
+-- Create index for filtering by auth provider
+CREATE INDEX IF NOT EXISTS idx_users_auth_provider ON users(auth_provider);
+
+-- Create composite index for OIDC issuer + subject (for multi-provider scenarios)
+CREATE INDEX IF NOT EXISTS idx_users_oidc_issuer_subject ON users(oidc_issuer, oidc_subject) 
+    WHERE oidc_issuer IS NOT NULL AND oidc_subject IS NOT NULL;
+
+-- Add unique constraint for OIDC subject (within same issuer)
+-- Note: SQLite doesn't support adding unique constraints to existing columns directly,
+-- so we create a unique index instead
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_unique ON users(oidc_issuer, oidc_subject) 
+    WHERE oidc_issuer IS NOT NULL AND oidc_subject IS NOT NULL;
+	`
+}
+
+// getAddChangelogV1111Migration returns SQL for adding changelog v1.11.1 (v35 migration)
+func (s *SQLiteDB) getAddChangelogV1111Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.1', '2025-10-25', '## [1.11.1] - 2025-10-25
+
+### Added
+- **OIDC-01: Keycloak SSO Integration** 🔐
+  - OpenID Connect (OIDC) аутентификация для корпоративного Single Sign-On (SSO)
+  - Интеграция с Keycloak и другими OIDC providers (Google, Azure AD, Okta)
+  - Authorization Code Flow с PKCE для безопасной аутентификации
+  - Автоматическое user provisioning при первом входе через SSO
+  - Гибкий claims mapping для разных OIDC providers
+  - Role-based access control из OIDC groups/roles
+  - Session management для OIDC state с защитой от CSRF
+  - HTTP endpoints: /api/auth/oidc/login, /api/auth/oidc/callback, /api/auth/oidc/logout
+
+### Technical
+- Новые модули: internal/auth/oidc/provider.go - OIDC provider wrapper, internal/auth/oidc/claims.go - OIDC claims structures, internal/api/handlers/oidc.go - HTTP handlers
+- Конфигурация: auth.oidc.enabled, auth.oidc.issuer, auth.oidc.client_id, auth.oidc.client_secret, auth.oidc.scopes, auth.oidc.claims mapping, auth.oidc.auto_create_user, auth.oidc.auto_update_user, auth.oidc.default_role
+- База данных (Migration v34): users.auth_provider, users.oidc_subject, users.oidc_issuer, индексы для OIDC, unique constraint (issuer, subject)
+- Зависимости: coreos/go-oidc v3, golang.org/x/oauth2, gin-contrib/sessions
+- Тестирование: 10 unit tests PASS, 5 SKIP (mock OIDC required)
+
+### Security
+- CSRF Protection - random state parameter в OAuth2 flow
+- ID Token Verification - проверка подписи и claims через coreos/go-oidc
+- Session Security - HttpOnly cookies, SameSite=Lax, secure encryption
+- Claims Validation - проверка issuer, audience, expiration');
+	`
+}
+
+// getAddUniqueIndexTenantsNameMigration returns SQL for adding unique index on tenants.name (v36 migration)
+// Version 1.11.2+: Auto-tenant Provisioning from OIDC Groups
+func (s *SQLiteDB) getAddUniqueIndexTenantsNameMigration() string {
+	return `
+-- Add unique index on tenants.name for OIDC auto-provisioning (Version 1.11.2+)
+-- This ensures tenant names are unique and speeds up GetTenantByName lookups
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_name_unique ON tenants(name);
+
+-- Also create a regular index on tenants.slug if not already exists (for completeness)
+CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
+	`
+}
+
+// getAddChangelogV1112Migration returns SQL for adding changelog v1.11.2 (v37 migration)
+func (s *SQLiteDB) getAddChangelogV1112Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.2', '2025-10-25', '## [1.11.2] - 2025-10-25
+
+### Added
+- **OIDC-02: Auto-tenant Provisioning from OIDC Groups** 🏢
+  - Автоматическое создание tenants из OIDC groups claims (Keycloak, Google, Azure AD)
+  - Group → Tenant mapping с двумя режимами: Direct (1:1) и Prefix (path extraction)
+  - Auto-provisioning: создание tenants и добавление пользователей при первом логине
+  - Role assignment: admin/member роли из OIDC groups
+  - Orphaned memberships cleanup (опционально)
+  - Tenant name normalization
+
+### Technical
+- Модули: internal/auth/oidc/tenants.go (parsing), internal/auth/oidc/provisioner.go (provisioner)
+- Configuration: auth.oidc.tenant_provisioning (enabled, auto_create_tenants, sync_on_login, group_mapping)
+- Database (Migration v36): UNIQUE INDEX на tenants.name, GetTenantByName method
+- Integration: OIDC callback с tenant provisioning, JWT с tenant IDs
+- Tests: 16 unit tests (ParseGroups, mapping, normalization)');
+	`
+}
+
+// getAddLDAPDNToUsersMigration returns SQL for adding ldap_dn column to users (v38 migration)
+// Version 1.11.3+: LDAP/Active Directory Integration
+func (s *SQLiteDB) getAddLDAPDNToUsersMigration() string {
+	return `
+-- Add LDAP DN column for LDAP/Active Directory authentication (Version 1.11.3+)
+-- ldap_dn stores the LDAP Distinguished Name of the user
+
+ALTER TABLE users ADD COLUMN ldap_dn TEXT;
+
+-- Create unique index for LDAP DN (cannot use UNIQUE constraint in ALTER TABLE ADD COLUMN)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ldap_dn_unique ON users(ldap_dn) WHERE ldap_dn IS NOT NULL;
+	`
+}
+
+// getAddChangelogV1113Migration returns SQL for adding changelog v1.11.3 (v39 migration)
+func (s *SQLiteDB) getAddChangelogV1113Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.3', '2025-10-25', '## [1.11.3] - 2025-10-25
+
+### Added
+- **LDAP-01: LDAP/Active Directory Integration** 🔐
+  - LDAP Bind Authentication для корпоративных LDAP/AD серверов
+  - User/Group Search с настраиваемыми фильтрами (OpenLDAP, Active Directory)
+  - Auto-provisioning users при первом логине
+  - Auto-update users синхронизация email/full name
+  - Tenant provisioning из LDAP groups (reuse OIDC-02 logic)
+  - TLS/LDAPS support с StartTLS и certificate validation
+  - Admin detection на основе LDAP groups
+  - Test connection endpoint для admin (/api/auth/ldap/test)
+
+### Technical
+- Модули: internal/auth/ldap/client.go (LDAP client), internal/api/handlers/ldap.go (handler)
+- Configuration: auth.ldap (URL, bind credentials, user/group search, TLS, provisioning)
+- Database (Migration v38): ALTER TABLE users ADD COLUMN ldap_dn TEXT UNIQUE
+- API Routes: POST /api/auth/ldap/login (public), GET /api/auth/ldap/test (admin)
+- Integration: JWT с tenant IDs, tenant provisioner из OIDC-02
+- Tests: 17 unit tests (config, authentication, isAdminGroup)
+- Support: OpenLDAP, Active Directory, FreeIPA');
+	`
+}
+
+// getCreateAuditEventsTableMigration returns SQL for creating audit_events table (v40 migration)
+// Version 1.11.4+: Enhanced Audit Logging
+func (s *SQLiteDB) getCreateAuditEventsTableMigration() string {
+	return `
+-- Create audit_events table for comprehensive security and compliance logging (Version 1.11.4+)
+CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info',
+    
+    -- Actor (who performed the action)
+    actor_id TEXT NOT NULL,
+    actor_type TEXT NOT NULL DEFAULT 'user',
+    
+    -- Target (what was affected)
+    target_id TEXT,
+    target_type TEXT,
+    
+    -- Context
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error_msg TEXT,
+    metadata TEXT, -- JSON
+    
+    -- Request info
+    ip_address TEXT NOT NULL,
+    user_agent TEXT,
+    
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_events_actor_id ON audit_events(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_events_severity ON audit_events(severity);
+CREATE INDEX IF NOT EXISTS idx_audit_events_resource ON audit_events(resource);
+CREATE INDEX IF NOT EXISTS idx_audit_events_target_id ON audit_events(target_id) WHERE target_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_audit_events_status ON audit_events(status);
+	`
+}
+
+// getAddChangelogV1114Migration returns SQL for adding changelog v1.11.4 (v41 migration)
+// Version 1.11.4+: Enhanced Audit Logging
+func (s *SQLiteDB) getAddChangelogV1114Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.4', '2025-10-25', '## [1.11.4] - 2025-10-25
+
+### Added
+- **AUDIT-01: Enhanced Audit Logging** 🔐
+  - Comprehensive Security Events Logging для всех критичных операций
+  - Structured Audit Events с полной трассировкой actor/target/action
+  - Event Types (24 типа): LOGIN, API_KEY, TENANT, USER, BACKUP, PERMISSIONS
+  - Severity Levels: info, warning, critical
+  - Query API с фильтрами (event_type, severity, resource, date range)
+  - CSV Export для compliance reporting
+  - Statistics Dashboard с real-time метриками (24h)
+  - Admin UI в WebUI с preview + full audit page
+  - Retention Policy с auto-cleanup (90 days default, daily schedule)
+
+### Technical
+- Модули: models/audit.go, services/audit (logger, retention), handlers/audit.go, storage/sqlite/audit.go
+- Database (Migration v40): CREATE TABLE audit_events (id, event_type, severity, actor, target, action, resource, status, metadata)
+- 7 индексов для эффективных запросов
+- API Routes: GET /api/admin/audit (query), /stats (metrics), /export (CSV)
+- WebUI: web/admin-audit.html (dedicated page), web/admin.html (Audit tab)
+- Convenience Methods: LogLogin, LogOIDCLogin, LogLDAPLogin, LogAPIKeyCreated, LogTenantMemberAdded, LogPermissionDenied
+- Integration: AuthHandler с audit logging (LOGIN_SUCCESS, LOGIN_FAILED)');
+	`
+}
+
+// getCreateRBACTablesMigration returns SQL for creating RBAC tables (v42 migration)
+// Version 1.11.5+: Custom Roles & Permissions
+func (s *SQLiteDB) getCreateRBACTablesMigration() string {
+	return `
+-- Create RBAC tables for Role-Based Access Control (Version 1.11.5+)
+
+-- Permissions table
+CREATE TABLE IF NOT EXISTS permissions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    resource TEXT NOT NULL,
+    action TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'global', -- 'global', 'tenant', 'personal'
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Roles table
+CREATE TABLE IF NOT EXISTS roles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'custom', -- 'system', 'custom'
+    scope TEXT NOT NULL DEFAULT 'global', -- 'global', 'tenant'
+    tenant_id TEXT, -- null for global roles
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    UNIQUE(name, tenant_id) -- Unique name per tenant (or global if tenant_id is null)
+);
+
+-- Role-Permission mapping (many-to-many)
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id TEXT NOT NULL,
+    permission_id TEXT NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+);
+
+-- User-Role assignments (many-to-many)
+CREATE TABLE IF NOT EXISTS user_roles (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    tenant_id TEXT, -- null for global role assignment
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    UNIQUE(user_id, role_id, tenant_id) -- Can't assign same role twice
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_roles_tenant_id ON roles(tenant_id) WHERE tenant_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_roles_name ON roles(name);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_permissions_resource ON permissions(resource);
+CREATE INDEX IF NOT EXISTS idx_permissions_name ON permissions(name);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions(role_id);
+	`
+}
+
+// getCreateQuotasTablesMigration returns SQL for creating quotas tables (v43 migration)
+// Version 1.11.7+: Usage Quotas System
+func (s *SQLiteDB) getCreateQuotasTablesMigration() string {
+	return `
+-- Create Quotas tables for Usage Quotas System (Version 1.11.7+)
+
+-- Quotas table: defines limits for users or tenants
+CREATE TABLE IF NOT EXISTS quotas (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    scope TEXT NOT NULL, -- 'user', 'tenant'
+    target_id TEXT NOT NULL, -- user_id or tenant_id
+    
+    -- Token limits
+    tokens_per_day INTEGER,
+    tokens_per_month INTEGER,
+    
+    -- Request limits
+    requests_per_day INTEGER,
+    requests_per_month INTEGER,
+    max_concurrent INTEGER,
+    
+    -- Storage limits
+    max_storage_bytes INTEGER,
+    max_conversations INTEGER,
+    max_file_size INTEGER,
+    
+    -- Model restrictions (JSON array of model names)
+    allowed_models TEXT,
+    
+    -- Metadata
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(scope, target_id)
+);
+
+-- Quota usage table: tracks current usage against quotas
+CREATE TABLE IF NOT EXISTS quota_usage (
+    id TEXT PRIMARY KEY,
+    quota_id TEXT NOT NULL,
+    target_id TEXT NOT NULL, -- user_id or tenant_id (matches quota)
+    
+    -- Current usage counters
+    tokens_used_today INTEGER NOT NULL DEFAULT 0,
+    tokens_used_month INTEGER NOT NULL DEFAULT 0,
+    requests_today INTEGER NOT NULL DEFAULT 0,
+    requests_month INTEGER NOT NULL DEFAULT 0,
+    current_concurrent INTEGER NOT NULL DEFAULT 0,
+    storage_used_bytes INTEGER NOT NULL DEFAULT 0,
+    conversations_count INTEGER NOT NULL DEFAULT 0,
+    
+    -- Reset timestamps
+    last_daily_reset TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_monthly_reset TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (quota_id) REFERENCES quotas(id) ON DELETE CASCADE,
+    UNIQUE(quota_id, target_id)
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_quotas_target ON quotas(scope, target_id) WHERE enabled = 1;
+CREATE INDEX IF NOT EXISTS idx_quotas_scope ON quotas(scope);
+CREATE INDEX IF NOT EXISTS idx_quota_usage_target ON quota_usage(target_id);
+CREATE INDEX IF NOT EXISTS idx_quota_usage_quota ON quota_usage(quota_id);
+	`
+}
+
+// getAddChangelogV1118Migration returns SQL for adding changelog v1.11.8 (v45 migration)
+// Version 1.11.8: WebUI Functionality Restoration
+func (s *SQLiteDB) getAddChangelogV1118Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.8', '2025-10-26', '## [1.11.8] - 2025-10-26
+
+### Added
+- **WebUI Complete Restoration**: Full synchronization of functionality from /web_old/ to /web/
+  - Dashboard: Restored gradient background, stats grid, recent conversations, tenants list, quick actions
+  - Admin Panel: Complete 11-tab interface (Dashboard, Users, API Keys, Files, Models, MCP Servers, Backups, Audit, RBAC, Logs, System)
+  - Navigation: Unified navbar.js component across all pages with prominent Admin link
+  - Chat: Full feature parity with model panel, context manager, file attachments
+  - API Keys: Personal and organization keys management with full CRUD operations
+  - Files: Drag & drop upload, filters, grid view, preview functionality
+  - Tenants: Organization management with member roles and permissions
+  - Profile: User information editing, password change, account management
+  - Usage: Statistics and analytics dashboard
+  - About: System information and changelogs display
+  - MCP: MCP servers management interface
+
+### Changed
+- **UI/UX Improvements**: Applied theme.css consistently across all pages for modern, cohesive design
+  - Gradient backgrounds for visual appeal
+  - Improved button and tab styling with hover effects
+  - Better readability with white headings and text shadows
+- **Performance Optimization**: Reduced frequent data request intervals
+  - GPU monitor: 5s → 10s update frequency
+  - Performance monitor: 5s → 10s update frequency
+  - Smart monitor management: auto-stop when tab not active
+
+### Technical
+- All 13 HTML pages synchronized and updated
+- Consistent navigation component across entire application
+- Modern CSS with gradient themes and responsive design
+- Optimized JavaScript for better performance
+- Fixed console errors and improved error handling
+');
+    `
+}
+
+// getAddChangelogV1119Migration returns SQL for adding changelog v1.11.9 (v46 migration)
+// Version 1.11.9: Enhanced Audit Logging
+func (s *SQLiteDB) getAddChangelogV1119Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.9', '2025-10-26', '## [1.11.9] - 2025-10-26
+
+### Added
+- **Enhanced Audit Logging**: Comprehensive audit trail for critical operations
+  - User operations: creation, deletion, enable/disable (LogUserCreated, LogUserDeleted, LogUserUpdated)
+  - API key operations: creation and deletion tracking (LogAPIKeyCreated, LogAPIKeyDeleted)
+  - Tenant operations: creation, updates, deletion (LogTenantCreated, LogTenantUpdated, LogTenantDeleted)
+  - Backup operations: creation and restoration tracking (LogBackupCreated, LogBackupRestored)
+  - Performance monitoring: reduced update frequency from 5s to 10s for GPU and system metrics
+  - WebUI performance: monitors now stop when not actively viewing System tab
+
+### Technical
+- Added AuditLogger integration to handlers: AdminUserHandler, UserHandler, TenantHandler, BackupHandler
+- New audit methods in internal/services/audit/logger.go: LogUserUpdated(), LogTenantUpdated()
+- Updated handler constructors to accept *audit.AuditLogger parameter
+- Router injection of auditLogger into all relevant handlers
+- WebUI optimization: admin.js now stops performance/GPU monitors when switching tabs
+
+### Security
+- **Audit trail for CRITICAL operations**: User deletion (data loss risk), Backup restoration (overwrites current data), Tenant deletion (organization data loss), API key operations (security credentials)
+');
+    `
+}
+
+// getAddChangelogV1117Migration returns SQL for adding changelog v1.11.7 (v44 migration)
+// Version 1.11.7: Usage Quotas System
+func (s *SQLiteDB) getAddChangelogV1117Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.7', '2025-10-25', '## [1.11.7] - 2025-10-25
+
+### Added
+
+- **QUOTA-01: Usage Quotas System** 📊
+  - **Flexible Quota System** для per-user и per-tenant limits
+  - **Token Quotas**: Daily token limits (tokens_per_day), Monthly token limits (tokens_per_month), Automatic usage tracking с prompt/completion tokens
+  - **Request Quotas**: Daily request limits (requests_per_day), Monthly request limits (requests_per_month), Concurrent request limiting (max_concurrent)
+  - **Storage Quotas** (future-ready): Max file upload size (max_file_size), Max total storage per user/tenant (max_storage_bytes), Max conversations count (max_conversations)
+  - **Model Restrictions**: Per-quota model allow-list (allowed_models), Block specific models for certain users/tenants
+  - **Auto-Reset Logic**: Daily quota reset (24h sliding window), Monthly quota reset (calendar month boundary), Background reset при первом request after reset time
+  - **Quota Service** (internal/services/quota/service.go): CheckQuota() - проверка before request processing, RecordUsage() - tracking actual usage after request, IncrementConcurrent() / DecrementConcurrent() - concurrent tracking, GetQuotaStats() - статистика для UI display
+  - **Quota Middleware** (internal/api/middleware/quota.go): Автоматическая проверка квот для chat/completion endpoints, 429 Too Many Requests при quota exceeded, Concurrent request tracking with defer cleanup
+  - **Prometheus Integration**: ollama_proxy_quota_usage - Current usage by target_id/type, ollama_proxy_quota_limit - Quota limits, ollama_proxy_quota_exceeded_total - Exceeded events counter, Periodic collection (30s interval) в MetricsCollector
+  - **Admin API** (/api/admin/quotas): GET /quotas - List all quotas (filter by scope), POST /quotas - Create quota, GET /quotas/:id - Get quota details, PUT /quotas/:id - Update quota, DELETE /quotas/:id - Delete quota (cascade delete usage), GET /quotas/:id/usage - Get current usage
+  - **User API** (/api/quota/me): Get current user''s quota stats with percentages, Tenant-scoped quota support
+  - **Database Schema** (migration v43): quotas table - quota definitions, quota_usage table - usage tracking, Indexes for efficient queries по scope/target_id, Foreign key constraints с cascade delete
+  - **Data Models**: Quota - quota definition (limits, scope, target), QuotaUsage - current usage counters, QuotaStats - computed stats для UI (percentages, remaining), QuotaCheck - result of quota validation
+
+### Changed
+
+- **Router**: Quota service и middleware инициализируются автоматически при наличии database
+- **Metrics Collector**: Добавлен periodic collection для quota usage/limits (каждые 30s)
+
+### Technical
+
+- **Testing**: All internal/* package tests passing ✅ (кроме deprecated extractors tests)
+- **Build**: Server binary собирается успешно с QUOTA-01 ✅
+- **Race Detector**: Tests pass с -race flag ✅
+- **SQLite Implementation**: Full QUOTA CRUD operations в internal/storage/sqlite/quotas.go
+- **PostgreSQL**: Stubs added для будущей реализации
+- **Transactions**: Transaction wrappers delegating to DB methods для quotas
+');
+    `
 }
 
 // ========================================

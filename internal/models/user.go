@@ -16,6 +16,14 @@ type User struct {
 	// Аутентификация
 	PasswordHash string `json:"-" db:"password_hash"` // Bcrypt hash пароля (не возвращается в JSON)
 
+	// OIDC аутентификация (Version 1.11.1+: Keycloak SSO Integration)
+	AuthProvider string  `json:"auth_provider" db:"auth_provider"` // Authentication provider: 'local', 'oidc', 'ldap'
+	OIDCSubject  *string `json:"oidc_subject,omitempty" db:"oidc_subject"`   // OIDC 'sub' claim (unique identifier)
+	OIDCIssuer   *string `json:"oidc_issuer,omitempty" db:"oidc_issuer"`     // OIDC issuer URL
+	
+	// LDAP аутентификация (Version 1.11.3+: LDAP/AD Integration)
+	LDAPDN *string `json:"ldap_dn,omitempty" db:"ldap_dn"` // LDAP Distinguished Name
+
 	// Статус
 	Status     UserStatus `json:"status" db:"status"`       // Статус пользователя
 	IsAdmin    bool       `json:"is_admin" db:"is_admin"`   // Глобальный администратор
@@ -43,6 +51,13 @@ const (
 	UserStatusInactive  UserStatus = "inactive"  // Неактивен
 	UserStatusSuspended UserStatus = "suspended" // Приостановлен
 	UserStatusDeleted   UserStatus = "deleted"   // Удален (soft delete)
+)
+
+// AuthProvider представляет провайдера аутентификации (Version 1.11.1+)
+const (
+	AuthProviderLocal string = "local" // Локальная аутентификация (username/password)
+	AuthProviderOIDC  string = "oidc"  // OpenID Connect (Keycloak, Google, Azure, etc.)
+	AuthProviderLDAP  string = "ldap"  // LDAP/Active Directory
 )
 
 // UserPreferences содержит пользовательские настройки

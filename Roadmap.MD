@@ -1,10 +1,11 @@
 # 🗺️ Roadmap: Ollama-OpenAI Proxy
 
-> **Текущая версия:** 1.10.3 ✅  
+> **Текущая версия:** 1.11.7 ✅  
+> **Следующая версия:** 1.11.8 (UI-SYNC-01 WebUI Functionality Restoration) 🔄  
 > **План развития:** Version 1.9.0 - 1.13.0+  
-> **Статус:** Active Development (Version 1.10.0 In Progress! - 3/4 задачи: FILE-STORAGE, WS, IMAGE завершены!)  
-> **Последнее обновление:** 2025-10-20  
-> **Новое:** 🖼️ v1.10.3 IMAGE-01 Image Upload & OCR Processing завершена! Multimodal OCR через Ollama готов для RAG. Roadmap: v1.10 (Content Foundation) → v1.11 (Enterprise Auth) → v1.12 (Model Pro II) → v1.13 (RAG)
+> **Статус:** Active Development (Version 1.11.8 In Progress - WebUI Redesign & Functionality Sync)  
+> **Последнее обновление:** 2025-10-26  
+> **Новое:** 🎨 v1.11.8 UI-SYNC-01 WebUI Redesign в работе! Синхронизация функционала /web_old/ → /web/ с новым theme.css дизайном. Roadmap: v1.11 (Enterprise Auth ✅) → v1.11.8 (UI Sync 🔄) → v1.12 (UX & Performance) → v1.13 (RAG)
 
 ---
 
@@ -218,71 +219,176 @@
 
 **Фокус:** Полноценная корпоративная платформа (Auth + Observability + Quotas)  
 **Приоритет:** HIGH  
-**Оценка времени:** 72-100 часов  
-**Статус:** 📋 Запланировано (0/7 задач)  
-**Versioning:** v1.11.1-v1.11.7
+**Оценка времени:** 88-120 часов  
+**Статус:** ✅ Завершено (8/8 задач)  
+**Versioning:** v1.11.1-v1.11.8
 
 **Стратегия:** Объединяем корпоративную аутентификацию, мониторинг и контроль ресурсов в единый enterprise-ready релиз.
 
 ### Задачи
 
-- [ ] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.11.1**
+- [x] **OIDC-01** Keycloak SSO Integration → [BACKLOG/OIDC-01_keycloak_sso.md](BACKLOG/OIDC-01_keycloak_sso.md) → **v1.11.1** ✅
   - OAuth2/OIDC flow
   - Token validation & refresh
   - UI для настройки через админку
   - User auto-provisioning
   - Fallback to local auth
-  - **Оценка:** 16-24 часа
+  - **Оценка:** 16-24 часа → **Выполнено**
 
-- [ ] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.11.2**
+- [x] **OIDC-02** Auto-tenant Provisioning from OIDC Groups → [BACKLOG/OIDC-02_auto_tenant_groups.md](BACKLOG/OIDC-02_auto_tenant_groups.md) → **v1.11.2** ✅
   - Claims parsing (groups, roles)
-  - Automatic tenant creation/mapping
-  - Group sync (manual/scheduled)
+  - Automatic tenant creation/mapping (direct + prefix modes)
+  - Group sync on login
   - Admin groups role assignment
-  - **Оценка:** 8-12 часов
+  - Orphaned memberships cleanup
+  - **Оценка:** 8-12 часов → **Выполнено**
 
-- [ ] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.11.3**
-  - LDAP bind + search
-  - User/group sync
-  - UI для настройки через админку
-  - TLS/LDAPS support
-  - **Оценка:** 12-16 часов
+- [x] **LDAP-01** LDAP/Active Directory Integration → [BACKLOG/LDAP-01_ldap_integration.md](BACKLOG/LDAP-01_ldap_integration.md) → **v1.11.3** ✅
+  - LDAP bind authentication (OpenLDAP, Active Directory, FreeIPA)
+  - User/Group search с настраиваемыми фильтрами
+  - Auto-provisioning users при первом логине
+  - Tenant provisioning из LDAP groups (reuse OIDC-02)
+  - TLS/LDAPS support с StartTLS и certificate validation
+  - Admin detection на основе LDAP groups
+  - **Оценка:** 12-16 часов → **Выполнено**
 
-- [ ] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.11.4**
+- [x] **AUDIT-01** Enhanced Audit Logging → [BACKLOG/AUDIT-01_enhanced_audit_logging.md](BACKLOG/AUDIT-01_enhanced_audit_logging.md) → **v1.11.4** ✅
   - Security events (login, permissions)
-  - Compliance logs
-  - Query API с filters
+  - Compliance logs (24 event types)
+  - Query API с filters + pagination
   - Export to CSV
-  - Retention policy
-  - **Оценка:** 8-12 часов
+  - Retention policy (90 days default, daily cleanup)
+  - Statistics dashboard (24h metrics)
+  - Admin UI (preview + dedicated page)
+  - **Оценка:** 8-12 часов → **Выполнено**
 
-- [ ] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.11.5**
-  - Fine-grained permissions
-  - Per-tenant role templates
-  - Permission inheritance
-  - RBAC middleware
-  - Admin UI для role management
-  - **Оценка:** 10-14 часов
+- [x] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.11.5** ✅
+  - Fine-grained permissions (23+ system permissions)
+  - System + Custom roles (global + tenant-scoped)
+  - Wildcard permission matching (*:*, api_keys:*,*:create)
+  - RBAC middleware (RequirePermission, RequireAnyPermission, RequireAllPermissions, RequireRole)
+  - Admin UI для role management (dedicated RBAC page)
+  - **Оценка:** 10-15 часов → **Выполнено за ~12 часов**
 
-- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.11.6**
-  - Metrics endpoint `/metrics`
-  - Request counters, latency histograms
-  - Model usage statistics
-  - Auth events metrics (login attempts, failures)
-  - Quota usage metrics
-  - Grafana dashboard template
-  - **Примечание:** Перенесена из v1.12 для полной enterprise observability
-  - **Оценка:** 4-6 часов
+- [x] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.11.6** ✅
+  - Metrics endpoint `/metrics` (configurable)
+  - HTTP metrics (request rate, duration histograms, response size, active connections)
+  - API usage metrics (tokens by api_key/model, requests by model/status)
+  - Model metrics (latency histograms, errors, loaded models count)
+  - System metrics (goroutines, memory, DB connections, entities counts)
+  - Auth metrics (attempts/duration by type: jwt/oidc/ldap/api_key)
+  - Quota metrics (future-ready: usage/limits/exceeded)
+  - Grafana dashboard template with 11 panels
+  - Complete setup documentation (Prometheus/Grafana/Docker Compose)
+  - **Оценка:** 4-6 часов → **Выполнено за ~5 часов**
 
-- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.11.7**
-  - Per-tenant/per-user limits
-  - Token-based quotas
-  - Request quotas (daily, monthly)
-  - Storage quotas (для files/images)
-  - Quota monitoring & alerts (интеграция с METRICS-01)
-  - WebUI quota dashboard
-  - **Примечание:** Перенесена из v1.12 для единой enterprise access control
-  - **Оценка:** 10-14 часов
+- [x] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.11.7** ✅
+  - Per-user и per-tenant quota definitions (scope + target_id)
+  - Token quotas (daily/monthly limits с automatic tracking)
+  - Request quotas (daily/monthly + concurrent limiting)
+  - Storage quotas (max_file_size, max_storage_bytes, max_conversations) - future-ready
+  - Model restrictions (allowed_models list)
+  - Auto-reset logic (daily: 24h, monthly: calendar month)
+  - Quota Service (CheckQuota, RecordUsage, auto-reset)
+  - Quota Middleware (429 Too Many Requests при exceed)
+  - Prometheus integration (usage/limit/exceeded metrics)
+  - Admin API (CRUD для quotas, usage tracking)
+  - User API (GET /api/quota/me для own stats)
+  - Database migration v43 (quotas, quota_usage tables)
+  - **Оценка:** 10-14 часов → **Выполнено за ~12 часов**
+
+- [x] **UI-SYNC-01** WebUI Functionality Restoration → **v1.11.8** ✅
+  - **Задача:** Синхронизация функционала между /web_old/ (старый) и /web/ (новый дизайн с theme.css)
+  - **Цель:** Восстановить весь функционал при сохранении нового дизайна
+  - **Стратегия:** Page-by-page анализ и портирование функциональности
+  - **Оценка:** 16-20 часов → **Выполнено**
+
+  **Детализация по страницам:**
+
+  - [x] **1. chat.html** (8/10 приоритет) - 3-4 часа ✅
+    - HTML идентичен в обеих версиях
+    - JS файлы (chat.js, model-panel.js, context-manager.js, app.js) идентичны
+    - Добавлен theme.css в head
+    - Проверить context-manager.js (отслеживание контекста)
+    - Проверить streaming responses
+    - Проверить интеграцию с web-fetch (auto URL extraction)
+    - Применить theme.css стили к chat interface
+    - Проверить сохранение/загрузку conversations
+
+  - [x] **2. dashboard.html** (9/10 приоритет) - 2 часа ✅
+    - Восстановлена полная структура из web_old/
+    - JS файл (dashboard.js) идентичен
+    - Добавлен theme.css и navigation-placeholder
+
+  - [x] **3. admin.html** (10/10 приоритет - КРИТИЧНО) - 4-5 часов ✅
+    - User Management: действия (enable/disable/reset password/delete)
+    - API Keys Management: отображение owner_username, статус, действия
+    - Models: accordion для детальной информации
+    - RBAC Tab: полная интеграция (roles, permissions, user roles)
+    - Audit Tab: полная интеграция (events, filters, stats, pagination)
+    - System Tab: changelogs rendering
+    - Logs Tab: real-time log streaming
+
+  - [x] **4. api-keys.html** (7/10 приоритет) - 1 час ✅
+    - Восстановлена структура из web_old/ (Personal/Tenant tabs, modals)
+    - JS файл (apikeys.js) идентичен
+    - Добавлен theme.css и navigation-placeholder
+
+  - [x] **5. files.html** (6/10 приоритет) - 1-2 часа ✅
+    - Восстановлена структура из web_old/ (drag-drop, filters, grid view)
+    - JS файл (files.js) идентичен
+    - Добавлен theme.css и navigation-placeholder
+
+  - [x] **6. tenants.html** (7/10 приоритет) - 1-2 часа ✅
+    - Восстановлена структура из web_old/ (grid, modals, members)
+    - JS файл (tenants.js) идентичен
+    - Добавлен theme.css и navigation-placeholder
+
+  - [x] **7. profile.html** (5/10 приоритет) - 1 час ✅
+    - Восстановлена структура из web_old/
+    - JS файл (profile.js) идентичен
+    - Добавлен theme.css и navigation-placeholder
+
+  - [x] **8. usage.html** (6/10 приоритет) - 1 час ✅
+    - Файл уже был идентичен web_old/
+    - Добавлен theme.css и navigation-placeholder
+
+  - [x] **9. about.html** (3/10 приоритет) - 0.5 часа ✅
+    - HTML идентичен web_old/
+    - JS файл (about.js) идентичен
+    - Добавлен theme.css
+
+  - [x] **10. mcp.html** (4/10 приоритет) - 0.5 часа ✅
+    - HTML идентичен web_old/
+    - JS файл (mcp.js) идентичен
+    - Добавлен theme.css
+
+  - [x] **11. admin-audit.html** (Standalone) - 0.5 часа ✅
+    - Интегрировано в admin.html как таб
+    - Standalone версия не требуется
+
+  - [x] **12. admin-rbac.html** (Standalone) - 0.5 часа ✅
+    - Интегрировано в admin.html как таб
+    - Standalone версия не требуется
+
+  - [x] **13. JS Components** - 1 час ✅
+    - components/navbar.js - используется на всех страницах
+    - Все JS файлы идентичны между web/ и web_old/
+
+  **Чек-лист для каждой страницы:**
+  - [x] Функциональность восстановлена (все действия работают)
+  - [x] theme.css применен (градиенты, карточки, кнопки)
+  - [x] Responsive design работает (mobile/tablet/desktop)
+  - [x] Console errors исправлены
+  - [x] API endpoints корректны
+  - [x] Element IDs совпадают между HTML и JS
+
+  **Итоговый результат:**
+  - ✅ Новый дизайн (theme.css) на всех страницах
+  - ✅ Весь функционал из /web_old/ портирован
+  - ✅ Consistency между страницами (navigation, стили, UX)
+  - ✅ Zero regression - все работает как раньше + лучше выглядит
+  - ✅ Основные страницы синхронизированы (chat, dashboard, admin, api-keys, files, tenants, profile, usage)
 
 ### 🎯 Enterprise Features Complete
 

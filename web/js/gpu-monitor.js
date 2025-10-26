@@ -202,8 +202,8 @@ class GPUMonitor {
     }
 
     startAutoUpdate() {
-        // Обновляем каждые 5 секунд
-        this.updateInterval = setInterval(() => this.updateMetrics(), 5000);
+        // Обновляем каждые 10 секунд (уменьшена нагрузка)
+        this.updateInterval = setInterval(() => this.updateMetrics(), 10000);
     }
 
     stop() {

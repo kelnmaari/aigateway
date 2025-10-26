@@ -81,6 +81,12 @@ type Database interface {
 	// GetUserByEmail получает пользователя по email
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 
+	// GetUserByOIDCSubject получает пользователя по OIDC subject и issuer (Version 1.11.1+)
+	GetUserByOIDCSubject(ctx context.Context, issuer, subject string) (*models.User, error)
+	
+	// GetUserByLDAPDN получает пользователя по LDAP DN (Version 1.11.3+: LDAP Integration)
+	GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error)
+
 	// UpdateUser обновляет данные пользователя
 	UpdateUser(ctx context.Context, user *models.User) error
 
@@ -105,6 +111,9 @@ type Database interface {
 
 	// GetTenantBySlug получает tenant по slug
 	GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error)
+
+	// GetTenantByName получает tenant по имени (Version 1.11.2+: для OIDC auto-provisioning)
+	GetTenantByName(ctx context.Context, name string) (*models.Tenant, error)
 
 	// UpdateTenant обновляет данные tenant
 	UpdateTenant(ctx context.Context, tenant *models.Tenant) error
@@ -323,6 +332,82 @@ type Database interface {
 
 	// GetFileAccessLogs возвращает историю доступа к файлу
 	GetFileAccessLogs(ctx context.Context, fileID string, limit int) ([]*models.FileAccessLog, error)
+
+	// ========================================
+	// Audit Events (Version 1.11.4+: Enhanced Audit Logging)
+	// ========================================
+
+	// CreateAuditEvent создает новое событие аудита
+	CreateAuditEvent(ctx context.Context, event *models.AuditEvent) error
+
+	// GetAuditEvents возвращает список событий аудита с фильтрами
+	GetAuditEvents(ctx context.Context, filters AuditFilters) ([]*models.AuditEvent, int, error)
+
+	// DeleteOldAuditEvents удаляет события аудита старше указанного времени (retention policy)
+	DeleteOldAuditEvents(ctx context.Context, olderThan time.Time) (int, error)
+
+	// ========================================
+	// RBAC (Roles & Permissions) (Version 1.11.5+: Custom Roles & Permissions)
+	// ========================================
+
+	// Permissions
+	CreatePermission(ctx context.Context, permission *models.RBACPermission) error
+	GetPermission(ctx context.Context, id string) (*models.RBACPermission, error)
+	GetPermissionByName(ctx context.Context, name string) (*models.RBACPermission, error)
+	ListPermissions(ctx context.Context) ([]*models.RBACPermission, error)
+
+	// Roles
+	CreateRole(ctx context.Context, role *models.Role) error
+	GetRole(ctx context.Context, id string) (*models.Role, error)
+	GetRoleByName(ctx context.Context, name string, tenantID *string) (*models.Role, error)
+	ListRoles(ctx context.Context, tenantID *string) ([]*models.Role, error)
+	UpdateRole(ctx context.Context, role *models.Role) error
+	DeleteRole(ctx context.Context, id string) error
+
+	// Role-Permission mapping
+	AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error
+	RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error
+	GetRolePermissions(ctx context.Context, roleID string) ([]*models.RBACPermission, error)
+
+	// User-Role assignments
+	AssignRoleToUser(ctx context.Context, userRole *models.UserRole) error
+	RemoveRoleFromUser(ctx context.Context, userID, roleID string, tenantID *string) error
+	GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error)
+	GetRoleUsers(ctx context.Context, roleID string) ([]*models.User, error)
+
+	// ========================================
+	// Quotas (Version 1.11.7+: Usage Quotas System)
+	// ========================================
+
+	// Quota Management
+	CreateQuota(ctx context.Context, quota *models.Quota) error
+	GetQuota(ctx context.Context, id string) (*models.Quota, error)
+	GetQuotaByTarget(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, error)
+	ListQuotas(ctx context.Context, scope *models.QuotaScope) ([]*models.Quota, error)
+	UpdateQuota(ctx context.Context, quota *models.Quota) error
+	DeleteQuota(ctx context.Context, id string) error
+
+	// Quota Usage Tracking
+	GetQuotaUsage(ctx context.Context, quotaID string) (*models.QuotaUsage, error)
+	GetQuotaUsageByTarget(ctx context.Context, targetID string) (*models.QuotaUsage, error)
+	UpdateQuotaUsage(ctx context.Context, usage *models.QuotaUsage) error
+	ResetQuotaUsage(ctx context.Context, quotaID string, resetType string) error // "daily" or "monthly"
+
+	// Quota & Usage Combined (for checking)
+	GetQuotaWithUsage(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, *models.QuotaUsage, error)
+}
+
+// AuditFilters фильтры для запроса audit events (Version 1.11.4+)
+type AuditFilters struct {
+	EventType  string
+	ActorID    string
+	Resource   string
+	Severity   string
+	Status     string
+	FromDate   time.Time
+	ToDate     time.Time
+	Limit      int
+	Offset     int
 }
 
 // Tx представляет транзакцию БД

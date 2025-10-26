@@ -11,20 +11,23 @@ import (
 	"ollama-openai-proxy/internal/auth/middleware"
 	"ollama-openai-proxy/internal/auth/password"
 	"ollama-openai-proxy/internal/models"
+	auditService "ollama-openai-proxy/internal/services/audit"
 	"ollama-openai-proxy/internal/storage"
 )
 
 // UserHandler обрабатывает user management запросы
 type UserHandler struct {
-	db     storage.Database
-	logger *logrus.Logger
+	db          storage.Database
+	logger      *logrus.Logger
+	auditLogger *auditService.AuditLogger
 }
 
 // NewUserHandler создает новый User Handler
-func NewUserHandler(db storage.Database, logger *logrus.Logger) *UserHandler {
+func NewUserHandler(db storage.Database, logger *logrus.Logger, auditLogger *auditService.AuditLogger) *UserHandler {
 	return &UserHandler{
-		db:     db,
-		logger: logger,
+		db:          db,
+		logger:      logger,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -362,6 +365,11 @@ func (h *UserHandler) CreatePersonalAPIKey(c *gin.Context) {
 		"key_id":  apiKey.ID,
 	}).Info("Personal API key created")
 
+	// Audit log: API Key created
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogAPIKeyCreated(c.Request.Context(), userID, apiKey.ID, apiKey.Name, c.ClientIP())
+	}
+
 	// Return API key with plaintext (only shown once!)
 	apiKey.KeyHash = "" // Don't return hash
 	c.JSON(http.StatusCreated, gin.H{
@@ -422,6 +430,11 @@ func (h *UserHandler) DeletePersonalAPIKey(c *gin.Context) {
 		"user_id": userID,
 		"key_id":  keyID,
 	}).Info("Personal API key deleted")
+
+	// Audit log: API Key deleted
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogAPIKeyDeleted(c.Request.Context(), userID, keyID, c.ClientIP())
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "API key deleted successfully",

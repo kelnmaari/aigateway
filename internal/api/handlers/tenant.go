@@ -13,20 +13,23 @@ import (
 
 	"ollama-openai-proxy/internal/auth/middleware"
 	"ollama-openai-proxy/internal/models"
+	auditService "ollama-openai-proxy/internal/services/audit"
 	"ollama-openai-proxy/internal/storage"
 )
 
 // TenantHandler обрабатывает tenant management запросы
 type TenantHandler struct {
-	db     storage.Database
-	logger *logrus.Logger
+	db          storage.Database
+	logger      *logrus.Logger
+	auditLogger *auditService.AuditLogger
 }
 
 // NewTenantHandler создает новый Tenant Handler
-func NewTenantHandler(db storage.Database, logger *logrus.Logger) *TenantHandler {
+func NewTenantHandler(db storage.Database, logger *logrus.Logger, auditLogger *auditService.AuditLogger) *TenantHandler {
 	return &TenantHandler{
-		db:     db,
-		logger: logger,
+		db:          db,
+		logger:      logger,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -115,6 +118,11 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 		"tenant_id": tenant.ID,
 		"user_id":   userID,
 	}).Info("Tenant created successfully")
+
+	// Audit log: Tenant created
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogTenantCreated(c.Request.Context(), userID, tenant.ID, tenant.Name, c.ClientIP())
+	}
 
 	c.JSON(http.StatusCreated, tenant)
 }
@@ -236,6 +244,11 @@ func (h *TenantHandler) UpdateTenant(c *gin.Context) {
 
 	h.logger.WithField("tenant_id", tenantID).Info("Tenant updated")
 
+	// Audit log: Tenant updated
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogTenantUpdated(c.Request.Context(), userID, tenantID, "tenant information updated", c.ClientIP())
+	}
+
 	c.JSON(http.StatusOK, tenant)
 }
 
@@ -285,6 +298,11 @@ func (h *TenantHandler) DeleteTenant(c *gin.Context) {
 	}
 
 	h.logger.WithField("tenant_id", tenantID).Info("Tenant deleted")
+
+	// Audit log: Tenant deleted (CRITICAL)
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogTenantDeleted(c.Request.Context(), userID, tenantID, c.ClientIP())
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Tenant deleted successfully",

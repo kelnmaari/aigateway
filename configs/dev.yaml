@@ -40,6 +40,103 @@ auth:
     access_token_expiry: "15m"    # Access token живет 15 минут
     refresh_token_expiry: "168h"  # Refresh token живет 7 дней
 
+  # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
+  oidc:
+    enabled: false  # Отключено по умолчанию в dev (требует Keycloak сервер)
+    provider: "keycloak"
+    issuer: "https://keycloak.example.com/realms/myrealm"
+    client_id: "ollama-proxy"
+    client_secret: "${OIDC_CLIENT_SECRET}"  # Из environment variable
+    redirect_uri: "http://localhost:8085/auth/oidc/callback"
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+    
+    # Claims mapping (default values)
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+      name: "name"
+      groups: "groups"
+      roles: "realm_roles"
+    
+    # User provisioning
+    auto_create_user: true   # Автоматически создавать пользователя при первом логине
+    auto_update_user: true   # Автоматически обновлять данные при каждом логине
+    default_role: "user"     # Роль по умолчанию для новых пользователей
+    
+    # Session management
+    session_store: "memory"  # memory или redis
+    session_ttl: "10m"       # 10 минут на OIDC flow
+    
+    # Tenant provisioning from OIDC groups (Version 1.11.2+: Auto-tenant Provisioning)
+    tenant_provisioning:
+      enabled: true  # Автоматическое создание tenants из OIDC groups
+      auto_create_tenants: true  # Создавать tenants если они не существуют
+      sync_on_login: true  # Синхронизировать tenants при каждом логине
+      remove_orphaned_memberships: false  # Не удалять membership если группа удалена
+      
+      # Group → Tenant mapping rules
+      group_mapping:
+        mode: "prefix"  # "direct" (1:1) или "prefix" (extract after prefix)
+        prefix: "/engineering/"  # Для prefix mode: "/engineering/backend" → "backend"
+        
+        # Groups которые дают admin роль в tenant
+        admin_groups:
+          - "engineering-admins"
+          - "tenant-admins"
+          - "/admins"
+  
+  # LDAP/Active Directory (Version 1.11.3+: Enterprise Suite)
+  ldap:
+    enabled: false  # Отключено по умолчанию (требует LDAP сервер)
+    
+    # LDAP Server
+    url: "ldap://ldap.example.com:389"  # или ldaps://ldap.example.com:636 для TLS
+    bind_dn: "cn=admin,dc=example,dc=com"
+    bind_password: "${LDAP_BIND_PASSWORD}"  # Из environment variable
+    
+    # User Search
+    user_base_dn: "ou=users,dc=example,dc=com"
+    user_filter: "(uid={username})"  # OpenLDAP; для AD: "(sAMAccountName={username})"
+    user_id_attribute: "uid"  # для AD: "sAMAccountName"
+    user_email_attribute: "mail"
+    user_name_attribute: "cn"
+    
+    # Group Search (optional)
+    group_base_dn: "ou=groups,dc=example,dc=com"
+    group_filter: "(member={userdn})"  # для AD: "(memberOf={userdn})"
+    group_name_attribute: "cn"
+    
+    # TLS/SSL
+    start_tls: false  # Использовать StartTLS для ldap:// connections
+    skip_verify: false  # НЕ ВКЛЮЧАЙТЕ в production!
+    ca_cert_file: ""  # Путь к CA certificate (optional)
+    
+    # User Provisioning
+    auto_create_user: true  # Создавать пользователя при первом логине
+    auto_update_user: true  # Обновлять email/name при каждом логине
+    
+    # Tenant Provisioning from LDAP Groups (reuse OIDC-02 logic)
+    tenant_provisioning:
+      enabled: true
+      auto_create_tenants: true
+      sync_on_login: true
+      remove_orphaned_memberships: false
+      
+      group_mapping:
+        mode: "direct"  # или "prefix"
+        prefix: ""  # Для prefix mode
+        admin_groups:
+          - "Domain Admins"
+          - "Administrators"
+    
+    # Timeout
+    timeout: "30s"
+
 # 💾 DATABASE - User Management & Multi-Tenancy (Version 1.3.0+)
 database:
   # Database type: sqlite or postgresql

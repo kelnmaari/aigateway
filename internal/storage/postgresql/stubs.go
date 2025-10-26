@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ollama-openai-proxy/internal/models"
+	"ollama-openai-proxy/internal/storage"
 )
 
 // ========================================
@@ -24,6 +25,96 @@ func (db *PostgreSQLDB) GetTenant(ctx context.Context, id string) (*models.Tenan
 
 func (db *PostgreSQLDB) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	return nil, fmt.Errorf("GetTenantBySlug not implemented yet")
+}
+
+func (db *PostgreSQLDB) GetTenantByName(ctx context.Context, name string) (*models.Tenant, error) {
+	return nil, fmt.Errorf("GetTenantByName not implemented yet (Version 1.11.2+)")
+}
+
+func (db *PostgreSQLDB) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	return nil, fmt.Errorf("GetUserByLDAPDN not implemented yet (Version 1.11.3+)")
+}
+
+// Audit Events (Version 1.11.4+: Enhanced Audit Logging)
+func (db *PostgreSQLDB) CreateAuditEvent(ctx context.Context, event *models.AuditEvent) error {
+	return fmt.Errorf("CreateAuditEvent not implemented yet (Version 1.11.4+)")
+}
+
+func (db *PostgreSQLDB) GetAuditEvents(ctx context.Context, filters storage.AuditFilters) ([]*models.AuditEvent, int, error) {
+	return nil, 0, fmt.Errorf("GetAuditEvents not implemented yet (Version 1.11.4+)")
+}
+
+func (db *PostgreSQLDB) DeleteOldAuditEvents(ctx context.Context, olderThan time.Time) (int, error) {
+	return 0, fmt.Errorf("DeleteOldAuditEvents not implemented yet (Version 1.11.4+)")
+}
+
+// RBAC (Version 1.11.5+: Custom Roles & Permissions)
+func (db *PostgreSQLDB) CreatePermission(ctx context.Context, permission *models.RBACPermission) error {
+	return fmt.Errorf("CreatePermission not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetPermission(ctx context.Context, id string) (*models.RBACPermission, error) {
+	return nil, fmt.Errorf("GetPermission not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetPermissionByName(ctx context.Context, name string) (*models.RBACPermission, error) {
+	return nil, fmt.Errorf("GetPermissionByName not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) ListPermissions(ctx context.Context) ([]*models.RBACPermission, error) {
+	return nil, fmt.Errorf("ListPermissions not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) CreateRole(ctx context.Context, role *models.Role) error {
+	return fmt.Errorf("CreateRole not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetRole(ctx context.Context, id string) (*models.Role, error) {
+	return nil, fmt.Errorf("GetRole not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetRoleByName(ctx context.Context, name string, tenantID *string) (*models.Role, error) {
+	return nil, fmt.Errorf("GetRoleByName not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) ListRoles(ctx context.Context, tenantID *string) ([]*models.Role, error) {
+	return nil, fmt.Errorf("ListRoles not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) UpdateRole(ctx context.Context, role *models.Role) error {
+	return fmt.Errorf("UpdateRole not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) DeleteRole(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteRole not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error {
+	return fmt.Errorf("AssignPermissionToRole not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+	return fmt.Errorf("RemovePermissionFromRole not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetRolePermissions(ctx context.Context, roleID string) ([]*models.RBACPermission, error) {
+	return nil, fmt.Errorf("GetRolePermissions not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) AssignRoleToUser(ctx context.Context, userRole *models.UserRole) error {
+	return fmt.Errorf("AssignRoleToUser not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) RemoveRoleFromUser(ctx context.Context, userID, roleID string, tenantID *string) error {
+	return fmt.Errorf("RemoveRoleFromUser not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error) {
+	return nil, fmt.Errorf("GetUserRoles not implemented yet (Version 1.11.5+)")
+}
+
+func (db *PostgreSQLDB) GetRoleUsers(ctx context.Context, roleID string) ([]*models.User, error) {
+	return nil, fmt.Errorf("GetRoleUsers not implemented yet (Version 1.11.5+)")
 }
 
 func (db *PostgreSQLDB) DeleteTenant(ctx context.Context, id string) error {
@@ -288,4 +379,52 @@ func (db *PostgreSQLDB) DeleteModelConfig(ctx context.Context, id string) error 
 
 func (db *PostgreSQLDB) GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error) {
 	return nil, fmt.Errorf("GetEffectiveModelConfig not implemented for PostgreSQL yet")
+}
+
+// ========================================
+// Quota Methods (Stubs - v1.11.7+)
+// ========================================
+
+func (db *PostgreSQLDB) CreateQuota(ctx context.Context, quota *models.Quota) error {
+	return fmt.Errorf("CreateQuota not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) GetQuota(ctx context.Context, id string) (*models.Quota, error) {
+	return nil, fmt.Errorf("GetQuota not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) GetQuotaByTarget(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, error) {
+	return nil, fmt.Errorf("GetQuotaByTarget not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) ListQuotas(ctx context.Context, scope *models.QuotaScope) ([]*models.Quota, error) {
+	return nil, fmt.Errorf("ListQuotas not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) UpdateQuota(ctx context.Context, quota *models.Quota) error {
+	return fmt.Errorf("UpdateQuota not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) DeleteQuota(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteQuota not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) GetQuotaUsage(ctx context.Context, quotaID string) (*models.QuotaUsage, error) {
+	return nil, fmt.Errorf("GetQuotaUsage not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) GetQuotaUsageByTarget(ctx context.Context, targetID string) (*models.QuotaUsage, error) {
+	return nil, fmt.Errorf("GetQuotaUsageByTarget not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) UpdateQuotaUsage(ctx context.Context, usage *models.QuotaUsage) error {
+	return fmt.Errorf("UpdateQuotaUsage not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) ResetQuotaUsage(ctx context.Context, quotaID string, resetType string) error {
+	return fmt.Errorf("ResetQuotaUsage not implemented for PostgreSQL yet (Version 1.11.7+)")
+}
+
+func (db *PostgreSQLDB) GetQuotaWithUsage(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, *models.QuotaUsage, error) {
+	return nil, nil, fmt.Errorf("GetQuotaWithUsage not implemented for PostgreSQL yet (Version 1.11.7+)")
 }

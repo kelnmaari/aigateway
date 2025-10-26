@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama-OpenAI Proxy WebUI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <h1>🦙 Proxy</h1>
+            <p class="version">v1.0.0</p>
+        </div>
+        
+        <nav class="nav">
+            <a href="#" class="nav-item active" data-view="dashboard">
+                <span class="icon">📊</span>
+                Dashboard
+            </a>
+            <a href="#" class="nav-item" data-view="apikeys">
+                <span class="icon">🔑</span>
+                API Keys
+            </a>
+            <a href="#" class="nav-item" data-view="models">
+                <span class="icon">🤖</span>
+                Models
+            </a>
+            <a href="#" class="nav-item" data-view="logs">
+                <span class="icon">📝</span>
+                Logs
+            </a>
+            <a href="#" class="nav-item" data-view="config">
+                <span class="icon">⚙️</span>
+                Config
+            </a>
+        </nav>
+
+        <div class="status">
+            <div class="status-item">
+                <span class="status-dot" id="server-status"></span>
+                <span id="server-status-text">Connecting...</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+        <header class="header">
+            <h2 id="page-title">Dashboard</h2>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="refreshData()">
+                    <span>🔄</span> Refresh
+                </button>
+                <span class="last-update">Last update: <span id="last-update-time">Never</span></span>
+            </div>
+        </header>
+
+        <!-- Dashboard View -->
+        <div id="view-dashboard" class="view active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Requests</div>
+                        <div class="stat-value" id="stat-total-requests">-</div>
+                        <div class="stat-delta" id="stat-total-requests-delta"></div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Success Rate</div>
+                        <div class="stat-value" id="stat-success-rate">-</div>
+                        <div class="stat-delta" id="stat-success-delta"></div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Latency</div>
+                        <div class="stat-value" id="stat-avg-latency">-</div>
+                        <div class="stat-delta" id="stat-latency-delta"></div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🔑</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Active Keys</div>
+                        <div class="stat-value" id="stat-active-keys">-</div>
+                        <div class="stat-delta" id="stat-keys-delta"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Server Info</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="info-table">
+                            <tr>
+                                <td class="label">Status:</td>
+                                <td id="info-status">-</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Uptime:</td>
+                                <td id="info-uptime">-</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Address:</td>
+                                <td id="info-address">-</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Version:</td>
+                                <td id="info-version">-</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Ollama Connection</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="info-table">
+                            <tr>
+                                <td class="label">Status:</td>
+                                <td id="ollama-status">-</td>
+                            </tr>
+                            <tr>
+                                <td class="label">URL:</td>
+                                <td id="ollama-url">-</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Models:</td>
+                                <td id="ollama-models">-</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Requests:</td>
+                                <td id="ollama-requests">-</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Request Statistics</h3>
+                </div>
+                <div class="card-body">
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Count</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="request-stats-table">
+                            <tr>
+                                <td colspan="3" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Keys View -->
+        <div id="view-apikeys" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>API Keys Management</h3>
+                    <button class="btn btn-primary" onclick="showCreateKeyModal()">
+                        <span>➕</span> Create New Key
+                    </button>
+                </div>
+                <div class="card-body">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>ID</th>
+                                <th>Status</th>
+                                <th>Rate Limit</th>
+                                <th>Models</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apikeys-table">
+                            <tr>
+                                <td colspan="7" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Models View -->
+        <div id="view-models" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Available Models</h3>
+                </div>
+                <div class="card-body">
+                    <div id="models-grid" class="models-grid">
+                        <div class="text-center">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs View -->
+        <div id="view-logs" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Recent Logs</h3>
+                    <button class="btn btn-secondary" onclick="loadLogs()">
+                        <span>🔄</span> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="logs-container" class="logs-container">
+                        <div class="text-center">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config View -->
+        <div id="view-config" class="view">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Server Configuration</h3>
+                </div>
+                <div class="card-body">
+                    <div id="config-container">
+                        <div class="text-center">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for creating API Key -->
+    <div id="create-key-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New API Key</h3>
+                <button class="modal-close" onclick="closeCreateKeyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-key-form" onsubmit="createApiKey(event)">
+                    <div class="form-group">
+                        <label>Key Name</label>
+                        <input type="text" id="key-name" required placeholder="My API Key">
+                    </div>
+                    <div class="form-group">
+                        <label>Rate Limit (requests/minute)</label>
+                        <input type="number" id="key-rate-limit" value="60" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Allowed Models (comma-separated, * for all)</label>
+                        <input type="text" id="key-models" value="*" placeholder="*, gpt-4, gpt-3.5-turbo">
+                    </div>
+                    <div class="form-group">
+                        <label>Admin Key (for creating keys)</label>
+                        <input type="password" id="admin-key" required placeholder="sk-admin-...">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateKeyModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Key</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for displaying created key -->
+    <div id="show-key-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✅ API Key Created!</h3>
+                <button class="modal-close" onclick="closeShowKeyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="warning">⚠️ Save this key now - you won't be able to see it again!</p>
+                <div class="key-display">
+                    <code id="created-key-value"></code>
+                    <button class="btn btn-primary" onclick="copyKey()">
+                        📋 Copy
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeShowKeyModal()">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+

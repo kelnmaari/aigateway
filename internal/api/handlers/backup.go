@@ -14,20 +14,22 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"ollama-openai-proxy/internal/config"
+	auditService "ollama-openai-proxy/internal/services/audit"
 	"ollama-openai-proxy/internal/storage"
 )
 
 // BackupHandler обрабатывает backup и restore операции
 type BackupHandler struct {
-	config     *config.Config
-	logger     *logrus.Logger
-	db         storage.Database
-	backupDir  string
-	maxBackups int // Максимальное количество хранимых бэкапов
+	config      *config.Config
+	logger      *logrus.Logger
+	db          storage.Database
+	backupDir   string
+	maxBackups  int // Максимальное количество хранимых бэкапов
+	auditLogger *auditService.AuditLogger
 }
 
 // NewBackupHandler создает новый backup handler
-func NewBackupHandler(cfg *config.Config, logger *logrus.Logger, db storage.Database) *BackupHandler {
+func NewBackupHandler(cfg *config.Config, logger *logrus.Logger, db storage.Database, auditLogger *auditService.AuditLogger) *BackupHandler {
 	// Определяем директорию для бэкапов
 	backupDir := "./backups"
 	if cfg.Database.SQLite.Path != "" {
@@ -42,11 +44,12 @@ func NewBackupHandler(cfg *config.Config, logger *logrus.Logger, db storage.Data
 	}
 
 	return &BackupHandler{
-		config:     cfg,
-		logger:     logger,
-		db:         db,
-		backupDir:  backupDir,
-		maxBackups: 10, // Храним последние 10 бэкапов
+		config:      cfg,
+		logger:      logger,
+		db:          db,
+		backupDir:   backupDir,
+		maxBackups:  10, // Храним последние 10 бэкапов
+		auditLogger: auditLogger,
 	}
 }
 
@@ -86,6 +89,12 @@ func (h *BackupHandler) CreateBackup(c *gin.Context) {
 		"filename": backupFilename,
 		"size":     fileInfo.Size(),
 	}).Info("Backup created successfully")
+
+	// Audit log: Backup created (CRITICAL)
+	userID, _ := c.Get("user_id")
+	if h.auditLogger != nil && userID != nil {
+		_ = h.auditLogger.LogBackupCreated(c.Request.Context(), userID.(string), backupFilename, c.ClientIP())
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Backup created successfully",
@@ -206,6 +215,12 @@ func (h *BackupHandler) RestoreBackup(c *gin.Context) {
 	}
 
 	h.logger.WithField("filename", filename).Info("Backup restored successfully")
+
+	// Audit log: Backup restored (CRITICAL - data loss risk!)
+	userID, _ := c.Get("user_id")
+	if h.auditLogger != nil && userID != nil {
+		_ = h.auditLogger.LogBackupRestored(c.Request.Context(), userID.(string), filename, c.ClientIP())
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Backup restored successfully. Please restart the server for changes to take effect.",

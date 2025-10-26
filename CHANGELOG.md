@@ -5,6 +5,632 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.9] - 2025-10-26
+
+### Added
+- **Enhanced Audit Logging**: Comprehensive audit trail for critical operations
+  - User operations: creation, deletion, enable/disable (LogUserCreated, LogUserDeleted, LogUserUpdated)
+  - API key operations: creation and deletion tracking (LogAPIKeyCreated, LogAPIKeyDeleted)
+  - Tenant operations: creation, updates, deletion (LogTenantCreated, LogTenantUpdated, LogTenantDeleted)
+  - Backup operations: creation and restoration tracking (LogBackupCreated, LogBackupRestored)
+  - Performance monitoring: reduced update frequency from 5s to 10s for GPU and system metrics
+  - WebUI performance: monitors now stop when not actively viewing System tab
+
+### Technical
+- Added AuditLogger integration to handlers:
+  - `AdminUserHandler`: tracks user lifecycle events (create, delete, disable, enable)
+  - `UserHandler`: tracks personal API key management
+  - `TenantHandler`: tracks organization tenant operations
+  - `BackupHandler`: tracks critical backup/restore operations
+- New audit methods in `internal/services/audit/logger.go`:
+  - `LogUserUpdated()` - tracks user status changes and updates
+  - `LogTenantUpdated()` - tracks tenant information changes
+- Updated handler constructors to accept `*audit.AuditLogger` parameter
+- Router injection of `auditLogger` into all relevant handlers
+- WebUI optimization: `admin.js` now stops performance/GPU monitors when switching tabs
+
+### Security
+- **Audit trail for CRITICAL operations**:
+  - User deletion (data loss risk)
+  - Backup restoration (overwrites current data)
+  - Tenant deletion (organization data loss)
+  - API key operations (security credentials)
+
+## [1.11.7] - 2025-10-25
+
+### Added
+
+- **QUOTA-01: Usage Quotas System** 📊
+  - **Flexible Quota System** для per-user и per-tenant limits
+  - **Token Quotas**:
+    - Daily token limits (`tokens_per_day`)
+    - Monthly token limits (`tokens_per_month`)
+    - Automatic usage tracking с prompt/completion tokens
+  - **Request Quotas**:
+    - Daily request limits (`requests_per_day`)
+    - Monthly request limits (`requests_per_month`)
+    - Concurrent request limiting (`max_concurrent`)
+  - **Storage Quotas** (future-ready):
+    - Max file upload size (`max_file_size`)
+    - Max total storage per user/tenant (`max_storage_bytes`)
+    - Max conversations count (`max_conversations`)
+  - **Model Restrictions**:
+    - Per-quota model allow-list (`allowed_models`)
+    - Block specific models for certain users/tenants
+  - **Auto-Reset Logic**:
+    - Daily quota reset (24h sliding window)
+    - Monthly quota reset (calendar month boundary)
+    - Background reset при первом request after reset time
+  - **Quota Service** (`internal/services/quota/service.go`):
+    - `CheckQuota()` - проверка before request processing
+    - `RecordUsage()` - tracking actual usage after request
+    - `IncrementConcurrent() / DecrementConcurrent()` - concurrent tracking
+    - `GetQuotaStats()` - статистика для UI display
+  - **Quota Middleware** (`internal/api/middleware/quota.go`):
+    - Автоматическая проверка квот для chat/completion endpoints
+    - 429 Too Many Requests при quota exceeded
+    - Concurrent request tracking with defer cleanup
+  - **Prometheus Integration**:
+    - `ollama_proxy_quota_usage` - Current usage by target_id/type
+    - `ollama_proxy_quota_limit` - Quota limits
+    - `ollama_proxy_quota_exceeded_total` - Exceeded events counter
+    - Periodic collection (30s interval) в MetricsCollector
+  - **Admin API** (`/api/admin/quotas`):
+    - `GET /quotas` - List all quotas (filter by scope)
+    - `POST /quotas` - Create quota
+    - `GET /quotas/:id` - Get quota details
+    - `PUT /quotas/:id` - Update quota
+    - `DELETE /quotas/:id` - Delete quota (cascade delete usage)
+    - `GET /quotas/:id/usage` - Get current usage
+  - **User API** (`/api/quota/me`):
+    - Get current user's quota stats with percentages
+    - Tenant-scoped quota support
+  - **Database Schema** (migration v43):
+    - `quotas` table - quota definitions
+    - `quota_usage` table - usage tracking
+    - Indexes for efficient queries по scope/target_id
+    - Foreign key constraints с cascade delete
+  - **Data Models**:
+    - `Quota` - quota definition (limits, scope, target)
+    - `QuotaUsage` - current usage counters
+    - `QuotaStats` - computed stats для UI (percentages, remaining)
+    - `QuotaCheck` - result of quota validation
+
+### Changed
+
+- **Router**: Quota service и middleware инициализируются автоматически при наличии database
+- **Chat Endpoints**: Quota checking применяется к `/v1/chat/completions`, `/v1/completions`
+- **Metrics Collector**: Добавлен сбор quota metrics (usage/limits) каждые 30s
+
+### Technical
+
+- **internal/models/quota.go**: Data models для quotas
+- **internal/storage/sqlite/quotas.go**: SQLite CRUD implementation
+- **internal/storage/postgresql/stubs.go**: PostgreSQL stubs (v1.11.7+)
+- **internal/services/quota/service.go**: Core quota logic
+- **internal/api/middleware/quota.go**: Quota enforcement middleware
+- **internal/api/handlers/quota.go**: Admin & user API handlers
+- **internal/api/router/router.go**: Route registration
+- **internal/metrics/prometheus.go**: Quota metrics integration
+- **Dependencies**: No new dependencies required
+
+### Fair Usage
+
+- **Quota Hierarchy**: Tenant quota > User quota (tenant takes priority)
+- **Unlimited Access**: No quota = unlimited (admin override possible)
+- **Soft Enforcement**: Checks before request, records after (no mid-request interruption)
+- **Concurrent Safety**: Mutex-protected usage updates для race-free tracking
+- **Idempotent Resets**: Safe daily/monthly resets без data loss
+
+### Use Cases
+
+1. **Free Tier Limits**: Set daily/monthly token quotas для free users
+2. **Paid Plan Enforcement**: Different quotas per subscription tier
+3. **Team Quotas**: Tenant-level quotas для shared team resources
+4. **Model Access Control**: Restrict expensive models to premium users
+5. **Fair Usage Policy**: Prevent resource exhaustion from single user
+6. **Cost Control**: Track and limit token consumption for budget management
+7. **Concurrent Throttling**: Limit simultaneous requests per user/tenant
+
+### Future Enhancements
+
+- Soft limits vs hard limits (warnings before enforcement)
+- Quota alerts/notifications (email/webhook when 80% usage)
+- Time-based quotas (hourly, weekly)
+- Cost-based quotas (dollar amounts instead of tokens)
+- Quota templates для quick assignment
+- Bulk quota operations (assign to multiple users)
+- Storage quota enforcement для file uploads
+- Conversation count enforcement
+
+## [1.11.6] - 2025-10-25
+
+### Added
+
+- **METRICS-01: Prometheus Metrics Export** 📊
+  - **Comprehensive Metrics Collection** для monitoring и observability
+  - **HTTP Metrics**:
+    - Request rate (by method, endpoint, status)
+    - Request duration histograms (p50, p95, p99)
+    - Response size histograms
+    - Active connections gauge
+  - **API Usage Metrics**:
+    - Tokens used (by api_key, model, type: prompt/completion)
+    - API requests (by model, status: success/error)
+    - API cost tracking (if pricing enabled)
+  - **Model Metrics**:
+    - Model request duration histograms (by model)
+    - Models loaded gauge
+    - Model errors (by model, error_type)
+  - **System Metrics**:
+    - Goroutines count
+    - Memory usage (alloc, sys, heap_alloc, heap_sys, heap_inuse, stack_inuse)
+    - DB connections
+    - API keys/users/tenants total counts
+  - **Authentication Metrics** (v1.11+):
+    - Auth attempts (by type: jwt/oidc/ldap/api_key, status)
+    - Auth duration by type
+  - **Quota Metrics** (future-ready):
+    - Quota usage/limits/exceeded events
+  - **Prometheus Middleware** для автоматического сбора HTTP metrics
+  - **Usage Tracking Integration** экспортирует API/model metrics в Prometheus
+  - **MetricsCollector** с periodic collection system metrics (30s interval)
+  - **Grafana Dashboard Template** (`docs/grafana-dashboard.json`):
+    - HTTP request rate & duration panels
+    - Token usage rate by model
+    - Model latency (p95) by model
+    - Top 5 models by request rate
+    - System health (goroutines, memory, models loaded)
+  - **Setup Documentation** (`docs/PROMETHEUS_SETUP.md`):
+    - Installation guide (Prometheus, Grafana)
+    - Docker Compose setup example
+    - Alerting examples
+    - PromQL query examples
+    - Troubleshooting guide
+
+### Changed
+
+- **Middleware Order**: Prometheus middleware добавлен after OpenTelemetry tracing
+- **Usage Tracking**: Интегрирован с Prometheus metrics export
+- **MetricsCollector**: Запускается автоматически при `metrics.enabled=true`
+
+### Technical
+
+- **internal/metrics/prometheus.go**: Все определения Prometheus metrics
+- **internal/api/middleware/prometheus.go**: HTTP metrics middleware
+- **internal/api/middleware/usage_tracking.go**: Интеграция с Prometheus
+- **cmd/server/main.go**: Запуск MetricsCollector
+- **Dependencies**: `github.com/prometheus/client_golang v1.17+`
+- **Endpoint**: `GET /metrics` (configurable via `metrics.prometheus_path`)
+- **Configuration**: `metrics.enabled`, `metrics.prometheus_path` в config.yaml
+
+### Observability
+
+- **Enterprise-Ready Monitoring**: Полная интеграция с Prometheus/Grafana stack
+- **Production Metrics**: Low-cardinality labels для efficient storage
+- **Real-Time Visibility**: Automatic metrics collection без manual instrumentation
+- **Alerting Support**: Ready-to-use alert rules в documentation
+
+### Use Cases
+
+1. **Production Monitoring**: Track HTTP performance, API usage, model latency
+2. **Capacity Planning**: Monitor resource usage (memory, goroutines, connections)
+3. **Performance Optimization**: Identify slow endpoints и models
+4. **Cost Tracking**: Monitor token usage per API key/model
+5. **SLA Compliance**: Track request success rate и latency percentiles
+6. **Incident Response**: Real-time dashboards для quick troubleshooting
+
+## [1.11.5] - 2025-10-25
+
+### Added
+
+- **RBAC-01: Custom Roles & Permissions** 🛡️
+  - **Fine-Grained Permission System** с wildcard support (*:*, api_keys:*, *:create)
+  - **Role Management** (system + custom roles)
+    - **System Roles**: super_admin, admin, user, api_manager, read_only
+    - **Custom Roles**: создание tenant-specific или global ролей
+  - **Permission Types** (23+ permissions):
+    - API Keys: create, read, update, delete, revoke
+    - Users: create, read, update, delete, manage
+    - Tenants: create, read, update, delete, manage
+    - Files: upload, read, delete, manage
+    - Conversations: read, delete
+    - Usage Stats: view
+    - Backups: create, restore
+    - Models: view, manage
+    - System: admin, read
+  - **RBAC Service** с permission checking и user roles resolution
+  - **RBAC Middleware** для Gin:
+    - `RequirePermission(permission)` - проверка одного разрешения
+    - `RequireAnyPermission(...)` - проверка любого из разрешений
+    - `RequireAllPermissions(...)` - проверка всех разрешений
+    - `RequireRole(roleName)` - проверка роли по имени
+  - **Database CRUD** для permissions, roles, role_permissions, user_roles
+  - **Admin UI** для RBAC Management:
+    - Roles management (create, edit, delete, assign permissions)
+    - User roles assignment/removal
+    - Permissions reference viewer
+    - Quick stats dashboard
+  - **API Endpoints** (`/api/admin/rbac/*`):
+    - `GET /permissions` - список всех системных permissions
+    - `GET /roles`, `POST /roles`, `PUT /roles/:id`, `DELETE /roles/:id`
+    - `GET /roles/:id/permissions`, `POST /roles/:id/permissions`
+    - `GET /users/:id/roles`, `POST /users/:id/roles`, `DELETE /users/:id/roles/:role_id`
+    - `GET /users/:id/permissions` - computed permissions от всех ролей
+
+### Changed
+
+- **Database Schema** (migration v42):
+  - Таблицы: `permissions`, `roles`, `role_permissions`, `user_roles`
+  - Индексы для оптимизации permission checks
+- **Admin Panel** добавлена вкладка RBAC с quick stats и link на full RBAC manager
+
+### Technical
+
+- **models/rbac.go**: RBACPermission, Role, UserRole data models
+- **services/rbac/**: Service, Permissions definitions
+- **api/middleware/rbac.go**: RBAC middleware для authorization
+- **api/handlers/rbac.go**: CRUD handlers для roles/permissions
+- **web/admin-rbac.html**, **web/js/admin-rbac.js**: Full-featured RBAC UI
+- **Wildcard Support** в permission matching (resource:*, *:action, *:*)
+
+### Security
+
+- **Granular Access Control**: Замена грубой admin/non-admin логики на fine-grained permissions
+- **Tenant Isolation**: Роли могут быть tenant-specific или global
+- **System Roles Protection**: System roles (super_admin, admin) не могут быть удалены или изменены
+- **Super Admin Bypass**: Super admins автоматически проходят все permission checks
+
+### Use Cases
+
+1. **Content Manager Role**: upload/read/delete files, но не может управлять users
+2. **API Manager Role**: create/read/update/delete API keys, но не может создавать users
+3. **Read-Only Admin**: view usage stats, models, system info без возможности изменений
+4. **Tenant Admin**: управление users/members внутри своего tenant, но не global admin
+5. **Custom Business Roles**: например "Support Agent", "Billing Manager", "DevOps Engineer"
+
+## [1.11.4] - 2025-10-25
+
+### Added
+
+- **AUDIT-01: Enhanced Audit Logging** 🔐
+  - **Comprehensive Security Events Logging** для всех критичных операций
+  - **Structured Audit Events** с полной трассировкой actor/target/action
+  - **Event Types** (24 типа): LOGIN, API_KEY, TENANT, USER, BACKUP, PERMISSIONS
+  - **Severity Levels**: info, warning, critical для приоритизации
+  - **Metadata Support** для хранения произвольных данных в JSON
+  - **Query API** с мощными фильтрами (event_type, severity, resource, date range)
+  - **CSV Export** для compliance reporting и external analysis
+  - **Statistics Dashboard** с real-time метриками (24h window)
+  - **Admin UI** в WebUI с preview последних 20 событий + полнофункциональная страница
+  - **Retention Policy** с автоматической очисткой старых событий (90 days default)
+  - **Automatic Cleanup** (daily schedule) для управления размером БД
+
+### Changed
+
+- **AuthHandler** интегрирован с audit logging (LOGIN_SUCCESS, LOGIN_FAILED events)
+- **Database Interface** расширен методами для audit events (CreateAuditEvent, GetAuditEvents, DeleteOldAuditEvents)
+
+### Technical
+
+- **Новые модули**:
+  - `internal/models/audit.go` - AuditEvent data model с 24 event types
+  - `internal/services/audit/logger.go` - AuditLogger service с convenience methods
+  - `internal/services/audit/retention.go` - RetentionPolicy для auto-cleanup
+  - `internal/api/handlers/audit.go` - HTTP handlers для query/export/stats
+  - `internal/storage/sqlite/audit.go` - SQLite CRUD для audit events
+- **Database** (Migration v40):
+  - `CREATE TABLE audit_events` с полями:
+    - `id, event_type, severity, actor_id, actor_type, target_id, target_type`
+    - `action, resource, status, error_msg, metadata (JSON)`
+    - `ip_address, user_agent, timestamp`
+  - **7 индексов** для эффективных запросов:
+    - `idx_audit_events_timestamp` (DESC для recent events)
+    - `idx_audit_events_actor_id, idx_audit_events_event_type`
+    - `idx_audit_events_severity, idx_audit_events_resource`
+    - `idx_audit_events_target_id, idx_audit_events_status`
+- **API Routes** (Admin-only):
+  - `GET /api/admin/audit` - Query audit events с pagination/filters
+  - `GET /api/admin/audit/stats` - Real-time statistics (24h)
+  - `GET /api/admin/audit/export` - CSV export с filters
+- **WebUI**:
+  - `web/admin-audit.html` - Dedicated audit log viewer с:
+    - Stats cards (critical/warning/info/failed logins)
+    - Filters panel (event type, severity, resource, status, date range, actor)
+    - Pagination (50 events per page)
+    - CSV export button
+  - `web/admin.html` - New "Audit" tab с preview последних 20 событий
+  - `web/js/admin.js` - `loadAudit()` method для загрузки audit data
+- **Convenience Methods** в AuditLogger:
+  - `LogLogin(userID, ipAddress, success, errMsg)` - LOGIN events
+  - `LogOIDCLogin(userID, issuer, ipAddress, success)` - OIDC events
+  - `LogLDAPLogin(userID, server, ipAddress, success)` - LDAP events
+  - `LogAPIKeyCreated(actorID, keyID, ipAddress)` - API key events
+  - `LogTenantMemberAdded(actorID, tenantID, memberID, ipAddress)` - Tenant events
+  - `LogPermissionDenied(userID, resource, ipAddress)` - Authorization events
+- **Retention Policy**:
+  - Default: 90 days retention
+  - Daily cleanup schedule (configurable)
+  - Manual trigger via `RunOnce()` method
+  - Graceful shutdown support
+
+### Use Cases
+
+1. **Security Monitoring**: Track failed login attempts, permission denied events
+2. **Compliance Reporting**: Export audit log для SOC2, ISO27001 compliance
+3. **Incident Investigation**: Full trace с actor/target/action/IP/timestamp
+4. **User Activity Tracking**: Кто и когда выполнял операции
+5. **Administrative Auditing**: Все изменения (users, API keys, tenants)
+6. **Trend Analysis**: Statistics dashboard для выявления аномалий
+
+### Configuration Example
+
+```yaml
+# Retention policy настраивается в коде (future: yaml config)
+# Default: 90 days retention, daily cleanup
+# WithRetentionPeriod(duration) - custom retention period
+# WithCleanupInterval(duration) - custom cleanup interval
+```
+
+### Notes
+
+- Audit events хранятся в отдельной таблице `audit_events` для изоляции
+- Автоматическая очистка запускается при старте сервера
+- WebUI показывает последние 20 событий + full audit page для детального анализа
+- CSV export поддерживает все filters для targeted reporting
+- Integration в handlers требует добавления `auditLogger.Log*()` calls
+
+### Future Enhancements (Phase 2)
+
+- SIEM integration (Syslog, Splunk, ELK)
+- Real-time alerting для critical events
+- Advanced analytics и dashboards
+- Audit event replay для forensics
+- Encryption at rest для sensitive audit data
+
+## [1.11.3] - 2025-10-25
+
+### Added
+
+- **LDAP-01: LDAP/Active Directory Integration** 🔐
+  - **LDAP Bind Authentication** для корпоративных LDAP/AD серверов
+  - **User Search** с настраиваемыми фильтрами (OpenLDAP, Active Directory)
+  - **Group Search** для извлечения LDAP groups
+  - **Auto-provisioning users** при первом логине через LDAP
+  - **Auto-update users** синхронизация email/full name при каждом логине
+  - **Tenant provisioning** из LDAP groups (reuse OIDC-02 logic)
+  - **TLS/LDAPS support** с StartTLS и certificate validation
+  - **Admin detection** на основе LDAP groups
+  - **Test connection endpoint** для admin (`/api/auth/ldap/test`)
+
+### Technical
+
+- **Новые модули**:
+  - `internal/auth/ldap/client.go` - LDAP client с bind auth, user/group search, TLS
+  - `internal/api/handlers/ldap.go` - LDAP login handler с user provisioning
+  - 17 unit tests (config validation, authentication, isAdminGroup logic)
+- **Configuration** (Version 1.11.3+):
+  - `auth.ldap.enabled` - включение LDAP аутентификации
+  - `auth.ldap.url` - LDAP server URL (ldap:// или ldaps://)
+  - `auth.ldap.bind_dn` - Service account DN для bind
+  - `auth.ldap.bind_password` - Пароль для bind
+  - `auth.ldap.user_base_dn`, `user_filter`, `user_id_attribute` - user search
+  - `auth.ldap.group_base_dn`, `group_filter`, `group_name_attribute` - group search
+  - `auth.ldap.start_tls`, `skip_verify`, `ca_cert_file` - TLS настройки
+  - `auth.ldap.auto_create_user`, `auto_update_user` - user provisioning
+  - `auth.ldap.tenant_provisioning` - tenant provisioning from groups
+  - `auth.ldap.timeout` - timeout для LDAP операций
+- **Database** (Migration v38):
+  - `ALTER TABLE users ADD COLUMN ldap_dn TEXT UNIQUE` - LDAP Distinguished Name
+  - `CREATE INDEX idx_users_ldap_dn` - быстрый поиск по LDAP DN
+  - `GetUserByLDAPDN(ctx, ldapDN)` - новый метод для LDAP lookup
+- **API Routes**:
+  - `POST /api/auth/ldap/login` - LDAP login endpoint (public)
+  - `GET /api/auth/ldap/test` - Test LDAP connection (admin only)
+- **Integration**:
+  - JWT tokens с tenant IDs из LDAP groups
+  - Reuse tenant provisioner из OIDC-02 (direct/prefix mapping modes)
+  - Support OpenLDAP, Active Directory, FreeIPA
+
+### Use Cases
+
+**OpenLDAP Authentication:**
+```yaml
+auth:
+  ldap:
+    enabled: true
+    url: "ldap://ldap.company.com:389"
+    bind_dn: "cn=admin,dc=company,dc=com"
+    bind_password: "${LDAP_BIND_PASSWORD}"
+    user_base_dn: "ou=users,dc=company,dc=com"
+    user_filter: "(uid={username})"
+    group_base_dn: "ou=groups,dc=company,dc=com"
+# → Users логинятся с LDAP credentials, auto-created
+```
+
+**Active Directory:**
+```yaml
+auth:
+  ldap:
+    enabled: true
+    url: "ldaps://ad.company.com:636"  # LDAPS для security
+    bind_dn: "cn=service-account,dc=company,dc=com"
+    bind_password: "${AD_SERVICE_PASSWORD}"
+    user_base_dn: "ou=users,dc=company,dc=com"
+    user_filter: "(sAMAccountName={username})"  # AD format
+    user_id_attribute: "sAMAccountName"
+    user_name_attribute: "displayName"
+    tenant_provisioning:
+      enabled: true
+      group_mapping:
+        mode: "prefix"
+        prefix: "CN=APP-"  # APP-Engineering → engineering
+        admin_groups: ["Domain Admins", "APP-Admins"]
+# → AD users логинятся, tenants создаются из APP-* groups
+```
+
+---
+
+## [1.11.2] - 2025-10-25
+
+### Added
+
+- **OIDC-02: Auto-tenant Provisioning from OIDC Groups** 🏢
+  - **Автоматическое создание tenants** из OIDC groups claims (Keycloak, Google, Azure AD)
+  - **Group → Tenant mapping** с двумя режимами:
+    - **Direct mode**: 1:1 mapping (group name = tenant name)
+    - **Prefix mode**: извлечение tenant из path (`/organizations/acme` → `acme`)
+  - **Auto-provisioning**: создание tenants и добавление пользователей при первом логине
+  - **Role assignment**: автоматическое назначение admin/member ролей из OIDC groups
+  - **Orphaned memberships cleanup**: удаление доступа при удалении из группы (опционально)
+  - **Tenant name normalization**: lowercase, hyphens, deduplication
+
+### Technical
+
+- **Новые модули**:
+  - `internal/auth/oidc/tenants.go` - Group parsing и mapping logic
+  - `internal/auth/oidc/provisioner.go` - Tenant provisioner service
+  - 16 unit tests (ParseGroups, mapping modes, admin roles, normalization)
+- **Configuration** (Version 1.11.2+):
+  - `auth.oidc.tenant_provisioning.enabled` - включение tenant provisioning
+  - `auth.oidc.tenant_provisioning.auto_create_tenants` - автосоздание tenants
+  - `auth.oidc.tenant_provisioning.sync_on_login` - синхронизация при каждом логине
+  - `auth.oidc.tenant_provisioning.remove_orphaned_memberships` - удаление orphaned memberships
+  - `auth.oidc.tenant_provisioning.group_mapping.mode` - direct или prefix
+  - `auth.oidc.tenant_provisioning.group_mapping.prefix` - префикс для prefix mode
+  - `auth.oidc.tenant_provisioning.group_mapping.admin_groups` - список admin groups
+- **Database** (Migration v36):
+  - `CREATE UNIQUE INDEX idx_tenants_name_unique ON tenants(name)` - быстрый поиск tenants
+  - `GetTenantByName(ctx, name)` - новый метод для OIDC provisioning
+- **Integration**:
+  - OIDC callback flow обновлен для tenant provisioning
+  - JWT tokens теперь включают tenant IDs пользователя
+  - Graceful error handling (login продолжается даже при ошибках provisioning)
+
+### Use Cases
+
+**Enterprise Keycloak Integration:**
+```yaml
+# Keycloak groups: /organizations/acme, /organizations/acme/engineering
+auth:
+  oidc:
+    tenant_provisioning:
+      enabled: true
+      auto_create_tenants: true
+      group_mapping:
+        mode: "prefix"
+        prefix: "/organizations/"
+        admin_groups: ["/admins", "tenant-owners"]
+# → User автоматически добавляется в tenant "acme" при логине
+```
+
+**Direct Group Mapping:**
+```yaml
+# Keycloak groups: engineering, sales, support
+auth:
+  oidc:
+    tenant_provisioning:
+      group_mapping:
+        mode: "direct"
+        admin_groups: ["engineering-admins"]
+# → Каждая группа = отдельный tenant
+```
+
+---
+
+## [1.11.1] - 2025-10-25
+
+### Added
+
+- **OIDC-01: Keycloak SSO Integration** 🔐
+  - **OpenID Connect (OIDC)** аутентификация для корпоративного Single Sign-On (SSO)
+  - Интеграция с **Keycloak** и другими OIDC providers (Google, Azure AD, Okta)
+  - **Authorization Code Flow** с PKCE для безопасной аутентификации
+  - Автоматическое **user provisioning** при первом входе через SSO
+  - Гибкий **claims mapping** для разных OIDC providers
+  - **Role-based access control** из OIDC groups/roles
+  - Session management для OIDC state с защитой от CSRF
+  - HTTP endpoints: `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/oidc/logout`
+
+### Technical
+
+- **Новые модули**:
+  - `internal/auth/oidc/provider.go` - OIDC provider wrapper на базе `coreos/go-oidc`
+  - `internal/auth/oidc/claims.go` - структуры для OIDC claims (Standard, Keycloak, Generic)
+  - `internal/api/handlers/oidc.go` - HTTP handlers для OIDC flow
+- **Конфигурация**:
+  - `auth.oidc.enabled` - включение/выключение OIDC
+  - `auth.oidc.issuer` - URL OIDC провайдера (e.g., Keycloak realm)
+  - `auth.oidc.client_id`, `auth.oidc.client_secret` - OIDC client credentials
+  - `auth.oidc.redirect_uri` - callback URL
+  - `auth.oidc.scopes` - запрашиваемые scopes (openid, profile, email, groups, roles)
+  - `auth.oidc.claims.*` - mapping OIDC claims на поля пользователя
+  - `auth.oidc.auto_create_user`, `auth.oidc.auto_update_user` - auto-provisioning
+  - `auth.oidc.default_role` - роль по умолчанию для новых пользователей
+  - `auth.oidc.session_store` - memory или redis для session storage
+  - `auth.oidc.session_ttl` - время жизни OIDC session state
+- **База данных (Migration v34)**:
+  - `users.auth_provider` - тип провайдера (local, oidc, ldap)
+  - `users.oidc_subject` - OIDC 'sub' claim (уникальный идентификатор)
+  - `users.oidc_issuer` - OIDC issuer URL
+  - Индексы для быстрого поиска по OIDC subject
+  - Unique constraint для пары (issuer, subject)
+- **Зависимости**:
+  - `github.com/coreos/go-oidc/v3/oidc` - OIDC client library
+  - `golang.org/x/oauth2` - OAuth2 flow
+  - `github.com/gin-contrib/sessions` - session middleware
+  - `github.com/gin-contrib/sessions/cookie` - cookie-based session store
+- **Тестирование**:
+  - Unit tests для OIDC provider (валидация конфигурации, discovery)
+  - Unit tests для OIDC handlers (login, callback, logout)
+  - Unit tests для helper functions (generateUsername, isAdminRole)
+  - 10 тестов PASS, 5 SKIP (требуют mock OIDC provider)
+
+### Security
+
+- **CSRF Protection** - random state parameter в OAuth2 flow
+- **ID Token Verification** - проверка подписи и claims через `coreos/go-oidc`
+- **Session Security** - HttpOnly cookies, SameSite=Lax, secure encryption
+- **Claims Validation** - проверка issuer, audience, expiration
+- **Auto-Logout** - на expired/invalid tokens
+
+### Configuration Examples
+
+**Development (Keycloak):**
+```yaml
+auth:
+  oidc:
+    enabled: true
+    provider: "keycloak"
+    issuer: "https://keycloak.example.com/realms/myrealm"
+    client_id: "ollama-proxy"
+    client_secret: "${OIDC_CLIENT_SECRET}"
+    redirect_uri: "http://localhost:8085/auth/oidc/callback"
+    scopes: [openid, profile, email, groups, roles]
+    auto_create_user: true
+    auto_update_user: true
+    default_role: "user"
+```
+
+**Production (Azure AD):**
+```yaml
+auth:
+  oidc:
+    enabled: true
+    provider: "azure"
+    issuer: "https://login.microsoftonline.com/{tenant-id}/v2.0"
+    client_id: "your-client-id"
+    client_secret: "${OIDC_CLIENT_SECRET}"
+    redirect_uri: "https://proxy.yourdomain.com/auth/oidc/callback"
+    scopes: [openid, profile, email]
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+```
+
+---
+
 ## [1.10.5] - 2025-10-25
 
 ### Changed

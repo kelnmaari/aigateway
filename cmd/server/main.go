@@ -60,10 +60,10 @@ func main() {
 		WithField("build_date", version.BuildDate).
 		Info("Starting Ollama-OpenAI Proxy Server")
 
-	// Инициализация Prometheus метрик (если включено)
+	// Prometheus метрики (если включено)
+	// Metrics are already registered globally via promauto in prometheus.go
 	if cfg.Metrics.Enabled {
-		metrics.Init("ollama_proxy")
-		appLogger.Info("Prometheus metrics initialized")
+		appLogger.Info("Prometheus metrics enabled")
 	}
 
 	// Инициализация базы данных (Version 1.3.0+)
@@ -316,6 +316,12 @@ func main() {
 
 	if err != nil {
 		log.Fatalf("❌ Не удалось создать роутер: %v", err)
+	}
+
+	// Start Prometheus Metrics Collector (v1.11.6+)
+	if cfg.Metrics.Enabled && appRouter.GetMetricsCollector() != nil {
+		go appRouter.GetMetricsCollector().Start(context.Background())
+		appLogger.Info("Prometheus metrics collector started")
 	}
 
 	// Инициализация роутера (включая API Key Management если включен)

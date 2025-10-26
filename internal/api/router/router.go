@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -17,7 +19,9 @@ import (
 	"ollama-openai-proxy/internal/api/middleware"
 	"ollama-openai-proxy/internal/auth/apikey"
 	"ollama-openai-proxy/internal/auth/jwt"
+	ldapauth "ollama-openai-proxy/internal/auth/ldap"
 	authMiddleware "ollama-openai-proxy/internal/auth/middleware"
+	oidcauth "ollama-openai-proxy/internal/auth/oidc"
 	"ollama-openai-proxy/internal/auth/ratelimit"
 	authService "ollama-openai-proxy/internal/auth/service"
 	"ollama-openai-proxy/internal/client/ollama"
@@ -28,6 +32,9 @@ import (
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/request"
+	"ollama-openai-proxy/internal/services/audit"
+	"ollama-openai-proxy/internal/services/quota"
+	"ollama-openai-proxy/internal/services/rbac"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/websocket"
 
@@ -80,6 +87,11 @@ type Router struct {
 	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
 	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
 	fileHandler           *handlers.FileHandler           // Handler для file operations (v1.10.0)
+	oidcHandler           *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
+	ldapHandler           *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
+	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
+	rbacHandler           *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
+	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -103,6 +115,21 @@ type Router struct {
 	// GPU Monitoring (v1.9.3)
 	gpuMonitor *metrics.GPUMonitor
 	gpuHandler *handlers.GPUHandler
+
+	// Audit Logging (v1.11.4)
+	auditLogger          *audit.AuditLogger
+	auditRetentionPolicy *audit.RetentionPolicy
+
+	// RBAC (Version 1.11.5+: Custom Roles & Permissions)
+	rbacService    *rbac.Service
+	rbacMiddleware *middleware.RBACMiddleware
+
+	// Quotas (Version 1.11.7+: Usage Quotas System)
+	quotaService    *quota.Service
+	quotaMiddleware *middleware.QuotaMiddleware
+
+	// Metrics (Version 1.11.6+: Prometheus Metrics Export)
+	metricsCollector *metrics.MetricsCollector
 }
 
 // NewOptions содержит опции для создания роутера
@@ -246,6 +273,31 @@ func (r *Router) setupMiddleware() {
 		r.engine.Use(middleware.TracingMiddleware(r.tracer))
 		r.logger.Info("OpenTelemetry tracing middleware enabled")
 	}
+
+	// Prometheus metrics middleware (v1.11.6+)
+	if r.config.Metrics.Enabled {
+		r.engine.Use(middleware.PrometheusMiddleware())
+		r.logger.Info("Prometheus metrics middleware enabled")
+	}
+
+	// Session middleware для OIDC authentication (Version 1.11.1+)
+	// Используем cookie-based session store
+	sessionSecret := []byte(r.config.Auth.JWT.Secret) // Используем JWT secret для session encryption
+	if len(sessionSecret) < 32 {
+		// Ensure session secret is at least 32 bytes for security
+		sessionSecret = []byte("ollama-proxy-session-secret-change-this-in-production!")
+		r.logger.Warn("Using default session secret - please configure a secure JWT secret")
+	}
+	store := cookie.NewStore(sessionSecret)
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   3600,    // 1 hour
+		HttpOnly: true,    // Protect against XSS
+		Secure:   false,   // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+	})
+	r.engine.Use(sessions.Sessions("ollama_session", store))
+	r.logger.Info("Session middleware enabled for OIDC authentication")
 
 	// Slow request logging middleware (v1.6.2) - после tracing
 	if r.config.Observability.Performance.Enabled {
@@ -471,6 +523,16 @@ func (r *Router) setupMetricsHistoryRoutes() {
 	}
 
 	r.logger.Info("Metrics history API endpoints configured")
+
+	// User Quota API (v1.11.7)
+	if r.quotaHandler != nil && r.authenticator != nil {
+		quotaAPI := r.engine.Group("/api/quota")
+		quotaAPI.Use(r.authenticator.AuthenticationMiddleware())
+		{
+			quotaAPI.GET("/me", r.quotaHandler.GetMyQuota) // Current user's quota stats
+		}
+		r.logger.Info("User quota API endpoints configured")
+	}
 }
 
 // setupRequestsRoutes настраивает эндпоинты для request monitoring (TUI-04)
@@ -534,6 +596,37 @@ func (r *Router) setupAuthRoutes() {
 		authPublic.POST("/register", r.authHandler.Register)
 		authPublic.POST("/login", r.authHandler.Login)
 		authPublic.POST("/refresh", r.authHandler.RefreshToken)
+	}
+
+	// OIDC authentication endpoints (Version 1.11.1+: Keycloak SSO Integration)
+	if r.oidcHandler != nil {
+		oidcPublic := r.engine.Group("/api/auth/oidc")
+		{
+			oidcPublic.GET("/login", r.oidcHandler.HandleLogin)
+			oidcPublic.GET("/callback", r.oidcHandler.HandleCallback)
+			oidcPublic.POST("/logout", r.oidcHandler.HandleLogout)
+		}
+		r.logger.Info("OIDC authentication routes registered")
+	}
+
+	// LDAP/Active Directory authentication endpoints (Version 1.11.3+: LDAP Integration)
+	if r.ldapHandler != nil {
+		ldapPublic := r.engine.Group("/api/auth/ldap")
+		{
+			ldapPublic.POST("/login", r.ldapHandler.HandleLogin)
+		}
+
+		// Admin endpoints (requires admin authentication)
+		if r.jwtManager != nil && r.db != nil {
+			ldapAdmin := r.engine.Group("/api/auth/ldap")
+			ldapAdmin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+			ldapAdmin.Use(middleware.RequireAdmin(r.db, r.logger))
+			{
+				ldapAdmin.GET("/test", r.ldapHandler.HandleTestConnection)
+			}
+		}
+
+		r.logger.Info("LDAP authentication routes registered")
 	}
 
 	// Protected authentication endpoints (require JWT)
@@ -656,11 +749,14 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
 	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
 	r.engine.StaticFile("/admin.html", "./web/admin.html") // Admin Panel (Version 1.3.0)
+	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html") // RBAC Management (v1.11.5)
+	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html") // Audit Log (v1.11.4)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
 	r.engine.Static("/js", "./web/js")
 	r.engine.Static("/assets", "./web/assets")
+	r.engine.Static("/images", "./web/images")
 
 	// Legacy /web/* routes for backward compatibility
 	r.engine.Static("/web", "./web")
@@ -822,6 +918,57 @@ func (r *Router) setupAdminRoutes() {
 		admin.DELETE("/backup/:filename", r.backupHandler.DeleteBackup)
 	}
 
+	// Audit Logging endpoints (v1.11.4)
+	if r.auditHandler != nil {
+		r.logger.Info("Admin routes: Registering Audit Logging endpoints")
+		admin.GET("/audit", r.auditHandler.GetAuditEvents)
+		admin.GET("/audit/stats", r.auditHandler.GetAuditStats)
+		admin.GET("/audit/export", r.auditHandler.ExportAuditEvents)
+	}
+
+	// RBAC endpoints (v1.11.5)
+	if r.rbacHandler != nil {
+		r.logger.Info("Admin routes: Registering RBAC Management endpoints")
+
+		// Permissions
+		admin.GET("/rbac/permissions", r.rbacHandler.ListPermissions)
+
+		// Roles
+		admin.GET("/rbac/roles", r.rbacHandler.ListRoles)
+		admin.POST("/rbac/roles", r.rbacHandler.CreateRole)
+		admin.GET("/rbac/roles/:id", r.rbacHandler.GetRole)
+		admin.PUT("/rbac/roles/:id", r.rbacHandler.UpdateRole)
+		admin.DELETE("/rbac/roles/:id", r.rbacHandler.DeleteRole)
+
+		// Role-Permission mapping
+		admin.GET("/rbac/roles/:id/permissions", r.rbacHandler.GetRolePermissions)
+		admin.POST("/rbac/roles/:id/permissions", r.rbacHandler.AssignPermissionToRole)
+		admin.DELETE("/rbac/roles/:id/permissions/:permission_id", r.rbacHandler.RemovePermissionFromRole)
+
+		// User-Role assignments
+		admin.GET("/rbac/users/:id/roles", r.rbacHandler.GetUserRoles)
+		admin.POST("/rbac/users/:id/roles", r.rbacHandler.AssignRoleToUser)
+		admin.DELETE("/rbac/users/:id/roles/:role_id", r.rbacHandler.RemoveRoleFromUser)
+
+		// User permissions (computed)
+		admin.GET("/rbac/users/:id/permissions", r.rbacHandler.GetUserPermissions)
+	}
+
+	// Quota endpoints (v1.11.7)
+	if r.quotaHandler != nil {
+		r.logger.Info("Admin routes: Registering Quota Management endpoints")
+
+		// Quota CRUD
+		admin.GET("/quotas", r.quotaHandler.ListQuotas)
+		admin.POST("/quotas", r.quotaHandler.CreateQuota)
+		admin.GET("/quotas/:id", r.quotaHandler.GetQuota)
+		admin.PUT("/quotas/:id", r.quotaHandler.UpdateQuota)
+		admin.DELETE("/quotas/:id", r.quotaHandler.DeleteQuota)
+
+		// Quota usage
+		admin.GET("/quotas/:id/usage", r.quotaHandler.GetQuotaUsage)
+	}
+
 	// System endpoints
 	admin.GET("/stats", func(c *gin.Context) {
 		if r.keyManager != nil {
@@ -967,13 +1114,107 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	}
 
 	if r.authService != nil && r.db != nil {
-		r.authHandler = handlers.NewAuthHandler(r.authService, logger)
-		r.userHandler = handlers.NewUserHandler(r.db, logger)
-		r.tenantHandler = handlers.NewTenantHandler(r.db, logger)
+		r.authHandler = handlers.NewAuthHandler(r.authService, logger, r.auditLogger)
+		r.userHandler = handlers.NewUserHandler(r.db, logger, r.auditLogger)
+		r.tenantHandler = handlers.NewTenantHandler(r.db, logger, r.auditLogger)
 		r.conversationHandler = handlers.NewConversationHandler(r.db)
-		r.adminUserHandler = handlers.NewAdminUserHandler(r.db, logger)
+		r.adminUserHandler = handlers.NewAdminUserHandler(r.db, logger, r.auditLogger)
 		r.usageHandler = handlers.NewUsageHandler(r.db, logger)
 		logger.Info("User authentication handlers initialized")
+	}
+
+	// OIDC/Keycloak SSO handler (Version 1.11.1+: Enterprise Suite)
+	if cfg.Auth.OIDC.Enabled && r.db != nil && r.jwtManager != nil {
+		logger.Info("Initializing OIDC provider...")
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		oidcProvider, err := oidcauth.NewOIDCProvider(ctx, &cfg.Auth.OIDC, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize OIDC provider")
+			logger.Warn("OIDC authentication will be unavailable")
+		} else {
+			r.oidcHandler = handlers.NewOIDCHandler(cfg, oidcProvider, r.db, r.jwtManager, logger)
+			logger.WithFields(logrus.Fields{
+				"provider": cfg.Auth.OIDC.Provider,
+				"issuer":   cfg.Auth.OIDC.Issuer,
+			}).Info("OIDC handler initialized successfully")
+		}
+	} else if cfg.Auth.OIDC.Enabled {
+		logger.Warn("OIDC is enabled but required components (database or JWT manager) are not available")
+	}
+
+	// LDAP/Active Directory handler (Version 1.11.3+: Enterprise Suite)
+	if cfg.Auth.LDAP.Enabled && r.db != nil && r.jwtManager != nil {
+		logger.Info("Initializing LDAP client...")
+		
+		ldapClient, err := ldapauth.NewClient(&cfg.Auth.LDAP, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize LDAP client")
+			logger.Warn("LDAP authentication will be unavailable")
+		} else {
+			r.ldapHandler = handlers.NewLDAPHandler(cfg, ldapClient, r.db, r.jwtManager, logger)
+			logger.WithFields(logrus.Fields{
+				"url":          cfg.Auth.LDAP.URL,
+				"user_base_dn": cfg.Auth.LDAP.UserBaseDN,
+			}).Info("LDAP handler initialized successfully")
+		}
+	} else if cfg.Auth.LDAP.Enabled {
+		logger.Warn("LDAP is enabled but required components (database or JWT manager) are not available")
+	}
+
+	// Audit Logger initialization (Version 1.11.4+: Enhanced Audit Logging)
+	if r.db != nil {
+		logger.Info("Initializing Audit logger...")
+		r.auditLogger = audit.NewAuditLogger(r.db, logger)
+		logger.Info("Audit logger initialized successfully")
+
+		// Audit Handler initialization
+		r.auditHandler = handlers.NewAuditHandler(cfg, r.db, logger)
+		logger.Info("Audit handler initialized successfully")
+
+		// RBAC Service initialization (Version 1.11.5+: Custom Roles & Permissions)
+		logger.Info("Initializing RBAC service...")
+		r.rbacService = rbac.NewService(r.db, logger)
+		logger.Info("RBAC service initialized successfully")
+
+		// RBAC Handler initialization
+		r.rbacHandler = handlers.NewRBACHandler(r.db, r.rbacService, logger)
+		logger.Info("RBAC handler initialized successfully")
+
+		// RBAC Middleware initialization
+		r.rbacMiddleware = middleware.NewRBACMiddleware(r.rbacService, r.db, logger)
+		logger.Info("RBAC middleware initialized successfully")
+
+		// Quota Service initialization (Version 1.11.7+: Usage Quotas System)
+		logger.Info("Initializing Quota service...")
+		r.quotaService = quota.NewService(r.db, logger)
+		logger.Info("Quota service initialized successfully")
+
+		// Quota Handler initialization
+		r.quotaHandler = handlers.NewQuotaHandler(r.db, r.quotaService, logger)
+		logger.Info("Quota handler initialized successfully")
+
+		// Quota Middleware initialization
+		r.quotaMiddleware = middleware.NewQuotaMiddleware(r.quotaService, logger)
+		logger.Info("Quota middleware initialized successfully")
+
+		// Metrics Collector initialization (Version 1.11.6+: Prometheus Metrics Export)
+		if cfg.Metrics.Enabled {
+			logger.Info("Initializing Prometheus metrics collector...")
+			r.metricsCollector = metrics.NewMetricsCollector(r.db, logger, 30*time.Second)
+			logger.Info("Prometheus metrics collector initialized successfully")
+		}
+
+		// Audit Retention Policy initialization
+		r.auditRetentionPolicy = audit.NewRetentionPolicy(r.db, logger).
+			WithRetentionPeriod(90 * 24 * time.Hour).  // 90 days retention
+			WithCleanupInterval(24 * time.Hour)         // Daily cleanup
+		r.auditRetentionPolicy.Start()
+		logger.Info("Audit retention policy started (90 days retention, daily cleanup)")
+	} else {
+		logger.Warn("Audit logging unavailable (database not configured)")
 	}
 
 	logger.Info("DEBUG: BEFORE AdminHandler creation block")
@@ -1015,7 +1256,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	}
 
 	// Backup Handler (v1.5.14)
-	r.backupHandler = handlers.NewBackupHandler(r.config, logger, r.db)
+	r.backupHandler = handlers.NewBackupHandler(r.config, logger, r.db, r.auditLogger)
 	logger.Info("Backup handler initialized")
 
 	// Performance Handler (v1.6.2)
@@ -1114,8 +1355,19 @@ func (r *Router) setupFileStorage(cfg *config.Config, logger *logrus.Logger) {
 }
 
 // Shutdown gracefully останавливает все компоненты роутера
+// GetMetricsCollector возвращает Prometheus metrics collector
+func (r *Router) GetMetricsCollector() *metrics.MetricsCollector {
+	return r.metricsCollector
+}
+
 func (r *Router) Shutdown(ctx context.Context) error {
 	r.logger.Info("Shutting down router components")
+
+	// Останавливаем Prometheus Metrics Collector (v1.11.6+)
+	if r.metricsCollector != nil {
+		r.metricsCollector.Stop()
+		r.logger.Info("Prometheus metrics collector stopped")
+	}
 
 	// Останавливаем Metrics Broadcaster
 	if r.metricsBroadcaster != nil {

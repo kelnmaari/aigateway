@@ -234,6 +234,10 @@ func (m *Manager) UpdateAPIKey(ctx context.Context, id string, req models.Update
 		return nil, err
 	}
 
+	// Создаем копию для безопасного concurrent access
+	keyCopy := *apiKey
+	apiKey = &keyCopy
+
 	// Применяем обновления
 	if req.Name != nil {
 		apiKey.Name = *req.Name

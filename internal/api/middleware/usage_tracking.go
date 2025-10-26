@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
+	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/models"
 	"ollama-openai-proxy/internal/storage"
 )
@@ -117,6 +118,44 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 			case *string:
 				usage.TenantID = v
 			}
+		}
+
+		// Export metrics to Prometheus (v1.11.6+)
+		// Экспортируем метрики синхронно для немедленной доступности
+		apiKeyIDForMetrics := "unknown"
+		if usage.APIKeyID != nil {
+			apiKeyIDForMetrics = *usage.APIKeyID
+		} else if usage.UserID != "" {
+			// For JWT auth, use user_id as identifier
+			apiKeyIDForMetrics = "jwt:" + usage.UserID
+		}
+		
+		metrics.RecordAPIUsage(
+			apiKeyIDForMetrics,
+			model,
+			promptTokens,
+			completionTokens,
+			success,
+		)
+		
+		// Also record model request duration
+		if model != "" && model != "unknown" {
+			metrics.RecordModelRequest(model, time.Duration(duration)*time.Millisecond)
+		}
+		
+		// Record model errors if any
+		if !success && model != "" {
+			errorType := "unknown"
+			if statusCode >= 500 {
+				errorType = "server_error"
+			} else if statusCode == 404 {
+				errorType = "not_found"
+			} else if statusCode == 400 {
+				errorType = "bad_request"
+			} else if statusCode == 401 || statusCode == 403 {
+				errorType = "auth_error"
+			}
+			metrics.RecordModelError(model, errorType)
 		}
 
 		// Записываем в БД асинхронно (не блокируем ответ)

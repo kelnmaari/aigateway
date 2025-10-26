@@ -129,15 +129,24 @@ class Dashboard {
 
     // Render stats cards
     renderStats() {
-        document.getElementById('stat-conversations').textContent = this.stats.conversations;
-        document.getElementById('stat-tenants').textContent = this.stats.tenants;
-        document.getElementById('stat-apikeys').textContent = this.stats.apiKeys;
-        document.getElementById('stat-requests').textContent = this.stats.requests.toLocaleString();
+        const statConv = document.getElementById('stat-conversations');
+        const statTen = document.getElementById('stat-tenants');
+        const statKeys = document.getElementById('stat-api-keys') || document.getElementById('stat-apikeys');
+        const statReq = document.getElementById('stat-requests') || document.getElementById('stat-files');
+        
+        if (statConv) statConv.textContent = this.stats.conversations;
+        if (statTen) statTen.textContent = this.stats.tenants;
+        if (statKeys) statKeys.textContent = this.stats.apiKeys;
+        if (statReq) statReq.textContent = this.stats.requests || 0;
     }
 
     // Load recent conversations
     async loadRecentConversations() {
-        const tbody = document.getElementById('recent-conversations');
+        const tbody = document.getElementById('recent-conversations-tbody') || document.getElementById('recent-conversations');
+        if (!tbody) {
+            console.warn('Recent conversations tbody not found');
+            return;
+        }
         tbody.innerHTML = '';
         
         try {
@@ -145,7 +154,7 @@ class Dashboard {
             const conversations = response.conversations || [];
             
             if (conversations.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No conversations yet. <a href="/chat.html">Start chatting!</a></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No conversations yet. <a href="/chat.html">Start chatting!</a></td></tr>';
                 return;
             }
             
@@ -161,21 +170,10 @@ class Dashboard {
                     <td>
                         <span class="badge badge-info">${this.escapeHtml(conv.model)}</span>
                     </td>
+                    <td>${conv.message_count || 0}</td>
                     <td>${this.formatDate(conv.created_at)}</td>
                     <td>
-                        <div class="table-actions">
-                            <button class="btn btn-icon" onclick="dashboard.openConversation('${conv.id}')" title="Open">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-width="2"/>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-width="2"/>
-                                </svg>
-                            </button>
-                            <button class="btn btn-icon" onclick="dashboard.deleteConversation('${conv.id}')" title="Delete">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-width="2"/>
-                                </svg>
-                            </button>
-                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="dashboard.openConversation('${conv.id}')">Open</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -183,7 +181,7 @@ class Dashboard {
             
         } catch (error) {
             console.error('Failed to load conversations:', error);
-            tbody.innerHTML = '<tr><td colspan="4" class="table-empty">Failed to load conversations</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Failed to load conversations</td></tr>';
         }
     }
 
@@ -199,16 +197,18 @@ class Dashboard {
             const data = await response.json();
             const tenants = data.tenants || [];
             
-            const container = document.getElementById('tenants-list');
+            const container = document.getElementById('tenants-grid') || document.getElementById('tenants-list');
+            if (!container) {
+                console.warn('Tenants container not found');
+                return;
+            }
             container.innerHTML = '';
             
             if (tenants.length === 0) {
                 container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🏢</div>
-                        <h3>No tenants yet</h3>
-                        <p>Create your first organization to collaborate with your team</p>
-                        <a href="/web/tenants.html" class="btn btn-primary">Create Organization</a>
+                    <div class="stat-card">
+                        <h3>No tenants</h3>
+                        <div class="label"><a href="/tenants.html">Create your first tenant</a></div>
                     </div>
                 `;
                 return;
@@ -221,46 +221,25 @@ class Dashboard {
             
         } catch (error) {
             console.error('Failed to load tenants:', error);
-            document.getElementById('tenants-list').innerHTML = 
-                '<div class="tenant-card loading">Failed to load tenants</div>';
+            const container = document.getElementById('tenants-grid') || document.getElementById('tenants-list');
+            if (container) {
+                container.innerHTML = 
+                    '<div class="stat-card danger"><h3>Error</h3><div class="label">Failed to load tenants</div></div>';
+            }
         }
     }
 
     // Create tenant card element
     createTenantCard(tenant) {
         const card = document.createElement('div');
-        card.className = 'tenant-card';
+        card.className = 'stat-card';
         card.style.cursor = 'pointer';
-        card.onclick = () => window.location.href = `/web/tenants.html?id=${tenant.id}`;
-        
-        const icon = tenant.type === 'personal' ? '👤' : '🏢';
-        const typeClass = tenant.type === 'personal' ? 'personal' : 'organization';
+        card.onclick = () => window.location.href = `/tenants.html?id=${tenant.id}`;
         
         card.innerHTML = `
-            <div class="tenant-header">
-                <div class="tenant-icon">${icon}</div>
-                <div class="tenant-info">
-                    <div class="tenant-name">${this.escapeHtml(tenant.name)}</div>
-                    <div class="tenant-type ${typeClass}">${tenant.type}</div>
-                </div>
-            </div>
-            ${tenant.description ? `<div class="tenant-description">${this.escapeHtml(tenant.description)}</div>` : ''}
-            <div class="tenant-stats">
-                <div class="tenant-stat">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-width="2"/>
-                        <circle cx="9" cy="7" r="4" stroke-width="2"/>
-                    </svg>
-                    <span>${tenant.member_count || 1} members</span>
-                </div>
-                <div class="tenant-stat">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="2"/>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-width="2"/>
-                    </svg>
-                    <span>${tenant.api_key_count || 0} keys</span>
-                </div>
-            </div>
+            <h3>${this.escapeHtml(tenant.name)}</h3>
+            <div class="value">${tenant.member_count || 0}</div>
+            <div class="label">members</div>
         `;
         
         return card;

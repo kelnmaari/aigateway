@@ -45,54 +45,84 @@ class AdminPanel {
 
         // Navbar component handles logout now
 
-        // Create User button
-        document.getElementById('create-user-btn').addEventListener('click', () => this.showCreateUserModal());
+        // Create User button (if exists)
+        const createUserBtn = document.getElementById('create-user-btn');
+        if (createUserBtn) {
+            createUserBtn.addEventListener('click', () => this.showCreateUserModal());
+        }
 
-        // Create User form
-        document.getElementById('create-user-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleCreateUser(e.target);
-        });
+        // Create User form (if exists)
+        const createUserForm = document.getElementById('create-user-form');
+        if (createUserForm) {
+            createUserForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleCreateUser(e.target);
+            });
+        }
 
-        // Create API Key button
-        document.getElementById('create-apikey-btn').addEventListener('click', () => this.showCreateAPIKeyModal());
+        // Create API Key button (if exists)
+        const createApiKeyBtn = document.getElementById('create-apikey-btn');
+        if (createApiKeyBtn) {
+            createApiKeyBtn.addEventListener('click', () => this.showCreateAPIKeyModal());
+        }
 
-        // Create API Key form
-        document.getElementById('create-apikey-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleCreateAPIKey(e.target);
-        });
+        // Create API Key form (if exists)
+        const createApiKeyForm = document.getElementById('create-apikey-form');
+        if (createApiKeyForm) {
+            createApiKeyForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleCreateAPIKey(e.target);
+            });
+        }
 
-        // Create Backup button
-        document.getElementById('create-backup-btn').addEventListener('click', () => this.createBackup());
+        // Create Backup button (if exists)
+        const createBackupBtn = document.getElementById('create-backup-btn');
+        if (createBackupBtn) {
+            createBackupBtn.addEventListener('click', () => this.createBackup());
+        }
 
-        // Edit User form
-        document.getElementById('edit-user-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleEditUser(e.target);
-        });
+        // Edit User form (if exists)
+        const editUserForm = document.getElementById('edit-user-form');
+        if (editUserForm) {
+            editUserForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleEditUser(e.target);
+            });
+        }
 
-        // Reset Password form
-        document.getElementById('reset-password-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleResetPassword(e.target);
-        });
+        // Reset Password form (if exists)
+        const resetPasswordForm = document.getElementById('reset-password-form');
+        if (resetPasswordForm) {
+            resetPasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleResetPassword(e.target);
+            });
+        }
 
-        // MCP Server button
-        document.getElementById('create-mcp-btn').addEventListener('click', () => this.showCreateMCPModal());
+        // MCP Server button (if exists)
+        const createMcpBtn = document.getElementById('create-mcp-btn');
+        if (createMcpBtn) {
+            createMcpBtn.addEventListener('click', () => this.showCreateMCPModal());
+        }
 
-        // MCP Server form
-        document.getElementById('mcp-server-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleMCPServerSubmit(e.target);
-        });
+        // MCP Server form (if exists)
+        const mcpServerForm = document.getElementById('mcp-server-form');
+        if (mcpServerForm) {
+            mcpServerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleMCPServerSubmit(e.target);
+            });
+        }
 
-        // MCP Category filter
-        document.getElementById('mcp-category-filter').addEventListener('change', (e) => {
-            this.filterMCPServers(e.target.value);
-        });
+        // MCP Category filter (if exists)
+        const mcpCategoryFilter = document.getElementById('mcp-category-filter');
+        if (mcpCategoryFilter) {
+            mcpCategoryFilter.addEventListener('change', (e) => {
+                this.filterMCPServers(e.target.value);
+            });
+        }
 
-        // Refresh models button (v1.9.3+)
+        // Refresh models button (v1.9.3+) (if exists)
         const refreshModelsBtn = document.getElementById('refresh-models-btn');
         if (refreshModelsBtn) {
             refreshModelsBtn.addEventListener('click', () => this.refreshModels());
@@ -112,6 +142,16 @@ class AdminPanel {
     }
 
     async switchTab(tabName) {
+        // Stop monitors when leaving System tab
+        if (this.currentTab === 'system' && tabName !== 'system') {
+            if (window.performanceMonitor) {
+                window.performanceMonitor.stop();
+            }
+            if (window.gpuMonitor) {
+                window.gpuMonitor.stop();
+            }
+        }
+
         // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -144,6 +184,12 @@ class AdminPanel {
                 break;
             case 'backups':
                 await this.loadBackups();
+                break;
+            case 'audit':
+                await this.loadAudit();
+                break;
+            case 'rbac':
+                await this.loadRBAC();
                 break;
             case 'system':
                 await this.loadSystem();
@@ -545,6 +591,121 @@ class AdminPanel {
         } catch (error) {
             console.error('Failed to delete backup:', error);
             toast.error(`Failed to delete backup: ${error.message}`);
+        }
+    }
+
+    // ==================== AUDIT ====================
+
+    // Load Audit Events (v1.11.4+)
+    async loadAudit() {
+        const loadingEl = document.getElementById('audit-loading');
+        const listEl = document.getElementById('audit-events-list');
+        const noEventsEl = document.getElementById('no-audit-events');
+
+        loadingEl.style.display = 'block';
+        listEl.style.display = 'none';
+        noEventsEl.style.display = 'none';
+
+        try {
+            // Load stats
+            const statsResp = await api.request(`${api.baseURL}/api/admin/audit/stats`);
+            if (statsResp.ok) {
+                const statsData = await statsResp.json();
+                document.getElementById('audit-stat-total').textContent = statsData.stats.total || 0;
+                document.getElementById('audit-stat-critical').textContent = statsData.stats.by_severity.critical || 0;
+                document.getElementById('audit-stat-warning').textContent = statsData.stats.by_severity.warning || 0;
+                document.getElementById('audit-stat-failed-logins').textContent = statsData.stats.security_events.failed_logins || 0;
+            }
+
+            // Load recent events (last 20)
+            const eventsResp = await api.request(`${api.baseURL}/api/admin/audit?limit=20&offset=0`);
+            if (eventsResp.ok) {
+                const eventsData = await eventsResp.json();
+                
+                if (eventsData.events && eventsData.events.length > 0) {
+                    this.renderAuditEvents(eventsData.events);
+                    listEl.style.display = 'block';
+                } else {
+                    noEventsEl.style.display = 'block';
+                }
+            } else {
+                throw new Error('Failed to load audit events');
+            }
+        } catch (error) {
+            console.error('Failed to load audit:', error);
+            listEl.innerHTML = `<div class="error-message">Failed to load audit events: ${error.message}</div>`;
+            listEl.style.display = 'block';
+        } finally {
+            loadingEl.style.display = 'none';
+        }
+    }
+
+    renderAuditEvents(events) {
+        const tbody = document.getElementById('audit-events-tbody');
+        
+        const getSeverityClass = (severity) => {
+            switch(severity) {
+                case 'critical': return 'severity-critical';
+                case 'warning': return 'severity-warning';
+                case 'info': return 'severity-info';
+                default: return '';
+            }
+        };
+
+        const getStatusClass = (status) => {
+            return status === 'success' ? 'status-success' : 'status-failure';
+        };
+
+        const html = events.map(event => `
+            <tr>
+                <td>${new Date(event.timestamp).toLocaleString()}</td>
+                <td><span class="badge">${event.event_type}</span></td>
+                <td><span class="badge ${getSeverityClass(event.severity)}">${event.severity}</span></td>
+                <td title="${event.actor_id}"><code>${event.actor_id.substring(0, 8)}...</code></td>
+                <td>${event.action}</td>
+                <td><span class="badge ${getStatusClass(event.status)}">${event.status}</span></td>
+            </tr>
+        `).join('');
+        
+        tbody.innerHTML = html;
+    }
+
+    // ==================== RBAC ====================
+
+    // Load RBAC Stats (v1.11.5+)
+    async loadRBAC() {
+        try {
+            // Load roles
+            const rolesResp = await api.request(`${api.baseURL}/api/admin/rbac/roles`);
+            if (rolesResp.ok) {
+                const rolesData = await rolesResp.json();
+                const roles = rolesData.roles || [];
+                const customRoles = roles.filter(r => r.type === 'custom');
+                
+                document.getElementById('rbac-stat-roles').textContent = roles.length;
+                document.getElementById('rbac-stat-custom-roles').textContent = customRoles.length;
+            }
+            
+            // Load permissions
+            const permsResp = await api.request(`${api.baseURL}/api/admin/rbac/permissions`);
+            if (permsResp.ok) {
+                const permsData = await permsResp.json();
+                document.getElementById('rbac-stat-permissions').textContent = (permsData.permissions || []).length;
+            }
+            
+            // Count user assignments (approximate - total users * avg roles)
+            const usersResp = await api.request(`${api.baseURL}/api/admin/users`);
+            if (usersResp.ok) {
+                const usersData = await usersResp.json();
+                // For now, just show user count as proxy for assignments
+                document.getElementById('rbac-stat-assignments').textContent = (usersData.users || []).length;
+            }
+        } catch (error) {
+            console.error('Failed to load RBAC stats:', error);
+            document.getElementById('rbac-stat-roles').textContent = 'Error';
+            document.getElementById('rbac-stat-custom-roles').textContent = 'Error';
+            document.getElementById('rbac-stat-permissions').textContent = 'Error';
+            document.getElementById('rbac-stat-assignments').textContent = 'Error';
         }
     }
 

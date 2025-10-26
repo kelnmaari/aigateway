@@ -77,3 +77,4 @@ type ImportResult struct {
 	MessagesImported int    `json:"messages_imported"`
 	Error            string `json:"error,omitempty"`
 }
+

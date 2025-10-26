@@ -275,3 +275,4 @@ func (r *AdvancedRateLimiter) StartCleanupLoop(ctx context.Context) {
 func (r *AdvancedRateLimiter) GetStats() map[string]interface{} {
 	return r.slidingWindow.GetCacheStats()
 }
+

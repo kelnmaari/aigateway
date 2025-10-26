@@ -486,3 +486,4 @@ function showNotification(message, type = 'info') {
         toast.remove();
     });
 }
+

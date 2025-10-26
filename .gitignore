@@ -71,7 +71,7 @@ docker-compose.override.yml
 /data/
 /kilocode/
 /continue/
-/monigo/
-
+monigo/
+/monigo/cache.dat
 # AI Review artifacts
 .ai-review-artifacts/

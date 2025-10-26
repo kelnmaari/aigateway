@@ -243,12 +243,13 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 	// Query for API key usage (LIMIT to top 10 keys)
 	// COALESCE используется для группировки WebUI (JWT) запросов с api_key_id=NULL
+	// datetime() для правильного формата timestamp вместо Go time.String()
 	apiKeyQuery := `
 		SELECT 
 			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			COUNT(*) as requests,
 			SUM(total_tokens) as tokens,
-			MAX(created_at) as last_used
+			datetime(MAX(created_at)) as last_used
 		FROM api_usage
 		WHERE user_id = ? AND created_at >= ?
 		GROUP BY COALESCE(api_key_id, 'webui-jwt')
@@ -271,16 +272,11 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 				continue
 			}
 			
-			// Parse SQLite timestamp string to time.Time
-			// SQLite stores timestamps as "2006-01-02 15:04:05" or RFC3339
+			// Parse SQLite datetime() format: "2006-01-02 15:04:05"
 			lastUsed, err := time.Parse("2006-01-02 15:04:05", lastUsedStr)
 			if err != nil {
-				// Try RFC3339 format
-				lastUsed, err = time.Parse(time.RFC3339, lastUsedStr)
-				if err != nil {
-					s.logger.WithError(err).Warnf("Failed to parse last_used timestamp: %s", lastUsedStr)
-					lastUsed = time.Time{} // Zero time as fallback
-				}
+				s.logger.WithError(err).Warnf("Failed to parse last_used: %s", lastUsedStr)
+				lastUsed = time.Time{} // Zero time as fallback
 			}
 			apiKey.LastUsed = lastUsed
 			
@@ -290,9 +286,10 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 	// Query for recent requests
 	// COALESCE для api_key_id так как WebUI (JWT) запросы имеют NULL
+	// datetime() для правильного формата timestamp
 	recentQuery := `
 		SELECT 
-			created_at,
+			datetime(created_at) as created_at,
 			model,
 			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			total_tokens,
@@ -319,14 +316,11 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 				continue
 			}
 			
-			// Parse SQLite timestamp string to time.Time
+			// Parse SQLite datetime() format: "2006-01-02 15:04:05"
 			timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
 			if err != nil {
-				timestamp, err = time.Parse(time.RFC3339, timestampStr)
-				if err != nil {
-					s.logger.WithError(err).Warnf("Failed to parse timestamp: %s", timestampStr)
-					timestamp = time.Now() // Fallback to current time
-				}
+				s.logger.WithError(err).Warnf("Failed to parse timestamp: %s", timestampStr)
+				timestamp = time.Now() // Fallback to current time
 			}
 			req.Timestamp = timestamp
 			

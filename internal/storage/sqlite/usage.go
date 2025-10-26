@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"ollama-openai-proxy/internal/models"
@@ -243,13 +244,13 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 	// Query for API key usage (LIMIT to top 10 keys)
 	// COALESCE используется для группировки WebUI (JWT) запросов с api_key_id=NULL
-	// IFNULL для обработки NULL timestamps, strftime для правильного формата
+	// MAX(created_at) возвращает raw timestamp - парсим в Go с fallback
 	apiKeyQuery := `
 		SELECT 
 			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			COUNT(*) as requests,
 			SUM(total_tokens) as tokens,
-			IFNULL(strftime('%Y-%m-%d %H:%M:%S', MAX(created_at)), '1970-01-01 00:00:00') as last_used
+			MAX(created_at) as last_used
 		FROM api_usage
 		WHERE user_id = ? AND created_at >= ?
 		GROUP BY COALESCE(api_key_id, 'webui-jwt')
@@ -266,19 +267,18 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 		for rows.Next() {
 			apiKey := &models.APIKeyUsageStats{}
-			var lastUsedStr string
+			var lastUsedStr sql.NullString
 			if err := rows.Scan(&apiKey.KeyID, &apiKey.Requests, &apiKey.Tokens, &lastUsedStr); err != nil {
 				s.logger.WithError(err).Warn("Failed to scan API key usage")
 				continue
 			}
 			
-			// Parse SQLite datetime() format: "2006-01-02 15:04:05"
-			lastUsed, err := time.Parse("2006-01-02 15:04:05", lastUsedStr)
-			if err != nil {
-				s.logger.WithError(err).Warnf("Failed to parse last_used: %s", lastUsedStr)
-				lastUsed = time.Time{} // Zero time as fallback
+			// Parse timestamp with multiple format support
+			if lastUsedStr.Valid && lastUsedStr.String != "" {
+				apiKey.LastUsed = s.parseTimestamp(lastUsedStr.String)
+			} else {
+				apiKey.LastUsed = time.Time{} // Zero time if NULL
 			}
-			apiKey.LastUsed = lastUsed
 			
 			stats.APIKeys = append(stats.APIKeys, apiKey)
 		}
@@ -286,10 +286,10 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 	// Query for recent requests
 	// COALESCE для api_key_id так как WebUI (JWT) запросы имеют NULL
-	// IFNULL + strftime для обработки NULL timestamps
+	// created_at raw timestamp - парсим в Go с fallback
 	recentQuery := `
 		SELECT 
-			IFNULL(strftime('%Y-%m-%d %H:%M:%S', created_at), '1970-01-01 00:00:00') as created_at,
+			created_at,
 			model,
 			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			total_tokens,
@@ -310,19 +310,18 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 		for rows.Next() {
 			req := &models.RecentRequest{}
-			var timestampStr string
+			var timestampStr sql.NullString
 			if err := rows.Scan(&timestampStr, &req.Model, &req.KeyID, &req.Tokens, &req.Duration, &req.Success); err != nil {
 				s.logger.WithError(err).Warn("Failed to scan recent request")
 				continue
 			}
 			
-			// Parse SQLite datetime() format: "2006-01-02 15:04:05"
-			timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
-			if err != nil {
-				s.logger.WithError(err).Warnf("Failed to parse timestamp: %s", timestampStr)
-				timestamp = time.Now() // Fallback to current time
+			// Parse timestamp with multiple format support
+			if timestampStr.Valid && timestampStr.String != "" {
+				req.Timestamp = s.parseTimestamp(timestampStr.String)
+			} else {
+				req.Timestamp = time.Now() // Fallback to current time
 			}
-			req.Timestamp = timestamp
 			
 			stats.RecentRequests = append(stats.RecentRequests, req)
 		}
@@ -339,6 +338,32 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 	}).Debug("Retrieved user usage stats")
 
 	return &stats, nil
+}
+
+// parseTimestamp пытается распарсить timestamp в разных форматах
+func (s *SQLiteDB) parseTimestamp(ts string) time.Time {
+	// Список форматов для пробы
+	formats := []string{
+		"2006-01-02 15:04:05",                    // SQLite datetime
+		time.RFC3339,                             // 2006-01-02T15:04:05Z07:00
+		time.RFC3339Nano,                         // 2006-01-02T15:04:05.999999999Z07:00
+		"2006-01-02 15:04:05.999999999 -0700 MST", // Go time.String() format
+	}
+	
+	for _, format := range formats {
+		if t, err := time.Parse(format, ts); err == nil {
+			return t
+		}
+	}
+	
+	// Если ничего не подошло, попробуем удалить "m=+XXX" из конца (monotonic clock)
+	if idx := strings.Index(ts, " m="); idx > 0 {
+		cleaned := ts[:idx]
+		return s.parseTimestamp(cleaned) // Рекурсивно с очищенной строкой
+	}
+	
+	s.logger.Warnf("Failed to parse timestamp in any format: %s", ts)
+	return time.Time{} // Zero time as last resort
 }
 
 // GetTenantUsageStats возвращает статистику использования для tenant за период

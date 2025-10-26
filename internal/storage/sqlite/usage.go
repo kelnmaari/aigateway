@@ -242,15 +242,16 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 	}
 
 	// Query for API key usage (LIMIT to top 10 keys)
+	// COALESCE используется для группировки WebUI (JWT) запросов с api_key_id=NULL
 	apiKeyQuery := `
 		SELECT 
-			api_key_id,
+			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			COUNT(*) as requests,
 			SUM(total_tokens) as tokens,
 			MAX(created_at) as last_used
 		FROM api_usage
 		WHERE user_id = ? AND created_at >= ?
-		GROUP BY api_key_id
+		GROUP BY COALESCE(api_key_id, 'webui-jwt')
 		ORDER BY requests DESC
 		LIMIT 10
 	`
@@ -264,20 +265,36 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 		for rows.Next() {
 			apiKey := &models.APIKeyUsageStats{}
-			if err := rows.Scan(&apiKey.KeyID, &apiKey.Requests, &apiKey.Tokens, &apiKey.LastUsed); err != nil {
+			var lastUsedStr string
+			if err := rows.Scan(&apiKey.KeyID, &apiKey.Requests, &apiKey.Tokens, &lastUsedStr); err != nil {
 				s.logger.WithError(err).Warn("Failed to scan API key usage")
 				continue
 			}
+			
+			// Parse SQLite timestamp string to time.Time
+			// SQLite stores timestamps as "2006-01-02 15:04:05" or RFC3339
+			lastUsed, err := time.Parse("2006-01-02 15:04:05", lastUsedStr)
+			if err != nil {
+				// Try RFC3339 format
+				lastUsed, err = time.Parse(time.RFC3339, lastUsedStr)
+				if err != nil {
+					s.logger.WithError(err).Warnf("Failed to parse last_used timestamp: %s", lastUsedStr)
+					lastUsed = time.Time{} // Zero time as fallback
+				}
+			}
+			apiKey.LastUsed = lastUsed
+			
 			stats.APIKeys = append(stats.APIKeys, apiKey)
 		}
 	}
 
 	// Query for recent requests
+	// COALESCE для api_key_id так как WebUI (JWT) запросы имеют NULL
 	recentQuery := `
 		SELECT 
 			created_at,
 			model,
-			api_key_id,
+			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			total_tokens,
 			duration_ms,
 			success
@@ -296,10 +313,23 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 		for rows.Next() {
 			req := &models.RecentRequest{}
-			if err := rows.Scan(&req.Timestamp, &req.Model, &req.KeyID, &req.Tokens, &req.Duration, &req.Success); err != nil {
+			var timestampStr string
+			if err := rows.Scan(&timestampStr, &req.Model, &req.KeyID, &req.Tokens, &req.Duration, &req.Success); err != nil {
 				s.logger.WithError(err).Warn("Failed to scan recent request")
 				continue
 			}
+			
+			// Parse SQLite timestamp string to time.Time
+			timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
+			if err != nil {
+				timestamp, err = time.Parse(time.RFC3339, timestampStr)
+				if err != nil {
+					s.logger.WithError(err).Warnf("Failed to parse timestamp: %s", timestampStr)
+					timestamp = time.Now() // Fallback to current time
+				}
+			}
+			req.Timestamp = timestamp
+			
 			stats.RecentRequests = append(stats.RecentRequests, req)
 		}
 	}

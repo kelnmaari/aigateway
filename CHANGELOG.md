@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.9] - 2025-10-26
+
+### Added
+- **Enhanced Audit Logging**: Comprehensive audit trail for critical operations
+  - User operations: creation, deletion, enable/disable (LogUserCreated, LogUserDeleted, LogUserUpdated)
+  - API key operations: creation and deletion tracking (LogAPIKeyCreated, LogAPIKeyDeleted)
+  - Tenant operations: creation, updates, deletion (LogTenantCreated, LogTenantUpdated, LogTenantDeleted)
+  - Backup operations: creation and restoration tracking (LogBackupCreated, LogBackupRestored)
+  - Performance monitoring: reduced update frequency from 5s to 10s for GPU and system metrics
+  - WebUI performance: monitors now stop when not actively viewing System tab
+
+### Technical
+- Added AuditLogger integration to handlers:
+  - `AdminUserHandler`: tracks user lifecycle events (create, delete, disable, enable)
+  - `UserHandler`: tracks personal API key management
+  - `TenantHandler`: tracks organization tenant operations
+  - `BackupHandler`: tracks critical backup/restore operations
+- New audit methods in `internal/services/audit/logger.go`:
+  - `LogUserUpdated()` - tracks user status changes and updates
+  - `LogTenantUpdated()` - tracks tenant information changes
+- Updated handler constructors to accept `*audit.AuditLogger` parameter
+- Router injection of `auditLogger` into all relevant handlers
+- WebUI optimization: `admin.js` now stops performance/GPU monitors when switching tabs
+
+### Security
+- **Audit trail for CRITICAL operations**:
+  - User deletion (data loss risk)
+  - Backup restoration (overwrites current data)
+  - Tenant deletion (organization data loss)
+  - API key operations (security credentials)
+
 ## [1.11.7] - 2025-10-25
 
 ### Added

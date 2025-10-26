@@ -749,11 +749,14 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
 	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
 	r.engine.StaticFile("/admin.html", "./web/admin.html") // Admin Panel (Version 1.3.0)
+	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html") // RBAC Management (v1.11.5)
+	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html") // Audit Log (v1.11.4)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
 	r.engine.Static("/js", "./web/js")
 	r.engine.Static("/assets", "./web/assets")
+	r.engine.Static("/images", "./web/images")
 
 	// Legacy /web/* routes for backward compatibility
 	r.engine.Static("/web", "./web")
@@ -1112,10 +1115,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 
 	if r.authService != nil && r.db != nil {
 		r.authHandler = handlers.NewAuthHandler(r.authService, logger, r.auditLogger)
-		r.userHandler = handlers.NewUserHandler(r.db, logger)
-		r.tenantHandler = handlers.NewTenantHandler(r.db, logger)
+		r.userHandler = handlers.NewUserHandler(r.db, logger, r.auditLogger)
+		r.tenantHandler = handlers.NewTenantHandler(r.db, logger, r.auditLogger)
 		r.conversationHandler = handlers.NewConversationHandler(r.db)
-		r.adminUserHandler = handlers.NewAdminUserHandler(r.db, logger)
+		r.adminUserHandler = handlers.NewAdminUserHandler(r.db, logger, r.auditLogger)
 		r.usageHandler = handlers.NewUsageHandler(r.db, logger)
 		logger.Info("User authentication handlers initialized")
 	}
@@ -1253,7 +1256,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	}
 
 	// Backup Handler (v1.5.14)
-	r.backupHandler = handlers.NewBackupHandler(r.config, logger, r.db)
+	r.backupHandler = handlers.NewBackupHandler(r.config, logger, r.db, r.auditLogger)
 	logger.Info("Backup handler initialized")
 
 	// Performance Handler (v1.6.2)

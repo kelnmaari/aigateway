@@ -13,20 +13,23 @@ import (
 
 	"ollama-openai-proxy/internal/auth/password"
 	"ollama-openai-proxy/internal/models"
+	auditService "ollama-openai-proxy/internal/services/audit"
 	"ollama-openai-proxy/internal/storage"
 )
 
 // AdminUserHandler handles admin-level user management
 type AdminUserHandler struct {
-	db     storage.Database
-	logger *logrus.Logger
+	db          storage.Database
+	logger      *logrus.Logger
+	auditLogger *auditService.AuditLogger
 }
 
 // NewAdminUserHandler creates a new admin user handler
-func NewAdminUserHandler(db storage.Database, logger *logrus.Logger) *AdminUserHandler {
+func NewAdminUserHandler(db storage.Database, logger *logrus.Logger, auditLogger *auditService.AuditLogger) *AdminUserHandler {
 	return &AdminUserHandler{
-		db:     db,
-		logger: logger,
+		db:          db,
+		logger:      logger,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -208,6 +211,12 @@ func (h *AdminUserHandler) CreateUser(c *gin.Context) {
 		"is_admin": user.IsAdmin,
 	}).Info("User created by admin")
 
+	// Audit log: User created
+	adminUserID, _ := c.Get("user_id")
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogUserCreated(c.Request.Context(), adminUserID.(string), user.ID, user.Username, c.ClientIP())
+	}
+
 	// Remove password hash from response
 	user.PasswordHash = ""
 
@@ -335,6 +344,11 @@ func (h *AdminUserHandler) DeleteUser(c *gin.Context) {
 		"deleted_by": adminUserID,
 	}).Info("User deleted by admin")
 
+	// Audit log: User deleted (CRITICAL)
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogUserDeleted(c.Request.Context(), adminUserID.(string), userID, c.ClientIP())
+	}
+
 	c.Status(http.StatusNoContent)
 }
 
@@ -427,6 +441,11 @@ func (h *AdminUserHandler) DisableUser(c *gin.Context) {
 		"disabled_by": adminUserID,
 	}).Info("User disabled by admin")
 
+	// Audit log: User status changed to inactive
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogUserUpdated(c.Request.Context(), adminUserID.(string), userID, "status changed to inactive", c.ClientIP())
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "user disabled successfully",
 		"user":    toPublicUser(user),
@@ -462,6 +481,11 @@ func (h *AdminUserHandler) EnableUser(c *gin.Context) {
 		"username":   user.Username,
 		"enabled_by": adminUserID,
 	}).Info("User enabled by admin")
+
+	// Audit log: User status changed to active
+	if h.auditLogger != nil {
+		_ = h.auditLogger.LogUserUpdated(c.Request.Context(), adminUserID.(string), userID, "status changed to active", c.ClientIP())
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "user enabled successfully",

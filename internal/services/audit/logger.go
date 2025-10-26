@@ -361,6 +361,29 @@ func (a *AuditLogger) LogTenantDeleted(ctx context.Context, actorID, tenantID, i
 	return a.LogEvent(ctx, event)
 }
 
+// LogTenantUpdated logs tenant information update
+func (a *AuditLogger) LogTenantUpdated(ctx context.Context, actorID, tenantID, changes, ipAddress string) error {
+	metadata := map[string]interface{}{
+		"changes": changes,
+	}
+
+	event := &models.AuditEvent{
+		EventType:  models.EventTenantUpdated,
+		Severity:   string(models.AuditSeverityInfo),
+		ActorID:    actorID,
+		ActorType:  models.ActorTypeUser,
+		TargetID:   &tenantID,
+		TargetType: stringPtr(models.TargetTypeTenant),
+		Action:     "update",
+		Resource:   "tenant",
+		Status:     models.AuditStatusSuccess,
+		IPAddress:  ipAddress,
+		Metadata:   metadata,
+	}
+
+	return a.LogEvent(ctx, event)
+}
+
 // LogTenantMemberAdded logs tenant member addition
 func (a *AuditLogger) LogTenantMemberAdded(ctx context.Context, actorID, tenantID, memberID, role, ipAddress string) error {
 	metadata := map[string]interface{}{
@@ -473,6 +496,29 @@ func (a *AuditLogger) LogUserDeleted(ctx context.Context, actorID, targetUserID,
 		Resource:   "user",
 		Status:     models.AuditStatusSuccess,
 		IPAddress:  ipAddress,
+	}
+
+	return a.LogEvent(ctx, event)
+}
+
+// LogUserUpdated logs user information update
+func (a *AuditLogger) LogUserUpdated(ctx context.Context, actorID, targetUserID, changes, ipAddress string) error {
+	metadata := map[string]interface{}{
+		"changes": changes,
+	}
+
+	event := &models.AuditEvent{
+		EventType:  models.EventUserUpdated,
+		Severity:   string(models.AuditSeverityInfo),
+		ActorID:    actorID,
+		ActorType:  models.ActorTypeUser,
+		TargetID:   &targetUserID,
+		TargetType: stringPtr(models.TargetTypeUser),
+		Action:     "update",
+		Resource:   "user",
+		Status:     models.AuditStatusSuccess,
+		IPAddress:  ipAddress,
+		Metadata:   metadata,
 	}
 
 	return a.LogEvent(ctx, event)

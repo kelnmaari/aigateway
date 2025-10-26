@@ -4,7 +4,7 @@
 class PerformanceMonitor {
     constructor() {
         this.updateInterval = null;
-        this.UPDATE_FREQUENCY = 5000; // 5 seconds
+        this.UPDATE_FREQUENCY = 10000; // 10 seconds (reduced load)
         this.baseURL = '';
         
         // DOM elements

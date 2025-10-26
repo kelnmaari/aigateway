@@ -16,7 +16,7 @@ $(document).ready(function() {
 });
 
 function checkAuth() {
-    const token = localStorage.getItem('jwt_token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
         window.location.href = '/login.html';
         return;
@@ -39,13 +39,13 @@ function initEventListeners() {
 }
 
 function handleLogout() {
-    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('access_token');
     window.location.href = '/login.html';
 }
 
 function getAuthHeaders() {
     return {
-        'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         'Content-Type': 'application/json'
     };
 }

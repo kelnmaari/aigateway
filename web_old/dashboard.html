@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Ollama Proxy</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+
+    <!-- Main Dashboard Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p class="page-description">Welcome back! Here's an overview of your account.</p>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 163, 127, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Conversations</div>
+                        <div class="stat-value" id="stat-conversations">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-width="2"/>
+                            <circle cx="9" cy="7" r="4" stroke-width="2"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Tenants</div>
+                        <div class="stat-value" id="stat-tenants">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a855f7">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">API Keys</div>
+                        <div class="stat-value" id="stat-apikeys">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">API Requests (30d)</div>
+                        <div class="stat-value" id="stat-requests">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <section class="dashboard-section">
+                <h2>Quick Actions</h2>
+                <div class="quick-actions-grid">
+                    <a href="/chat.html" class="action-card">
+                        <div class="action-icon">💬</div>
+                        <h3>New Chat</h3>
+                        <p>Start a conversation with AI models</p>
+                    </a>
+
+                    <a href="/api-keys.html" class="action-card">
+                        <div class="action-icon">🔑</div>
+                        <h3>Create API Key</h3>
+                        <p>Generate new API key for access</p>
+                    </a>
+
+                    <a href="/tenants.html" class="action-card">
+                        <div class="action-icon">🏢</div>
+                        <h3>Create Organization</h3>
+                        <p>Set up a new team workspace</p>
+                    </a>
+
+                    <a href="/usage.html" class="action-card">
+                        <div class="action-icon">📊</div>
+                        <h3>View Usage</h3>
+                        <p>Check your API usage statistics</p>
+                    </a>
+
+                    <a href="/mcp.html" class="action-card">
+                        <div class="action-icon">🔌</div>
+                        <h3>MCP Catalog</h3>
+                        <p>Browse available MCP servers</p>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Recent Activity -->
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2>Recent Conversations</h2>
+                    <a href="/chat.html" class="btn btn-secondary">View All</a>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Model</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-conversations">
+                            <tr>
+                                <td colspan="4" class="table-empty">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Tenants -->
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2>Your Tenants</h2>
+                    <a href="/web/tenants.html" class="btn btn-secondary">Manage</a>
+                </div>
+                <div id="tenants-list" class="tenants-grid">
+                    <div class="tenant-card loading">Loading tenants...</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <!-- Auth Guard MUST be loaded FIRST to protect the page -->
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>
+

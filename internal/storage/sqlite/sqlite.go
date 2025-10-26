@@ -530,6 +530,16 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_11_7",
 			SQL:     s.getAddChangelogV1117Migration(),
 		},
+		{
+			Version: 45,
+			Name:    "add_changelog_v1_11_8",
+			SQL:     s.getAddChangelogV1118Migration(),
+		},
+		{
+			Version: 46,
+			Name:    "add_changelog_v1_11_9",
+			SQL:     s.getAddChangelogV1119Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2811,6 +2821,76 @@ CREATE INDEX IF NOT EXISTS idx_quotas_scope ON quotas(scope);
 CREATE INDEX IF NOT EXISTS idx_quota_usage_target ON quota_usage(target_id);
 CREATE INDEX IF NOT EXISTS idx_quota_usage_quota ON quota_usage(quota_id);
 	`
+}
+
+// getAddChangelogV1118Migration returns SQL for adding changelog v1.11.8 (v45 migration)
+// Version 1.11.8: WebUI Functionality Restoration
+func (s *SQLiteDB) getAddChangelogV1118Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.8', '2025-10-26', '## [1.11.8] - 2025-10-26
+
+### Added
+- **WebUI Complete Restoration**: Full synchronization of functionality from /web_old/ to /web/
+  - Dashboard: Restored gradient background, stats grid, recent conversations, tenants list, quick actions
+  - Admin Panel: Complete 11-tab interface (Dashboard, Users, API Keys, Files, Models, MCP Servers, Backups, Audit, RBAC, Logs, System)
+  - Navigation: Unified navbar.js component across all pages with prominent Admin link
+  - Chat: Full feature parity with model panel, context manager, file attachments
+  - API Keys: Personal and organization keys management with full CRUD operations
+  - Files: Drag & drop upload, filters, grid view, preview functionality
+  - Tenants: Organization management with member roles and permissions
+  - Profile: User information editing, password change, account management
+  - Usage: Statistics and analytics dashboard
+  - About: System information and changelogs display
+  - MCP: MCP servers management interface
+
+### Changed
+- **UI/UX Improvements**: Applied theme.css consistently across all pages for modern, cohesive design
+  - Gradient backgrounds for visual appeal
+  - Improved button and tab styling with hover effects
+  - Better readability with white headings and text shadows
+- **Performance Optimization**: Reduced frequent data request intervals
+  - GPU monitor: 5s → 10s update frequency
+  - Performance monitor: 5s → 10s update frequency
+  - Smart monitor management: auto-stop when tab not active
+
+### Technical
+- All 13 HTML pages synchronized and updated
+- Consistent navigation component across entire application
+- Modern CSS with gradient themes and responsive design
+- Optimized JavaScript for better performance
+- Fixed console errors and improved error handling
+');
+    `
+}
+
+// getAddChangelogV1119Migration returns SQL for adding changelog v1.11.9 (v46 migration)
+// Version 1.11.9: Enhanced Audit Logging
+func (s *SQLiteDB) getAddChangelogV1119Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.11.9', '2025-10-26', '## [1.11.9] - 2025-10-26
+
+### Added
+- **Enhanced Audit Logging**: Comprehensive audit trail for critical operations
+  - User operations: creation, deletion, enable/disable (LogUserCreated, LogUserDeleted, LogUserUpdated)
+  - API key operations: creation and deletion tracking (LogAPIKeyCreated, LogAPIKeyDeleted)
+  - Tenant operations: creation, updates, deletion (LogTenantCreated, LogTenantUpdated, LogTenantDeleted)
+  - Backup operations: creation and restoration tracking (LogBackupCreated, LogBackupRestored)
+  - Performance monitoring: reduced update frequency from 5s to 10s for GPU and system metrics
+  - WebUI performance: monitors now stop when not actively viewing System tab
+
+### Technical
+- Added AuditLogger integration to handlers: AdminUserHandler, UserHandler, TenantHandler, BackupHandler
+- New audit methods in internal/services/audit/logger.go: LogUserUpdated(), LogTenantUpdated()
+- Updated handler constructors to accept *audit.AuditLogger parameter
+- Router injection of auditLogger into all relevant handlers
+- WebUI optimization: admin.js now stops performance/GPU monitors when switching tabs
+
+### Security
+- **Audit trail for CRITICAL operations**: User deletion (data loss risk), Backup restoration (overwrites current data), Tenant deletion (organization data loss), API key operations (security credentials)
+');
+    `
 }
 
 // getAddChangelogV1117Migration returns SQL for adding changelog v1.11.7 (v44 migration)

@@ -45,54 +45,84 @@ class AdminPanel {
 
         // Navbar component handles logout now
 
-        // Create User button
-        document.getElementById('create-user-btn').addEventListener('click', () => this.showCreateUserModal());
+        // Create User button (if exists)
+        const createUserBtn = document.getElementById('create-user-btn');
+        if (createUserBtn) {
+            createUserBtn.addEventListener('click', () => this.showCreateUserModal());
+        }
 
-        // Create User form
-        document.getElementById('create-user-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleCreateUser(e.target);
-        });
+        // Create User form (if exists)
+        const createUserForm = document.getElementById('create-user-form');
+        if (createUserForm) {
+            createUserForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleCreateUser(e.target);
+            });
+        }
 
-        // Create API Key button
-        document.getElementById('create-apikey-btn').addEventListener('click', () => this.showCreateAPIKeyModal());
+        // Create API Key button (if exists)
+        const createApiKeyBtn = document.getElementById('create-apikey-btn');
+        if (createApiKeyBtn) {
+            createApiKeyBtn.addEventListener('click', () => this.showCreateAPIKeyModal());
+        }
 
-        // Create API Key form
-        document.getElementById('create-apikey-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleCreateAPIKey(e.target);
-        });
+        // Create API Key form (if exists)
+        const createApiKeyForm = document.getElementById('create-apikey-form');
+        if (createApiKeyForm) {
+            createApiKeyForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleCreateAPIKey(e.target);
+            });
+        }
 
-        // Create Backup button
-        document.getElementById('create-backup-btn').addEventListener('click', () => this.createBackup());
+        // Create Backup button (if exists)
+        const createBackupBtn = document.getElementById('create-backup-btn');
+        if (createBackupBtn) {
+            createBackupBtn.addEventListener('click', () => this.createBackup());
+        }
 
-        // Edit User form
-        document.getElementById('edit-user-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleEditUser(e.target);
-        });
+        // Edit User form (if exists)
+        const editUserForm = document.getElementById('edit-user-form');
+        if (editUserForm) {
+            editUserForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleEditUser(e.target);
+            });
+        }
 
-        // Reset Password form
-        document.getElementById('reset-password-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleResetPassword(e.target);
-        });
+        // Reset Password form (if exists)
+        const resetPasswordForm = document.getElementById('reset-password-form');
+        if (resetPasswordForm) {
+            resetPasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleResetPassword(e.target);
+            });
+        }
 
-        // MCP Server button
-        document.getElementById('create-mcp-btn').addEventListener('click', () => this.showCreateMCPModal());
+        // MCP Server button (if exists)
+        const createMcpBtn = document.getElementById('create-mcp-btn');
+        if (createMcpBtn) {
+            createMcpBtn.addEventListener('click', () => this.showCreateMCPModal());
+        }
 
-        // MCP Server form
-        document.getElementById('mcp-server-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleMCPServerSubmit(e.target);
-        });
+        // MCP Server form (if exists)
+        const mcpServerForm = document.getElementById('mcp-server-form');
+        if (mcpServerForm) {
+            mcpServerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleMCPServerSubmit(e.target);
+            });
+        }
 
-        // MCP Category filter
-        document.getElementById('mcp-category-filter').addEventListener('change', (e) => {
-            this.filterMCPServers(e.target.value);
-        });
+        // MCP Category filter (if exists)
+        const mcpCategoryFilter = document.getElementById('mcp-category-filter');
+        if (mcpCategoryFilter) {
+            mcpCategoryFilter.addEventListener('change', (e) => {
+                this.filterMCPServers(e.target.value);
+            });
+        }
 
-        // Refresh models button (v1.9.3+)
+        // Refresh models button (v1.9.3+) (if exists)
         const refreshModelsBtn = document.getElementById('refresh-models-btn');
         if (refreshModelsBtn) {
             refreshModelsBtn.addEventListener('click', () => this.refreshModels());
@@ -112,6 +142,16 @@ class AdminPanel {
     }
 
     async switchTab(tabName) {
+        // Stop monitors when leaving System tab
+        if (this.currentTab === 'system' && tabName !== 'system') {
+            if (window.performanceMonitor) {
+                window.performanceMonitor.stop();
+            }
+            if (window.gpuMonitor) {
+                window.gpuMonitor.stop();
+            }
+        }
+
         // Update tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);

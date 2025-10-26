@@ -18,6 +18,11 @@ import (
 	"ollama-openai-proxy/internal/webfetch"
 )
 
+// ModelPreloader interface для tracking model usage (v1.12.1+)
+type ModelPreloader interface {
+	MarkUsed(modelName string)
+}
+
 // ChatHandler обрабатывает chat completions эндпоинт с упрощенными конвертерами
 type ChatHandler struct {
 	config              *config.Config
@@ -26,6 +31,7 @@ type ChatHandler struct {
 	converter           *converter.SimpleConverter
 	db                  storage.Database          // для model configs (v1.9.1+)
 	webfetchIntegration *webfetch.ChatIntegration // для автоматического fetch web content (v1.10.4+)
+	modelPreloader      ModelPreloader            // для tracking model usage (v1.12.1+)
 }
 
 // NewChatHandler создает новый chat handler с упрощенными конвертерами
@@ -71,6 +77,11 @@ func NewChatHandlerWithManager(cfg *config.Config, logger *logrus.Logger, ollama
 	}
 }
 
+// SetModelPreloader устанавливает model preloader для tracking (v1.12.1+)
+func (h *ChatHandler) SetModelPreloader(preloader ModelPreloader) {
+	h.modelPreloader = preloader
+}
+
 // Completion обрабатывает POST /v1/chat/completions
 func (h *ChatHandler) Completion(c *gin.Context) {
 	var req models.ChatCompletionRequest
@@ -100,6 +111,11 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 
 	// Сохраняем модель в контекст для usage tracking
 	c.Set("model", req.Model)
+
+	// Track model usage для preloading (v1.12.1+)
+	if h.modelPreloader != nil {
+		h.modelPreloader.MarkUsed(req.Model)
+	}
 
 	// Детальное логирование tools если они есть
 	if len(req.Tools) > 0 {

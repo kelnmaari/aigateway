@@ -33,6 +33,7 @@ import (
 	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/request"
 	"ollama-openai-proxy/internal/services/audit"
+	"ollama-openai-proxy/internal/services/model"
 	"ollama-openai-proxy/internal/services/quota"
 	"ollama-openai-proxy/internal/services/rbac"
 	"ollama-openai-proxy/internal/storage"
@@ -72,6 +73,7 @@ type Router struct {
 	adminUserHandler      *handlers.AdminUserHandler    // Admin User Management (Version 1.3.0)
 	usageHandler          *handlers.UsageHandler        // Usage Statistics (Version 1.3.0)
 	modelsHandler         *handlers.ModelsHandler
+	modelPreloadHandler   *handlers.ModelPreloadHandler // Model Preload Management (Version 1.12.1+)
 	chatHandler           *handlers.ChatHandler
 	embeddingsHandler     *handlers.EmbeddingsHandler
 	completionsHandler    *handlers.CompletionsHandler
@@ -130,6 +132,9 @@ type Router struct {
 
 	// Metrics (Version 1.11.6+: Prometheus Metrics Export)
 	metricsCollector *metrics.MetricsCollector
+
+	// Model Preloading (Version 1.12.1+: Model Preloading & Warming)
+	modelPreloader *model.ModelPreloader
 }
 
 // NewOptions содержит опции для создания роутера
@@ -144,6 +149,7 @@ type NewOptions struct {
 	LeakDetector       *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
 	MonigoPort         int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
 	GPUMonitor         *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
+	ModelPreloader     *model.ModelPreloader             // Опциональный model preloader (v1.12.1+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -174,6 +180,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		leakDetector:       opts.LeakDetector,
 		monigoPort:         opts.MonigoPort,
 		gpuMonitor:         opts.GPUMonitor,
+		modelPreloader:     opts.ModelPreloader,
 	}
 
 	// Setup tracer if provided
@@ -237,6 +244,11 @@ func (r *Router) Close() error {
 
 	if r.keyManager != nil {
 		r.keyManager.Close()
+	}
+
+	// Stop model preloader (Version 1.12.1+)
+	if r.modelPreloader != nil {
+		r.modelPreloader.Stop()
 	}
 
 	if r.ollamaClient != nil {
@@ -900,6 +912,13 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/models/:name/details", r.adminHandler.GetModelDetails)
 	}
 
+	// Model Preloading endpoints (v1.12.1+)
+	if r.modelPreloadHandler != nil {
+		r.logger.Info("Admin routes: Registering Model Preloading endpoints")
+		admin.GET("/models/loaded", r.modelPreloadHandler.GetLoadedModels)
+		admin.POST("/models/:name/preload", r.modelPreloadHandler.PreloadModel)
+	}
+
 	// Files management (v1.10.0) - Admin can manage all files
 	if r.adminFilesHandler != nil {
 		r.logger.Info("Admin routes: Registering Files Management endpoints")
@@ -1081,11 +1100,22 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	r.healthHandler = handlers.NewHealthHandler(cfg, logger, ollamaClient)
 	r.modelsHandler = handlers.NewModelsHandler(cfg, logger, ollamaClient)
 
+	// Model Preload handler (v1.12.1+)
+	if r.modelPreloader != nil {
+		r.modelPreloadHandler = handlers.NewModelPreloadHandler(logger, r.modelPreloader)
+	}
+
 	// Chat handler with database for model configs (v1.9.1+)
 	if r.db != nil {
 		r.chatHandler = handlers.NewChatHandlerWithDB(cfg, logger, ollamaClient, r.db)
 	} else {
 		r.chatHandler = handlers.NewChatHandler(cfg, logger, ollamaClient)
+	}
+
+	// Setup model preloader для tracking (v1.12.1+)
+	if r.modelPreloader != nil {
+		r.chatHandler.SetModelPreloader(r.modelPreloader)
+		logger.Info("Model preloader attached to chat handler")
 	}
 
 	r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)

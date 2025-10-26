@@ -293,6 +293,37 @@ type ModelsConfig struct {
 		TTL             time.Duration `mapstructure:"ttl"`
 		RefreshInterval time.Duration `mapstructure:"refresh_interval"`
 	} `mapstructure:"cache"`
+
+	// Preload настройки preloading моделей (Version 1.12.1+)
+	Preload ModelPreloadConfig `mapstructure:"preload"`
+}
+
+// ModelPreloadConfig конфигурация preloading моделей
+// Version 1.12.1+: Model Preloading & Warming
+type ModelPreloadConfig struct {
+	// Enabled включить preloading моделей
+	Enabled bool `mapstructure:"enabled"`
+
+	// Models список моделей для preload при старте
+	Models []string `mapstructure:"models"`
+
+	// OnStartup загрузить модели при старте сервера
+	OnStartup bool `mapstructure:"on_startup"`
+
+	// KeepWarm поддерживать модели в горячем состоянии через health check
+	KeepWarm bool `mapstructure:"keep_warm"`
+
+	// HealthCheckInterval интервал health check для keep-alive
+	HealthCheckInterval time.Duration `mapstructure:"health_check_interval"`
+
+	// WarmUpPrompt тестовый промпт для загрузки модели
+	WarmUpPrompt string `mapstructure:"warm_up_prompt"`
+
+	// MaxLoadedModels максимальное количество загруженных моделей (0 = unlimited)
+	MaxLoadedModels int `mapstructure:"max_loaded_models"`
+
+	// UnloadAfter выгрузить модель если не использовалась N времени (0 = never)
+	UnloadAfter time.Duration `mapstructure:"unload_after"`
 }
 
 // ToolsConfig конфигурация обработки tools (function calling)

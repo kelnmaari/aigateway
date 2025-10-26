@@ -188,6 +188,31 @@ models:
     enabled: true
     ttl: "5m"
     refresh_interval: "1m"
+  
+  # Model Preloading & Warming (Version 1.12.1+)
+  # Устраняет cold start задержку при первом запросе
+  preload:
+    enabled: true  # Включить preloading
+    on_startup: true  # Загружать модели при старте сервера
+    keep_warm: true  # Поддерживать модели в горячем состоянии
+    
+    # Модели для preload (добавь нужные модели)
+    models:
+      - "deepseek-coder:33b"
+      # - "qwen2.5:latest"
+      # - "mxbai-embed-large:latest"
+    
+    # Health check interval для keep-alive
+    health_check_interval: "5m"
+    
+    # Warm-up prompt для загрузки модели
+    warm_up_prompt: "Hello"
+    
+    # Максимальное количество загруженных моделей (0 = без ограничений)
+    max_loaded_models: 3
+    
+    # Выгружать модель если не использовалась N времени (0 = никогда)
+    unload_after: "30m"
 
 # 💬 ПРОМПТЫ И СИСТЕМНЫЕ СООБЩЕНИЯ
 prompts:

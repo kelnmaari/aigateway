@@ -540,6 +540,16 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v1_11_9",
 			SQL:     s.getAddChangelogV1119Migration(),
 		},
+		{
+			Version: 47,
+			Name:    "add_changelog_v1_12_1",
+			SQL:     s.getAddChangelogV1121Migration(),
+		},
+		{
+			Version: 48,
+			Name:    "add_advanced_rate_limiting",
+			SQL:     s.getAddAdvancedRateLimitingMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2931,6 +2941,108 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - **PostgreSQL**: Stubs added для будущей реализации
 - **Transactions**: Transaction wrappers delegating to DB methods для quotas
 ');
+    `
+}
+
+// getAddChangelogV1121Migration returns SQL for adding changelog v1.12.1 (v47 migration)
+func (s *SQLiteDB) getAddChangelogV1121Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.12.1', '2025-10-26', '## [1.12.1] - 2025-10-26
+
+### Added
+- **Model Preloading & Warming**: Механизм предзагрузки моделей для устранения cold start задержки
+  - Preload моделей при старте сервера (настраиваемый список в конфигурации)
+  - Health check loop для поддержания моделей в горячем состоянии
+  - Автоматическая выгрузка неиспользуемых моделей через настраиваемый timeout
+  - Track model usage для оптимизации preloading
+  - Admin API endpoints:
+    - `GET /api/admin/models/loaded` - список загруженных моделей с статусом
+    - `POST /api/admin/models/:name/preload` - ручная загрузка модели
+
+### Changed
+- **Chat Handler**: Автоматический tracking использования моделей при каждом запросе
+- **Configuration**: Добавлена секция `models.preload` с полной настройкой preloading
+
+### Technical
+- Новый сервис `internal/services/model/preloader.go`:
+  - `ModelPreloader` с async startup и health check loops
+  - Thread-safe tracking загруженных моделей
+  - Graceful shutdown при остановке сервера
+- Новый handler `internal/api/handlers/model_preload.go` для Admin API
+- Integration в `Router` через `NewOptions.ModelPreloader`
+- Integration в `ChatHandler` через `ModelPreloader` interface
+- Конфигурация:
+  - `models.preload.enabled` - включить/выключить preloading
+  - `models.preload.on_startup` - загружать при старте
+  - `models.preload.keep_warm` - поддерживать в горячем состоянии
+  - `models.preload.health_check_interval` - интервал проверки (default: 5m)
+  - `models.preload.warm_up_prompt` - тестовый промпт (default: "Hello")
+  - `models.preload.max_loaded_models` - лимит одновременно загруженных (0 = unlimited)
+  - `models.preload.unload_after` - timeout выгрузки (0 = never)
+
+### Performance
+- **First Request Latency**: Сокращение времени первого ответа с 5-30s до <1s для preloaded моделей
+- **Memory Management**: LRU eviction через Ollama при достижении лимита памяти
+- **Non-blocking**: Async preload не блокирует startup сервера
+
+### Documentation
+- Updated configs/dev.yaml с примером конфигурации preloading
+- API documentation для Admin endpoints в Roadmap');
+    `
+}
+
+// getAddAdvancedRateLimitingMigration returns SQL for advanced rate limiting (v48 migration)
+func (s *SQLiteDB) getAddAdvancedRateLimitingMigration() string {
+	return `
+-- Advanced Rate Limits Table (v1.12.2+: RATE-02)
+CREATE TABLE IF NOT EXISTS rate_limits (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    
+    -- Scope: "global", "tenant", "user", "api_key", "model"
+    scope TEXT NOT NULL DEFAULT 'global',
+    
+    -- Target ID: depends on scope (user_id, tenant_id, api_key_id, model_name, "all" для global)
+    target_id TEXT,
+    
+    -- Model-specific rate limit (optional)
+    model_name TEXT,
+    
+    -- Rate limits (NULL = no limit)
+    requests_per_second INTEGER,
+    requests_per_minute INTEGER,
+    requests_per_hour INTEGER,
+    requests_per_day INTEGER,
+    
+    -- Burst allowance
+    burst_size INTEGER DEFAULT 0,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for efficient lookups
+CREATE INDEX IF NOT EXISTS idx_rate_limits_scope_target ON rate_limits(scope, target_id);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_model ON rate_limits(model_name) WHERE model_name IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_rate_limits_scope ON rate_limits(scope);
+
+-- Rate Limit Usage Tracking (for sliding window)
+CREATE TABLE IF NOT EXISTS rate_limit_usage (
+    id TEXT PRIMARY KEY,
+    rate_limit_id TEXT NOT NULL,
+    window_type TEXT NOT NULL, -- "second", "minute", "hour", "day"
+    window_start TIMESTAMP NOT NULL,
+    request_count INTEGER DEFAULT 0,
+    last_request_at TIMESTAMP,
+    
+    FOREIGN KEY (rate_limit_id) REFERENCES rate_limits(id) ON DELETE CASCADE
+);
+
+-- Index for sliding window queries
+CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_window ON rate_limit_usage(rate_limit_id, window_type, window_start DESC);
+CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_cleanup ON rate_limit_usage(window_start);
     `
 }
 

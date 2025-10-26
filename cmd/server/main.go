@@ -16,11 +16,13 @@ import (
 
 	"ollama-openai-proxy/internal/api/router"
 	"ollama-openai-proxy/internal/auth/jwt"
+	"ollama-openai-proxy/internal/client/ollama"
 	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/dbfactory"
 	"ollama-openai-proxy/internal/logger"
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/observability"
+	"ollama-openai-proxy/internal/services/model"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/version"
 )
@@ -291,6 +293,38 @@ func main() {
 		fmt.Println("⚠️  MoniGo Performance Dashboard НЕ включен (требуется database + JWT)")
 	}
 
+	// Инициализация Model Preloader (Version 1.12.1+)
+	var modelPreloader *model.ModelPreloader
+	if cfg.Models.Preload.Enabled {
+		appLogger.Info("Initializing Model Preloader...")
+
+		// Создаем Ollama client для preloader
+		ollamaClient, err := ollama.NewClient(cfg.Ollama.URL, cfg.Ollama.Timeout, appLogger)
+		if err != nil {
+			appLogger.WithError(err).Warn("Failed to create Ollama client for preloader, continuing without preloading")
+		} else {
+			modelPreloader = model.NewModelPreloader(
+				ollamaClient,
+				&cfg.Models.Preload,
+				appLogger,
+			)
+
+			// Start preloader (async, non-blocking)
+			preloadCtx := context.Background()
+			if err := modelPreloader.Start(preloadCtx); err != nil {
+				appLogger.WithError(err).Warn("Failed to start model preloader")
+			} else {
+				appLogger.WithFields(map[string]interface{}{
+					"models":                len(cfg.Models.Preload.Models),
+					"on_startup":            cfg.Models.Preload.OnStartup,
+					"keep_warm":             cfg.Models.Preload.KeepWarm,
+					"health_check_interval": cfg.Models.Preload.HealthCheckInterval,
+				}).Info("✅ Model Preloader initialized successfully")
+				fmt.Println("🔥 Model Preloading включен")
+			}
+		}
+	}
+
 	// Создание роутера
 	var appRouter *router.Router
 	// Всегда используем NewWithOptions для передачи database (необходим для MCP и других фич)
@@ -312,6 +346,7 @@ func main() {
 		LeakDetector:       leakDetector,   // Может быть nil если leak detection отключен (v1.6.2+)
 		MonigoPort:         monigoPort,     // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
 		GPUMonitor:         gpuMonitor,     // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
+		ModelPreloader:     modelPreloader, // Может быть nil если preloading отключен (v1.12.1+)
 	})
 
 	if err != nil {

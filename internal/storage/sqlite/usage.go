@@ -243,13 +243,13 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 	// Query for API key usage (LIMIT to top 10 keys)
 	// COALESCE используется для группировки WebUI (JWT) запросов с api_key_id=NULL
-	// datetime() для правильного формата timestamp вместо Go time.String()
+	// IFNULL для обработки NULL timestamps, strftime для правильного формата
 	apiKeyQuery := `
 		SELECT 
 			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			COUNT(*) as requests,
 			SUM(total_tokens) as tokens,
-			datetime(MAX(created_at)) as last_used
+			IFNULL(strftime('%Y-%m-%d %H:%M:%S', MAX(created_at)), '1970-01-01 00:00:00') as last_used
 		FROM api_usage
 		WHERE user_id = ? AND created_at >= ?
 		GROUP BY COALESCE(api_key_id, 'webui-jwt')
@@ -286,10 +286,10 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 
 	// Query for recent requests
 	// COALESCE для api_key_id так как WebUI (JWT) запросы имеют NULL
-	// datetime() для правильного формата timestamp
+	// IFNULL + strftime для обработки NULL timestamps
 	recentQuery := `
 		SELECT 
-			datetime(created_at) as created_at,
+			IFNULL(strftime('%Y-%m-%d %H:%M:%S', created_at), '1970-01-01 00:00:00') as created_at,
 			model,
 			COALESCE(api_key_id, 'webui-jwt') as api_key_id,
 			total_tokens,

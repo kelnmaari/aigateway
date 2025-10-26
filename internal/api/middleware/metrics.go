@@ -54,7 +54,7 @@ func PrometheusMetrics() gin.HandlerFunc {
 		// Если есть API key в контексте, записываем метрику для ключа
 		if keyID, exists := c.Get("key_id"); exists {
 			if keyIDStr, ok := keyID.(string); ok {
-				metrics.DefaultMetrics.RecordAPIKeyRequest(keyIDStr, endpoint)
+				metrics.DefaultMetrics.RecordAPIKeyRequest(keyIDStr, "", endpoint, 0)
 			}
 		}
 	}

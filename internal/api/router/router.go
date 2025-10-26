@@ -33,6 +33,8 @@ import (
 	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/request"
 	"ollama-openai-proxy/internal/services/audit"
+	"ollama-openai-proxy/internal/services/quota"
+	"ollama-openai-proxy/internal/services/rbac"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/websocket"
 
@@ -88,6 +90,8 @@ type Router struct {
 	oidcHandler           *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
 	ldapHandler           *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
 	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
+	rbacHandler           *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
+	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -113,8 +117,19 @@ type Router struct {
 	gpuHandler *handlers.GPUHandler
 
 	// Audit Logging (v1.11.4)
-	auditLogger         *audit.AuditLogger
+	auditLogger          *audit.AuditLogger
 	auditRetentionPolicy *audit.RetentionPolicy
+
+	// RBAC (Version 1.11.5+: Custom Roles & Permissions)
+	rbacService    *rbac.Service
+	rbacMiddleware *middleware.RBACMiddleware
+
+	// Quotas (Version 1.11.7+: Usage Quotas System)
+	quotaService    *quota.Service
+	quotaMiddleware *middleware.QuotaMiddleware
+
+	// Metrics (Version 1.11.6+: Prometheus Metrics Export)
+	metricsCollector *metrics.MetricsCollector
 }
 
 // NewOptions содержит опции для создания роутера
@@ -257,6 +272,12 @@ func (r *Router) setupMiddleware() {
 	if r.tracer != nil {
 		r.engine.Use(middleware.TracingMiddleware(r.tracer))
 		r.logger.Info("OpenTelemetry tracing middleware enabled")
+	}
+
+	// Prometheus metrics middleware (v1.11.6+)
+	if r.config.Metrics.Enabled {
+		r.engine.Use(middleware.PrometheusMiddleware())
+		r.logger.Info("Prometheus metrics middleware enabled")
 	}
 
 	// Session middleware для OIDC authentication (Version 1.11.1+)
@@ -502,6 +523,16 @@ func (r *Router) setupMetricsHistoryRoutes() {
 	}
 
 	r.logger.Info("Metrics history API endpoints configured")
+
+	// User Quota API (v1.11.7)
+	if r.quotaHandler != nil && r.authenticator != nil {
+		quotaAPI := r.engine.Group("/api/quota")
+		quotaAPI.Use(r.authenticator.AuthenticationMiddleware())
+		{
+			quotaAPI.GET("/me", r.quotaHandler.GetMyQuota) // Current user's quota stats
+		}
+		r.logger.Info("User quota API endpoints configured")
+	}
 }
 
 // setupRequestsRoutes настраивает эндпоинты для request monitoring (TUI-04)
@@ -892,6 +923,49 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/audit/export", r.auditHandler.ExportAuditEvents)
 	}
 
+	// RBAC endpoints (v1.11.5)
+	if r.rbacHandler != nil {
+		r.logger.Info("Admin routes: Registering RBAC Management endpoints")
+
+		// Permissions
+		admin.GET("/rbac/permissions", r.rbacHandler.ListPermissions)
+
+		// Roles
+		admin.GET("/rbac/roles", r.rbacHandler.ListRoles)
+		admin.POST("/rbac/roles", r.rbacHandler.CreateRole)
+		admin.GET("/rbac/roles/:id", r.rbacHandler.GetRole)
+		admin.PUT("/rbac/roles/:id", r.rbacHandler.UpdateRole)
+		admin.DELETE("/rbac/roles/:id", r.rbacHandler.DeleteRole)
+
+		// Role-Permission mapping
+		admin.GET("/rbac/roles/:id/permissions", r.rbacHandler.GetRolePermissions)
+		admin.POST("/rbac/roles/:id/permissions", r.rbacHandler.AssignPermissionToRole)
+		admin.DELETE("/rbac/roles/:id/permissions/:permission_id", r.rbacHandler.RemovePermissionFromRole)
+
+		// User-Role assignments
+		admin.GET("/rbac/users/:id/roles", r.rbacHandler.GetUserRoles)
+		admin.POST("/rbac/users/:id/roles", r.rbacHandler.AssignRoleToUser)
+		admin.DELETE("/rbac/users/:id/roles/:role_id", r.rbacHandler.RemoveRoleFromUser)
+
+		// User permissions (computed)
+		admin.GET("/rbac/users/:id/permissions", r.rbacHandler.GetUserPermissions)
+	}
+
+	// Quota endpoints (v1.11.7)
+	if r.quotaHandler != nil {
+		r.logger.Info("Admin routes: Registering Quota Management endpoints")
+
+		// Quota CRUD
+		admin.GET("/quotas", r.quotaHandler.ListQuotas)
+		admin.POST("/quotas", r.quotaHandler.CreateQuota)
+		admin.GET("/quotas/:id", r.quotaHandler.GetQuota)
+		admin.PUT("/quotas/:id", r.quotaHandler.UpdateQuota)
+		admin.DELETE("/quotas/:id", r.quotaHandler.DeleteQuota)
+
+		// Quota usage
+		admin.GET("/quotas/:id/usage", r.quotaHandler.GetQuotaUsage)
+	}
+
 	// System endpoints
 	admin.GET("/stats", func(c *gin.Context) {
 		if r.keyManager != nil {
@@ -1097,6 +1171,39 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		r.auditHandler = handlers.NewAuditHandler(cfg, r.db, logger)
 		logger.Info("Audit handler initialized successfully")
 
+		// RBAC Service initialization (Version 1.11.5+: Custom Roles & Permissions)
+		logger.Info("Initializing RBAC service...")
+		r.rbacService = rbac.NewService(r.db, logger)
+		logger.Info("RBAC service initialized successfully")
+
+		// RBAC Handler initialization
+		r.rbacHandler = handlers.NewRBACHandler(r.db, r.rbacService, logger)
+		logger.Info("RBAC handler initialized successfully")
+
+		// RBAC Middleware initialization
+		r.rbacMiddleware = middleware.NewRBACMiddleware(r.rbacService, r.db, logger)
+		logger.Info("RBAC middleware initialized successfully")
+
+		// Quota Service initialization (Version 1.11.7+: Usage Quotas System)
+		logger.Info("Initializing Quota service...")
+		r.quotaService = quota.NewService(r.db, logger)
+		logger.Info("Quota service initialized successfully")
+
+		// Quota Handler initialization
+		r.quotaHandler = handlers.NewQuotaHandler(r.db, r.quotaService, logger)
+		logger.Info("Quota handler initialized successfully")
+
+		// Quota Middleware initialization
+		r.quotaMiddleware = middleware.NewQuotaMiddleware(r.quotaService, logger)
+		logger.Info("Quota middleware initialized successfully")
+
+		// Metrics Collector initialization (Version 1.11.6+: Prometheus Metrics Export)
+		if cfg.Metrics.Enabled {
+			logger.Info("Initializing Prometheus metrics collector...")
+			r.metricsCollector = metrics.NewMetricsCollector(r.db, logger, 30*time.Second)
+			logger.Info("Prometheus metrics collector initialized successfully")
+		}
+
 		// Audit Retention Policy initialization
 		r.auditRetentionPolicy = audit.NewRetentionPolicy(r.db, logger).
 			WithRetentionPeriod(90 * 24 * time.Hour).  // 90 days retention
@@ -1245,8 +1352,19 @@ func (r *Router) setupFileStorage(cfg *config.Config, logger *logrus.Logger) {
 }
 
 // Shutdown gracefully останавливает все компоненты роутера
+// GetMetricsCollector возвращает Prometheus metrics collector
+func (r *Router) GetMetricsCollector() *metrics.MetricsCollector {
+	return r.metricsCollector
+}
+
 func (r *Router) Shutdown(ctx context.Context) error {
 	r.logger.Info("Shutting down router components")
+
+	// Останавливаем Prometheus Metrics Collector (v1.11.6+)
+	if r.metricsCollector != nil {
+		r.metricsCollector.Stop()
+		r.logger.Info("Prometheus metrics collector stopped")
+	}
 
 	// Останавливаем Metrics Broadcaster
 	if r.metricsBroadcaster != nil {

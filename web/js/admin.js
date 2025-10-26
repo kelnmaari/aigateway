@@ -148,6 +148,9 @@ class AdminPanel {
             case 'audit':
                 await this.loadAudit();
                 break;
+            case 'rbac':
+                await this.loadRBAC();
+                break;
             case 'system':
                 await this.loadSystem();
                 break;
@@ -625,6 +628,45 @@ class AdminPanel {
         `).join('');
         
         tbody.innerHTML = html;
+    }
+
+    // ==================== RBAC ====================
+
+    // Load RBAC Stats (v1.11.5+)
+    async loadRBAC() {
+        try {
+            // Load roles
+            const rolesResp = await api.request(`${api.baseURL}/api/admin/rbac/roles`);
+            if (rolesResp.ok) {
+                const rolesData = await rolesResp.json();
+                const roles = rolesData.roles || [];
+                const customRoles = roles.filter(r => r.type === 'custom');
+                
+                document.getElementById('rbac-stat-roles').textContent = roles.length;
+                document.getElementById('rbac-stat-custom-roles').textContent = customRoles.length;
+            }
+            
+            // Load permissions
+            const permsResp = await api.request(`${api.baseURL}/api/admin/rbac/permissions`);
+            if (permsResp.ok) {
+                const permsData = await permsResp.json();
+                document.getElementById('rbac-stat-permissions').textContent = (permsData.permissions || []).length;
+            }
+            
+            // Count user assignments (approximate - total users * avg roles)
+            const usersResp = await api.request(`${api.baseURL}/api/admin/users`);
+            if (usersResp.ok) {
+                const usersData = await usersResp.json();
+                // For now, just show user count as proxy for assignments
+                document.getElementById('rbac-stat-assignments').textContent = (usersData.users || []).length;
+            }
+        } catch (error) {
+            console.error('Failed to load RBAC stats:', error);
+            document.getElementById('rbac-stat-roles').textContent = 'Error';
+            document.getElementById('rbac-stat-custom-roles').textContent = 'Error';
+            document.getElementById('rbac-stat-permissions').textContent = 'Error';
+            document.getElementById('rbac-stat-assignments').textContent = 'Error';
+        }
     }
 
     // ==================== SYSTEM ====================

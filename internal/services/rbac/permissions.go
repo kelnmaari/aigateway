@@ -8,7 +8,7 @@ import (
 
 // SystemPermissions defines all available permissions in the system
 // These are seeded into the database on first run
-var SystemPermissions = []models.Permission{
+var SystemPermissions = []models.RBACPermission{
 	// API Keys permissions
 	{
 		Name:        models.PermAPIKeysCreate,
@@ -154,7 +154,7 @@ var SystemPermissions = []models.Permission{
 }
 
 // GetPermissionByName находит permission по имени
-func GetPermissionByName(name string) *models.Permission {
+func GetPermissionByName(name string) *models.RBACPermission {
 	for i := range SystemPermissions {
 		if SystemPermissions[i].Name == name {
 			return &SystemPermissions[i]
@@ -164,8 +164,8 @@ func GetPermissionByName(name string) *models.Permission {
 }
 
 // GetPermissionsByResource возвращает все permissions для resource
-func GetPermissionsByResource(resource string) []models.Permission {
-	var result []models.Permission
+func GetPermissionsByResource(resource string) []models.RBACPermission {
+	var result []models.RBACPermission
 	for _, perm := range SystemPermissions {
 		if perm.Resource == resource {
 			result = append(result, perm)

@@ -318,6 +318,12 @@ func main() {
 		log.Fatalf("❌ Не удалось создать роутер: %v", err)
 	}
 
+	// Start Prometheus Metrics Collector (v1.11.6+)
+	if cfg.Metrics.Enabled && appRouter.GetMetricsCollector() != nil {
+		go appRouter.GetMetricsCollector().Start(context.Background())
+		appLogger.Info("Prometheus metrics collector started")
+	}
+
 	// Инициализация роутера (включая API Key Management если включен)
 	if err := appRouter.Initialize(); err != nil {
 		log.Fatalf("❌ Не удалось инициализировать роутер: %v", err)

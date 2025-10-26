@@ -242,6 +242,93 @@ func (a *testDBAdapter) GetTenantByName(ctx context.Context, name string) (*mode
 	return nil, nil
 }
 
+// RBAC methods (Version 1.11.5+: Custom Roles & Permissions)
+func (a *testDBAdapter) CreatePermission(ctx context.Context, permission *models.RBACPermission) error {
+	return nil
+}
+func (a *testDBAdapter) GetPermission(ctx context.Context, id string) (*models.RBACPermission, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetPermissionByName(ctx context.Context, name string) (*models.RBACPermission, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListPermissions(ctx context.Context) ([]*models.RBACPermission, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) CreateRole(ctx context.Context, role *models.Role) error { return nil }
+func (a *testDBAdapter) GetRole(ctx context.Context, id string) (*models.Role, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetRoleByName(ctx context.Context, name string, tenantID *string) (*models.Role, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListRoles(ctx context.Context, tenantID *string) ([]*models.Role, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateRole(ctx context.Context, role *models.Role) error { return nil }
+func (a *testDBAdapter) DeleteRole(ctx context.Context, id string) error          { return nil }
+func (a *testDBAdapter) AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error {
+	return nil
+}
+func (a *testDBAdapter) RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+	return nil
+}
+func (a *testDBAdapter) GetRolePermissions(ctx context.Context, roleID string) ([]*models.RBACPermission, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) AssignRoleToUser(ctx context.Context, userRole *models.UserRole) error {
+	return nil
+}
+func (a *testDBAdapter) RemoveRoleFromUser(ctx context.Context, userID, roleID string, tenantID *string) error {
+	return nil
+}
+func (a *testDBAdapter) GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetRoleUsers(ctx context.Context, roleID string) ([]*models.User, error) {
+	return nil, nil
+}
+
+// Quota methods (Version 1.11.7+: Usage Quotas System)
+func (a *testDBAdapter) CreateQuota(ctx context.Context, quota *models.Quota) error { return nil }
+func (a *testDBAdapter) GetQuota(ctx context.Context, id string) (*models.Quota, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetQuotaByTarget(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) ListQuotas(ctx context.Context, scope *models.QuotaScope) ([]*models.Quota, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateQuota(ctx context.Context, quota *models.Quota) error { return nil }
+func (a *testDBAdapter) DeleteQuota(ctx context.Context, id string) error           { return nil }
+func (a *testDBAdapter) GetQuotaUsage(ctx context.Context, quotaID string) (*models.QuotaUsage, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) GetQuotaUsageByTarget(ctx context.Context, targetID string) (*models.QuotaUsage, error) {
+	return nil, nil
+}
+func (a *testDBAdapter) UpdateQuotaUsage(ctx context.Context, usage *models.QuotaUsage) error {
+	return nil
+}
+func (a *testDBAdapter) ResetQuotaUsage(ctx context.Context, quotaID string, resetType string) error {
+	return nil
+}
+func (a *testDBAdapter) GetQuotaWithUsage(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, *models.QuotaUsage, error) {
+	return nil, nil, nil
+}
+
+// Audit methods (Version 1.11.4+: Audit Logging)
+func (a *testDBAdapter) CreateAuditEvent(ctx context.Context, event *models.AuditEvent) error {
+	return nil
+}
+func (a *testDBAdapter) GetAuditEvents(ctx context.Context, filters storage.AuditFilters) ([]*models.AuditEvent, int, error) {
+	return nil, 0, nil
+}
+func (a *testDBAdapter) DeleteOldAuditEvents(ctx context.Context, olderThan time.Time) (int, error) {
+	return 0, nil
+}
+
 // setupAdminTest создает тестовое окружение для admin handler
 func setupAdminTest(t *testing.T) (*AdminHandler, *storage.MemoryStorage) {
 	gin.SetMode(gin.TestMode)

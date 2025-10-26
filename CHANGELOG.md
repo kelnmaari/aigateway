@@ -5,6 +5,259 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.7] - 2025-10-25
+
+### Added
+
+- **QUOTA-01: Usage Quotas System** 📊
+  - **Flexible Quota System** для per-user и per-tenant limits
+  - **Token Quotas**:
+    - Daily token limits (`tokens_per_day`)
+    - Monthly token limits (`tokens_per_month`)
+    - Automatic usage tracking с prompt/completion tokens
+  - **Request Quotas**:
+    - Daily request limits (`requests_per_day`)
+    - Monthly request limits (`requests_per_month`)
+    - Concurrent request limiting (`max_concurrent`)
+  - **Storage Quotas** (future-ready):
+    - Max file upload size (`max_file_size`)
+    - Max total storage per user/tenant (`max_storage_bytes`)
+    - Max conversations count (`max_conversations`)
+  - **Model Restrictions**:
+    - Per-quota model allow-list (`allowed_models`)
+    - Block specific models for certain users/tenants
+  - **Auto-Reset Logic**:
+    - Daily quota reset (24h sliding window)
+    - Monthly quota reset (calendar month boundary)
+    - Background reset при первом request after reset time
+  - **Quota Service** (`internal/services/quota/service.go`):
+    - `CheckQuota()` - проверка before request processing
+    - `RecordUsage()` - tracking actual usage after request
+    - `IncrementConcurrent() / DecrementConcurrent()` - concurrent tracking
+    - `GetQuotaStats()` - статистика для UI display
+  - **Quota Middleware** (`internal/api/middleware/quota.go`):
+    - Автоматическая проверка квот для chat/completion endpoints
+    - 429 Too Many Requests при quota exceeded
+    - Concurrent request tracking with defer cleanup
+  - **Prometheus Integration**:
+    - `ollama_proxy_quota_usage` - Current usage by target_id/type
+    - `ollama_proxy_quota_limit` - Quota limits
+    - `ollama_proxy_quota_exceeded_total` - Exceeded events counter
+    - Periodic collection (30s interval) в MetricsCollector
+  - **Admin API** (`/api/admin/quotas`):
+    - `GET /quotas` - List all quotas (filter by scope)
+    - `POST /quotas` - Create quota
+    - `GET /quotas/:id` - Get quota details
+    - `PUT /quotas/:id` - Update quota
+    - `DELETE /quotas/:id` - Delete quota (cascade delete usage)
+    - `GET /quotas/:id/usage` - Get current usage
+  - **User API** (`/api/quota/me`):
+    - Get current user's quota stats with percentages
+    - Tenant-scoped quota support
+  - **Database Schema** (migration v43):
+    - `quotas` table - quota definitions
+    - `quota_usage` table - usage tracking
+    - Indexes for efficient queries по scope/target_id
+    - Foreign key constraints с cascade delete
+  - **Data Models**:
+    - `Quota` - quota definition (limits, scope, target)
+    - `QuotaUsage` - current usage counters
+    - `QuotaStats` - computed stats для UI (percentages, remaining)
+    - `QuotaCheck` - result of quota validation
+
+### Changed
+
+- **Router**: Quota service и middleware инициализируются автоматически при наличии database
+- **Chat Endpoints**: Quota checking применяется к `/v1/chat/completions`, `/v1/completions`
+- **Metrics Collector**: Добавлен сбор quota metrics (usage/limits) каждые 30s
+
+### Technical
+
+- **internal/models/quota.go**: Data models для quotas
+- **internal/storage/sqlite/quotas.go**: SQLite CRUD implementation
+- **internal/storage/postgresql/stubs.go**: PostgreSQL stubs (v1.11.7+)
+- **internal/services/quota/service.go**: Core quota logic
+- **internal/api/middleware/quota.go**: Quota enforcement middleware
+- **internal/api/handlers/quota.go**: Admin & user API handlers
+- **internal/api/router/router.go**: Route registration
+- **internal/metrics/prometheus.go**: Quota metrics integration
+- **Dependencies**: No new dependencies required
+
+### Fair Usage
+
+- **Quota Hierarchy**: Tenant quota > User quota (tenant takes priority)
+- **Unlimited Access**: No quota = unlimited (admin override possible)
+- **Soft Enforcement**: Checks before request, records after (no mid-request interruption)
+- **Concurrent Safety**: Mutex-protected usage updates для race-free tracking
+- **Idempotent Resets**: Safe daily/monthly resets без data loss
+
+### Use Cases
+
+1. **Free Tier Limits**: Set daily/monthly token quotas для free users
+2. **Paid Plan Enforcement**: Different quotas per subscription tier
+3. **Team Quotas**: Tenant-level quotas для shared team resources
+4. **Model Access Control**: Restrict expensive models to premium users
+5. **Fair Usage Policy**: Prevent resource exhaustion from single user
+6. **Cost Control**: Track and limit token consumption for budget management
+7. **Concurrent Throttling**: Limit simultaneous requests per user/tenant
+
+### Future Enhancements
+
+- Soft limits vs hard limits (warnings before enforcement)
+- Quota alerts/notifications (email/webhook when 80% usage)
+- Time-based quotas (hourly, weekly)
+- Cost-based quotas (dollar amounts instead of tokens)
+- Quota templates для quick assignment
+- Bulk quota operations (assign to multiple users)
+- Storage quota enforcement для file uploads
+- Conversation count enforcement
+
+## [1.11.6] - 2025-10-25
+
+### Added
+
+- **METRICS-01: Prometheus Metrics Export** 📊
+  - **Comprehensive Metrics Collection** для monitoring и observability
+  - **HTTP Metrics**:
+    - Request rate (by method, endpoint, status)
+    - Request duration histograms (p50, p95, p99)
+    - Response size histograms
+    - Active connections gauge
+  - **API Usage Metrics**:
+    - Tokens used (by api_key, model, type: prompt/completion)
+    - API requests (by model, status: success/error)
+    - API cost tracking (if pricing enabled)
+  - **Model Metrics**:
+    - Model request duration histograms (by model)
+    - Models loaded gauge
+    - Model errors (by model, error_type)
+  - **System Metrics**:
+    - Goroutines count
+    - Memory usage (alloc, sys, heap_alloc, heap_sys, heap_inuse, stack_inuse)
+    - DB connections
+    - API keys/users/tenants total counts
+  - **Authentication Metrics** (v1.11+):
+    - Auth attempts (by type: jwt/oidc/ldap/api_key, status)
+    - Auth duration by type
+  - **Quota Metrics** (future-ready):
+    - Quota usage/limits/exceeded events
+  - **Prometheus Middleware** для автоматического сбора HTTP metrics
+  - **Usage Tracking Integration** экспортирует API/model metrics в Prometheus
+  - **MetricsCollector** с periodic collection system metrics (30s interval)
+  - **Grafana Dashboard Template** (`docs/grafana-dashboard.json`):
+    - HTTP request rate & duration panels
+    - Token usage rate by model
+    - Model latency (p95) by model
+    - Top 5 models by request rate
+    - System health (goroutines, memory, models loaded)
+  - **Setup Documentation** (`docs/PROMETHEUS_SETUP.md`):
+    - Installation guide (Prometheus, Grafana)
+    - Docker Compose setup example
+    - Alerting examples
+    - PromQL query examples
+    - Troubleshooting guide
+
+### Changed
+
+- **Middleware Order**: Prometheus middleware добавлен after OpenTelemetry tracing
+- **Usage Tracking**: Интегрирован с Prometheus metrics export
+- **MetricsCollector**: Запускается автоматически при `metrics.enabled=true`
+
+### Technical
+
+- **internal/metrics/prometheus.go**: Все определения Prometheus metrics
+- **internal/api/middleware/prometheus.go**: HTTP metrics middleware
+- **internal/api/middleware/usage_tracking.go**: Интеграция с Prometheus
+- **cmd/server/main.go**: Запуск MetricsCollector
+- **Dependencies**: `github.com/prometheus/client_golang v1.17+`
+- **Endpoint**: `GET /metrics` (configurable via `metrics.prometheus_path`)
+- **Configuration**: `metrics.enabled`, `metrics.prometheus_path` в config.yaml
+
+### Observability
+
+- **Enterprise-Ready Monitoring**: Полная интеграция с Prometheus/Grafana stack
+- **Production Metrics**: Low-cardinality labels для efficient storage
+- **Real-Time Visibility**: Automatic metrics collection без manual instrumentation
+- **Alerting Support**: Ready-to-use alert rules в documentation
+
+### Use Cases
+
+1. **Production Monitoring**: Track HTTP performance, API usage, model latency
+2. **Capacity Planning**: Monitor resource usage (memory, goroutines, connections)
+3. **Performance Optimization**: Identify slow endpoints и models
+4. **Cost Tracking**: Monitor token usage per API key/model
+5. **SLA Compliance**: Track request success rate и latency percentiles
+6. **Incident Response**: Real-time dashboards для quick troubleshooting
+
+## [1.11.5] - 2025-10-25
+
+### Added
+
+- **RBAC-01: Custom Roles & Permissions** 🛡️
+  - **Fine-Grained Permission System** с wildcard support (*:*, api_keys:*, *:create)
+  - **Role Management** (system + custom roles)
+    - **System Roles**: super_admin, admin, user, api_manager, read_only
+    - **Custom Roles**: создание tenant-specific или global ролей
+  - **Permission Types** (23+ permissions):
+    - API Keys: create, read, update, delete, revoke
+    - Users: create, read, update, delete, manage
+    - Tenants: create, read, update, delete, manage
+    - Files: upload, read, delete, manage
+    - Conversations: read, delete
+    - Usage Stats: view
+    - Backups: create, restore
+    - Models: view, manage
+    - System: admin, read
+  - **RBAC Service** с permission checking и user roles resolution
+  - **RBAC Middleware** для Gin:
+    - `RequirePermission(permission)` - проверка одного разрешения
+    - `RequireAnyPermission(...)` - проверка любого из разрешений
+    - `RequireAllPermissions(...)` - проверка всех разрешений
+    - `RequireRole(roleName)` - проверка роли по имени
+  - **Database CRUD** для permissions, roles, role_permissions, user_roles
+  - **Admin UI** для RBAC Management:
+    - Roles management (create, edit, delete, assign permissions)
+    - User roles assignment/removal
+    - Permissions reference viewer
+    - Quick stats dashboard
+  - **API Endpoints** (`/api/admin/rbac/*`):
+    - `GET /permissions` - список всех системных permissions
+    - `GET /roles`, `POST /roles`, `PUT /roles/:id`, `DELETE /roles/:id`
+    - `GET /roles/:id/permissions`, `POST /roles/:id/permissions`
+    - `GET /users/:id/roles`, `POST /users/:id/roles`, `DELETE /users/:id/roles/:role_id`
+    - `GET /users/:id/permissions` - computed permissions от всех ролей
+
+### Changed
+
+- **Database Schema** (migration v42):
+  - Таблицы: `permissions`, `roles`, `role_permissions`, `user_roles`
+  - Индексы для оптимизации permission checks
+- **Admin Panel** добавлена вкладка RBAC с quick stats и link на full RBAC manager
+
+### Technical
+
+- **models/rbac.go**: RBACPermission, Role, UserRole data models
+- **services/rbac/**: Service, Permissions definitions
+- **api/middleware/rbac.go**: RBAC middleware для authorization
+- **api/handlers/rbac.go**: CRUD handlers для roles/permissions
+- **web/admin-rbac.html**, **web/js/admin-rbac.js**: Full-featured RBAC UI
+- **Wildcard Support** в permission matching (resource:*, *:action, *:*)
+
+### Security
+
+- **Granular Access Control**: Замена грубой admin/non-admin логики на fine-grained permissions
+- **Tenant Isolation**: Роли могут быть tenant-specific или global
+- **System Roles Protection**: System roles (super_admin, admin) не могут быть удалены или изменены
+- **Super Admin Bypass**: Super admins автоматически проходят все permission checks
+
+### Use Cases
+
+1. **Content Manager Role**: upload/read/delete files, но не может управлять users
+2. **API Manager Role**: create/read/update/delete API keys, но не может создавать users
+3. **Read-Only Admin**: view usage stats, models, system info без возможности изменений
+4. **Tenant Admin**: управление users/members внутри своего tenant, но не global admin
+5. **Custom Business Roles**: например "Support Agent", "Billing Manager", "DevOps Engineer"
+
 ## [1.11.4] - 2025-10-25
 
 ### Added

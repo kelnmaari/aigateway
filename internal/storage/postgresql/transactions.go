@@ -121,6 +121,75 @@ func (tx *postgresqlTx) DeleteOldAuditEvents(ctx context.Context, olderThan time
 	return tx.db.DeleteOldAuditEvents(ctx, olderThan)
 }
 
+// RBAC (Version 1.11.5+: Custom Roles & Permissions)
+func (tx *postgresqlTx) CreatePermission(ctx context.Context, permission *models.RBACPermission) error {
+	return tx.db.CreatePermission(ctx, permission)
+}
+
+func (tx *postgresqlTx) GetPermission(ctx context.Context, id string) (*models.RBACPermission, error) {
+	return tx.db.GetPermission(ctx, id)
+}
+
+func (tx *postgresqlTx) GetPermissionByName(ctx context.Context, name string) (*models.RBACPermission, error) {
+	return tx.db.GetPermissionByName(ctx, name)
+}
+
+func (tx *postgresqlTx) ListPermissions(ctx context.Context) ([]*models.RBACPermission, error) {
+	return tx.db.ListPermissions(ctx)
+}
+
+func (tx *postgresqlTx) CreateRole(ctx context.Context, role *models.Role) error {
+	return tx.db.CreateRole(ctx, role)
+}
+
+func (tx *postgresqlTx) GetRole(ctx context.Context, id string) (*models.Role, error) {
+	return tx.db.GetRole(ctx, id)
+}
+
+func (tx *postgresqlTx) GetRoleByName(ctx context.Context, name string, tenantID *string) (*models.Role, error) {
+	return tx.db.GetRoleByName(ctx, name, tenantID)
+}
+
+func (tx *postgresqlTx) ListRoles(ctx context.Context, tenantID *string) ([]*models.Role, error) {
+	return tx.db.ListRoles(ctx, tenantID)
+}
+
+func (tx *postgresqlTx) UpdateRole(ctx context.Context, role *models.Role) error {
+	return tx.db.UpdateRole(ctx, role)
+}
+
+func (tx *postgresqlTx) DeleteRole(ctx context.Context, id string) error {
+	return tx.db.DeleteRole(ctx, id)
+}
+
+func (tx *postgresqlTx) AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error {
+	return tx.db.AssignPermissionToRole(ctx, roleID, permissionID)
+}
+
+func (tx *postgresqlTx) RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+	return tx.db.RemovePermissionFromRole(ctx, roleID, permissionID)
+}
+
+func (tx *postgresqlTx) GetRolePermissions(ctx context.Context, roleID string) ([]*models.RBACPermission, error) {
+	return tx.db.GetRolePermissions(ctx, roleID)
+}
+
+func (tx *postgresqlTx) AssignRoleToUser(ctx context.Context, userRole *models.UserRole) error {
+	return tx.db.AssignRoleToUser(ctx, userRole)
+}
+
+func (tx *postgresqlTx) RemoveRoleFromUser(ctx context.Context, userID, roleID string, tenantID *string) error {
+	return tx.db.RemoveRoleFromUser(ctx, userID, roleID, tenantID)
+}
+
+func (tx *postgresqlTx) GetUserRoles(ctx context.Context, userID string) ([]*models.UserRole, error) {
+	return tx.db.GetUserRoles(ctx, userID)
+}
+
+func (tx *postgresqlTx) GetRoleUsers(ctx context.Context, roleID string) ([]*models.User, error) {
+	return tx.db.GetRoleUsers(ctx, roleID)
+}
+
 func (tx *postgresqlTx) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {
 	return tx.db.UpdateTenant(ctx, tenant)
 }
@@ -335,4 +404,52 @@ func (tx *postgresqlTx) LogFileAccess(ctx context.Context, log models.FileAccess
 
 func (tx *postgresqlTx) GetFileAccessLogs(ctx context.Context, fileID string, limit int) ([]*models.FileAccessLog, error) {
 	return tx.db.GetFileAccessLogs(ctx, fileID, limit)
+}
+
+// ========================================
+// Quotas (Version 1.11.7+: Usage Quotas System)
+// ========================================
+
+func (tx *postgresqlTx) CreateQuota(ctx context.Context, quota *models.Quota) error {
+	return tx.db.CreateQuota(ctx, quota)
+}
+
+func (tx *postgresqlTx) GetQuota(ctx context.Context, id string) (*models.Quota, error) {
+	return tx.db.GetQuota(ctx, id)
+}
+
+func (tx *postgresqlTx) GetQuotaByTarget(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, error) {
+	return tx.db.GetQuotaByTarget(ctx, scope, targetID)
+}
+
+func (tx *postgresqlTx) ListQuotas(ctx context.Context, scope *models.QuotaScope) ([]*models.Quota, error) {
+	return tx.db.ListQuotas(ctx, scope)
+}
+
+func (tx *postgresqlTx) UpdateQuota(ctx context.Context, quota *models.Quota) error {
+	return tx.db.UpdateQuota(ctx, quota)
+}
+
+func (tx *postgresqlTx) DeleteQuota(ctx context.Context, id string) error {
+	return tx.db.DeleteQuota(ctx, id)
+}
+
+func (tx *postgresqlTx) GetQuotaUsage(ctx context.Context, quotaID string) (*models.QuotaUsage, error) {
+	return tx.db.GetQuotaUsage(ctx, quotaID)
+}
+
+func (tx *postgresqlTx) GetQuotaUsageByTarget(ctx context.Context, targetID string) (*models.QuotaUsage, error) {
+	return tx.db.GetQuotaUsageByTarget(ctx, targetID)
+}
+
+func (tx *postgresqlTx) UpdateQuotaUsage(ctx context.Context, usage *models.QuotaUsage) error {
+	return tx.db.UpdateQuotaUsage(ctx, usage)
+}
+
+func (tx *postgresqlTx) ResetQuotaUsage(ctx context.Context, quotaID string, resetType string) error {
+	return tx.db.ResetQuotaUsage(ctx, quotaID, resetType)
+}
+
+func (tx *postgresqlTx) GetQuotaWithUsage(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, *models.QuotaUsage, error) {
+	return tx.db.GetQuotaWithUsage(ctx, scope, targetID)
 }

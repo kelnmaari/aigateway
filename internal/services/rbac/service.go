@@ -126,7 +126,7 @@ func (s *Service) HasRole(ctx context.Context, userID string, roleName string) (
 }
 
 // GetUserPermissions возвращает все разрешения пользователя (для UI)
-func (s *Service) GetUserPermissions(ctx context.Context, userID string) ([]models.Permission, error) {
+func (s *Service) GetUserPermissions(ctx context.Context, userID string) ([]models.RBACPermission, error) {
 	// Get user roles
 	roles, err := s.db.GetUserRoles(ctx, userID)
 	if err != nil {
@@ -134,7 +134,7 @@ func (s *Service) GetUserPermissions(ctx context.Context, userID string) ([]mode
 	}
 
 	// Collect all permissions (deduplicated)
-	permissionMap := make(map[string]models.Permission)
+	permissionMap := make(map[string]models.RBACPermission)
 	for _, role := range roles {
 		permissions, err := s.db.GetRolePermissions(ctx, role.RoleID)
 		if err != nil {
@@ -143,12 +143,12 @@ func (s *Service) GetUserPermissions(ctx context.Context, userID string) ([]mode
 		}
 
 		for _, perm := range permissions {
-			permissionMap[perm.ID] = perm
+			permissionMap[perm.ID] = *perm
 		}
 	}
 
 	// Convert map to slice
-	result := make([]models.Permission, 0, len(permissionMap))
+	result := make([]models.RBACPermission, 0, len(permissionMap))
 	for _, perm := range permissionMap {
 		result = append(result, perm)
 	}

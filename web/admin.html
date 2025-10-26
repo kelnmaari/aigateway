@@ -30,6 +30,7 @@
             <button class="tab-btn" data-tab="mcp">MCP Servers</button>
             <button class="tab-btn" data-tab="backups">Backups</button>
             <button class="tab-btn" data-tab="audit">Audit</button>
+            <button class="tab-btn" data-tab="rbac">RBAC</button>
             <button class="tab-btn" data-tab="logs">Logs</button>
             <button class="tab-btn" data-tab="system">System</button>
         </div>
@@ -354,6 +355,66 @@
                         <i class="fas fa-clipboard-check"></i>
                         <h3>No Audit Events</h3>
                         <p>Audit events will appear here as system activity occurs</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RBAC Tab (v1.11.5) -->
+            <div id="rbac-tab" class="tab-pane">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>🛡️ RBAC Management</h2>
+                        <a href="/web/admin-rbac.html" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-external-link-alt"></i> Open RBAC Manager
+                        </a>
+                    </div>
+                    
+                    <div class="info-card">
+                        <i class="fas fa-shield-alt"></i>
+                        <div>
+                            <strong>Role-Based Access Control</strong>
+                            <p>Manage custom roles and permissions. Create fine-grained access control policies for users and groups. Configure who can access what resources and perform which actions.</p>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid" style="margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value" id="rbac-stat-roles">-</div>
+                                <div class="stat-label">Total Roles</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%); color: white;">
+                            <div>
+                                <div class="stat-value" id="rbac-stat-custom-roles">-</div>
+                                <div class="stat-label">Custom Roles</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <div>
+                                <div class="stat-value" id="rbac-stat-permissions">-</div>
+                                <div class="stat-label">Permissions</div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                            <div>
+                                <div class="stat-value" id="rbac-stat-assignments">-</div>
+                                <div class="stat-label">User Assignments</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-bottom: 1rem;">Quick Actions</h3>
+                    <div class="stats-grid">
+                        <button class="btn btn-primary" onclick="window.open('/web/admin-rbac.html#roles', '_blank')">
+                            <i class="fas fa-user-tag"></i> Manage Roles
+                        </button>
+                        <button class="btn btn-primary" onclick="window.open('/web/admin-rbac.html#user-roles', '_blank')">
+                            <i class="fas fa-users-cog"></i> User Roles
+                        </button>
+                        <button class="btn btn-primary" onclick="window.open('/web/admin-rbac.html#permissions', '_blank')">
+                            <i class="fas fa-key"></i> View Permissions
+                        </button>
                     </div>
                 </div>
             </div>

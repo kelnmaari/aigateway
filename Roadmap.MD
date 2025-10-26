@@ -219,7 +219,7 @@
 **Фокус:** Полноценная корпоративная платформа (Auth + Observability + Quotas)  
 **Приоритет:** HIGH  
 **Оценка времени:** 72-100 часов  
-**Статус:** 🚧 В работе (4/7 задач завершено)  
+**Статус:** ✅ Завершено (7/7 задач завершено)  
 **Versioning:** v1.11.1-v1.11.7
 
 **Стратегия:** Объединяем корпоративную аутентификацию, мониторинг и контроль ресурсов в единый enterprise-ready релиз.
@@ -261,33 +261,40 @@
   - Admin UI (preview + dedicated page)
   - **Оценка:** 8-12 часов → **Выполнено**
 
-- [ ] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.11.5**
-  - Fine-grained permissions
-  - Per-tenant role templates
-  - Permission inheritance
-  - RBAC middleware
-  - Admin UI для role management
-  - **Оценка:** 10-14 часов
+- [x] **RBAC-01** Custom Roles & Permissions → [BACKLOG/RBAC-01_custom_roles_permissions.md](BACKLOG/RBAC-01_custom_roles_permissions.md) → **v1.11.5** ✅
+  - Fine-grained permissions (23+ system permissions)
+  - System + Custom roles (global + tenant-scoped)
+  - Wildcard permission matching (*:*, api_keys:*,*:create)
+  - RBAC middleware (RequirePermission, RequireAnyPermission, RequireAllPermissions, RequireRole)
+  - Admin UI для role management (dedicated RBAC page)
+  - **Оценка:** 10-15 часов → **Выполнено за ~12 часов**
 
-- [ ] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.11.6**
-  - Metrics endpoint `/metrics`
-  - Request counters, latency histograms
-  - Model usage statistics
-  - Auth events metrics (login attempts, failures)
-  - Quota usage metrics
-  - Grafana dashboard template
-  - **Примечание:** Перенесена из v1.12 для полной enterprise observability
-  - **Оценка:** 4-6 часов
+- [x] **METRICS-01** Prometheus Metrics Export → [BACKLOG/METRICS-01_prometheus_export.md](BACKLOG/METRICS-01_prometheus_export.md) → **v1.11.6** ✅
+  - Metrics endpoint `/metrics` (configurable)
+  - HTTP metrics (request rate, duration histograms, response size, active connections)
+  - API usage metrics (tokens by api_key/model, requests by model/status)
+  - Model metrics (latency histograms, errors, loaded models count)
+  - System metrics (goroutines, memory, DB connections, entities counts)
+  - Auth metrics (attempts/duration by type: jwt/oidc/ldap/api_key)
+  - Quota metrics (future-ready: usage/limits/exceeded)
+  - Grafana dashboard template with 11 panels
+  - Complete setup documentation (Prometheus/Grafana/Docker Compose)
+  - **Оценка:** 4-6 часов → **Выполнено за ~5 часов**
 
-- [ ] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.11.7**
-  - Per-tenant/per-user limits
-  - Token-based quotas
-  - Request quotas (daily, monthly)
-  - Storage quotas (для files/images)
-  - Quota monitoring & alerts (интеграция с METRICS-01)
-  - WebUI quota dashboard
-  - **Примечание:** Перенесена из v1.12 для единой enterprise access control
-  - **Оценка:** 10-14 часов
+- [x] **QUOTA-01** Usage Quotas System → [BACKLOG/QUOTA-01_usage_quotas.md](BACKLOG/QUOTA-01_usage_quotas.md) → **v1.11.7** ✅
+  - Per-user и per-tenant quota definitions (scope + target_id)
+  - Token quotas (daily/monthly limits с automatic tracking)
+  - Request quotas (daily/monthly + concurrent limiting)
+  - Storage quotas (max_file_size, max_storage_bytes, max_conversations) - future-ready
+  - Model restrictions (allowed_models list)
+  - Auto-reset logic (daily: 24h, monthly: calendar month)
+  - Quota Service (CheckQuota, RecordUsage, auto-reset)
+  - Quota Middleware (429 Too Many Requests при exceed)
+  - Prometheus integration (usage/limit/exceeded metrics)
+  - Admin API (CRUD для quotas, usage tracking)
+  - User API (GET /api/quota/me для own stats)
+  - Database migration v43 (quotas, quota_usage tables)
+  - **Оценка:** 10-14 часов → **Выполнено за ~12 часов**
 
 ### 🎯 Enterprise Features Complete
 

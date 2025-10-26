@@ -4,8 +4,8 @@ package models
 
 import "time"
 
-// Permission представляет разрешение на выполнение действия с ресурсом
-type Permission struct {
+// RBACPermission представляет разрешение на выполнение действия с ресурсом
+type RBACPermission struct {
 	ID          string    `json:"id" db:"id"`
 	Name        string    `json:"name" db:"name"`               // e.g., "api_keys:create"
 	Description string    `json:"description" db:"description"` // e.g., "Create API keys"
@@ -32,10 +32,10 @@ type Role struct {
 	Description string       `json:"description" db:"description"`
 	Type        string       `json:"type" db:"type"`                   // "system", "custom"
 	Scope       string       `json:"scope" db:"scope"`                 // "global", "tenant"
-	TenantID    *string      `json:"tenant_id,omitempty" db:"tenant_id"` // null for global roles
-	Permissions []Permission `json:"permissions,omitempty" db:"-"`     // Loaded separately
-	CreatedAt   time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at" db:"updated_at"`
+	TenantID    *string          `json:"tenant_id,omitempty" db:"tenant_id"` // null for global roles
+	Permissions []RBACPermission `json:"permissions,omitempty" db:"-"`     // Loaded separately
+	CreatedAt   time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at" db:"updated_at"`
 }
 
 // RoleType определяет тип роли

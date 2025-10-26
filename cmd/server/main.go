@@ -299,7 +299,7 @@ func main() {
 		appLogger.Info("Initializing Model Preloader...")
 
 		// Создаем Ollama client для preloader
-		ollamaClient, err := ollama.NewClient(cfg.Ollama.URL, cfg.Ollama.Timeout, appLogger)
+		ollamaClient, err := ollama.NewClient(cfg, appLogger)
 		if err != nil {
 			appLogger.WithError(err).Warn("Failed to create Ollama client for preloader, continuing without preloading")
 		} else {

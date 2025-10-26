@@ -5,6 +5,181 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.4] - 2025-10-26
+
+### Added
+- **MCP Servers Catalog**: Полноценный каталог популярных MCP серверов
+  - Красивая WebUI страница `web/mcp-catalog.html` с современным дизайном
+  - 10+ предустановленных серверов (Filesystem, PostgreSQL, GitHub, Slack, etc.)
+  - Category filtering: Filesystem, Database, API, Tools, Search
+  - Search по названию, описанию и features
+  - Sorting: Most Popular, Recently Added, Name (A-Z)
+  - Server cards с полной информацией:
+    - Status badges (Official/Community)
+    - Stars, downloads, last updated metadata
+    - Features list
+    - Documentation links
+  - One-click installation:
+    - Copy configuration to clipboard
+    - Direct install через Admin API
+    - Installation wizard modal
+  - Responsive design для всех устройств
+
+### Changed
+- **WebUI**: Добавлена новая навигация в MCP Catalog из dashboard и mcp.html
+- **Navigation**: Quick links между MCP pages и catalog
+
+### Technical
+- JavaScript модуль `web/js/mcp-catalog.js`:
+  - Catalog data с реальными MCP серверами
+  - Filtering, search, sorting logic
+  - Install modal с configuration preview
+  - Clipboard integration
+  - Toast notifications
+- HTML template `web/mcp-catalog.html`:
+  - Gradient purple design theme
+  - Card-based grid layout
+  - Modern CSS animations и hover effects
+  - Bootstrap 5 integration
+  - Font Awesome icons
+
+### Featured MCP Servers
+- **Official (Anthropic)**:
+  - Filesystem - Direct file access
+  - PostgreSQL - Database queries
+  - GitHub - Repository management
+  - Brave Search - Web search
+  - Slack - Team communication
+  - Puppeteer - Browser automation
+  - SQLite - Lightweight DB
+  - Git - Version control
+- **Community**:
+  - Google Drive - Cloud storage
+  - Docker - Container management
+
+### User Experience
+- **Discovery**: Easy browsing через categories и search
+- **Evaluation**: Full server details перед installation
+- **Installation**: One-click setup с auto-configuration
+- **Documentation**: Direct links к official docs
+
+### Future Enhancements
+- User ratings and reviews
+- Community-contributed servers
+- Advanced filtering (by language, license, etc.)
+- Server dependencies detection
+- Auto-update notifications
+
+## [1.12.3] - 2025-10-26
+
+### Added
+- **Conversation Export/Import**: Полная система экспорта и импорта conversations
+  - Export форматы: JSON, Markdown, Text
+  - Single conversation export через GET `/api/conversations/{id}/export?format=json|markdown|text`
+  - Bulk export через POST `/api/conversations/bulk-export` (multiple conversations at once)
+  - Import из JSON через POST `/api/conversations/import`
+  - Import опции:
+    - Merge into existing conversation (добавить messages в существующую)
+    - Preserve timestamps (сохранить оригинальные даты)
+    - Preserve IDs (сохранить оригинальные IDs для recovery)
+  - Metadata export (total messages, tokens used, model, dates)
+
+### Changed
+- **API**: Новые endpoints для работы с экспортом/импортом conversations
+- **Models**: Новые data models для export/import operations
+
+### Technical
+- Новый сервис `internal/services/export/conversation_exporter.go`:
+  - `ConversationExporter` с support для JSON/Markdown/Text форматов
+  - Rich Markdown formatting с emojis и metadata
+  - Bulk export с error handling для каждой conversation
+- Новый сервис `internal/services/export/conversation_importer.go`:
+  - `ConversationImporter` для восстановления conversations
+  - Merge support (добавление messages в existing conversation)
+  - Flexible options (preserve timestamps/IDs)
+- Новый handler `internal/api/handlers/conversation_export.go`:
+  - Export endpoints с content-type negotiation
+  - Bulk export endpoint
+  - Import endpoint с validation
+- Data Models в `internal/models/conversation_export.go`:
+  - `ConversationExport` - структура экспорта
+  - `BulkExportRequest/Result` - bulk operations
+  - `ImportConversationRequest` - импорт с опциями
+  - `ImportResult` - результат импорта
+
+### Security
+- **Access Control**: Verify conversation ownership при export/import
+- **Validation**: Strict validation для import data format
+- **User Isolation**: Импорт только в свой tenant/user scope
+
+### Performance
+- **Bulk Export**: Efficient batch processing для multiple conversations
+- **Error Resilience**: Продолжение export при ошибках отдельных conversations
+- **Memory Efficient**: Streaming для больших conversations (future improvement)
+
+### Use Cases
+- **Backup**: Full backup conversations в JSON для restore
+- **Sharing**: Export в Markdown для sharing с коллегами
+- **Migration**: Import conversations с другого instance
+- **Analysis**: Export в Text для text analysis
+- **Recovery**: Restore deleted conversations из backup
+
+## [1.12.2] - 2025-10-26
+
+### Added
+- **Advanced Rate Limiting**: Multi-scope rate limiting с sliding window algorithm
+  - Scope support: Global, Tenant, User, API Key, Model-specific
+  - Priority-based checking (API Key → User → Tenant → Model → Global)
+  - Sliding window algorithm для точного подсчета requests (предотвращает burst attacks)
+  - RFC 6585 compliance headers:
+    - `X-RateLimit-Limit` - общий лимит
+    - `X-RateLimit-Remaining` - оставшееся количество
+    - `X-RateLimit-Reset` - Unix timestamp сброса
+    - `X-RateLimit-Window` - временное окно (second/minute/hour/day)
+    - `X-RateLimit-Scope` - какой scope сработал
+    - `Retry-After` - через сколько секунд можно retry
+  - 429 Too Many Requests при превышении лимита
+
+### Changed
+- **Rate Limiting**: Базовая система расширена multi-scope support
+- **Database Schema**: Новые таблицы `rate_limits` и `rate_limit_usage` для гибкой настройки
+
+### Technical
+- Новый сервис `internal/services/ratelimit/sliding_window.go`:
+  - `SlidingWindowLimiter` с in-memory cache для performance
+  - Thread-safe operations с sync.RWMutex
+  - Automatic cache cleanup (configurable)
+  - Cache statistics для мониторинга
+- Новый сервис `internal/services/ratelimit/advanced_service.go`:
+  - `AdvancedRateLimiter` с multi-scope checking
+  - Priority-based rate limit enforcement
+  - Configurable default limits
+  - Per-second, per-minute, per-hour, per-day windows
+- Новый middleware `internal/api/middleware/advanced_rate_limit.go`:
+  - RFC 6585 headers support
+  - Context-aware (user, tenant, API key, model extraction)
+  - Detailed error messages with retry information
+- Data Models в `internal/models/rate_limit.go`:
+  - `RateLimitConfig` - конфигурация rate limits
+  - `RateLimitResult` - результат проверки
+  - `RateLimitUsage` - tracking для persistence
+- Database Migration v48:
+  - `rate_limits` table с support для всех scopes
+  - `rate_limit_usage` table для sliding window tracking
+  - Indexes для efficient queries (scope, target_id, model_name)
+
+### Performance
+- **Sliding Window Algorithm**: Более точный чем fixed window, fair distribution
+- **In-Memory Cache**: Fast lookups без DB queries на каждый request
+- **Async Cleanup**: Periodic cache cleanup не блокирует requests
+- **Low Latency**: < 1ms overhead на rate limit check (in-memory)
+
+### Future Enhancements
+- Admin API для управления rate limits (CRUD)
+- WebUI для настройки limits через интерфейс
+- Burst allowance support
+- Redis backend для distributed rate limiting
+
 ## [1.12.1] - 2025-10-26
 
 ### Added

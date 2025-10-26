@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Servers Catalog - Ollama OpenAI Proxy</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/all.min.css">
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .catalog-container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .catalog-header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .catalog-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .catalog-header p {
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .filters-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group input {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .category-badge.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .category-badge:not(.active) {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .category-badge:not(.active):hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .server-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .server-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .server-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+
+        .server-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .server-header {
+            display: flex;
+            align-items: start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .server-title {
+            flex: 1;
+        }
+
+        .server-title h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 0.25rem 0;
+            color: #2c3e50;
+        }
+
+        .server-title .author {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+
+        .server-description {
+            color: #495057;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .server-meta {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            background: #f8f9fa;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+
+        .meta-tag i {
+            font-size: 0.75rem;
+        }
+
+        .server-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .btn-install {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-install:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+
+        .btn-details {
+            padding: 0.6rem 1rem;
+            background: #f8f9fa;
+            color: #495057;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-details:hover {
+            background: #e9ecef;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-official {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-community {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .empty-state {
+            background: white;
+            border-radius: 16px;
+            padding: 4rem 2rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #e9ecef;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h3 {
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: #adb5bd;
+        }
+
+        /* Install Modal */
+        .install-modal .modal-content {
+            border-radius: 16px;
+            border: none;
+        }
+
+        .install-modal .modal-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 16px 16px 0 0;
+            padding: 1.5rem;
+        }
+
+        .install-modal .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+        .config-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="dashboard.html">
+                <i class="fas fa-robot"></i> Ollama OpenAI Proxy
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="mcp.html">
+                    <i class="fas fa-plug"></i> My MCP Servers
+                </a>
+                <a class="nav-link" href="dashboard.html">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="catalog-container">
+        <!-- Header -->
+        <div class="catalog-header">
+            <h1><i class="fas fa-store"></i> MCP Servers Catalog</h1>
+            <p>Discover and install MCP (Model Context Protocol) servers to extend your AI capabilities</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-card">
+            <div class="filter-group">
+                <input type="text" id="searchInput" class="form-control" placeholder="🔍 Search servers...">
+                <select id="sortSelect" class="form-select" style="width: auto;">
+                    <option value="popular">Most Popular</option>
+                    <option value="recent">Recently Added</option>
+                    <option value="name">Name (A-Z)</option>
+                </select>
+            </div>
+            <div class="mt-3">
+                <span class="category-badge active" data-category="all">
+                    <i class="fas fa-th"></i> All
+                </span>
+                <span class="category-badge" data-category="filesystem">
+                    <i class="fas fa-folder"></i> Filesystem
+                </span>
+                <span class="category-badge" data-category="database">
+                    <i class="fas fa-database"></i> Database
+                </span>
+                <span class="category-badge" data-category="api">
+                    <i class="fas fa-cloud"></i> API
+                </span>
+                <span class="category-badge" data-category="tools">
+                    <i class="fas fa-wrench"></i> Tools
+                </span>
+                <span class="category-badge" data-category="search">
+                    <i class="fas fa-search"></i> Search
+                </span>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-spinner" style="display: none;">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-white">Loading MCP servers catalog...</p>
+        </div>
+
+        <!-- Servers Grid -->
+        <div id="serversGrid" class="servers-grid"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <i class="fas fa-search"></i>
+            <h3>No servers found</h3>
+            <p>Try adjusting your filters or search query</p>
+        </div>
+    </div>
+
+    <!-- Install Modal -->
+    <div class="modal fade install-modal" id="installModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-download"></i> Install MCP Server
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="installContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/mcp-catalog.js"></script>
+</body>
+</html>

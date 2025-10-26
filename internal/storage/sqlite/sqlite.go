@@ -550,6 +550,21 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_advanced_rate_limiting",
 			SQL:     s.getAddAdvancedRateLimitingMigration(),
 		},
+		{
+			Version: 49,
+			Name:    "add_changelog_v1_12_2",
+			SQL:     s.getAddChangelogV1122Migration(),
+		},
+		{
+			Version: 50,
+			Name:    "add_changelog_v1_12_3",
+			SQL:     s.getAddChangelogV1123Migration(),
+		},
+		{
+			Version: 51,
+			Name:    "add_changelog_v1_12_4",
+			SQL:     s.getAddChangelogV1124Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -2957,29 +2972,29 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
   - Автоматическая выгрузка неиспользуемых моделей через настраиваемый timeout
   - Track model usage для оптимизации preloading
   - Admin API endpoints:
-    - `GET /api/admin/models/loaded` - список загруженных моделей с статусом
-    - `POST /api/admin/models/:name/preload` - ручная загрузка модели
+    - GET /api/admin/models/loaded - список загруженных моделей с статусом
+    - POST /api/admin/models/:name/preload - ручная загрузка модели
 
 ### Changed
 - **Chat Handler**: Автоматический tracking использования моделей при каждом запросе
-- **Configuration**: Добавлена секция `models.preload` с полной настройкой preloading
+- **Configuration**: Добавлена секция models.preload с полной настройкой preloading
 
 ### Technical
-- Новый сервис `internal/services/model/preloader.go`:
-  - `ModelPreloader` с async startup и health check loops
+- Новый сервис internal/services/model/preloader.go:
+  - ModelPreloader с async startup и health check loops
   - Thread-safe tracking загруженных моделей
   - Graceful shutdown при остановке сервера
-- Новый handler `internal/api/handlers/model_preload.go` для Admin API
-- Integration в `Router` через `NewOptions.ModelPreloader`
-- Integration в `ChatHandler` через `ModelPreloader` interface
+- Новый handler internal/api/handlers/model_preload.go для Admin API
+- Integration в Router через NewOptions.ModelPreloader
+- Integration в ChatHandler через ModelPreloader interface
 - Конфигурация:
-  - `models.preload.enabled` - включить/выключить preloading
-  - `models.preload.on_startup` - загружать при старте
-  - `models.preload.keep_warm` - поддерживать в горячем состоянии
-  - `models.preload.health_check_interval` - интервал проверки (default: 5m)
-  - `models.preload.warm_up_prompt` - тестовый промпт (default: "Hello")
-  - `models.preload.max_loaded_models` - лимит одновременно загруженных (0 = unlimited)
-  - `models.preload.unload_after` - timeout выгрузки (0 = never)
+  - models.preload.enabled - включить/выключить preloading
+  - models.preload.on_startup - загружать при старте
+  - models.preload.keep_warm - поддерживать в горячем состоянии
+  - models.preload.health_check_interval - интервал проверки (default: 5m)
+  - models.preload.warm_up_prompt - тестовый промпт (default: "Hello")
+  - models.preload.max_loaded_models - лимит одновременно загруженных (0 = unlimited)
+  - models.preload.unload_after - timeout выгрузки (0 = never)
 
 ### Performance
 - **First Request Latency**: Сокращение времени первого ответа с 5-30s до <1s для preloaded моделей
@@ -3043,6 +3058,89 @@ CREATE TABLE IF NOT EXISTS rate_limit_usage (
 -- Index for sliding window queries
 CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_window ON rate_limit_usage(rate_limit_id, window_type, window_start DESC);
 CREATE INDEX IF NOT EXISTS idx_rate_limit_usage_cleanup ON rate_limit_usage(window_start);
+    `
+}
+
+// getAddChangelogV1122Migration returns SQL for adding changelog v1.12.2 (v49 migration)
+func (s *SQLiteDB) getAddChangelogV1122Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.12.2', '2025-10-26', '## [1.12.2] - 2025-10-26
+
+### Added
+- **Advanced Rate Limiting**: Multi-scope rate limiting с sliding window algorithm
+  - Scope support: Global, Tenant, User, API Key, Model-specific
+  - Priority-based checking (API Key → User → Tenant → Model → Global)
+  - Sliding window algorithm для точного подсчета requests (предотвращает burst attacks)
+  - RFC 6585 compliance headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Window, X-RateLimit-Scope, Retry-After
+  - 429 Too Many Requests при превышении лимита
+
+### Changed
+- **Rate Limiting**: Базовая система расширена multi-scope support
+- **Database Schema**: Новые таблицы rate_limits и rate_limit_usage для гибкой настройки
+
+### Technical
+- Новый сервис internal/services/ratelimit/sliding_window.go: SlidingWindowLimiter с in-memory cache
+- Новый сервис internal/services/ratelimit/advanced_service.go: AdvancedRateLimiter с multi-scope checking
+- Новый middleware internal/api/middleware/advanced_rate_limit.go: RFC 6585 headers support
+- Data Models в internal/models/rate_limit.go
+- Database Migration v48: rate_limits + rate_limit_usage tables
+
+### Performance
+- **Sliding Window Algorithm**: Более точный чем fixed window
+- **In-Memory Cache**: < 1ms overhead на rate limit check');
+    `
+}
+
+// getAddChangelogV1123Migration returns SQL for adding changelog v1.12.3 (v50 migration)
+func (s *SQLiteDB) getAddChangelogV1123Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.12.3', '2025-10-26', '## [1.12.3] - 2025-10-26
+
+### Added
+- **Conversation Export/Import**: Полная система экспорта и импорта conversations
+  - Export форматы: JSON, Markdown, Text
+  - Single conversation export через GET /api/conversations/{id}/export?format=json|markdown|text
+  - Bulk export через POST /api/conversations/bulk-export
+  - Import из JSON через POST /api/conversations/import
+  - Import опции: Merge into existing, Preserve timestamps/IDs
+  - Metadata export: total messages, tokens used, model, dates
+
+### Technical
+- Новый сервис internal/services/export/conversation_exporter.go
+- Новый сервис internal/services/export/conversation_importer.go
+- Новый handler internal/api/handlers/conversation_export.go
+- Data Models в internal/models/conversation_export.go
+
+### Security
+- **Access Control**: Verify conversation ownership при export/import
+- **User Isolation**: Импорт только в свой tenant/user scope');
+    `
+}
+
+// getAddChangelogV1124Migration returns SQL for adding changelog v1.12.4 (v51 migration)
+func (s *SQLiteDB) getAddChangelogV1124Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('1.12.4', '2025-10-26', '## [1.12.4] - 2025-10-26
+
+### Added
+- **MCP Servers Catalog**: Полноценный каталог популярных MCP серверов
+  - Красивая WebUI страница web/mcp-catalog.html с современным дизайном
+  - 10+ предустановленных серверов (Filesystem, PostgreSQL, GitHub, Slack, etc.)
+  - Category filtering, Search, Sorting
+  - Server cards с полной информацией (status, stars, downloads, features)
+  - One-click installation: Copy config или direct install через Admin API
+  - Responsive design для всех устройств
+
+### Technical
+- JavaScript модуль web/js/mcp-catalog.js: Catalog data, filtering, search, install modal
+- HTML template web/mcp-catalog.html: Gradient purple design, card-based layout
+
+### Featured MCP Servers
+- Official: Filesystem, PostgreSQL, GitHub, Brave Search, Slack, Puppeteer, SQLite, Git
+- Community: Google Drive, Docker');
     `
 }
 

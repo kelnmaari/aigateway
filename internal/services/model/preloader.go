@@ -139,12 +139,13 @@ func (p *ModelPreloader) loadModel(ctx context.Context, modelName string) error 
 	defer cancel()
 
 	// Send dummy request с minimal token generation
+	numPredict := 1
 	req := &ollama.GenerateRequest{
 		Model:  modelName,
 		Prompt: p.config.WarmUpPrompt,
 		Stream: false,
-		Options: map[string]interface{}{
-			"num_predict": 1, // Generate only 1 token (fast)
+		Options: &ollama.GenerateOptions{
+			NumPredict: &numPredict, // Generate only 1 token (fast)
 		},
 	}
 

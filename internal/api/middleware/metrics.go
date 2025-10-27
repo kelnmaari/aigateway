@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/metrics"
 )
 
 // PrometheusMetrics middleware для сбора метрик HTTP запросов
@@ -59,3 +59,4 @@ func PrometheusMetrics() gin.HandlerFunc {
 		}
 	}
 }
+

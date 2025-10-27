@@ -324,3 +324,4 @@ func BenchmarkValidateFilename(b *testing.B) {
 		_ = validator.ValidateFilename(filename)
 	}
 }
+

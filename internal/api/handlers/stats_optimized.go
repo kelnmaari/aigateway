@@ -110,3 +110,4 @@ type StatsSnapshot struct {
 	ErrorRequests   int64   `json:"error_requests"`
 	AverageDuration string  `json:"average_duration"`
 }
+

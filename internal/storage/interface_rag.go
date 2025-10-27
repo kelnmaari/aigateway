@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // RAGDataSourceRepository интерфейс для работы с RAG data sources
@@ -127,4 +127,5 @@ type RAGQueryLogRepository interface {
 	// GetStats возвращает статистику по логам
 	GetQueryStats(ctx context.Context, userID *uuid.UUID, from, to *time.Time) (*models.RAGQueryStats, error)
 }
+
 

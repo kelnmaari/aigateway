@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
+	"aigateway/internal/models"
 )
 
 // EmbeddingsHandler обрабатывает запросы на создание embeddings
@@ -101,3 +101,4 @@ func (h *EmbeddingsHandler) HandleEmbeddings(c *gin.Context) {
 
 	c.JSON(http.StatusOK, openaiResp)
 }
+

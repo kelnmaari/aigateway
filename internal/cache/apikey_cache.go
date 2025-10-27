@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // APIKeyCache provides thread-safe in-memory cache for APIKey hot data
@@ -216,3 +216,4 @@ func (c *APIKeyCache) GetOrLoad(keyID string, loader func() (*models.APIKeyHot, 
 
 	return hot, nil
 }
+

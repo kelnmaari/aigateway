@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/services/model"
+	"aigateway/internal/services/model"
 )
 
 // ModelPreloadHandler обрабатывает endpoints для управления preloading
@@ -77,4 +77,5 @@ func (h *ModelPreloadHandler) PreloadModel(c *gin.Context) {
 		"model":   modelName,
 	})
 }
+
 

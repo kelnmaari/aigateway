@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/errors"
+	"aigateway/internal/errors"
 )
 
 // ErrorHandling создает middleware для централизованной обработки ошибок
@@ -80,3 +80,4 @@ func AddApplicationError(c *gin.Context, errType errors.ErrorType, message, code
 	appErr := errors.NewApplicationError(errType, message, code, statusCode, metadata, cause)
 	c.Error(appErr)
 }
+

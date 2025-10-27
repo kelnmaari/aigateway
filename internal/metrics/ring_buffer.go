@@ -174,3 +174,4 @@ func (rb *RingBuffer) IsFull() bool {
 	defer rb.mu.RUnlock()
 	return rb.isFull
 }
+

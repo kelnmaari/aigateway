@@ -1505,3 +1505,5 @@ document.addEventListener('DOMContentLoaded', () => {
     adminPanel = new AdminPanel();
 });
 
+
+

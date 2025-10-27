@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // RAG Data Sources (v1.13.0+) - Stubs for PostgreSQL
@@ -119,4 +119,5 @@ func (p *PostgreSQLDB) GetRAGQueryLog(ctx context.Context, id int64) (*models.RA
 func (p *PostgreSQLDB) ListRAGQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*models.RAGQueryLog, error) {
 	return nil, fmt.Errorf("RAG query logs not yet implemented for PostgreSQL")
 }
+
 

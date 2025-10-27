@@ -72,3 +72,4 @@ type TableStructure struct {
 	Data    [][]string
 	BBox    BoundingBox
 }
+

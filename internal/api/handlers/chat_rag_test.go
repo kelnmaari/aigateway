@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/rag/orchestrator"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
+	"aigateway/internal/models"
+	"aigateway/internal/rag/orchestrator"
 )
 
 // Mock RAG Orchestrator
@@ -377,4 +377,5 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
 

@@ -15,11 +15,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/jwt"
-	oidcauth "ollama-openai-proxy/internal/auth/oidc"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/jwt"
+	oidcauth "aigateway/internal/auth/oidc"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // OIDCHandler обрабатывает OIDC authentication flow
@@ -454,4 +454,5 @@ func (h *OIDCHandler) HandleLogout(c *gin.Context) {
 		"message": "Logged out successfully",
 	})
 }
+
 

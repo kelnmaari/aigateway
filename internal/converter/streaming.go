@@ -8,9 +8,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // StreamConverter обрабатывает конвертацию streaming responses
@@ -303,3 +303,4 @@ func (s *StreamConverter) convertToolCallsToOpenAI(ollamaToolCalls []ollama.Tool
 
 	return openaiToolCalls
 }
+

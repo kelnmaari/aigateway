@@ -56,3 +56,4 @@ func (hook *ErrorLogHook) Fire(entry *logrus.Entry) error {
 	return err
 }
 
+

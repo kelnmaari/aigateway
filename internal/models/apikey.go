@@ -534,3 +534,4 @@ func (k *APIKeyPublic) IsExpired() bool {
 func (k *APIKeyPublic) IsActive() bool {
 	return k.Status == APIKeyStatusActive && !k.IsExpired()
 }
+

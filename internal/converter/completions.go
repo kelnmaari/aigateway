@@ -4,7 +4,7 @@ package converter
 import (
 	"fmt"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ConvertCompletionToChatRequest конвертирует legacy CompletionRequest в ChatCompletionRequest
@@ -175,3 +175,4 @@ func ConvertCompletionStreamChunk(chatChunk *models.ChatCompletionChunk, model s
 
 	return chunk, nil
 }
+

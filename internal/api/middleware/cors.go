@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // CORS создает middleware для обработки CORS запросов
@@ -66,3 +66,4 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 		c.Next()
 	}
 }
+

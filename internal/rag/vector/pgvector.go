@@ -496,3 +496,4 @@ func stringToVector(s string) ([]float64, error) {
 // Ensure PgVectorStore implements VectorStore interface
 var _ VectorStore = (*PgVectorStore)(nil)
 
+

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
 
 	"github.com/sirupsen/logrus"
 )
@@ -319,4 +319,5 @@ type ModelStatus struct {
 	LastUsed time.Time     `json:"last_used"`
 	IdleTime time.Duration `json:"idle_time"`
 }
+
 

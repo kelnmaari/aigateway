@@ -1703,22 +1703,22 @@ body {
 
 .changelog-content {
     padding: 20px;
-    background: #ffffff;
+    background: var(--bg-tertiary);
     border-top: 1px solid var(--border-color);
 }
 
 .changelog-markdown {
     line-height: 1.6;
-    color: #000000;
+    color: rgba(255, 255, 255, 0.95);
 }
 
 .changelog-markdown h3 {
     margin-top: 0;
     margin-bottom: 20px;
     padding-bottom: 8px;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
     font-size: 1.3em;
-    color: #1f2937;
+    color: #ffffff;
     font-weight: 700;
 }
 
@@ -1741,38 +1741,44 @@ body {
 
 /* Added - green */
 .changelog-markdown h4.badge-added {
-    background: #d1fae5;
-    color: #065f46;
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 /* Changed - blue */
 .changelog-markdown h4.badge-changed {
-    background: #dbeafe;
-    color: #1e40af;
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 /* Fixed - orange */
 .changelog-markdown h4.badge-fixed {
-    background: #fed7aa;
-    color: #9a3412;
+    background: rgba(251, 146, 60, 0.2);
+    color: #fb923c;
+    border: 1px solid rgba(251, 146, 60, 0.3);
 }
 
 /* Technical - purple */
 .changelog-markdown h4.badge-technical {
-    background: #e9d5ff;
-    color: #6b21a8;
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 /* Security - red */
 .changelog-markdown h4.badge-security {
-    background: #fecaca;
-    color: #991b1b;
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 /* Removed - gray */
 .changelog-markdown h4.badge-removed {
-    background: #e5e7eb;
-    color: #374151;
+    background: rgba(156, 163, 175, 0.2);
+    color: #d1d5db;
+    border: 1px solid rgba(156, 163, 175, 0.3);
 }
 
 .changelog-markdown ul {
@@ -1785,7 +1791,7 @@ body {
     margin: 8px 0;
     padding-left: 24px;
     position: relative;
-    color: #374151;
+    color: rgba(255, 255, 255, 0.9);
     line-height: 1.6;
 }
 
@@ -1793,33 +1799,33 @@ body {
     content: "▸";
     position: absolute;
     left: 0;
-    color: #6366f1;
+    color: #818cf8;
     font-weight: bold;
 }
 
 /* Nested list items (indented) */
 .changelog-markdown li li {
     font-size: 0.95em;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .changelog-markdown li li::before {
     content: "•";
-    color: #9ca3af;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .changelog-markdown code {
-    background: #f3f4f6;
-    color: #1f2937;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fbbf24;
     padding: 3px 8px;
     border-radius: 4px;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 0.9em;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .changelog-markdown strong {
-    color: #111827;
+    color: #ffffff;
     font-weight: 700;
 }
 

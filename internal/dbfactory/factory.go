@@ -7,10 +7,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/storage/postgresql"
-	"ollama-openai-proxy/internal/storage/sqlite"
+	"aigateway/internal/config"
+	"aigateway/internal/storage"
+	"aigateway/internal/storage/postgresql"
+	"aigateway/internal/storage/sqlite"
 )
 
 // NewDatabase создает новый экземпляр базы данных на основе конфигурации
@@ -109,3 +109,4 @@ func CloseDatabase(db storage.Database, logger *logrus.Logger) error {
 	logger.Info("Database connection closed successfully")
 	return nil
 }
+

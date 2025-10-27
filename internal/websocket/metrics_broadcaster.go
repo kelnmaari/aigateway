@@ -5,7 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/metrics"
 )
 
 // MetricsBroadcaster периодически отправляет обновления метрик
@@ -118,3 +118,4 @@ func (mb *MetricsBroadcaster) broadcastMetrics() {
 func (mb *MetricsBroadcaster) BroadcastImmediate() {
 	mb.broadcastMetrics()
 }
+

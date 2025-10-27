@@ -14,18 +14,18 @@ import (
 
 	"github.com/iyashjayesh/monigo"
 
-	"ollama-openai-proxy/internal/api/router"
-	"ollama-openai-proxy/internal/auth/jwt"
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/dbfactory"
-	"ollama-openai-proxy/internal/logger"
-	"ollama-openai-proxy/internal/metrics"
-	"ollama-openai-proxy/internal/observability"
-	"ollama-openai-proxy/internal/services/model"
-	ragservice "ollama-openai-proxy/internal/services/rag"
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/version"
+	"aigateway/internal/api/router"
+	"aigateway/internal/auth/jwt"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/dbfactory"
+	"aigateway/internal/logger"
+	"aigateway/internal/metrics"
+	"aigateway/internal/observability"
+	"aigateway/internal/services/model"
+	ragservice "aigateway/internal/services/rag"
+	"aigateway/internal/storage"
+	"aigateway/internal/version"
 )
 
 func main() {
@@ -447,3 +447,4 @@ func main() {
 	appLogger.Info("Server stopped successfully")
 	fmt.Println("✅ Сервер успешно остановлен")
 }
+

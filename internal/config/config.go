@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	ragconfig "ollama-openai-proxy/internal/rag/config"
+	ragconfig "aigateway/internal/rag/config"
 )
 
 // Config представляет конфигурацию всего приложения
@@ -548,7 +548,7 @@ func Load(configPath string) (*Config, error) {
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("./configs")
 		viper.AddConfigPath("../configs")
-		viper.AddConfigPath("/opt/ollama-openai-proxy/configs")
+		viper.AddConfigPath("/opt/aigateway/configs")
 		viper.AddConfigPath("/app/configs")
 
 		// Try config.yaml first (production), fallback to dev.yaml (development)
@@ -759,3 +759,4 @@ func (c *Config) GetServerAddr() string {
 func (c *Config) IsDevelopment() bool {
 	return c.Development.DebugMode || c.Logging.Level == "debug"
 }
+

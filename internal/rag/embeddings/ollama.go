@@ -233,3 +233,4 @@ func (e *OllamaEmbedder) EmbedBatch(ctx context.Context, req BatchEmbeddingReque
 	}, nil
 }
 
+

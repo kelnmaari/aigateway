@@ -1,4 +1,4 @@
-# Makefile для Ollama-OpenAI Proxy v1.4.3
+# Makefile для AIGateway Platform v2.1.0
 # Cross-platform build automation
 
 .PHONY: help build build-all build-linux build-windows package clean test lint run install version
@@ -12,9 +12,9 @@ OUTPUT_DIR := dist
 
 # Go build flags with version information
 LDFLAGS := -w -s \
-	-X 'ollama-openai-proxy/internal/version.Version=$(VERSION)' \
-	-X 'ollama-openai-proxy/internal/version.GitCommit=$(GIT_COMMIT)' \
-	-X 'ollama-openai-proxy/internal/version.BuildDate=$(BUILD_DATE)'
+	-X 'aigateway/internal/version.Version=$(VERSION)' \
+	-X 'aigateway/internal/version.GitCommit=$(GIT_COMMIT)' \
+	-X 'aigateway/internal/version.BuildDate=$(BUILD_DATE)'
 
 BUILD_TAGS := sqlite_fts5 sqlite_json1
 
@@ -23,7 +23,7 @@ BUILD_TAGS := sqlite_fts5 sqlite_json1
 
 ## help: Показать список доступных команд
 help:
-	@echo "Ollama-OpenAI Proxy v$(VERSION) - Build Commands"
+	@echo "AIGateway Platform v$(VERSION) - Build Commands"
 	@echo ""
 	@echo "Usage: make [command]"
 	@echo ""
@@ -41,8 +41,8 @@ version:
 ## build: Сборка для текущей платформы
 build:
 	@echo "Building for current platform..."
-	@go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy ./cmd/server
-	@echo "✓ Built: $(OUTPUT_DIR)/ollama-proxy"
+	@go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway ./cmd/server
+	@echo "✓ Built: $(OUTPUT_DIR)/aigateway"
 
 ## build-all: Сборка для всех платформ (Linux amd64/arm64, Windows amd64)
 build-all:
@@ -50,13 +50,13 @@ build-all:
 	@mkdir -p $(OUTPUT_DIR)
 	
 	@echo "Building Linux AMD64..."
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy-linux-amd64 ./cmd/server
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway-linux-amd64 ./cmd/server
 	
 	@echo "Building Linux ARM64..."
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy-linux-arm64 ./cmd/server
+	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway-linux-arm64 ./cmd/server
 	
 	@echo "Building Windows AMD64..."
-	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy-windows-amd64.exe ./cmd/server
+	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway-windows-amd64.exe ./cmd/server
 	
 	@echo "✓ All builds completed!"
 	@ls -lh $(OUTPUT_DIR)/
@@ -67,10 +67,10 @@ build-linux:
 	@mkdir -p $(OUTPUT_DIR)
 	
 	@echo "Building Linux AMD64..."
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy-linux-amd64 ./cmd/server
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway-linux-amd64 ./cmd/server
 	
 	@echo "Building Linux ARM64..."
-	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy-linux-arm64 ./cmd/server
+	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway-linux-arm64 ./cmd/server
 	
 	@echo "✓ Linux builds completed!"
 
@@ -80,7 +80,7 @@ build-windows:
 	@mkdir -p $(OUTPUT_DIR)
 	
 	@echo "Building Windows AMD64..."
-	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/ollama-proxy-windows-amd64.exe ./cmd/server
+	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -tags "$(BUILD_TAGS)" -trimpath -o $(OUTPUT_DIR)/aigateway-windows-amd64.exe ./cmd/server
 	
 	@echo "✓ Windows build completed!"
 
@@ -167,13 +167,14 @@ docker-stop:
 ## release: Подготовить release (build + package + checksums)
 release: clean build-all package
 	@echo "Creating checksums..."
-	@cd $(OUTPUT_DIR) && sha256sum ollama-proxy-$(VERSION)-*.{tar.gz,zip} > checksums.txt 2>/dev/null || true
+	@cd $(OUTPUT_DIR) && sha256sum aigateway-$(VERSION)-*.{tar.gz,zip} > checksums.txt 2>/dev/null || true
 	@echo "✓ Release ready in $(OUTPUT_DIR)/"
 	@ls -lh $(OUTPUT_DIR)/
 
 ## version: Показать версию
 version:
-	@echo "Ollama-OpenAI Proxy"
+	@echo "AIGateway Platform"
 	@echo "Version: $(VERSION)"
 	@echo "Build Time: $(BUILD_TIME)"
 	@echo "Git Commit: $(GIT_COMMIT)"
+

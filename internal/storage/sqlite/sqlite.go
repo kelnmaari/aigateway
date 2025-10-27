@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // SQLiteDB представляет SQLite имплементацию Database interface
@@ -574,6 +574,21 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Version: 53,
 			Name:    "update_changelog_v2_0_0_with_export_import",
 			SQL:     s.getUpdateChangelogV200WithExportImportMigration(),
+		},
+		{
+			Version: 54,
+			Name:    "add_changelog_v2_1_0",
+			SQL:     s.getAddChangelogV210Migration(),
+		},
+		{
+			Version: 55,
+			Name:    "update_changelog_v2_1_0_formatting",
+			SQL:     s.getUpdateChangelogV210FormattingMigration(),
+		},
+		{
+			Version: 56,
+			Name:    "update_changelog_v2_1_0_final_format",
+			SQL:     s.getUpdateChangelogV210FinalFormatMigration(),
 		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
@@ -3527,6 +3542,253 @@ UPDATE changelogs SET content = '## [2.0.0] - 2025-10-27
 - Added Playwright для E2E testing
 - Added lumberjack для log rotation' 
 WHERE version = '2.0.0';
+    `
+}
+
+// getAddChangelogV210Migration returns SQL for adding changelog v2.1.0 (v54 migration)
+func (s *SQLiteDB) getAddChangelogV210Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.1.0', '2025-10-27', '## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+### Changed
+
+- **Project Identity**:
+  - Repository name: ollama-openai-proxy → aigateway
+  - Module path: ollama-openai-proxy → aigateway
+  - Container name: ollama-openai-proxy → aigateway
+  - Database file: proxy.db → aigateway.db
+  - Log files: proxy.log → aigateway.log
+
+- **Environment Variables** (Breaking Change ⚠️):
+  - All PROXY_* variables → AIGATEWAY_*
+  - Example: PROXY_SERVER_PORT → AIGATEWAY_SERVER_PORT
+
+- **Documentation**:
+  - ✅ README.md - complete rewrite для AIGateway Platform
+  - ✅ Architecture.MD - updated diagrams with RAG System, Model Registry
+  - ✅ All docs/*.md files - branding updates (20+ files)
+
+- **Code**:
+  - ✅ go.mod module path updated
+  - ✅ All import statements across entire codebase
+  - ✅ Docker Compose configuration
+  - ✅ Dockerfile с новым VERSION=2.1.0
+
+- **WebUI**:
+  - ✅ All HTML page titles: "AIGateway Platform"
+  - ✅ Navigation labels и headers
+  - ✅ About System page
+  - ✅ Footer copyright
+
+### Why Rebranding?
+
+1. **Expanded Scope**: No longer just an Ollama proxy - now supports multiple model providers (vLLM, future: OpenAI, Anthropic)
+2. **RAG System**: Built-in RAG capabilities make it more than a proxy
+3. **Enterprise Positioning**: "Gateway" better represents the platform''s role as AI infrastructure
+4. **Scalability**: Name allows for future expansion to cloud providers and custom models
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed migration steps.
+
+**Quick Migration Checklist:**
+- Update environment variables: PROXY_* → AIGATEWAY_*
+- Update Docker image names
+- Rename database file (optional): proxy.db → aigateway.db
+- Update any scripts/configs referencing old names
+- Pull new Docker images: aigateway:2.1.0
+
+### Technical
+
+- Module path: aigateway (was ollama-openai-proxy)
+- All import paths updated throughout codebase
+- Docker Compose volumes: aigateway_data, aigateway_logs
+- Zero functional changes - pure rebranding release');
+    `
+}
+
+// getUpdateChangelogV210FormattingMigration returns SQL for updating changelog v2.1.0 formatting (v55 migration)
+func (s *SQLiteDB) getUpdateChangelogV210FormattingMigration() string {
+	return `
+UPDATE changelogs 
+SET content = '## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+---
+
+### Changed
+
+#### **Project Identity**
+
+- Repository name: ollama-openai-proxy → aigateway
+- Module path: ollama-openai-proxy → aigateway  
+- Container name: ollama-openai-proxy → aigateway
+- Database file: proxy.db → aigateway.db
+- Log files: proxy.log → aigateway.log
+
+#### **Environment Variables** (Breaking Change ⚠️)
+
+- All PROXY_* variables → AIGATEWAY_*
+- Example: PROXY_SERVER_PORT → AIGATEWAY_SERVER_PORT
+- See [Migration Guide](docs/MIGRATION_GUIDE_v2.1.0.md) for complete variable mapping
+
+#### **Documentation**
+
+- ✅ README.md - complete rewrite для AIGateway Platform
+- ✅ Architecture.MD - updated diagrams with RAG System, Model Registry  
+- ✅ All docs/*.md files - branding updates (20+ files)
+- ✅ All BACKLOG/*.md files - task descriptions updated
+
+#### **Code**
+
+- ✅ go.mod module path updated
+- ✅ All import statements across entire codebase
+- ✅ Docker Compose configuration
+- ✅ Dockerfile с новым VERSION=2.1.0
+
+#### **WebUI**
+
+- ✅ All HTML page titles: "AIGateway Platform"
+- ✅ Navigation labels и headers
+- ✅ About System page
+- ✅ Footer copyright
+
+---
+
+### Why Rebranding?
+
+**Reasons for transition to "AIGateway":**
+
+1. **Expanded Scope**: No longer just an Ollama proxy - now supports multiple model providers (vLLM, future: OpenAI, Anthropic)
+
+2. **RAG System**: Built-in RAG capabilities make it more than a proxy
+
+3. **Enterprise Positioning**: "Gateway" better represents the platform''s role as AI infrastructure
+
+4. **Scalability**: Name allows for future expansion to cloud providers and custom models
+
+---
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed migration steps.
+
+**Quick Migration Checklist:**
+
+- Update environment variables: PROXY_* → AIGATEWAY_*
+- Update Docker image names
+- Rename database file (optional): proxy.db → aigateway.db
+- Update any scripts/configs referencing old names
+- Pull new Docker images: aigateway:2.1.0
+
+---
+
+### Technical
+
+- **Module path**: aigateway (was ollama-openai-proxy)
+- **Import paths**: Updated throughout codebase
+- **Docker volumes**: aigateway_data, aigateway_logs
+- **Functional changes**: Zero - pure rebranding release
+- **Compilation**: Verified ✅'
+WHERE version = '2.1.0';
+    `
+}
+
+// getUpdateChangelogV210FinalFormatMigration returns SQL for final v2.1.0 formatting fix (v56 migration)
+func (s *SQLiteDB) getUpdateChangelogV210FinalFormatMigration() string {
+	return `
+UPDATE changelogs SET content = '## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+### Changed
+
+- **Repository name**: ollama-openai-proxy → aigateway
+- **Module path**: ollama-openai-proxy → aigateway
+- **Container name**: ollama-openai-proxy → aigateway
+- **Database file**: proxy.db → aigateway.db (optional rename)
+- **Log files**: proxy.log → aigateway.log
+
+- **Environment Variables (⚠️ Breaking Change)**: All PROXY_* → AIGATEWAY_*
+  - Example: PROXY_SERVER_PORT → AIGATEWAY_SERVER_PORT
+  - PROXY_OLLAMA_URL → AIGATEWAY_OLLAMA_URL
+  - PROXY_DATABASE_TYPE → AIGATEWAY_DATABASE_TYPE
+  - See [Migration Guide](docs/MIGRATION_GUIDE_v2.1.0.md) for complete mapping
+
+- **Documentation Updates**: 40+ files rebranded
+  - README.md - complete rewrite для AIGateway Platform
+  - Architecture.MD - updated diagrams with RAG System, Model Registry
+  - All docs/*.md files (20+ files)
+  - All BACKLOG/*.md files
+
+- **Code Changes**: Zero functional changes - pure rebranding
+  - go.mod module path updated
+  - All import statements across entire codebase
+  - Docker Compose configuration
+  - Dockerfile VERSION=2.1.0
+
+- **WebUI Branding**: Complete frontend rebranding
+  - All HTML page titles: "AIGateway Platform"
+  - Navigation labels и headers
+  - About System page
+  - Footer copyright
+
+### Why Rebranding?
+
+**Reasons for transition to "AIGateway":**
+
+1. **Expanded Scope**: No longer just an Ollama proxy
+  - Multi-provider support: vLLM (v2.2.0), future: OpenAI, Anthropic
+  - Model registry для unified API access
+
+2. **RAG System**: Built-in RAG capabilities
+  - Vector search, embeddings, document processing
+  - Enterprise-ready data integration
+
+3. **Enterprise Positioning**: "Gateway" better represents platform role
+  - Central AI infrastructure component
+  - Unified API для multiple backends
+
+4. **Scalability**: Name allows future expansion
+  - Cloud provider integration
+  - Custom model support
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed steps.
+
+**Quick Migration Checklist:**
+  - Update environment variables: PROXY_* → AIGATEWAY_*
+  - Update Docker image names
+  - Rename database file (optional): proxy.db → aigateway.db
+  - Update scripts/configs referencing old names
+  - Pull new Docker images: aigateway:2.1.0
+
+### Technical
+
+- **Module path**: aigateway (was ollama-openai-proxy)
+- **Import paths**: Updated throughout codebase (~150+ Go files)
+- **Docker Compose**: Service name aigateway, volumes aigateway_data/aigateway_logs
+- **Functional changes**: Zero - pure rebranding release
+- **Compilation**: Verified ✅
+- **Database schema**: Unchanged (backward compatible)'
+WHERE version = '2.1.0';
     `
 }
 

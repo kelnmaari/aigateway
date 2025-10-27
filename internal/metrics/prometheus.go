@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/storage"
 )
 
 // Prometheus metrics namespace
@@ -459,4 +459,5 @@ func UpdateQuotaUsage(targetID, quotaType string, current, limit float64) {
 	QuotaUsage.WithLabelValues(targetID, quotaType).Set(current)
 	QuotaLimit.WithLabelValues(targetID, quotaType).Set(limit)
 }
+
 

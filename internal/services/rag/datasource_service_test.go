@@ -8,8 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // Mock Database
@@ -467,4 +467,5 @@ func BenchmarkDataSourceService_EncryptDecrypt(b *testing.B) {
 func stringPtr(s string) *string {
 	return &s
 }
+
 

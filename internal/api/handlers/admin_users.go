@@ -11,10 +11,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"ollama-openai-proxy/internal/auth/password"
-	"ollama-openai-proxy/internal/models"
-	auditService "ollama-openai-proxy/internal/services/audit"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/password"
+	"aigateway/internal/models"
+	auditService "aigateway/internal/services/audit"
+	"aigateway/internal/storage"
 )
 
 // AdminUserHandler handles admin-level user management
@@ -506,3 +506,4 @@ func toPublicUser(user *models.User) gin.H {
 		"updated_at": user.UpdatedAt,
 	}
 }
+

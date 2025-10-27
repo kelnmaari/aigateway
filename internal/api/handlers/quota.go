@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/services/quota"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/services/quota"
+	"aigateway/internal/storage"
 )
 
 // QuotaHandler handles quota management requests
@@ -206,4 +206,5 @@ func (h *QuotaHandler) GetMyQuota(c *gin.Context) {
 
 	c.JSON(http.StatusOK, stats)
 }
+
 

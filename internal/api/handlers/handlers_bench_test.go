@@ -13,9 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // MockOllamaClient для benchmark тестов
@@ -388,3 +388,4 @@ func BenchmarkParallelChatCompletion(b *testing.B) {
 		}
 	})
 }
+

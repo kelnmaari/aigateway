@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================
@@ -703,3 +703,4 @@ func (s *SQLiteDB) scanTenantMemberWithUserInfo(row scanner) (*models.TenantMemb
 
 	return &member, nil
 }
+

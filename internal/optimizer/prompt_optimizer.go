@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // PromptOptimizer оптимизирует промпты для локальных моделей
@@ -389,3 +389,4 @@ func extractKeywords(query string) []string {
 
 	return keywords
 }
+

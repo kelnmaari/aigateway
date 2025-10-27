@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/metrics"
 )
 
 // GPUHandler handles GPU monitoring endpoints
@@ -55,3 +55,4 @@ func (h *GPUHandler) GetGPUMetrics(c *gin.Context) {
 		"data":    metrics,
 	})
 }
+

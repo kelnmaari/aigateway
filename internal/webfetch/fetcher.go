@@ -281,3 +281,4 @@ func (f *Fetcher) isAllowedContentType(contentType string) bool {
 
 	return false
 }
+

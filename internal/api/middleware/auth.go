@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // APIKeyAuth создает middleware для аутентификации API ключей
@@ -127,3 +127,4 @@ func min(a, b int) int {
 	}
 	return b
 }
+

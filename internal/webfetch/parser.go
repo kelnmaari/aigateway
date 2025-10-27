@@ -191,3 +191,4 @@ func (p *HTMLParser) extractMetadata(doc *goquery.Document) *PageMetadata {
 
 	return meta
 }
+

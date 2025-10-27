@@ -4,8 +4,8 @@ package converter
 import (
 	"fmt"
 
-	ollamaapi "ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/models"
+	ollamaapi "aigateway/internal/client/ollama"
+	"aigateway/internal/models"
 )
 
 // ConvertEmbeddingRequest конвертирует OpenAI embedding request в Ollama format
@@ -139,3 +139,4 @@ func normalizeInput(input interface{}) ([]string, error) {
 		return nil, fmt.Errorf("unsupported input type: %T", input)
 	}
 }
+

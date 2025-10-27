@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // ========================================
@@ -240,4 +240,5 @@ func (s *SQLiteDB) scanAuditEvent(row scanner) (*models.AuditEvent, error) {
 
 	return &event, nil
 }
+
 

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/filestorage"
+	"aigateway/internal/config"
+	"aigateway/internal/filestorage"
 )
 
 // NewStorageBackend создает storage backend на основе конфигурации
@@ -111,3 +111,4 @@ func parseSize(sizeStr string) (int64, error) {
 
 	return num * multiplier, nil
 }
+

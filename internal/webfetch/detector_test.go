@@ -159,3 +159,4 @@ func BenchmarkURLDetector_DetectURLs(b *testing.B) {
 		_ = detector.DetectURLs(text)
 	}
 }
+

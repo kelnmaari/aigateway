@@ -8,8 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/rag/embeddings"
-	"ollama-openai-proxy/internal/rag/vector"
+	"aigateway/internal/rag/embeddings"
+	"aigateway/internal/rag/vector"
 )
 
 // Mock Embedder
@@ -534,4 +534,5 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
 

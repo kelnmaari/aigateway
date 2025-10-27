@@ -158,3 +158,4 @@ func (p *ImageProcessor) ConvertImageFormat(imageReader io.Reader, format string
 
 	return buf, nil
 }
+

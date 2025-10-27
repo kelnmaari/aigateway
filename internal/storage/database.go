@@ -30,7 +30,7 @@ import (
 	"context"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // Database представляет unified интерфейс для работы с БД
@@ -479,3 +479,4 @@ type Tx interface {
 	// Database - все методы Database доступны в транзакции
 	Database
 }
+

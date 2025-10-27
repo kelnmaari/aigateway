@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 var (
@@ -251,4 +251,5 @@ func (w *Worker) processJob(ctx context.Context, job *models.RAGJob) {
 func (w *Worker) Stop() {
 	close(w.StopChan)
 }
+
 

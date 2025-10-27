@@ -95,3 +95,4 @@ func (r *Registry) SupportedTypes() []string {
 	}
 	return types
 }
+

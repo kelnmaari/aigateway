@@ -144,7 +144,7 @@ database:
   
   # SQLite Configuration (для development)
   sqlite:
-    path: "data/proxy.db"
+    path: "data/aigateway.db"
     journal_mode: "WAL"      # Write-Ahead Logging для лучшей concurrency
     busy_timeout: 5000        # ms - ожидание при locked БД
     cache_size: 10000         # KB - размер кеша SQLite

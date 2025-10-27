@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/middleware"
-	"ollama-openai-proxy/internal/auth/password"
-	"ollama-openai-proxy/internal/models"
-	auditService "ollama-openai-proxy/internal/services/audit"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/middleware"
+	"aigateway/internal/auth/password"
+	"aigateway/internal/models"
+	auditService "aigateway/internal/services/audit"
+	"aigateway/internal/storage"
 )
 
 // UserHandler обрабатывает user management запросы
@@ -519,3 +519,4 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		"message": "Password changed successfully",
 	})
 }
+

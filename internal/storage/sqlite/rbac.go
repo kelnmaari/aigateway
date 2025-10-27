@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================
@@ -615,4 +615,5 @@ func (s *SQLiteDB) GetRoleUsers(ctx context.Context, roleID string) ([]*models.U
 
 	return users, nil
 }
+
 

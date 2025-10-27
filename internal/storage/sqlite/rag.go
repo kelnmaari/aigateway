@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // ========================================
@@ -1213,4 +1213,5 @@ func boolToInt(b bool) int {
 func intToBool(i int) bool {
 	return i != 0
 }
+
 

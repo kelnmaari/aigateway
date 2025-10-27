@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ErrorHandler обрабатывает централизованную обработку ошибок
@@ -317,3 +317,4 @@ func NewApplicationError(errType ErrorType, message, code string, statusCode int
 		Cause:      cause,
 	}
 }
+

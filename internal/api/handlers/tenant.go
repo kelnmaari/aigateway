@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/middleware"
-	"ollama-openai-proxy/internal/models"
-	auditService "ollama-openai-proxy/internal/services/audit"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/middleware"
+	"aigateway/internal/models"
+	auditService "aigateway/internal/services/audit"
+	"aigateway/internal/storage"
 )
 
 // TenantHandler обрабатывает tenant management запросы
@@ -907,3 +907,4 @@ func generateSlug(name string) string {
 
 	return slug
 }
+

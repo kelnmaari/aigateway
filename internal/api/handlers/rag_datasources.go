@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/services/rag"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/services/rag"
+	"aigateway/internal/storage"
 )
 
 // RAGDataSourcesHandler обрабатывает запросы к RAG data sources API
@@ -320,4 +320,5 @@ func getTenantIDFromContext(c *gin.Context) *uuid.UUID {
 	
 	return &tenantID
 }
+
 

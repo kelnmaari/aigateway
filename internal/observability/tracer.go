@@ -139,3 +139,4 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 	}
 	return tp.provider.Shutdown(ctx)
 }
+

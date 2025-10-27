@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/apikey"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/apikey"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // AdminHandler обрабатывает административные эндпоинты
@@ -1007,3 +1007,4 @@ func trimSpace(s string) string {
 
 	return s[start:end]
 }
+

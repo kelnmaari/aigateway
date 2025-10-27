@@ -10,11 +10,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ollama-openai-proxy/internal/auth/apikey"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/logger"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/apikey"
+	"aigateway/internal/config"
+	"aigateway/internal/logger"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 func main() {
@@ -134,3 +134,4 @@ func main() {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
+

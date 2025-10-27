@@ -47,3 +47,4 @@ func SlowRequestLogger(logger *logrus.Logger, threshold time.Duration) gin.Handl
 		}
 	}
 }
+

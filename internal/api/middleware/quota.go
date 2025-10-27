@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/metrics"
-	"ollama-openai-proxy/internal/services/quota"
+	"aigateway/internal/metrics"
+	"aigateway/internal/services/quota"
 )
 
 // QuotaMiddleware provides quota checking middleware
@@ -168,4 +168,5 @@ func (m *QuotaMiddleware) getModelFromRequest(c *gin.Context) string {
 
 	return "unknown"
 }
+
 

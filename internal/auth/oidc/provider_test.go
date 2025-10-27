@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 func TestNewOIDCProvider_DisabledConfig(t *testing.T) {
@@ -136,4 +136,5 @@ func generateRandomState() (string, error) {
 	// For testing purposes, we would need to export it or test it through handlers
 	return "test-state", nil
 }
+
 

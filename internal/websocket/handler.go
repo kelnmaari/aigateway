@@ -191,3 +191,4 @@ func (h *Handler) handleClientMessage(client *Client, message []byte) {
 func generateClientID() string {
 	return fmt.Sprintf("client_%d", time.Now().UnixNano())
 }
+

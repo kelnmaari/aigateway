@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/storage"
 )
 
 // UsageHandler handles usage statistics endpoints
@@ -141,3 +141,4 @@ func (h *UsageHandler) GetTenantUsage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, stats)
 }
+

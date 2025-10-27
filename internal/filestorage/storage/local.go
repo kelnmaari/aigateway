@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"ollama-openai-proxy/internal/filestorage"
+	"aigateway/internal/filestorage"
 )
 
 // LocalStorage реализует хранение файлов в локальной файловой системе
@@ -246,3 +246,4 @@ func (s *LocalStorage) GetSize(ctx context.Context, path string) (int64, error) 
 func (s *LocalStorage) Type() string {
 	return "local"
 }
+

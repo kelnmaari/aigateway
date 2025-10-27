@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/services/ratelimit"
+	"aigateway/internal/models"
+	"aigateway/internal/services/ratelimit"
 )
 
 // AdvancedRateLimitMiddleware middleware для advanced rate limiting с RFC 6585 headers
@@ -168,4 +168,5 @@ func formatRateLimitMessage(result *models.RateLimitResult) string {
 	}
 	return "Rate limit exceeded"
 }
+
 

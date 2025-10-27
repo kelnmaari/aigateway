@@ -181,3 +181,4 @@ func isMimeTypeCompatible(detected, expected string) bool {
 
 	return false
 }
+

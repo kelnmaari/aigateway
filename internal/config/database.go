@@ -85,3 +85,4 @@ func DefaultDatabaseConfig() DatabaseConfig {
 		LogQueries:  false,
 	}
 }
+

@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/jwt"
-	ldapauth "ollama-openai-proxy/internal/auth/ldap"
-	oidcauth "ollama-openai-proxy/internal/auth/oidc"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/jwt"
+	ldapauth "aigateway/internal/auth/ldap"
+	oidcauth "aigateway/internal/auth/oidc"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // LDAPHandler обрабатывает LDAP authentication requests
@@ -294,4 +294,5 @@ func (h *LDAPHandler) HandleTestConnection(c *gin.Context) {
 		"message": "LDAP connection successful",
 	})
 }
+
 

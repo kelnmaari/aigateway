@@ -246,3 +246,4 @@ func (h *APIKeyHot) HasPermission(permission string) bool {
 func (h *APIKeyHot) IsActive() bool {
 	return h.Status == APIKeyStatusActive && !h.IsExpired
 }
+

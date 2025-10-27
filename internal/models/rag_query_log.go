@@ -100,3 +100,4 @@ type RAGQueryStats struct {
 	TotalTokensUsed    int64   `json:"total_tokens_used"`
 }
 
+

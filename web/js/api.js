@@ -1,4 +1,4 @@
-// API Client for Ollama Proxy
+// API Client for AIGateway
 class API {
     constructor() {
         this.baseURL = window.location.origin;
@@ -759,4 +759,6 @@ class API {
 
 // Create global API instance
 window.api = new API();
+
+
 

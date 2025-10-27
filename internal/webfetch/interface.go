@@ -79,3 +79,4 @@ type ParsedContent struct {
 	WordCount int
 	Language  string // Detected language code (e.g., "en", "ru")
 }
+

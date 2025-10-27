@@ -8,9 +8,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // Manager управляет API ключами
@@ -695,3 +695,4 @@ func (m *Manager) createBootstrapAdminKey(ctx context.Context) error {
 
 	return nil
 }
+

@@ -61,3 +61,4 @@ func TracingMiddleware(tracer trace.Tracer) gin.HandlerFunc {
 		}
 	}
 }
+

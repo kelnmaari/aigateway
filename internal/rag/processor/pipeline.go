@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/rag/chunker"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/rag/chunker"
+	"aigateway/internal/storage"
 )
 
 // ProcessingStatus статус обработки документа
@@ -212,4 +212,5 @@ func (p *DocumentProcessor) GetPendingDocuments(ctx context.Context, sourceID st
 
 	return jobs, nil
 }
+
 

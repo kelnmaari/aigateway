@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 func TestLDAPHandler_isAdminGroup(t *testing.T) {
@@ -213,4 +213,5 @@ func TestLDAPHandler_isAdminGroup_ActiveDirectoryFormat(t *testing.T) {
 // - Mock JWT manager
 // - Gin test context
 // These integration tests can be added when needed
+
 

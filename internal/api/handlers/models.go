@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
 )
 
 // ModelsHandler обрабатывает эндпоинты управления моделями
@@ -85,3 +85,4 @@ func (h *ModelsHandler) List(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+

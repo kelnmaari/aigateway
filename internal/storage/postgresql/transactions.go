@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // ========================================
@@ -453,3 +453,4 @@ func (tx *postgresqlTx) ResetQuotaUsage(ctx context.Context, quotaID string, res
 func (tx *postgresqlTx) GetQuotaWithUsage(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, *models.QuotaUsage, error) {
 	return tx.db.GetQuotaWithUsage(ctx, scope, targetID)
 }
+

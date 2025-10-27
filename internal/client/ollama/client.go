@@ -13,8 +13,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/config"
+	"aigateway/internal/metrics"
 )
 
 // Client представляет HTTP клиент для Ollama API
@@ -294,3 +294,4 @@ func (c *Client) Close() {
 	}
 	c.logger.Debug("Ollama client connections closed")
 }
+

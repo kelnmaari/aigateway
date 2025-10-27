@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 func TestAPIKeyCache_GetSet(t *testing.T) {
@@ -229,3 +229,4 @@ func BenchmarkAPIKeyCache_Parallel(b *testing.B) {
 		}
 	})
 }
+

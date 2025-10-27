@@ -10,9 +10,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/rag/embeddings"
-	"ollama-openai-proxy/internal/rag/vector"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/rag/embeddings"
+	"aigateway/internal/rag/vector"
+	"aigateway/internal/storage"
 )
 
 // RAGOrchestrator координирует все компоненты RAG системы
@@ -352,4 +352,5 @@ func (o *RAGOrchestrator) logQuery(
 	// 	o.logger.WithError(err).Warn("Failed to log RAG query")
 	// }
 }
+
 

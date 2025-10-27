@@ -220,3 +220,4 @@ func (ci *ChatIntegration) ExtractWebContentSummary(pages []*WebPage) string {
 
 	return fmt.Sprintf("Fetched %d page(s): %s", len(pages), strings.Join(titles, ", "))
 }
+

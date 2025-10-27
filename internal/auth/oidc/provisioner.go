@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // TenantProvisioner управляет автоматическим созданием tenants и добавлением пользователей
@@ -312,4 +312,5 @@ func formatTenantDisplayName(name string) string {
 	
 	return displayName
 }
+
 

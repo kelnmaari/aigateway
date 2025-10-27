@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // TestModelsHandler_List_Success тестирует успешное получение списка моделей
@@ -109,3 +109,4 @@ func TestModelsHandler_List_ResponseFormat(t *testing.T) {
 		assert.NotEmpty(t, model.OwnedBy)
 	}
 }
+

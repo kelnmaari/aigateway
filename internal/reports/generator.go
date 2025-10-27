@@ -11,8 +11,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/observability"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/observability"
+	"aigateway/internal/storage"
 )
 
 //go:embed templates/*.html
@@ -312,4 +312,5 @@ func convertToUserUsage(users []struct {
 func (g *ReportGenerator) SetLastBackupTime(t time.Time) {
 	g.lastBackupTime = &t
 }
+
 

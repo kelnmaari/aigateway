@@ -9,7 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // State представляет состояние circuit breaker
@@ -357,3 +357,4 @@ func (m *Manager) ResetAll() {
 		m.logger.WithField("breaker", name).Info("Circuit breaker reset")
 	}
 }
+

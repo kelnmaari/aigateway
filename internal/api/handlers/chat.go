@@ -11,12 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/rag/orchestrator"
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/webfetch"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
+	"aigateway/internal/models"
+	"aigateway/internal/rag/orchestrator"
+	"aigateway/internal/storage"
+	"aigateway/internal/webfetch"
 )
 
 // ModelPreloader interface для tracking model usage (v1.12.1+)
@@ -521,3 +521,4 @@ func (h *ChatHandler) enrichMessagesWithRAG(ctx context.Context, req *models.Cha
 
 	return nil
 }
+

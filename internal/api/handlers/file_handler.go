@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/extractors"
-	"ollama-openai-proxy/internal/filestorage"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/extractors"
+	"aigateway/internal/filestorage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // FileHandler обрабатывает HTTP запросы для работы с файлами (v1.10.0+)
@@ -574,3 +574,4 @@ func detectMimeType(filename, browserMimeType string) string {
 	// Fallback на текст/plain для неизвестных файлов
 	return "application/octet-stream"
 }
+

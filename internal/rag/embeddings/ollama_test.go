@@ -384,3 +384,4 @@ func BenchmarkOllamaEmbedder_EmbedBatch(b *testing.B) {
 	}
 }
 
+

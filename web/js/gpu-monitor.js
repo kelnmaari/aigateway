@@ -217,3 +217,5 @@ class GPUMonitor {
 // Создаем глобальный экземпляр
 window.gpuMonitor = new GPUMonitor();
 
+
+

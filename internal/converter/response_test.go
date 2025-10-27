@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/models"
 )
 
 // TestUsageCompletionTokensAlwaysPresent проверяет что completion_tokens всегда есть в JSON
@@ -157,3 +157,4 @@ func (m *mockModelManager) UpdateModelMapping(model string, mapping *models.Mode
 func (m *mockModelManager) RemoveModelMapping(model string) error {
 	return nil
 }
+

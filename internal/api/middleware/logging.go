@@ -103,3 +103,4 @@ func Recovery(logger *logrus.Logger) gin.HandlerFunc {
 		c.AbortWithStatus(500)
 	})
 }
+

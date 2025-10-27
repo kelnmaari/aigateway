@@ -13,8 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/storage"
 )
 
 // AuditHandler handles audit log HTTP requests
@@ -318,4 +318,5 @@ func (h *AuditHandler) GetAuditStats(c *gin.Context) {
 		},
 	})
 }
+
 

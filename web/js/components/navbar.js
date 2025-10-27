@@ -40,7 +40,7 @@ class TopNavbar {
         const navHTML = `
             <nav class="top-nav">
                 <div class="nav-brand">
-                    <h1>🤖 Ollama Proxy</h1>
+                    <h1>🤖 AIGateway</h1>
                 </div>
                 
                 <div class="nav-menu">
@@ -188,4 +188,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const navbar = new TopNavbar();
     await navbar.init();
 });
+
+
 

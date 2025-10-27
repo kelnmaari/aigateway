@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // RAG Data Sources (v1.13.0+)
@@ -118,3 +118,4 @@ func (tx *sqliteTx) GetRAGQueryLog(ctx context.Context, id int64) (*models.RAGQu
 func (tx *sqliteTx) ListRAGQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*models.RAGQueryLog, error) {
 	return tx.db.ListRAGQueryLogsByUser(ctx, userID, limit, offset)
 }
+

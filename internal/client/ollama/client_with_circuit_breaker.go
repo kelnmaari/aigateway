@@ -7,9 +7,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/circuit"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/errors"
+	"aigateway/internal/circuit"
+	"aigateway/internal/config"
+	"aigateway/internal/errors"
 )
 
 // ClientWithCircuitBreaker оборачивает Ollama клиент с circuit breaker
@@ -296,3 +296,4 @@ func (c *ClientWithCircuitBreaker) ResetCircuitBreakers() {
 	c.circuitManager.ResetAll()
 	c.logger.Info("All circuit breakers reset")
 }
+

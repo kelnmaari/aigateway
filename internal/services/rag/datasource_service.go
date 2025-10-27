@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // DataSourceService сервис для управления data sources
@@ -291,4 +291,5 @@ func (s *DataSourceService) decryptCredentials(encryptedData string) (map[string
 	// For now, this is a placeholder
 	return make(map[string]string), nil
 }
+
 

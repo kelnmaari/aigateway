@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // MCPHandler обрабатывает MCP server endpoints
@@ -266,3 +266,4 @@ func (h *MCPHandler) GetMCPCategories(c *gin.Context) {
 		"categories": models.GetMCPCategories(),
 	})
 }
+

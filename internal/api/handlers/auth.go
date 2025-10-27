@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/middleware"
-	"ollama-openai-proxy/internal/auth/password"
-	"ollama-openai-proxy/internal/auth/service"
-	auditService "ollama-openai-proxy/internal/services/audit"
+	"aigateway/internal/auth/middleware"
+	"aigateway/internal/auth/password"
+	"aigateway/internal/auth/service"
+	auditService "aigateway/internal/services/audit"
 )
 
 // AuthHandler обрабатывает authentication запросы
@@ -275,3 +275,4 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+

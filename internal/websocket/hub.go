@@ -232,3 +232,4 @@ func (h *Hub) GetClients() []*Client {
 
 	return clients
 }
+

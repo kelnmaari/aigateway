@@ -5,8 +5,8 @@ package oidc
 import (
 	"strings"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // TenantMapping представляет mapping от OIDC group к tenant
@@ -173,4 +173,5 @@ func UniqueTenantMappings(mappings []TenantMapping) []TenantMapping {
 	
 	return uniqueMappings
 }
+
 

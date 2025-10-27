@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/metrics"
 )
 
 // PrometheusMiddleware собирает HTTP metrics для Prometheus
@@ -55,4 +55,5 @@ func normalizePath(path string) string {
 	
 	return path
 }
+
 

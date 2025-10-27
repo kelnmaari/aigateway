@@ -166,3 +166,4 @@ func (e *CSVExtractor) MaxFileSize() int64 {
 	// CSV может быть большим, используем 100MB
 	return 100 * 1024 * 1024
 }
+

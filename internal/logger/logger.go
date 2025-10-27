@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/version"
+	"aigateway/internal/config"
+	"aigateway/internal/version"
 )
 
 // Setup настраивает логгер согласно конфигурации
@@ -252,3 +252,4 @@ func setupErrorLogHook(cfg config.LoggingConfig, formatter logrus.Formatter) *Er
 		formatter,
 	)
 }
+

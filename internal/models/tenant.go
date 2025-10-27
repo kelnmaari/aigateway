@@ -152,3 +152,4 @@ type TenantWithMember struct {
 	*Tenant
 	MemberRole TenantRole `json:"member_role"` // Роль текущего пользователя
 }
+

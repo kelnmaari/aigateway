@@ -1,5 +1,5 @@
 # Cross-compilation build script для Windows
-# Ollama-OpenAI Proxy v1.4.3
+# AIGateway Platform v2.1.0
 
 param(
     [Parameter(Position=0)]
@@ -69,9 +69,9 @@ function Build-Platform {
     
     # Build flags with version information
     $ldflags = "-w -s"
-    $ldflags += " -X 'ollama-openai-proxy/internal/version.Version=$Version'"
-    $ldflags += " -X 'ollama-openai-proxy/internal/version.GitCommit=$GitCommit'"
-    $ldflags += " -X 'ollama-openai-proxy/internal/version.BuildDate=$BuildDate'"
+    $ldflags += " -X 'aigateway/internal/version.Version=$Version'"
+    $ldflags += " -X 'aigateway/internal/version.GitCommit=$GitCommit'"
+    $ldflags += " -X 'aigateway/internal/version.BuildDate=$BuildDate'"
     
     # Build tags for SQLite
     $tags = "sqlite_fts5,sqlite_json1"
@@ -111,13 +111,13 @@ function Build-All {
     Write-Host ""
     
     # Linux AMD64
-    Build-Platform -OS "linux" -Arch "amd64" -OutputName "ollama-proxy-linux-amd64"
+    Build-Platform -OS "linux" -Arch "amd64" -OutputName "aigateway-linux-amd64"
     
     # Linux ARM64
-    Build-Platform -OS "linux" -Arch "arm64" -OutputName "ollama-proxy-linux-arm64"
+    Build-Platform -OS "linux" -Arch "arm64" -OutputName "aigateway-linux-arm64"
     
     # Windows AMD64
-    Build-Platform -OS "windows" -Arch "amd64" -OutputName "ollama-proxy-windows-amd64.exe"
+    Build-Platform -OS "windows" -Arch "amd64" -OutputName "aigateway-windows-amd64.exe"
     
     Write-Host ""
     Write-Info "Build completed successfully!"
@@ -129,15 +129,15 @@ function Build-All {
 # Build Linux only
 function Build-Linux {
     Write-Info "Building Linux binaries..."
-    Build-Platform -OS "linux" -Arch "amd64" -OutputName "ollama-proxy-linux-amd64"
-    Build-Platform -OS "linux" -Arch "arm64" -OutputName "ollama-proxy-linux-arm64"
+    Build-Platform -OS "linux" -Arch "amd64" -OutputName "aigateway-linux-amd64"
+    Build-Platform -OS "linux" -Arch "arm64" -OutputName "aigateway-linux-arm64"
     Write-Info "Linux builds completed!"
 }
 
 # Build Windows only
 function Build-Windows {
     Write-Info "Building Windows binary..."
-    Build-Platform -OS "windows" -Arch "amd64" -OutputName "ollama-proxy-windows-amd64.exe"
+    Build-Platform -OS "windows" -Arch "amd64" -OutputName "aigateway-windows-amd64.exe"
     Write-Info "Windows build completed!"
 }
 
@@ -145,12 +145,12 @@ function Build-Windows {
 function Invoke-Package {
     Write-Info "Creating distribution packages..."
     
-    $versionDir = "$OutputDir\ollama-proxy-$Version"
+    $versionDir = "$OutputDir\aigateway-$Version"
     
-    Get-ChildItem $OutputDir -Filter "ollama-proxy-*" | ForEach-Object {
+    Get-ChildItem $OutputDir -Filter "aigateway-*" | ForEach-Object {
         $binary = $_.FullName
         $basename = $_.Name
-        $platform = $basename -replace "ollama-proxy-", "" -replace "\.exe$", ""
+        $platform = $basename -replace "aigateway-", "" -replace "\.exe$", ""
         
         $pkgDir = "$versionDir-$platform"
         New-Item -ItemType Directory -Path $pkgDir -Force | Out-Null
@@ -167,7 +167,7 @@ function Invoke-Package {
         if (Test-Path "LICENSE") { Copy-Item "LICENSE" $pkgDir\ }
         
         # Create archive
-        $archiveName = "ollama-proxy-$Version-$platform.zip"
+        $archiveName = "aigateway-$Version-$platform.zip"
         $archivePath = Join-Path $OutputDir $archiveName
         
         Compress-Archive -Path $pkgDir -DestinationPath $archivePath -Force

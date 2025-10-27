@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 
 	"github.com/sirupsen/logrus"
 )
@@ -275,4 +275,5 @@ func (r *AdvancedRateLimiter) StartCleanupLoop(ctx context.Context) {
 func (r *AdvancedRateLimiter) GetStats() map[string]interface{} {
 	return r.slidingWindow.GetCacheStats()
 }
+
 

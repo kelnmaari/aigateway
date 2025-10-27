@@ -10,8 +10,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // PostgresQueue implements Queue using PostgreSQL table
@@ -221,4 +221,5 @@ func (q *PostgresQueue) UnlockExpiredJobs(ctx context.Context) error {
 
 	return nil
 }
+
 

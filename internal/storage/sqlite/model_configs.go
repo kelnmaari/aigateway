@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 
 	"github.com/google/uuid"
 )
@@ -411,3 +411,4 @@ func (tx *sqliteTx) DeleteModelConfig(ctx context.Context, id string) error {
 func (tx *sqliteTx) GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error) {
 	return tx.db.GetEffectiveModelConfig(ctx, modelName, userID, tenantID)
 }
+

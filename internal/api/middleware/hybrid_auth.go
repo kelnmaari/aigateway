@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/jwt"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/jwt"
+	"aigateway/internal/config"
+	"aigateway/internal/storage"
 )
 
 // HybridAuth creates middleware that accepts EITHER JWT tokens OR API Keys
@@ -81,3 +81,4 @@ func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database
 		c.Abort()
 	}
 }
+

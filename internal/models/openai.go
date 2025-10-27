@@ -328,3 +328,4 @@ func NewChatCompletionChunk(id, model string) *ChatCompletionChunk {
 		Choices: make([]ChatCompletionChunkChoice, 0),
 	}
 }
+

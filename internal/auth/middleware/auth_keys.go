@@ -14,10 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/apikey"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/metrics"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/auth/apikey"
+	"aigateway/internal/config"
+	"aigateway/internal/metrics"
+	"aigateway/internal/models"
 )
 
 // APIKeyAuthenticator обрабатывает аутентификацию через API ключи
@@ -393,3 +393,4 @@ func RequireAuthentication() gin.HandlerFunc {
 		c.Next()
 	}
 }
+

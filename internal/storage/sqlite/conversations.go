@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================
@@ -637,3 +637,4 @@ func (s *SQLiteDB) scanMessage(row scanner) (*models.Message, error) {
 
 	return &msg, nil
 }
+

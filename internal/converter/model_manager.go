@@ -7,8 +7,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // DefaultModelManager реализация ModelManager с поддержкой конфигурации
@@ -405,3 +405,4 @@ func (mm *DefaultModelManager) RefreshMappings() {
 
 	mm.logger.Info("Refreshed model mappings")
 }
+

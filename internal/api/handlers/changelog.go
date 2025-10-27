@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/version"
+	"aigateway/internal/config"
+	"aigateway/internal/storage"
+	"aigateway/internal/version"
 )
 
 // ChangelogHandler обрабатывает changelog endpoints
@@ -88,3 +88,4 @@ func (h *ChangelogHandler) GetChangelog(c *gin.Context) {
 
 	c.JSON(http.StatusOK, changelog)
 }
+

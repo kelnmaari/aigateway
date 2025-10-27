@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // AuditLogger handles audit event logging to database and standard logger
@@ -571,4 +571,5 @@ func (a *AuditLogger) LogBackupRestored(ctx context.Context, actorID, backupID, 
 func stringPtr(s string) *string {
 	return &s
 }
+
 

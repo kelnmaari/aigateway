@@ -61,3 +61,4 @@ func (d *URLDetector) ExtractFirstURL(text string) string {
 	}
 	return ""
 }
+

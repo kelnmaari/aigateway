@@ -8,8 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/models"
 )
 
 // ResponseConverter обрабатывает конвертацию ответов Ollama в OpenAI формат
@@ -417,3 +417,4 @@ func (r *ResponseConverter) convertToolCallsToOpenAI(ollamaToolCalls []ollama.To
 	}
 	return openaiToolCalls
 }
+

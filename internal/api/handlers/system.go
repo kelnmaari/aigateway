@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/service"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/auth/service"
+	"aigateway/internal/config"
 )
 
 // SystemHandler handles system-level operations (initialization, health, etc)
@@ -72,3 +72,4 @@ func (h *SystemHandler) Bootstrap(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, response)
 }
+

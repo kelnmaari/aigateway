@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 
 	"github.com/google/uuid"
 )
@@ -390,3 +390,4 @@ func nullableString(s *string) interface{} {
 }
 
 // boolToInt and intToBool helpers moved to rag.go to avoid redeclaration
+

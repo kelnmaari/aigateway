@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/metrics"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/metrics"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // UsageTracking middleware записывает API usage в базу данных
@@ -248,3 +248,4 @@ func extractIntFromContext(c *gin.Context, key string) int {
 	}
 	return 0
 }
+

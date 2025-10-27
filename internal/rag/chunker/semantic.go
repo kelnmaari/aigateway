@@ -339,3 +339,4 @@ func (c *SemanticChunker) createChunk(text string, index, startOffset, endOffset
 	}
 }
 
+

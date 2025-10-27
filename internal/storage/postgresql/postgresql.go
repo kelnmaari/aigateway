@@ -27,9 +27,9 @@ import (
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // PostgreSQLDB представляет PostgreSQL имплементацию Database interface
@@ -810,3 +810,4 @@ var _ storage.Tx = (*postgresqlTx)(nil)
 // Transaction methods are implemented in transactions.go
 // They delegate to the parent DB's methods
 // ========================================
+

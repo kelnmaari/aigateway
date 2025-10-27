@@ -14,7 +14,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
-	"ollama-openai-proxy/internal/filestorage"
+	"aigateway/internal/filestorage"
 )
 
 // S3Storage реализует хранение файлов в S3-compatible storage (MinIO)
@@ -271,3 +271,4 @@ func (s *S3Storage) parsePath(path string) (bucket, objectKey string, err error)
 
 	return bucket, objectKey, nil
 }
+

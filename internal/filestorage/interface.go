@@ -60,3 +60,4 @@ type FileInfo struct {
 	Metadata  map[string]interface{} // Метаданные
 	CreatedAt time.Time              // Время создания
 }
+

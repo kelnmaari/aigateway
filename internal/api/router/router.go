@@ -70,9 +70,10 @@ type Router struct {
 	authHandler           *handlers.AuthHandler         // Auth endpoints (login, register, etc)
 	userHandler           *handlers.UserHandler         // User management
 	tenantHandler         *handlers.TenantHandler       // Tenant management
-	conversationHandler   *handlers.ConversationHandler // Conversation management (Version 1.3.0)
-	adminUserHandler      *handlers.AdminUserHandler    // Admin User Management (Version 1.3.0)
-	usageHandler          *handlers.UsageHandler        // Usage Statistics (Version 1.3.0)
+	conversationHandler       *handlers.ConversationHandler       // Conversation management (Version 1.3.0)
+	conversationExportHandler *handlers.ConversationExportHandler // Conversation export/import (Version 1.12.3+)
+	adminUserHandler          *handlers.AdminUserHandler          // Admin User Management (Version 1.3.0)
+	usageHandler              *handlers.UsageHandler              // Usage Statistics (Version 1.3.0)
 	modelsHandler         *handlers.ModelsHandler
 	modelPreloadHandler   *handlers.ModelPreloadHandler // Model Preload Management (Version 1.12.1+)
 	chatHandler           *handlers.ChatHandler
@@ -746,6 +747,13 @@ func (r *Router) setupConversationsRoutes() {
 		// Messages sub-routes
 		conversations.POST("/:id/messages", r.conversationHandler.CreateMessage) // Добавить сообщение
 		conversations.GET("/:id/messages", r.conversationHandler.ListMessages)   // Получить сообщения
+		
+		// Export/Import endpoints (Version 1.12.3+, v2.0.0 UI)
+		if r.conversationExportHandler != nil {
+			conversations.GET("/:id/export", r.conversationExportHandler.ExportConversation)           // Export conversation
+			conversations.POST("/import", r.conversationExportHandler.ImportConversation)              // Import conversation
+			conversations.POST("/bulk-export", r.conversationExportHandler.BulkExportConversations)  // Bulk export
+		}
 	}
 
 	r.logger.Info("Conversations API endpoints configured")
@@ -1191,6 +1199,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		r.userHandler = handlers.NewUserHandler(r.db, logger, r.auditLogger)
 		r.tenantHandler = handlers.NewTenantHandler(r.db, logger, r.auditLogger)
 		r.conversationHandler = handlers.NewConversationHandler(r.db)
+		r.conversationExportHandler = handlers.NewConversationExportHandler(r.db, logger) // v1.12.3+ Export/Import
 		r.adminUserHandler = handlers.NewAdminUserHandler(r.db, logger, r.auditLogger)
 		r.usageHandler = handlers.NewUsageHandler(r.db, logger)
 		logger.Info("User authentication handlers initialized")

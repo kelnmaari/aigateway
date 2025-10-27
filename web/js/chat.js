@@ -675,31 +675,39 @@ async function exportConversation(format) {
     const convId = window.chatManager.currentConversationId;
     
     if (!convId) {
-        showNotification('No conversation selected', 'error');
+        window.toast.error('No conversation selected');
         return;
     }
     
     try {
-        const response = await api.request(`/api/conversations/${convId}/export?format=${format}`, {
-            method: 'GET'
+        // Make direct fetch to get blob response
+        const response = await fetch(`${api.baseURL}/api/conversations/${convId}/export?format=${format}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${api.accessToken}`
+            }
         });
         
-        // Create blob based on format
-        let blob, filename;
+        if (!response.ok) {
+            throw new Error(`Export failed: ${response.statusText}`);
+        }
+        
+        // Get response as blob
+        const blob = await response.blob();
+        
+        // Generate filename
         const convTitle = window.chatManager.chatTitle?.textContent || 'conversation';
         const sanitizedTitle = convTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         
+        let filename;
         switch(format) {
             case 'json':
-                blob = new Blob([response], { type: 'application/json' });
                 filename = `${sanitizedTitle}_${convId}.json`;
                 break;
             case 'markdown':
-                blob = new Blob([response], { type: 'text/markdown' });
                 filename = `${sanitizedTitle}_${convId}.md`;
                 break;
             case 'text':
-                blob = new Blob([response], { type: 'text/plain' });
                 filename = `${sanitizedTitle}_${convId}.txt`;
                 break;
         }
@@ -714,10 +722,10 @@ async function exportConversation(format) {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         
-        showNotification(`Conversation exported as ${format.toUpperCase()}`, 'success');
+        window.toast.success(`Conversation exported as ${format.toUpperCase()}`);
     } catch (error) {
         console.error('Export failed:', error);
-        showNotification(`Failed to export conversation: ${error.message}`, 'error');
+        window.toast.error(`Failed to export conversation: ${error.message}`);
     }
 }
 

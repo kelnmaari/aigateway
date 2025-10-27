@@ -621,3 +621,191 @@ class RAGManager {
 window.chatManager = new ChatManager();
 window.ragManager = new RAGManager();
 
+// ========================================
+// Export/Import Functions (v2.0.0)
+// ========================================
+
+// Toggle export dropdown
+document.getElementById('export-menu-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const dropdown = document.getElementById('export-dropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('export-dropdown');
+    const menuBtn = document.getElementById('export-menu-btn');
+    if (dropdown && !dropdown.contains(e.target) && e.target !== menuBtn && !menuBtn.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
+});
+
+// Export as JSON
+document.getElementById('export-json-btn')?.addEventListener('click', async () => {
+    document.getElementById('export-dropdown').style.display = 'none';
+    await exportConversation('json');
+});
+
+// Export as Markdown
+document.getElementById('export-markdown-btn')?.addEventListener('click', async () => {
+    document.getElementById('export-dropdown').style.display = 'none';
+    await exportConversation('markdown');
+});
+
+// Export as Text
+document.getElementById('export-text-btn')?.addEventListener('click', async () => {
+    document.getElementById('export-dropdown').style.display = 'none';
+    await exportConversation('text');
+});
+
+// Open import modal
+document.getElementById('import-btn')?.addEventListener('click', () => {
+    document.getElementById('export-dropdown').style.display = 'none';
+    openImportModal();
+});
+
+// Import submit
+document.getElementById('import-submit-btn')?.addEventListener('click', async () => {
+    await importConversation();
+});
+
+// Export conversation to specified format
+async function exportConversation(format) {
+    const convId = window.chatManager.currentConversationId;
+    
+    if (!convId) {
+        showNotification('No conversation selected', 'error');
+        return;
+    }
+    
+    try {
+        const response = await api.request(`/api/conversations/${convId}/export?format=${format}`, {
+            method: 'GET'
+        });
+        
+        // Create blob based on format
+        let blob, filename;
+        const convTitle = window.chatManager.chatTitle?.textContent || 'conversation';
+        const sanitizedTitle = convTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        
+        switch(format) {
+            case 'json':
+                blob = new Blob([response], { type: 'application/json' });
+                filename = `${sanitizedTitle}_${convId}.json`;
+                break;
+            case 'markdown':
+                blob = new Blob([response], { type: 'text/markdown' });
+                filename = `${sanitizedTitle}_${convId}.md`;
+                break;
+            case 'text':
+                blob = new Blob([response], { type: 'text/plain' });
+                filename = `${sanitizedTitle}_${convId}.txt`;
+                break;
+        }
+        
+        // Trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showNotification(`Conversation exported as ${format.toUpperCase()}`, 'success');
+    } catch (error) {
+        console.error('Export failed:', error);
+        showNotification(`Failed to export conversation: ${error.message}`, 'error');
+    }
+}
+
+// Open import modal
+function openImportModal() {
+    const modal = document.getElementById('import-modal');
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    
+    // Reset form
+    document.getElementById('import-file-input').value = '';
+    document.getElementById('import-preserve-timestamps').checked = false;
+    document.getElementById('import-preserve-ids').checked = false;
+    document.getElementById('import-error').style.display = 'none';
+    document.getElementById('import-success').style.display = 'none';
+}
+
+// Close import modal
+function closeImportModal() {
+    const modal = document.getElementById('import-modal');
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+}
+
+// Import conversation from JSON file
+async function importConversation() {
+    const fileInput = document.getElementById('import-file-input');
+    const preserveTimestamps = document.getElementById('import-preserve-timestamps').checked;
+    const preserveIds = document.getElementById('import-preserve-ids').checked;
+    const errorDiv = document.getElementById('import-error');
+    const successDiv = document.getElementById('import-success');
+    
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        errorDiv.textContent = 'Please select a JSON file';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    
+    try {
+        // Read file content
+        const fileContent = await file.text();
+        const conversationData = JSON.parse(fileContent);
+        
+        // Validate JSON structure
+        if (!conversationData.id || !conversationData.messages) {
+            throw new Error('Invalid conversation JSON format');
+        }
+        
+        // Prepare import request
+        const importRequest = {
+            conversation: conversationData,
+            options: {
+                preserve_timestamps: preserveTimestamps,
+                preserve_ids: preserveIds
+            }
+        };
+        
+        // Call import API
+        const result = await api.request('/api/conversations/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(importRequest)
+        });
+        
+        successDiv.textContent = `Conversation imported successfully! (${result.messages_imported} messages)`;
+        successDiv.style.display = 'block';
+        
+        // Reload conversations list
+        setTimeout(() => {
+            closeImportModal();
+            window.location.reload(); // Reload to show new conversation
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Import failed:', error);
+        errorDiv.textContent = `Import failed: ${error.message}`;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Make functions globally accessible
+window.openImportModal = openImportModal;
+window.closeImportModal = closeImportModal;
+

@@ -54,6 +54,49 @@
             </div>
             
             <div class="chat-nav-links">
+                <!-- Export/Import Dropdown -->
+                <div class="dropdown-container">
+                    <button class="btn btn-icon" id="export-menu-btn" title="Export/Import">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <polyline points="7 10 12 15 17 10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <line x1="12" y1="15" x2="12" y2="3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <div class="dropdown-menu" id="export-dropdown" style="display: none;">
+                        <button class="dropdown-item" id="export-json-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2"/>
+                                <polyline points="14 2 14 8 20 8" stroke-width="2"/>
+                            </svg>
+                            Export as JSON
+                        </button>
+                        <button class="dropdown-item" id="export-markdown-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2"/>
+                                <polyline points="14 2 14 8 20 8" stroke-width="2"/>
+                            </svg>
+                            Export as Markdown
+                        </button>
+                        <button class="dropdown-item" id="export-text-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2"/>
+                                <polyline points="14 2 14 8 20 8" stroke-width="2"/>
+                            </svg>
+                            Export as Text
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="import-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <polyline points="17 8 12 3 7 8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="12" y1="3" x2="12" y2="15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Import Conversation
+                        </button>
+                    </div>
+                </div>
+                
                 <a href="/dashboard.html" class="nav-link" title="Dashboard">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <rect x="3" y="3" width="7" height="7" stroke-width="2"/>
@@ -356,6 +399,48 @@
     </main>
 
     <!-- Scripts -->
+    <!-- Import Conversation Modal -->
+    <div class="modal" id="import-modal" style="display: none;">
+        <div class="modal-overlay" onclick="closeImportModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Conversation</h2>
+                <button class="modal-close" onclick="closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary" style="margin-bottom: 16px;">
+                    Upload a JSON file exported from a previous conversation to restore it.
+                </p>
+                
+                <div class="form-group">
+                    <label>Select JSON File</label>
+                    <input type="file" id="import-file-input" accept=".json" class="file-input" />
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="import-preserve-timestamps" />
+                        <span>Preserve original timestamps</span>
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="import-preserve-ids" />
+                        <span>Preserve original IDs</span>
+                    </label>
+                </div>
+                
+                <div id="import-error" class="error-message" style="display: none;"></div>
+                <div id="import-success" class="success-message" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <button class="btn btn-primary" id="import-submit-btn">Import</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Auth Guard MUST be loaded FIRST to protect the page -->
     <script src="/js/auth-guard.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>

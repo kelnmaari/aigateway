@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Source attribution в ответах
   - **RAG Disable Banner**: Информационная плашка когда RAG отключен администратором
 
+- **Chat Export/Import UI**: Полнофункциональный интерфейс экспорта и импорта conversations
+  - **Export Dropdown в Chat Header**:
+    - Export as JSON (structured data с metadata)
+    - Export as Markdown (readable format с форматированием)
+    - Export as Text (plain text без форматирования)
+    - Автоматическое скачивание файла с sanitized filename
+  - **Import Modal**:
+    - Upload JSON файла экспортированной conversation
+    - Опция "Preserve original timestamps" (сохранить оригинальные даты)
+    - Опция "Preserve original IDs" (сохранить оригинальные идентификаторы)
+    - Validation JSON структуры перед импортом
+    - Success notification с количеством imported messages
+    - Автоматический reload для отображения импортированной conversation
+
 - **Browser Testing Integration**: MCP browser extension для E2E тестирования
   - Chrome browser automation через Playwright
   - Accessibility snapshots для UI testing

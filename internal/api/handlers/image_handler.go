@@ -11,11 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/filestorage"
-	"ollama-openai-proxy/internal/imageproc"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/vision"
+	"aigateway/internal/filestorage"
+	"aigateway/internal/imageproc"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
+	"aigateway/internal/vision"
 )
 
 // ImageHandler обрабатывает операции с изображениями (v1.10.3)
@@ -392,3 +392,4 @@ func getThumbnailURL(fileID string, thumbnailPath *string) *string {
 	url := fmt.Sprintf("/api/images/%s/thumbnail", fileID)
 	return &url
 }
+

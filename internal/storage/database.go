@@ -30,7 +30,7 @@ import (
 	"context"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // Database представляет unified интерфейс для работы с БД
@@ -395,6 +395,45 @@ type Database interface {
 
 	// Quota & Usage Combined (for checking)
 	GetQuotaWithUsage(ctx context.Context, scope models.QuotaScope, targetID string) (*models.Quota, *models.QuotaUsage, error)
+
+	// ========================================
+	// RAG System (Version 1.13.0+: RAG System)
+	// ========================================
+
+	// RAG Data Sources
+	CreateRAGDataSource(ctx context.Context, source *models.RAGDataSource) error
+	GetRAGDataSource(ctx context.Context, id string) (*models.RAGDataSource, error)
+	UpdateRAGDataSource(ctx context.Context, source *models.RAGDataSource) error
+	DeleteRAGDataSource(ctx context.Context, id string) error
+	ListRAGDataSources(ctx context.Context, filter *RAGDataSourceFilter) ([]*models.RAGDataSource, int, error)
+
+	// RAG Documents
+	CreateRAGDocument(ctx context.Context, doc *models.RAGDocument) error
+	GetRAGDocument(ctx context.Context, id string) (*models.RAGDocument, error)
+	UpdateRAGDocument(ctx context.Context, doc *models.RAGDocument) error
+	DeleteRAGDocument(ctx context.Context, id string) error
+	ListRAGDocuments(ctx context.Context, filter *RAGDocumentFilter) ([]*models.RAGDocument, error)
+
+	// RAG Chunks
+	CreateRAGChunk(ctx context.Context, chunk *models.RAGChunk) error
+	GetRAGChunk(ctx context.Context, id string) (*models.RAGChunk, error)
+	ListRAGChunksByDocument(ctx context.Context, documentID string) ([]*models.RAGChunk, error)
+	ListRAGChunksBySource(ctx context.Context, sourceID string, limit, offset int) ([]*models.RAGChunk, error)
+	DeleteRAGChunksByDocument(ctx context.Context, documentID string) error
+
+	// RAG Jobs Queue
+	CreateRAGJob(ctx context.Context, job *models.RAGJob) error
+	GetRAGJob(ctx context.Context, id string) (*models.RAGJob, error)
+	UpdateRAGJob(ctx context.Context, job *models.RAGJob) error
+	GetNextPendingRAGJob(ctx context.Context) (*models.RAGJob, error)
+	CountRAGJobsByStatus(ctx context.Context, status string) (int, error)
+	DeleteOldRAGJobs(ctx context.Context, cutoffTime time.Time, statuses []string) (int, error)
+	UnlockExpiredRAGJobs(ctx context.Context, now time.Time) (int, error)
+
+	// RAG Query Logs
+	CreateRAGQueryLog(ctx context.Context, log *models.RAGQueryLog) error
+	GetRAGQueryLog(ctx context.Context, id int64) (*models.RAGQueryLog, error)
+	ListRAGQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*models.RAGQueryLog, error)
 }
 
 // AuditFilters фильтры для запроса audit events (Version 1.11.4+)
@@ -410,6 +449,25 @@ type AuditFilters struct {
 	Offset     int
 }
 
+// RAGDataSourceFilter фильтр для списка RAG data sources (Version 1.13.0+)
+type RAGDataSourceFilter struct {
+	UserID     *string
+	TenantID   *string
+	SourceType *string
+	Status     *string
+	Tags       []string
+	Limit      int
+	Offset     int
+}
+
+// RAGDocumentFilter фильтр для списка RAG documents (Version 1.13.0+)
+type RAGDocumentFilter struct {
+	SourceID *string
+	Status   *string
+	Limit    int
+	Offset   int
+}
+
 // Tx представляет транзакцию БД
 type Tx interface {
 	// Commit фиксирует транзакцию
@@ -421,3 +479,4 @@ type Tx interface {
 	// Database - все методы Database доступны в транзакции
 	Database
 }
+

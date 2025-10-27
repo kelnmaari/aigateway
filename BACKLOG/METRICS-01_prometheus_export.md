@@ -303,7 +303,7 @@ scrape_configs:
 ```json
 {
   "dashboard": {
-    "title": "Ollama-OpenAI Proxy",
+    "title": "AIGateway Platform",
     "panels": [
       {
         "title": "HTTP Requests Rate",
@@ -457,4 +457,5 @@ topk(5, sum by (model) (rate(ollama_proxy_api_requests_total[5m])))
 
 **Статус:** 📋 Planned for v1.10.0  
 **Последнее обновление:** 2025-10-11
+
 

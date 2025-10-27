@@ -106,3 +106,4 @@ type Table struct {
 	Rows    [][]string // Данные строк
 	Page    int        // Номер страницы (для PDF, DOCX)
 }
+

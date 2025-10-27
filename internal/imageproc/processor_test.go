@@ -174,3 +174,4 @@ func BenchmarkImageProcessor_GenerateThumbnail(b *testing.B) {
 		}
 	}
 }
+

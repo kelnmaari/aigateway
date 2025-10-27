@@ -1,5 +1,5 @@
-# Multi-stage Dockerfile для Ollama-OpenAI Proxy v1.3.0
-# Поддержка Go 1.25, PostgreSQL, WebUI
+# Multi-stage Dockerfile для AIGateway Platform v2.1.0
+# Поддержка Go 1.25, Multi-Provider (Ollama/vLLM), RAG System, PostgreSQL, WebUI
 
 # ================================
 # Stage 1: Builder
@@ -33,7 +33,7 @@ RUN go mod verify
 COPY . .
 
 # Сборка приложений с оптимизациями для Go 1.25
-ARG VERSION=1.3.0
+ARG VERSION=2.1.0
 ARG BUILD_TIME
 ARG GIT_COMMIT
 ARG CGO_ENABLED=1

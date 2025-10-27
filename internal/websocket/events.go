@@ -336,3 +336,4 @@ func (eb *EventBroadcaster) BroadcastNotification(level NotificationLevel, title
 	event := NewEvent(EventTypeNotification, data)
 	return eb.BroadcastEvent(event)
 }
+

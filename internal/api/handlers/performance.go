@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ollama-openai-proxy/internal/observability"
+	"aigateway/internal/observability"
 )
 
 // PerformanceHandler handles performance monitoring API endpoints.
@@ -116,3 +116,4 @@ func (h *PerformanceHandler) ResetLeakDetector(c *gin.Context) {
 		"message": "Leak detector samples reset successfully",
 	})
 }
+

@@ -8,10 +8,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/optimizer"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/optimizer"
 )
 
 // SimpleConverter обеспечивает прямую конвертацию без маппинга моделей
@@ -701,3 +701,4 @@ func (c *SimpleConverter) injectAdditionalSystemMessage(messages []models.ChatMe
 
 	return messages
 }
+

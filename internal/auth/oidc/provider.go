@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // OIDCProvider предоставляет OIDC authentication functionality
@@ -217,4 +217,5 @@ func (p *OIDCProvider) GetConfig() *config.OIDCConfig {
 func (p *OIDCProvider) GetEndpoint() oauth2.Endpoint {
 	return p.oauth2Config.Endpoint
 }
+
 

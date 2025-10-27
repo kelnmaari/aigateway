@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // TestParseGroups_DirectMode tests direct 1:1 group mapping
@@ -356,4 +356,5 @@ func BenchmarkParseGroups_Prefix(b *testing.B) {
 		ParseGroups(groups, cfg)
 	}
 }
+
 

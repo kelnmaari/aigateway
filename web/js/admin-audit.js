@@ -22,17 +22,7 @@ const pageSize = 50;
 // Load audit statistics
 async function loadAuditStats() {
     try {
-        const response = await fetch('/api/admin/audit/stats', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const stats = await response.json();
+        const stats = await api.getAuditStats();
         
         // Update stats cards
         document.getElementById('critical-events').textContent = stats.by_severity?.critical || 0;
@@ -51,23 +41,13 @@ async function loadAuditEvents() {
     const filters = getFilters();
     
     try {
-        const queryParams = new URLSearchParams({
+        const params = {
             page: currentPage,
             page_size: pageSize,
             ...filters
-        });
+        };
 
-        const response = await fetch(`/api/admin/audit?${queryParams}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await api.getAuditLogs(params);
         
         // Display events
         displayAuditEvents(data.events || []);
@@ -226,13 +206,7 @@ async function exportToCSV() {
     const filters = getFilters();
     
     try {
-        const queryParams = new URLSearchParams(filters);
-        
-        const response = await fetch(`/api/admin/audit/export?${queryParams}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            }
-        });
+        const response = await api.exportAuditLogs(filters);
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -280,4 +254,6 @@ function showError(message) {
     // TODO: Use proper notification system
     console.error(message);
 }
+
+
 

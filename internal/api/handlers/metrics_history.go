@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/config"
+	"aigateway/internal/metrics"
 )
 
 // MetricsHistoryHandler обрабатывает запросы к историческим метрикам
@@ -164,3 +164,4 @@ func (h *MetricsHistoryHandler) GetMetricTypes(c *gin.Context) {
 		"count":        len(types),
 	})
 }
+

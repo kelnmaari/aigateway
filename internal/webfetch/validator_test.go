@@ -141,3 +141,4 @@ func BenchmarkURLValidator_Validate(b *testing.B) {
 		_ = validator.Validate("https://example.com/page")
 	}
 }
+

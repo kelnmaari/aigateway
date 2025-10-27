@@ -216,3 +216,4 @@ func TestAggregator_AggregateDataPoints(t *testing.T) {
 		t.Errorf("Expected avg 2.0, got %f", stats.Avg)
 	}
 }
+

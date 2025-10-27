@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -220,4 +220,5 @@ func max(a, b int) int {
 	}
 	return b
 }
+
 

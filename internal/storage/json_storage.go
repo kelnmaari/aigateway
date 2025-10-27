@@ -14,7 +14,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // JSONStorage реализует APIKeyStorage используя JSON файлы
@@ -719,3 +719,4 @@ func (s *JSONStorage) applySorting(keys []models.APIKey, sortBy, sortOrder strin
 		return less
 	})
 }
+

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 func TestNewClient_DisabledLDAP(t *testing.T) {
@@ -243,4 +243,5 @@ func TestAuthenticate_EmptyCredentials(t *testing.T) {
 
 // Note: Full authentication tests require a real LDAP server or mock LDAP server
 // These tests only cover configuration validation and basic input validation
+
 

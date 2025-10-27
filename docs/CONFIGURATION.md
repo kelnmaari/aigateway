@@ -1,4 +1,4 @@
-# ⚙️ Configuration Guide - Ollama-OpenAI Proxy v1.9.3
+# ⚙️ Configuration Guide - AIGateway Platform v1.9.3
 
 Полное руководство по конфигурации
 
@@ -186,7 +186,7 @@ auth:
   jwt_secret: "change-me-in-production-min-32-chars!"  # ⚠️ CRITICAL!
   token_expiration: "24h"          # Access token lifetime
   refresh_expiration: "7d"         # Refresh token lifetime
-  issuer: "ollama-openai-proxy"    # JWT issuer claim
+  issuer: "aigateway"    # JWT issuer claim
 ```
 
 **Security:**
@@ -273,7 +273,7 @@ observability:
     jaeger_endpoint: "http://localhost:14268/api/traces"
     zipkin_endpoint: "http://localhost:9411/api/v2/spans"
     sampling_rate: 0.1                             # 10% sampling
-    service_name: "ollama-openai-proxy"
+    service_name: "aigateway"
 ```
 
 **Exporters:**
@@ -328,7 +328,7 @@ logs/
 logging:
   format: "json"
   fields:
-    service: "ollama-openai-proxy"
+    service: "aigateway"
     environment: "production"
     version: "1.9.3"
 ```
@@ -338,7 +338,7 @@ logging:
 {
   "time": "2025-10-14T14:30:00Z",
   "level": "info",
-  "service": "ollama-openai-proxy",
+  "service": "aigateway",
   "environment": "production",
   "version": "1.9.3",
   "msg": "Server started",
@@ -546,3 +546,4 @@ volumes:
 
 **Version:** 1.9.3  
 **Last Updated:** 2025-10-14
+

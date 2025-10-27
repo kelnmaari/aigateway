@@ -1,82 +1,146 @@
-# 🦙 Ollama-OpenAI Proxy
+# 🚀 AIGateway Platform
 
-> **Enterprise-grade OpenAI-compatible API for local Ollama models**  
-> Multi-tenancy • ChatGPT-like UI • JWT Auth • Performance Monitoring • GPU Metrics
+> **Universal AI Infrastructure Platform with Multi-Provider Support**  
+> OpenAI-Compatible API • RAG System • Multi-Tenancy • Enterprise Security • GPU Acceleration
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.10.5-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)](VERSION)
 
 ---
 
-## 📖 Что это?
+## 📖 What is AIGateway?
 
-**Ollama-OpenAI Proxy** — production-ready Go приложение, предоставляющее **OpenAI-совместимый API** для локальных Ollama моделей. Идеальное решение для интеграции LLM в корпоративную инфраструктуру.
+**AIGateway** is a production-ready, enterprise-grade AI infrastructure platform that provides a unified **OpenAI-compatible API** for multiple AI model providers. Built with Go 1.25+, it combines local models (Ollama, vLLM), RAG capabilities, and enterprise features in a single platform.
 
-### 🎯 Ключевые возможности
+### 🎯 Why AIGateway?
 
-#### 🚀 Основные
+- **🔀 Multi-Provider**: Unified API для Ollama, vLLM, HuggingFace models (future: OpenAI, Anthropic)
+- **🧠 RAG Built-in**: Retrieval-Augmented Generation with vector search, embeddings, external data sources
+- **🏢 Enterprise-Ready**: Multi-tenancy, RBAC, OIDC/LDAP, audit logging, quotas
+- **⚡ GPU Optimized**: Multi-GPU support через vLLM для fast inference
+- **🌐 ChatGPT-like UI**: Полнофункциональный WebUI с RAG integration
+- **📊 Observability**: OpenTelemetry, Prometheus, GPU metrics, distributed tracing
 
-- ✅ **Full OpenAI API** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, `/v1/completions`
+---
+
+## ✨ Key Features
+
+### 🤖 AI Model Support
+
+- ✅ **Ollama Integration** - Local models с GGUF format
+- ✅ **vLLM Support** - HuggingFace models с GPU acceleration *(v2.2.0)*
+- ✅ **OpenAI-Compatible API** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`
 - 🔥 **Real-time Streaming** - Server-Sent Events (SSE) для живых ответов
-- 🛠️ **Function Calling** - Инструменты в стиле OpenAI с автомаршрутизацией моделей
-- 🧬 **Embeddings with Default Model** - Настраиваемая дефолтная модель для векторных представлений
-- 🌐 **Web Content Fetcher** ✨ NEW v1.10.4 - Безопасное извлечение веб-контента с SSRF защитой
-- 💬 **ChatGPT-like WebUI** - Полноценный чат-интерфейс с историей разговоров
+- 🛠️ **Function Calling** - Инструменты в стиле OpenAI
+- 🎨 **Vision Support** - Multimodal models (LLaVA, BakLLaVA)
 
-#### 🔐 Enterprise Security
+### 🧠 RAG System (v2.0.0)
 
-- 🔒 **JWT Authentication** - Полноценная система аутентификации пользователей
-- 👥 **Multi-Tenancy** - Организации с членством и RBAC (Owner/Admin/Member/Viewer)
-- 🔑 **API Key Management** - Personal & Tenant API keys с гранулярными правами
-- ⏱️ **Rate Limiting** - Настраиваемые лимиты per-key/per-tenant
+- 📄 **Multi-Format Documents** - PDF, DOCX, CSV, TXT, Images с OCR
+- 🔌 **External Data Sources** - REST APIs, PostgreSQL databases, Web scraping
+- 🧬 **Semantic Chunking** - Intelligent text splitting с overlap
+- 🔍 **Vector Search** - PgVector с HNSW indexing
+- ⚡ **Async Processing** - Worker pool для document processing
+- 🔐 **Credentials Encryption** - AES-256 для sensitive data
+- 💬 **Chat Integration** - RAG toggle, source selector, Top-K controls в UI
 
-#### 📊 Мониторинг & Observability
+### 🔐 Enterprise Security
 
-- 📈 **MoniGo Dashboard** - Real-time performance monitoring (CPU, Memory, Goroutines)
-- 🎮 **NVIDIA GPU Metrics** - Multi-GPU мониторинг через `nvidia-smi` (БЕЗ CGO!)
-- 📉 **Prometheus Metrics** - Полная интеграция для Grafana
-- 🔍 **OpenTelemetry** - Distributed tracing (Jaeger/Zipkin)
-- 📋 **Enhanced Logs** - Structured logging с SSE real-time streaming
+- 🔒 **JWT Authentication** - Access & Refresh tokens с rotation
+- 👥 **Multi-Tenancy** - Organizations с membership и RBAC
+- 🔑 **API Key Management** - Personal & Tenant keys с model-level permissions
+- ⏱️ **Advanced Rate Limiting** - Per-key, per-tenant, per-endpoint limits
+- 🔍 **Audit Logging** - Comprehensive event tracking для compliance
+- 🛡️ **OIDC/LDAP** - Enterprise SSO integration (Keycloak, Active Directory)
 
-#### ⚡ Performance & UX
+### 📊 Monitoring & Observability
 
-- 🎨 **Dynamic Model Parameters** - Настройка температуры, top_p, context window в UI
-- 📊 **Context Tracking** - Real-time отслеживание использования контекста
-- 🔄 **Auto-Summarization** - Автоматическое сжатие при переполнении контекста
-- 💾 **Backup & Restore** - Автоматическое резервное копирование БД
-- 🌐 **WebUI + TUI** - Два интерфейса управления на выбор
+- 📈 **Real-time Dashboard** - CPU, Memory, Goroutines, GPU metrics
+- 🎮 **Multi-GPU Monitoring** - NVIDIA GPU metrics через `nvidia-smi` (БЕЗ CGO!)
+- 📉 **Prometheus Integration** - Full metrics export для Grafana
+- 🔍 **OpenTelemetry Tracing** - Distributed tracing (Jaeger/Zipkin)
+- 📋 **Structured Logging** - Enhanced logs с SSE streaming
+- ⚠️ **Separate Error Log** - Dedicated error/warning log file с rotation
+
+### ⚡ Performance & UX
+
+- 🎨 **Dynamic Model Parameters** - Temperature, top_p, context window в UI
+- 📊 **Context Tracking** - Real-time usage monitoring
+- 🔄 **Auto-Summarization** - Context compression при overflow
+- 💾 **Conversation Export/Import** - JSON, Markdown, Text formats
+- 🌐 **Modern WebUI** - Consistent dark theme, responsive design
+- 🖥️ **Terminal UI (TUI)** - Alternative management interface
 
 ---
 
-## 🚀 Быстрый старт
+## 🏗️ Architecture
 
-### Требования
+```
+┌──────────────────────────────────────────────────┐
+│ AIGateway Platform (Port 8080)                   │
+│                                                  │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ OpenAI-Compatible API Layer                  │ │
+│ │ /v1/chat/completions, /v1/models, etc        │ │
+│ └──────────────────────────────────────────────┘ │
+│                                                  │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Model Router & Registry                      │ │
+│ │  ├─ Ollama models → Ollama (11434)          │ │
+│ │  ├─ HF models (GPU) → vLLM (8000)           │ │
+│ │  └─ Cloud APIs → OpenAI/Anthropic (future)  │ │
+│ └──────────────────────────────────────────────┘ │
+│                                                  │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ RAG System                                   │ │
+│ │  ├─ Document Processing Pipeline            │ │
+│ │  ├─ Vector Store (PgVector)                 │ │
+│ │  ├─ Embeddings (Ollama)                     │ │
+│ │  └─ Orchestrator & Reranking                │ │
+│ └──────────────────────────────────────────────┘ │
+│                                                  │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Enterprise Features                          │ │
+│ │  ├─ Multi-Tenancy & RBAC                    │ │
+│ │  ├─ Rate Limiting & Quotas                  │ │
+│ │  ├─ Audit Logging                           │ │
+│ │  └─ OIDC/LDAP Integration                   │ │
+│ └──────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 - **Go 1.25+** (для сборки из исходников)
-- **Ollama** server ([Скачать Ollama](https://ollama.ai/))
-- Хотя бы одна модель: `ollama pull llama3.2`
+- **Ollama** server ([Download Ollama](https://ollama.ai/))
+- **PostgreSQL 13+** с pgvector extension (для RAG)
+- At least one model: `ollama pull llama3.2`
 
-### Установка
+### Installation
 
-#### Docker Compose (рекомендуется)
+#### Option 1: Docker Compose (Recommended)
 
 ```bash
-git clone https://github.com/yourusername/ollama-openai-proxy.git
-cd ollama-openai-proxy
+git clone https://github.com/yourusername/aigateway.git
+cd aigateway
 
-# Build & Start
+# Build & Start all services
 docker compose --profile build up --build
 
-# Сервер: http://localhost:8080
+# Server: http://localhost:8080
 # WebUI: http://localhost:8080/login
 ```
 
-#### Сборка из исходников
+#### Option 2: Build from Source
 
 ```bash
-git clone https://github.com/yourusername/ollama-openai-proxy.git
-cd ollama-openai-proxy
+git clone https://github.com/yourusername/aigateway.git
+cd aigateway
 
 # Install dependencies
 go mod tidy
@@ -84,686 +148,233 @@ go mod tidy
 # Build all binaries
 ./build.sh all
 
-# Или через Docker
-docker compose --profile build up --build
-
 # Binaries в папке dist/
 ```
 
-### Первый запуск
+### First Run
 
-1. **Запустите Ollama**:
+1. **Start Ollama**:
 
 ```bash
 ollama serve
-ollama pull llama3.2  # Или любую другую модель
+ollama pull llama3.2  # Or any other model
 ```
 
-2. **Запустите Proxy Server** (WSL/Linux рекомендуется для GPU monitoring):
+2. **Configure AIGateway**:
 
 ```bash
-# Linux/macOS
-./dist/ollama-proxy-linux-amd64 -config configs/dev.yaml
-
-# Windows (без GPU monitoring)
-dist\ollama-proxy-windows-amd64.exe -config configs/dev.yaml
-
-# Server: http://localhost:8080
+cp configs/production.yaml.example configs/production.yaml
+# Edit configs/production.yaml with your settings
 ```
 
-3. **Bootstrap Admin User**:
-
-При первом запуске система предложит создать admin пользователя через специальный токен. Следуйте инструкциям в логах.
-
-4. **Откройте WebUI**:
-
-```
-http://localhost:8080/login
-```
-
-Зарегистрируйтесь и начните использовать!
-
----
-
-## 💬 ChatGPT-like WebUI
-
-### Основные возможности
-
-- 🎨 **Modern Dark Theme** - Красивый, отзывчивый интерфейс
-- 💬 **Real-time Chat** - Streaming ответы с поддержкой Markdown
-- 📚 **Conversations History** - Сохранение и восстановление диалогов
-- 🎛️ **Dynamic Parameters** - Настройка model parameters прямо в чате
-- 📊 **Context Tracking** - Визуальный индикатор использования контекста
-- 🔄 **Auto-Summarization** - Автоматическое сжатие при заполнении
-
-### Страницы WebUI
-
-| Страница | Описание | Доступ |
-|----------|----------|--------|
-| **Chat** | ChatGPT-подобный интерфейс | Все пользователи |
-| **Dashboard** | Статистика использования, быстрые действия | Все пользователи |
-| **Profile** | Управление профилем, смена пароля | Все пользователи |
-| **API Keys** | Personal & Tenant API keys management | Все пользователи |
-| **Tenants** | Управление организациями и участниками | Owner/Admin |
-| **Usage** | Детальная аналитика использования | Все пользователи |
-| **Admin** | Models, System, Logs, Performance, GPU | Admin only |
-| **MCP** | Catalog MCP серверов (справочник) | Все пользователи |
-| **About** | Changelog и информация о системе | Все пользователи |
-
-### Dynamic Model Parameters
-
-В чате доступна панель настройки параметров:
-
-- **Temperature** (0.0 - 2.0) - Креативность ответов
-- **Top P** (0.0 - 1.0) - Nucleus sampling
-- **Top K** (0 - 100) - Ограничение словаря
-- **Context Window** (512 - 128000) - Размер контекста
-- **Max Tokens** - Максимум токенов в ответе
-
-**Quick Presets:**
-
-- 🎨 Creative (temp: 1.2, top_p: 0.95)
-- ⚖️ Balanced (temp: 0.7, top_p: 0.9)
-- 🎯 Precise (temp: 0.3, top_p: 0.5)
-- 💻 Coding (temp: 0.2, top_p: 0.1)
-
-Настройки сохраняются в `localStorage` браузера.
-
----
-
-## 🔐 Multi-Tenancy & Authentication
-
-### User Roles
-
-| Role | Описание | Права |
-|------|----------|-------|
-| **Owner** | Создатель организации | Полный доступ, добавление админов |
-| **Admin** | Администратор | Управление участниками, API keys |
-| **Member** | Участник | Доступ к tenant resources |
-| **Viewer** | Наблюдатель | Только чтение |
-
-### Организации (Tenants)
-
-- **Personal Workspace** - Автоматически для каждого пользователя
-- **Organization Tenants** - Создаются вручную для команд
-- **API Keys Scoping** - Personal (user-scoped) + Tenant (org-scoped)
-- **Members Management** - Добавление/удаление участников с ролями
-
-### API Keys Management
-
-**Personal API Keys** - привязаны к пользователю:
-
-   ```bash
-# Создать в WebUI: API Keys → Personal Keys → Create New
-# Использование:
-curl -H "Authorization: Bearer sk-your-personal-key" \
-  http://localhost:8080/v1/chat/completions
-```
-
-**Tenant API Keys** - привязаны к организации:
+3. **Run AIGateway**:
 
 ```bash
-# Создать в WebUI: API Keys → Tenant Keys → Create New
-# Использование аналогично
+# From source
+./dist/server -config configs/production.yaml
+
+# Or with Docker
+docker compose up
 ```
 
-Каждый ключ имеет:
+4. **Access WebUI**:
 
-- ✅ Список разрешенных моделей
-- ⏱️ Rate limits (requests/min, requests/hour)
-- 📅 Expiration date
-- 🔒 Enable/Disable toggle
+Open [http://localhost:8080/login](http://localhost:8080/login)
+
+**Default credentials** (первый запуск):
+- Email: `admin@localhost`
+- Password: `admin`
+
+⚠️ **Change default password immediately!**
 
 ---
 
-## 📊 Performance Monitoring
+## 📚 Documentation
 
-### MoniGo Dashboard
+### Getting Started
+- [Quick Start Guide](docs/QUICKSTART.md)
+- [Configuration Guide](docs/CONFIGURATION.md)
+- [Docker Deployment](docs/DOCKER.md)
 
-Доступен на отдельном порту **:9091** для админов:
+### Features
+- [RAG System Guide](docs/RAG_DEPLOYMENT_GUIDE.md)
+- [vLLM Installation](docs/VLLM_INSTALLATION.md)
+- [Multi-Tenancy Setup](docs/MULTITENANCY.md)
+- [OIDC Integration](docs/OIDC_SETUP.md)
 
-```
-http://localhost:9091
-```
+### Development
+- [Architecture Overview](Architecture.MD)
+- [Development Guide](docs/DEVELOPMENT.md)
+- [API Reference](docs/API.md)
+- [Contributing Guide](CONTRIBUTING.md)
 
-**Quick Stats Cards** (интегрированы в Admin → System):
+---
 
-- 💻 **CPU Usage** - Real-time загрузка процессора
-- 🧠 **Memory Usage** - Использование RAM
-- 🔄 **Goroutines** - Активные горутины
-- ✅ **System Health** - Общее состояние
+## 🎯 Use Cases
 
-### NVIDIA GPU Monitoring
+### 1. **Private ChatGPT Alternative**
+Run your own ChatGPT-like service с local models и full data control.
 
-**Multi-GPU поддержка** через `nvidia-smi` (Linux/macOS only):
+### 2. **RAG-Powered Knowledge Base**
+Upload documents, connect databases, enable semantic search через RAG system.
 
-Метрики на каждую GPU:
+### 3. **Multi-Team AI Platform**
+Multi-tenancy с isolated workspaces, RBAC, usage quotas.
 
-- 🌡️ **Temperature** (с цветовыми индикаторами)
-- ⚡ **Power Usage** (W / % от лимита)
-- 📊 **GPU Load** (utilization %)
-- 💾 **VRAM Usage** (used / total GB)
-- 🔧 **Clock Speed** (MHz)
-- 💨 **Fan Speed** (%)
+### 4. **GPU-Accelerated Inference**
+Use vLLM для fast inference HuggingFace models на multi-GPU setups.
 
-Автообновление каждые 5 секунд. Unified card дизайн для всех GPU.
+### 5. **Enterprise AI Gateway**
+Unified API для multiple LLM providers с governance, audit, compliance.
 
-**Примечание:** Windows использует stub версию (GPU monitoring disabled).
+---
 
-### OpenTelemetry
+## 🔧 Configuration
 
-Distributed tracing для production мониторинга:
+### Basic Configuration
 
 ```yaml
-observability:
-  enabled: true
-  tracing:
-    enabled: true
-    exporter: "jaeger"
-    jaeger_endpoint: "http://localhost:14268/api/traces"
-    sampling_rate: 0.1  # 10% запросов
-   ```
-
----
-
-## 📚 API Documentation
-
-### Supported Endpoints
-
-| Endpoint | Method | Description | Auth Required |
-|----------|--------|-------------|---------------|
-| `/v1/chat/completions` | POST | Chat completions с streaming | ✅ Yes |
-| `/v1/models` | GET | Список доступных моделей | ✅ Yes |
-| `/v1/embeddings` | POST | Генерация embeddings | ✅ Yes |
-| `/v1/completions` | POST | Legacy text completions | ✅ Yes |
-| `/health` | GET | Health check | ❌ No |
-| `/api/system/changelogs` | GET | Changelog истории | ✅ Yes |
-| `/api/gpu/metrics` | GET | NVIDIA GPU метрики | ✅ Admin |
-| `/metrics` | GET | Prometheus metrics | ❌ No |
-
-### Chat Completions Example
-
-```bash
-curl -X POST http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-api-key" \
-  -d '{
-    "model": "llama3.2",
-    "messages": [
-      {"role": "system", "content": "You are a helpful assistant."},
-      {"role": "user", "content": "Explain quantum computing"}
-    ],
-    "temperature": 0.7,
-    "max_tokens": 500,
-    "stream": true
-  }'
-```
-
-**Streaming response:**
-
-```
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1699999999,"model":"llama3.2","choices":[{"index":0,"delta":{"role":"assistant","content":"Quantum"},"finish_reason":null}]}
-
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1699999999,"model":"llama3.2","choices":[{"index":0,"delta":{"content":" computing"},"finish_reason":null}]}
-
-...
-
-data: [DONE]
-```
-
-Полная документация: [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
-
----
-
-## ⚙️ Конфигурация
-
-### Основная конфигурация
-
-`configs/dev.yaml`:
-
-```yaml
+# configs/production.yaml
 server:
   host: "0.0.0.0"
   port: 8080
-  read_timeout: "30s"
-  write_timeout: "180s"
 
 ollama:
   url: "http://localhost:11434"
-  timeout: "180s"
-  retry_attempts: 3
+  timeout: 120s
 
-database:
-  type: "sqlite"  # или "postgresql"
-  sqlite:
-    path: "data/proxy.db"
-
-auth:
-  jwt_secret: "change-me-in-production"
-  token_expiration: "24h"
-  refresh_expiration: "7d"
-
-observability:
+# Enable RAG System
+rag:
   enabled: true
-  tracing:
-    enabled: true
-    exporter: "jaeger"
-    jaeger_endpoint: "http://localhost:14268/api/traces"
+  vector_store:
+    type: "pgvector"
+    connection_string: "postgresql://user:pass@localhost:5432/aigateway"
+  embeddings:
+    provider: "ollama"
+    model: "nomic-embed-text"
 
-performance:
-  monigo:
+# Enable vLLM Provider (v2.2.0+)
+providers:
+  ollama:
     enabled: true
-    port: 9091
-  gpu_monitoring:
+    base_url: "http://localhost:11434"
+  vllm:
     enabled: true
-    refresh_interval: "5s"
-
-logging:
-  level: "info"
-  format: "text"
-  output: "both"
-  file_path: "logs/proxy-dev.log"
+    base_url: "http://localhost:8000"
+    tensor_parallel_size: 2  # For 2x GPU
 ```
 
-### Environment Variables
-
-```bash
-export PROXY_SERVER_PORT=9000
-export PROXY_OLLAMA_URL="http://remote-server:11434"
-export PROXY_JWT_SECRET="super-secret-key"
-export PROXY_DATABASE_TYPE="postgresql"
-```
-
-Полная документация: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+See [Configuration Guide](docs/CONFIGURATION.md) для detailed options.
 
 ---
 
-## 🏗️ Архитектура
+## 🧪 Testing
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    CLIENT APPLICATIONS                       │
-│   (Zed, Continue.dev, VSCode, Custom Apps, WebUI Chat)      │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ OpenAI API + JWT Auth
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 OLLAMA-OPENAI PROXY (v1.9.3)                │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  HTTP Server (Gin) + WebUI (Embedded)                │  │
-│  │  • /v1/chat/completions  • /v1/models                │  │
-│  │  • /login  • /chat  • /dashboard  • /admin           │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                            │                                 │
-│  ┌─────────────────────────┴────────────────────────────┐  │
-│  │  Middleware Pipeline                                  │  │
-│  │  JWT → RBAC → Rate Limit → Tracing → Metrics         │  │
-│  └────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│  ┌─────────────────────────┴────────────────────────────┐  │
-│  │  Business Logic                                       │  │
-│  │  • User/Tenant Management  • Conversations            │  │
-│  │  • API Keys (Personal/Tenant)  • Context Tracking    │  │
-│  │  • Dynamic Parameters  • Auto-Summarization          │  │
-│  └────────────────────────────────────────────────────────┘ │
-│                            │                                 │
-│  ┌─────────────────────────┴────────────────────────────┐  │
-│  │  Database (SQLite/PostgreSQL)                        │  │
-│  │  • Users  • Tenants  • Members  • API Keys           │  │
-│  │  • Conversations  • Messages  • Usage  • Changelogs  │  │
-│  └────────────────────────────────────────────────────────┘ │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ Ollama API Format
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      OLLAMA SERVER                           │
-│            (llama3.2, qwen2.5-coder, etc.)                  │
-└─────────────────────────────────────────────────────────────┘
-
-       ┌──────────────────┐        ┌──────────────────┐
-       │  MoniGo :9091    │        │  TUI (optional)  │
-       │  Performance     │        │  Monitoring      │
-       │  Monitoring      │        │  Management      │
-       └──────────────────┘        └──────────────────┘
-
-       ┌──────────────────┐
-       │  nvidia-smi      │
-       │  GPU Metrics     │
-       │  (Linux/macOS)   │
-       └──────────────────┘
-```
-
-Подробная архитектура: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-
----
-
-## 🧪 Тестирование
-
-Проект имеет **высокое покрытие** тестами критических компонентов.
+### Run Tests
 
 ```bash
-# Все тесты
+# Unit tests
 go test ./...
 
-# С покрытием
-go test -cover ./...
+# With race detector
+go test -race ./...
 
-# Coverage report
+# With coverage
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
-
-# Race detection
-go test -race ./...
 ```
 
-**Категории тестов:**
-
-- ✅ Unit Tests (auth, converter, client)
-- ✅ Integration Tests (API handlers, middleware)
-- ✅ Security Tests (timing attacks, brute force)
-- ✅ Performance Tests (rate limiting, concurrency)
-
----
-
-## 🚀 Deployment
-
-### Systemd Service (Linux)
+### E2E Tests (Playwright)
 
 ```bash
-# Скопируйте пример
-sudo cp ollama-openai-proxy.service /etc/systemd/system/
-
-# Отредактируйте пути и настройки
-sudo nano /etc/systemd/system/ollama-openai-proxy.service
-
-# Включите и запустите
-sudo systemctl enable ollama-openai-proxy
-sudo systemctl start ollama-openai-proxy
-sudo systemctl status ollama-openai-proxy
-```
-
-Подробная инструкция: [SYSTEMD_INSTALL.md](SYSTEMD_INSTALL.md)
-
-### Docker Production
-
-```bash
-# Build production image
-docker compose -f docker-compose.yml up -d
-
-# Или через build скрипт
-./docker/build.sh
+cd tests/playwright
+npm install
+npm test
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## 📊 Roadmap
 
-### "Connection refused" to Ollama
+See [Roadmap.MD](Roadmap.MD) для detailed development plan.
 
-```bash
-# Проверьте Ollama
-curl http://localhost:11434/api/tags
+### ✅ Completed
+- **v1.x** - Ollama proxy, Multi-tenancy, RBAC, OIDC, Performance monitoring
+- **v2.0.0** - RAG System, Chat Export/Import UI
 
-# Запустите если не работает
-ollama serve
-```
+### 🚧 In Progress
+- **v2.1.0** - Rebranding to AIGateway
+- **v2.2.0** - Model Registry, vLLM Integration, Multi-Provider support
 
-### API key not working
-
-- Проверьте header: `Authorization: Bearer sk-xxx`
-- Проверьте права доступа к модели
-- Проверьте rate limits
-
-### GPU monitoring не работает
-
-**Linux/macOS:**
-
-```bash
-# Проверьте nvidia-smi
-nvidia-smi
-
-# Должен вывести список GPU
-```
-
-**Windows:** GPU monitoring не поддерживается (используется stub).
-
-Полное руководство: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-
----
-
-## 🤖 AI Code Review (GitLab CI/CD)
-
-Интегрируйте AI code review в ваш GitLab CI/CD pipeline используя Ollama-OpenAI Proxy!
-
-### ✨ Возможности
-
-- 🔍 **Inline Review** - Построчные комментарии к проблемным местам
-- 📝 **Summary Review** - Общий обзор изменений MR
-- 🏗️ **Context Review** - Архитектурный анализ
-- 💬 **Reply Mode** - Ответы на существующие комментарии
-- 🔐 **Self-Hosted** - AI работает через ваш proxy, данные не утекают
-
-### 🚀 Быстрый старт
-
-1. Создайте API ключ в WebUI вашего proxy
-2. Добавьте ключ в GitLab CI/CD Variables
-3. Настройте `.gitlab-ci.yml`
-
-**Пример:**
-
-```yaml
-ai-review:
-  stage: review
-  image: nikitafilonov/ai-review:latest
-  when: manual
-  script:
-    - ai-review run
-  variables:
-    # Ваш Ollama-OpenAI Proxy
-    LLM__PROVIDER: "OPENAI"
-    LLM__HTTP_CLIENT__API_URL: "http://your-proxy:8080/v1"
-    LLM__HTTP_CLIENT__API_TOKEN: "$OLLAMA_PROXY_API_KEY"
-    LLM__META__MODEL: "qwen2.5-coder:7b"
-    
-    # GitLab VCS
-    VCS__PROVIDER: "GITLAB"
-    VCS__PIPELINE__PROJECT_ID: "$CI_PROJECT_ID"
-    VCS__PIPELINE__MERGE_REQUEST_ID: "$CI_MERGE_REQUEST_IID"
-    VCS__HTTP_CLIENT__API_URL: "$CI_SERVER_URL"
-    VCS__HTTP_CLIENT__API_TOKEN: "$CI_JOB_TOKEN"
-```
-
-### 📖 Документация
-
-- 📘 [AI Review Quick Start](docs/AI_REVIEW_QUICKSTART.md) - 3 шага до первого review
-- 📖 [AI Review Setup](docs/AI_REVIEW_SETUP.md) - Полная инструкция
-- 🎨 [AI Review Go Prompts](docs/AI_REVIEW_GO_PROMPTS.md) - Кастомные промпты
-
-### 🎯 Рекомендуемые модели
-
-| Модель | JSON Support | Context | AI Review |
-|--------|--------------|---------|-----------|
-| **deepseek-coder:6.7b** | ✅ Отличный | 16K | ⭐⭐⭐⭐⭐ |
-| **qwen2.5-coder:7b** | ✅ Хороший | 32K | ⭐⭐⭐⭐ |
-| **qwen2.5-coder:14b** | ✅ Отличный | 32K | ⭐⭐⭐⭐⭐ |
-| llama3.2:70b | ⚠️ Средний | 128K | ⭐⭐⭐ |
-
-**⚠️ Важно:** Используйте модели с хорошей JSON поддержкой. AI-review требует строгий JSON формат без markdown wrapper.
-
-**Инструмент:** [github.com/Nikita-Filonov/ai-review](https://github.com/Nikita-Filonov/ai-review)
-
----
-
-## 📦 Структура проекта
-
-```
-ollama-openai-proxy/
-├── cmd/
-│   ├── server/main.go          # HTTP server + WebUI
-│   └── tui/                    # Terminal UI (legacy)
-├── internal/
-│   ├── api/
-│   │   ├── handlers/           # REST API handlers
-│   │   ├── middleware/         # JWT, RBAC, Rate Limit
-│   │   └── router/             # Route configuration
-│   ├── auth/                   # Authentication & Authorization
-│   ├── storage/                # Database (SQLite/PostgreSQL)
-│   ├── metrics/                # MoniGo, GPU, Prometheus
-│   ├── converter/              # OpenAI ↔ Ollama
-│   └── models/                 # Data models
-├── web/                        # WebUI (HTML/CSS/JS)
-│   ├── *.html                  # Pages
-│   ├── js/                     # JavaScript
-│   └── css/                    # Styles
-├── configs/
-│   ├── dev.yaml                # Development config
-│   └── production.yaml.example # Production template
-├── data/                       # Runtime data (SQLite DB)
-├── logs/                       # Log files
-├── docs/                       # Documentation
-├── BACKLOG/                    # Task specifications (85 files)
-├── go.mod
-├── Roadmap.MD                  # Development roadmap
-└── README.md
-```
-
----
-
-## 🗺️ Roadmap
-
-### ✅ Завершено (v1.9.3)
-
-- ✅ **Full OpenAI API** compatibility
-- ✅ **Multi-Tenancy** с RBAC
-- ✅ **JWT Authentication** + Bootstrap system
-- ✅ **ChatGPT-like WebUI** с conversations
-- ✅ **Dynamic Model Parameters** в чате
-- ✅ **Context Tracking** + Auto-Summarization
-- ✅ **MoniGo Performance Monitoring**
-- ✅ **NVIDIA GPU Monitoring** (multi-GPU)
-- ✅ **OpenTelemetry** distributed tracing
-- ✅ **Backup & Restore** system
-
-### ✅ Завершено (v1.10.4)
-
-**v1.10.0 - Content Foundation (RAG Prerequisites)** 🎉
-
-- ✅ **FILE-STORAGE-01** - Universal File Storage (Local FS + S3/MinIO) + Document Extractors (PDF, DOCX, TXT, CSV)
-- ✅ **WS-01** - WebSocket Real-time Updates для file processing и system notifications
-- ✅ **IMAGE-01** - Image Upload & OCR Processing (LLaVA, BakLLaVA, Llama3.2-Vision)
-- ✅ **WEB-FETCH-01** - Web Content Fetcher с Chat Integration (URL auto-detection + auto-fetch)
-
-### 📋 Запланировано
-
-**v1.11.0 - Enterprise Suite**
-
-- Keycloak SSO Integration
-- LDAP/AD Authentication
-- Advanced Metrics & Observability
-- Quota Management
-- Enhanced Audit Logging
-- Custom Roles & Permissions
-
-**v1.12.0 - Model Management Pro II**
-
-- Usage Quotas System
-- Model Preloading & Warming
-- Prometheus Metrics Export
-- Advanced Rate Limiting
-
-Полный roadmap: [Roadmap.MD](Roadmap.MD)
+### 🔮 Planned
+- **v2.3.0** - HuggingFace Hub integration, Model hot-swap
+- **v2.4.0** - OpenAI/Anthropic proxy support
+- **v2.5.0** - Advanced RAG features, Query analytics
 
 ---
 
 ## 🤝 Contributing
 
-Приветствуются contributions!
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) для guidelines.
 
-1. Fork репозитория
-2. Создайте feature branch (`git checkout -b feature/amazing`)
-3. Напишите тесты
-4. Commit (`git commit -m 'Add amazing feature'`)
-5. Push (`git push origin feature/amazing`)
-6. Откройте Pull Request
+### Development Setup
 
-**Code Standards:**
+```bash
+# Clone repository
+git clone https://github.com/yourusername/aigateway.git
+cd aigateway
 
-- Go 1.25+ idioms
-- 100% coverage критических компонентов
-- Structured logging (logrus)
-- Explicit error handling
+# Install dependencies
+go mod tidy
+
+# Run in dev mode
+go run cmd/server/main.go -config configs/dev.yaml
+
+# Run tests
+go test ./...
+```
 
 ---
 
-## 📄 License
+## 📜 License
 
-MIT License - см. [LICENSE](LICENSE)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file для details.
+
+---
+
+## 🌟 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/aigateway&type=Date)](https://star-history.com/#yourusername/aigateway&Date)
+
+---
+
+## 📧 Contact & Support
+
+- 📖 **Documentation**: [docs/](docs/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/aigateway/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/aigateway/discussions)
+- 📧 **Email**: your-email@example.com
 
 ---
 
 ## 🙏 Acknowledgments
 
-- **Ollama** - Замечательная платформа для локальных LLM
-- **OpenAI** - API стандарт
-- **Go Libraries:**
-  - [Gin](https://github.com/gin-gonic/gin) - HTTP framework
-  - [GORM](https://gorm.io/) - ORM для SQLite/PostgreSQL
-  - [JWT-Go](https://github.com/golang-jwt/jwt) - JWT tokens
-  - [Viper](https://github.com/spf13/viper) - Configuration
-  - [Logrus](https://github.com/sirupsen/logrus) - Logging
-  - [MoniGo](https://github.com/iyashjayesh/monigo) - Performance monitoring
-  - [OpenTelemetry](https://opentelemetry.io/) - Tracing
+- [Ollama](https://ollama.ai/) - Awesome local LLM runtime
+- [vLLM](https://vllm.ai/) - Fast inference engine
+- [Gin](https://gin-gonic.com/) - HTTP framework
+- [pgvector](https://github.com/pgvector/pgvector) - Vector similarity search
 
 ---
 
-## 🐛 Критические исправления
-
-### SSE Content-Type для Spring AI (v1.10.1)
-
-- **[BUGFIX: SSE Content-Type Header](docs/BUGFIX_SSE_CONTENT_TYPE.md)** - Исправлен `Content-Type` для Server-Sent Events
-  - **Проблема:** Spring AI плагины (JetBrains IDE) падали с `JsonParseException`
-  - **Решение:** Изменен заголовок с `text/plain` на `text/event-stream`
-  - **Impact:** ✅ Spring AI работает, ✅ обратная совместимость сохранена
-
-### AI Review совместимость (v1.6.1)
-
-- **[BUGFIX: AI Review Compatibility](docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md)** - OpenAI API совместимость
-  - Исправлен `completion_tokens` в `usage` объекте
-  - Исправлен streaming bug с `omitempty` на `Stream` field
-
-### Streaming omitempty (v1.6.0)
-
-- **[BUGFIX: Streaming omitempty](docs/BUGFIX_STREAMING_OMITEMPTY.md)** - Критический bug в streaming
-  - Ollama возвращал только первое слово вместо полного ответа
-  - Убран `omitempty` с `Stream` field в `ChatRequest`
+**Built with ❤️ for the open-source AI community**
 
 ---
 
-## 📚 Документация
+## 📈 Project Stats
 
-- **[API Documentation](docs/API_DOCUMENTATION.md)** - Полный API reference
-- **[Configuration](docs/CONFIGURATION.md)** - Все параметры конфигурации
-- **[Embeddings Configuration](docs/EMBEDDINGS_CONFIGURATION.md)** - Настройка дефолтной модели для embeddings
-- **[Web Fetch Quick Start](docs/WEB_FETCH_QUICKSTART.md)** ✨ NEW - Безопасное извлечение веб-контента
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Решение проблем
-- **[Architecture](docs/ARCHITECTURE.md)** - Архитектура системы
-- **[Performance](docs/PERFORMANCE.md)** - Performance tuning
-- **[TUI Guide](docs/TUI_GUIDE.md)** - Terminal UI документация
-- **[WebUI Guide](docs/WEBUI_GUIDE.md)** - Web UI документация
-- **[Roadmap](Roadmap.MD)** - План развития
-- **[Build Guide](BUILD.md)** - Инструкции по сборке
+![GitHub](https://img.shields.io/github/license/yourusername/aigateway)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/yourusername/aigateway)
+![GitHub last commit](https://img.shields.io/github/last-commit/yourusername/aigateway)
+![GitHub issues](https://img.shields.io/github/issues/yourusername/aigateway)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/aigateway)
 
----
-
-## 📞 Support
-
-- **Issues:** [GitHub Issues](https://github.com/yourusername/ollama-openai-proxy/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ollama-openai-proxy/discussions)
-
----
-
-**Made with ❤️ for the Open Source Community**
-
-⭐ Star this repo if you find it useful!
-
-**Current Version:** 1.9.3 | **Status:** Active Development 🚀

@@ -1006,3 +1006,4 @@ internal/rag/
 **Created:** 2025-01-15  
 **Last Updated:** 2025-01-16  
 **Status:** Ready for Implementation (после v1.10.0)
+

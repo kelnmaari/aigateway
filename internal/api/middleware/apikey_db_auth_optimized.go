@@ -11,10 +11,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"ollama-openai-proxy/internal/cache"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/cache"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // APIKeyDBAuthOptimized - cache-friendly версия APIKeyDBAuth middleware
@@ -236,3 +236,4 @@ func isKeyValidFastPath(keyHot *models.APIKeyHot, plainKey string, logger *logru
 
 	return true
 }
+

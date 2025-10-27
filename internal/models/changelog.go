@@ -16,3 +16,4 @@ type ChangelogListResponse struct {
 	Changelogs []*Changelog `json:"changelogs"`
 	Total      int          `json:"total"`
 }
+

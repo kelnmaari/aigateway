@@ -10,7 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/metrics"
 )
 
 // GetModels получает список доступных моделей из Ollama
@@ -295,3 +295,4 @@ func (c *Client) IsModelAvailable(ctx context.Context, modelName string) (bool, 
 
 	return false, nil
 }
+

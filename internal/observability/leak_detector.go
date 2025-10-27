@@ -169,3 +169,4 @@ func (ld *LeakDetector) Reset() {
 	ld.samples = make([]MemorySample, 0, ld.maxSamples)
 	ld.logger.Info("Leak detector samples reset")
 }
+

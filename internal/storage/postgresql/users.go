@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================

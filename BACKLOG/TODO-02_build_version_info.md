@@ -119,9 +119,9 @@ BUILD_DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GO_VERSION := $(shell go version | awk '{print $$3}')
 
 # Ldflags для версионирования
-LDFLAGS := -X 'github.com/yourusername/ollama-openai-proxy/internal/version.Version=$(VERSION)' \
-           -X 'github.com/yourusername/ollama-openai-proxy/internal/version.GitCommit=$(GIT_COMMIT)' \
-           -X 'github.com/yourusername/ollama-openai-proxy/internal/version.BuildDate=$(BUILD_DATE)'
+LDFLAGS := -X 'github.com/yourusername/aigateway/internal/version.Version=$(VERSION)' \
+           -X 'github.com/yourusername/aigateway/internal/version.GitCommit=$(GIT_COMMIT)' \
+           -X 'github.com/yourusername/aigateway/internal/version.BuildDate=$(BUILD_DATE)'
 
 # Build команды
 .PHONY: build
@@ -159,11 +159,11 @@ GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')
 
 # Ldflags
-LDFLAGS="-X 'github.com/yourusername/ollama-openai-proxy/internal/version.Version=${VERSION}' \
-         -X 'github.com/yourusername/ollama-openai-proxy/internal/version.GitCommit=${GIT_COMMIT}' \
-         -X 'github.com/yourusername/ollama-openai-proxy/internal/version.BuildDate=${BUILD_DATE}'"
+LDFLAGS="-X 'github.com/yourusername/aigateway/internal/version.Version=${VERSION}' \
+         -X 'github.com/yourusername/aigateway/internal/version.GitCommit=${GIT_COMMIT}' \
+         -X 'github.com/yourusername/aigateway/internal/version.BuildDate=${BUILD_DATE}'"
 
-echo "Building Ollama-OpenAI Proxy..."
+echo "Building AIGateway Platform..."
 echo "Version: ${VERSION}"
 echo "Commit: ${GIT_COMMIT}"
 echo "Build Date: ${BUILD_DATE}"
@@ -194,11 +194,11 @@ $GIT_COMMIT = (git rev-parse --short HEAD 2>$null) ?? "unknown"
 $BUILD_DATE = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd_HH:mm:ss")
 
 # Ldflags
-$LDFLAGS = "-X 'github.com/yourusername/ollama-openai-proxy/internal/version.Version=$VERSION' " +
-           "-X 'github.com/yourusername/ollama-openai-proxy/internal/version.GitCommit=$GIT_COMMIT' " +
-           "-X 'github.com/yourusername/ollama-openai-proxy/internal/version.BuildDate=$BUILD_DATE'"
+$LDFLAGS = "-X 'github.com/yourusername/aigateway/internal/version.Version=$VERSION' " +
+           "-X 'github.com/yourusername/aigateway/internal/version.GitCommit=$GIT_COMMIT' " +
+           "-X 'github.com/yourusername/aigateway/internal/version.BuildDate=$BUILD_DATE'"
 
-Write-Host "Building Ollama-OpenAI Proxy..." -ForegroundColor Green
+Write-Host "Building AIGateway Platform..." -ForegroundColor Green
 Write-Host "Version: $VERSION"
 Write-Host "Commit: $GIT_COMMIT"
 Write-Host "Build Date: $BUILD_DATE"
@@ -444,3 +444,4 @@ ollama-proxy-{os}-{arch}-v{version}
 - ollama-proxy-windows-amd64-v1.4.3.exe
 - ollama-proxy-linux-arm64-v1.4.3
 ```
+

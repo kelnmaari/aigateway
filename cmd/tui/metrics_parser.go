@@ -298,3 +298,4 @@ func (m *MetricsSnapshot) GetAverageOllamaDuration() float64 {
 	// Конвертируем в миллисекунды
 	return (totalDuration / totalRequests) * 1000
 }
+

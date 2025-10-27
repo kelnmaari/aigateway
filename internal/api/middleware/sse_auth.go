@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/jwt"
+	"aigateway/internal/auth/jwt"
 )
 
 // SSEAuthMiddleware аутентификация для SSE endpoints
@@ -58,3 +58,4 @@ func SSEAuthMiddleware(jwtManager *jwt.Manager, logger *logrus.Logger) gin.Handl
 		c.Next()
 	}
 }
+

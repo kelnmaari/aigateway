@@ -192,3 +192,4 @@ Memory:
   Optimized:  320 bytes/struct
   Overhead: 5x memory (acceptable для global singleton)
 */
+

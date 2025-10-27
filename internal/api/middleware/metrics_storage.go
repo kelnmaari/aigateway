@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ollama-openai-proxy/internal/metrics"
+	"aigateway/internal/metrics"
 )
 
 // MetricsStorageMiddleware middleware для записи метрик в storage
@@ -59,3 +59,4 @@ func MetricsStorageMiddleware(storage *metrics.MetricsStorage) gin.HandlerFunc {
 		storage.Record(metrics.MetricTypeActiveRequests, -1, labels)
 	}
 }
+

@@ -2,7 +2,7 @@
 
 ## Проблема
 
-AI-review (Python клиент) падал с ошибкой при обработке ответов от Ollama-OpenAI Proxy:
+AI-review (Python клиент) падал с ошибкой при обработке ответов от AIGateway Platform:
 
 ```
 pydantic_core._pydantic_core.ValidationError: 1 validation error for OpenAIChatResponseSchema
@@ -392,4 +392,5 @@ ai-review run-summary  # Меньше токенов
 - **OpenAI API Spec**: https://platform.openai.com/docs/api-reference/chat/object
 - **AI Review GitHub**: https://github.com/Nikita-Filonov/ai-review
 - **Related docs**: `docs/AI_REVIEW_SETUP.md`
+
 

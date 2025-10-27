@@ -71,3 +71,4 @@ ollama:
 
 **Dependencies:** SCALE-03 (Health Checks)  
 **Priority in 1.3.0:** #1
+

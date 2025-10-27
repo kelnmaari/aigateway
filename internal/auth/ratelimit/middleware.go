@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/middleware"
-	"ollama-openai-proxy/internal/metrics"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/auth/middleware"
+	"aigateway/internal/metrics"
+	"aigateway/internal/models"
 )
 
 // RateLimitMiddleware создает middleware для rate limiting
@@ -209,3 +209,4 @@ func (l *Limiter) ResetLimiter(keyID string) {
 		l.logger.WithField("key_id", keyID).Info("Rate limiter reset for API key")
 	}
 }
+

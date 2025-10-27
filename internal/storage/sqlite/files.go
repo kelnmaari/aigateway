@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================
@@ -410,3 +410,4 @@ func (s *SQLiteDB) GetFileAccessLogs(ctx context.Context, fileID string, limit i
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
+

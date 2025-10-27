@@ -1,45 +1,69 @@
-# Архитектура Ollama-OpenAI Proxy
+# Архитектура AIGateway Platform
 
 ## Обзор проекта
 
-Ollama-OpenAI Proxy - это серверное приложение на Go, которое предоставляет OpenAI-совместимый API для работы с локальными моделями Ollama. Приложение служит мостом между клиентами, ожидающими OpenAI API, и локальным сервером Ollama.
+**AIGateway** - это enterprise-grade AI infrastructure platform на Go, которая предоставляет унифицированный OpenAI-совместимый API для множественных AI model providers. Платформа объединяет local models (Ollama, vLLM), RAG capabilities, multi-tenancy, и enterprise features в единую систему. AIGateway служит универсальным шлюзом между клиентами, ожидающими OpenAI API, и различными LLM providers.
 
 ## Архитектурная диаграма
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Web UI (Chat)  │    │  Terminal UI    │    │  Web UI (Admin) │
-│  (Vanilla JS)   │    │  (Bubbletea)    │    │  (Dashboard)    │
-└────────┬────────┘    └────────┬────────┘    └────────┬────────┘
-         │                      │                       │
-         │                      ▼                       │
-         │               ┌─────────────────┐           │
-         └──────────────▶│  HTTP Server    │◀──────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Web UI (Chat)  │    │  Terminal UI    │    │  Web UI (Admin) │    │  RAG Management │
+│  (Vanilla JS)   │    │  (Bubbletea)    │    │  (Dashboard)    │    │     (WebUI)     │
+│  + RAG Controls │    │                 │    │  + Model Reg    │    │                 │
+└────────┬────────┘    └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+         │                      │                       │                      │
+         │                      ▼                       │                      │
+         │               ┌─────────────────┐           │                      │
+         └──────────────▶│  HTTP Server    │◀──────────┴──────────────────────┘
 ┌─────────────────┐      │  (Gin Router)   │
 │   Client Apps   │─────▶│  + Middleware   │
 │  (OpenAI API)   │      └────────┬────────┘
 └─────────────────┘               │
                                   ▼
-                    ┌──────────────────────────┐
-                    │   Ollama-OpenAI Proxy    │
-                    │   ┌──────────────────┐   │
-                    │   │ Authentication   │   │    ┌──────────────────┐
-                    │   │ & Authorization  │   │───▶│   Database       │
-                    │   └──────────────────┘   │    │  (SQLite/PG)     │
-                    │   ┌──────────────────┐   │    │  • Users         │
-                    │   │ Request/Response │   │    │  • Tenants       │
-                    │   │    Converter     │   │    │  • API Keys      │
-                    │   └──────────────────┘   │    │  • Conversations │
-                    │   ┌──────────────────┐   │    │  • Messages      │
-                    │   │ Ollama Client    │   │    └──────────────────┘
-                    │   └──────────────────┘   │
-                    └──────────┬───────────────┘
-                               │
-                               ▼
-                    ┌──────────────────┐
-                    │   Ollama Server  │
-                    │   (Local LLMs)   │
-                    └──────────────────┘
+                    ┌────────────────────────────────────────────────┐
+                    │         AIGateway Platform (Go 1.25)           │
+                    │                                                │
+                    │   ┌──────────────────────────────────────┐   │
+                    │   │  Authentication & Authorization       │   │
+                    │   │  • JWT tokens (Access + Refresh)     │   │    ┌──────────────────┐
+                    │   │  • API Key management                 │   │───▶│   Database       │
+                    │   │  • Multi-tenancy & RBAC              │   │    │  (SQLite/PG)     │
+                    │   │  • OIDC/LDAP integration             │   │    │  • Users         │
+                    │   └──────────────────────────────────────┘   │    │  • Tenants       │
+                    │                                                │    │  • API Keys      │
+                    │   ┌──────────────────────────────────────┐   │    │  • Conversations │
+                    │   │  Model Registry & Smart Router       │   │    │  • RAG Data      │
+                    │   │  • Provider abstraction              │   │    │  • Model Registry│
+                    │   │  • Model capabilities tracking       │   │    └──────────────────┘
+                    │   │  • Auto-discovery (Ollama/vLLM)      │   │
+                    │   │  • Fallback chains                   │   │
+                    │   └──────────────────────────────────────┘   │
+                    │                                                │
+                    │   ┌──────────────────────────────────────┐   │
+                    │   │  RAG System (v2.0.0)                 │   │
+                    │   │  • Document processing pipeline      │   │    ┌──────────────────┐
+                    │   │  • Semantic chunking                 │   │───▶│  Vector Store    │
+                    │   │  • Embeddings (Ollama)               │   │    │  (PgVector)      │
+                    │   │  • Vector search & reranking         │   │    │  • Chunks        │
+                    │   │  • External data sources             │   │    │  • Embeddings    │
+                    │   │  • RAG orchestrator                  │   │    │  • HNSW Index    │
+                    │   └──────────────────────────────────────┘   │    └──────────────────┘
+                    │                                                │
+                    │   ┌──────────────────────────────────────┐   │
+                    │   │  Provider Clients                    │   │
+                    │   │  • Ollama Client                     │   │
+                    │   │  • vLLM Client (v2.2.0)             │   │
+                    │   │  • Future: OpenAI, Anthropic        │   │
+                    │   └──────────────────────────────────────┘   │
+                    └───────────┬────────────┬────────────┬────────┘
+                                │            │            │
+                                ▼            ▼            ▼
+                    ┌──────────────┐  ┌──────────┐  ┌──────────────┐
+                    │   Ollama     │  │   vLLM   │  │  Cloud APIs  │
+                    │   (Local)    │  │  (GPU)   │  │   (Future)   │
+                    │   :11434     │  │  :8000   │  │              │
+                    └──────────────┘  └──────────┘  └──────────────┘
 ```
 
 ## Компоненты системы
@@ -314,7 +338,7 @@ Ollama-OpenAI Proxy - это серверное приложение на Go, к
 ## Структура проекта
 
 ```
-ollama-openai-proxy/
+aigateway/
 ├── cmd/
 │   ├── server/
 │   │   └── main.go              # HTTP сервер (основной)
@@ -322,7 +346,7 @@ ollama-openai-proxy/
 │   │   └── main.go              # TUI приложение
 │   ├── webui/
 │   │   └── main.go              # WebUI server (dashboard + chat)
-│   └── migrate/                 # (1.6.0+)
+│   └── migrate/                 # (v1.6.0+)
 │       └── main.go              # Database migration tool
 ├── internal/
 │   ├── api/
@@ -472,3 +496,4 @@ ollama-openai-proxy/
   - Live view активных запросов
   - Визуализация производительности (ASCII charts)
   - Интерактивное управление конфигурацией
+

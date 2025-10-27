@@ -214,3 +214,4 @@ go test -bench=. -benchmem -benchtime=10s ./...
 **Estimated Effort:** 3-5 дней (Phase 1 + Phase 2)  
 **Memory Cost:** ~1 MB additional RAM  
 **Risk:** LOW (хорошо протестировано, постепенный rollout)
+

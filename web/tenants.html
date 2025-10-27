@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tenants - Ollama Proxy</title>
+    <title>Tenants - AIGateway</title>
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/dashboard.css">
@@ -33,13 +33,16 @@
                 </div>
             </header>
 
-            <!-- Error/Success Messages -->
-            <div id="tenant-message" class="error-message" style="display: none;"></div>
-            <div id="tenant-success" class="success-message" style="display: none;"></div>
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Error/Success Messages -->
+                <div id="tenant-message" class="error-message" style="display: none;"></div>
+                <div id="tenant-success" class="success-message" style="display: none;"></div>
 
-            <!-- Tenants Grid -->
-            <div id="tenants-grid" class="tenants-grid">
-                <div class="tenant-card loading">Loading tenants...</div>
+                <!-- Tenants Grid -->
+                <div id="tenants-grid" class="tenants-grid">
+                    <div class="tenant-card loading">Loading tenants...</div>
+                </div>
             </div>
         </div>
     </main>
@@ -231,3 +234,5 @@
     <script src="/js/tenants.js?v=1.5.8.2"></script>
 </body>
 </html>
+
+

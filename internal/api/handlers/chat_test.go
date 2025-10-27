@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // TestChatHandler_Completion_ValidRequest тестирует успешный chat completion
@@ -178,3 +178,4 @@ func TestChatHandler_Streaming(t *testing.T) {
 	// Streaming может возвращать разные коды в зависимости от реализации
 	assert.NotEqual(t, 0, w.Code)
 }
+

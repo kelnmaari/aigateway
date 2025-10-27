@@ -564,3 +564,4 @@ function escapeHtml(text) {
 - Export деталей моделей в JSON/CSV
 - Сравнение нескольких моделей side-by-side
 - Model tags/labels management
+

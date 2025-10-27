@@ -38,7 +38,7 @@
 ```
 cmd/server/main.go
 ├── MoniGo Initialization
-│   ├── ServiceName: "Ollama-OpenAI-Proxy"
+│   ├── ServiceName: "aigateway"
 │   ├── Dashboard Middleware (JWT Auth)
 │   └── Custom Metrics (Ollama latency, API keys)
 ├── Gin Middleware Integration
@@ -127,7 +127,7 @@ go get github.com/iyashjayesh/monigo
 
 ```go
 monigoInstance := &monigo.Monigo{
-    ServiceName: "Ollama-OpenAI-Proxy",
+    ServiceName: "aigateway",
     DashboardMiddleware: []func(http.Handler) http.Handler{
         middleware.MonigoJWTAuth(jwtManager),
         monigo.LoggingMiddleware(),
@@ -396,3 +396,4 @@ func SetupCustomMonigoMetrics(m *monigo.Monigo, db storage.Database, cfg *config
 - MoniGo Docs: <https://pkg.go.dev/github.com/iyashjayesh/monigo>
 - Performance Monitoring Best Practices: <https://go.dev/blog/pprof>
 - Gin Middleware Guide: <https://gin-gonic.com/docs/examples/custom-middleware/>
+

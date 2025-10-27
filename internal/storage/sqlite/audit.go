@@ -4,11 +4,12 @@ package sqlite
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // ========================================
@@ -23,6 +24,16 @@ func (s *SQLiteDB) CreateAuditEvent(ctx context.Context, event *models.AuditEven
 
 	s.logger.WithField("event_type", event.EventType).Debug("Creating audit event")
 
+	// Serialize Metadata map to JSON
+	var metadataJSON []byte
+	var err error
+	if len(event.Metadata) > 0 {
+		metadataJSON, err = json.Marshal(event.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+		}
+	}
+
 	query := `
 		INSERT INTO audit_events (
 			id, event_type, severity,
@@ -34,7 +45,7 @@ func (s *SQLiteDB) CreateAuditEvent(ctx context.Context, event *models.AuditEven
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := s.db.ExecContext(ctx, query,
+	_, err = s.db.ExecContext(ctx, query,
 		event.ID,
 		event.EventType,
 		event.Severity,
@@ -46,7 +57,7 @@ func (s *SQLiteDB) CreateAuditEvent(ctx context.Context, event *models.AuditEven
 		event.Resource,
 		event.Status,
 		event.ErrorMsg,
-		event.Metadata,
+		metadataJSON, // Use JSON bytes instead of map
 		event.IPAddress,
 		event.UserAgent,
 		event.Timestamp,
@@ -196,6 +207,7 @@ func (s *SQLiteDB) DeleteOldAuditEvents(ctx context.Context, olderThan time.Time
 // scanAuditEvent сканирует строку БД в модель AuditEvent
 func (s *SQLiteDB) scanAuditEvent(row scanner) (*models.AuditEvent, error) {
 	var event models.AuditEvent
+	var metadataJSON []byte
 
 	err := row.Scan(
 		&event.ID,
@@ -209,7 +221,7 @@ func (s *SQLiteDB) scanAuditEvent(row scanner) (*models.AuditEvent, error) {
 		&event.Resource,
 		&event.Status,
 		&event.ErrorMsg,
-		&event.Metadata,
+		&metadataJSON, // Scan as JSON bytes
 		&event.IPAddress,
 		&event.UserAgent,
 		&event.Timestamp,
@@ -219,6 +231,14 @@ func (s *SQLiteDB) scanAuditEvent(row scanner) (*models.AuditEvent, error) {
 		return nil, err
 	}
 
+	// Deserialize metadata JSON to map
+	if len(metadataJSON) > 0 {
+		if err := json.Unmarshal(metadataJSON, &event.Metadata); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metadata JSON: %w", err)
+		}
+	}
+
 	return &event, nil
 }
+
 

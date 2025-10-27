@@ -3,7 +3,7 @@
 package rbac
 
 import (
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // SystemPermissions defines all available permissions in the system
@@ -173,4 +173,5 @@ func GetPermissionsByResource(resource string) []models.RBACPermission {
 	}
 	return result
 }
+
 

@@ -949,3 +949,4 @@ func (p *RAGFileProcessor) ProcessForRAG(ctx context.Context, fileID string) err
 **Last Updated:** 2025-01-16  
 **Status:** Ready for Implementation  
 **Next:** IMAGE-01 (v1.10.2) будет использовать этот storage layer
+

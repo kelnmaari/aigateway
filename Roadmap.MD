@@ -1,11 +1,11 @@
-# 🗺️ Roadmap: Ollama-OpenAI Proxy
+# 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 1.12.3 ✅  
-> **Следующая версия:** 1.13.0 (RAG System) 📋  
-> **План развития:** Version 1.9.0 - 1.13.0+  
-> **Статус:** Active Development (Version 1.12.0 Complete! Planning v1.13.0 RAG)  
-> **Последнее обновление:** 2025-10-26  
-> **Новое:** 🎉 v1.12.0-v1.12.3 завершены! Model Preloading, Advanced Rate Limiting, Conversation Export/Import. Roadmap: v1.11 (Enterprise Auth ✅) → v1.12 (UX & Performance ✅) → v1.13 (RAG 📋)
+> **Текущая версия:** 2.1.0 ✅ (Rebranding to AIGateway Platform)  
+> **Следующая версия:** 2.2.0 (Model Registry & Multi-Provider Foundation) 📋  
+> **План развития:** Version 2.0.0 - 2.5.0+  
+> **Статус:** Active Development (v2.1.0 Complete! Planning v2.2.0 Multi-Provider → v2.3.0 Invitation System)  
+> **Последнее обновление:** 2025-10-27  
+> **Новое:** 🎉 v2.1.0 релиз! Complete Rebranding to AIGateway. Next: Model Registry & vLLM → Invitation-Only Registration
 
 ---
 
@@ -475,61 +475,95 @@
 
 ---
 
-## 🧠 Version 1.13.0 - RAG System
+## 🧠 Version 1.13.0 → 2.0.0 - RAG System ✅ **COMPLETED!**
 
-**Фокус:** Полноценная RAG (Retrieval-Augmented Generation) система  
+**Фокус:** Полноценная RAG (Retrieval-Augmented Generation) система + Chat Export/Import UI  
 **Приоритет:** HIGH  
 **Оценка времени:** 54-72 часа (экономия 6-8ч благодаря v1.10.0)  
-**Статус:** 📋 Запланировано (0/5 задач)  
-**Версионирование:** v1.13.1-v1.13.5  
-**Dependencies:** ⚠️ Требует v1.10.0 (FILE-STORAGE-01, IMAGE-01, WEB-FETCH-01)
+**Фактическое время:** ~68 часов  
+**Статус:** 🎉 Завершено 100% (5/5 задач + Chat Export/Import UI)  
+**Версионирование:** v1.13.1-v1.13.5 → **v2.0.0 MAJOR RELEASE**  
+**Dependencies:** ✅ Использовано v1.10.0 (FILE-STORAGE-01, IMAGE-01, WEB-FETCH-01)
 
 **Стратегия:** Расширяем существующие компоненты из v1.10.0 добавляя векторный поиск, chunking, embeddings и orchestration. Переиспользуем file storage, extractors и web fetcher.
 
 ### Задачи
 
-- [ ] **RAG-01** Foundation & Data Sources Management → [BACKLOG/RAG-01_system_architecture.md](BACKLOG/RAG-01_system_architecture.md) → **v1.13.1**
-  - Database schema (sources, documents, chunks, jobs)
-  - Data sources CRUD API
-  - ~~File storage (Local + S3/MinIO)~~ ✅ *Переиспользуем из v1.10.0*
-  - WebUI: Data Sources management
-  - Basic in-memory queue
-  - **Оценка:** 12-16 часов (меньше т.к. storage готов)
+- [x] **RAG-01** Foundation & Data Sources Management → [BACKLOG/RAG-01_system_architecture.md](BACKLOG/RAG-01_system_architecture.md) → **v2.0.0** ✅
+  - ✅ Database schema (sources, documents, chunks, jobs)
+  - ✅ Data sources CRUD API (7 endpoints)
+  - ✅ ~~File storage (Local + S3/MinIO)~~ *Переиспользуем из v1.10.0*
+  - ✅ Basic in-memory queue
+  - ✅ Server integration & routes
+  - 📋 **WebUI: Data Sources Management Page** (осталось)
+    - Grid view со списком sources
+    - Create/Edit/Delete modals
+    - Source type selector (file/api/database/web)
+    - Configuration forms per source type
+    - Status indicators & sync controls
+    - Tags & search filtering
+  - **Оценка:** 12-16 часов (backend ✅ done, WebUI 📋 pending ~4-6 часов)
 
-- [ ] **RAG-02** Document Processing Pipeline → **v1.13.2**
-  - ~~PDF/DOCX/CSV extractors~~ ✅ *Переиспользуем из v1.10.0*
-  - Semantic chunking engine (новое)
-  - PostgreSQL job queue (новое)
-  - Worker pool (async processing)
-  - Progress tracking UI (WebSocket из v1.10.0)
+- [x] **RAG-02** Document Processing Pipeline → **v2.0.0** ✅
+  - ✅ ~~PDF/DOCX/CSV extractors~~ *Переиспользуем из v1.10.0*
+  - ✅ Semantic chunking engine
+  - ✅ PostgreSQL job queue
+  - ✅ Worker pool (async processing)
+  - **WebUI: Progress Tracking Dashboard**
+    - Real-time job status (WebSocket из v1.10.0)
+    - Processing queue visualization
+    - Document processing logs
+    - Chunk preview & statistics
+    - Error handling & retry controls
   - **Оценка:** 12-16 часов (меньше т.к. extractors готовы)
 
-- [ ] **RAG-03** Embeddings & Vector Search → **v1.13.3**
-  - Ollama embeddings integration (nomic-embed-text, bge-m3)
-  - pgvector setup + HNSW indexing
-  - Batch embedding processing
-  - Vector search API
-  - Search testing UI
+- [x] **RAG-03** Embeddings & Vector Search → **v2.0.0** ✅
+  - ✅ Ollama embeddings integration (nomic-embed-text, mxbai-embed-large)
+  - ✅ pgvector setup + HNSW indexing
+  - ✅ Batch embedding processing
+  - ✅ Vector search API
+  - **WebUI: Search Testing Interface**
+    - Query input с similarity threshold slider
+    - Top-K results selector
+    - Search results preview (chunks + metadata)
+    - Similarity score visualization
+    - Source filtering controls
+    - Export search results
   - **Оценка:** 12-16 часов
 
-- [ ] **RAG-04** External Data Sources → **v1.13.4**
-  - REST API source implementation
-  - PostgreSQL database source
-  - Credentials encryption (AES-256)
-  - Connection testing
-  - Scheduled auto-sync
+- [x] **RAG-04** External Data Sources → **v2.0.0** ✅
+  - ✅ REST API source implementation
+  - ✅ PostgreSQL database source
+  - ✅ Credentials encryption (AES-256)
+  - ✅ Connection testing
+  - ✅ Scheduled auto-sync
   - **Оценка:** 10-14 часов
 
-- [ ] **RAG-05** RAG Integration & Chat UI → **v1.13.5**
-  - RAG Orchestrator
-  - Reranking logic
-  - Context assembly (max 64k of 128k)
-  - Chat API integration
-  - WebUI: Source selector in chat sidebar
-  - RAG metadata in responses
+- [x] **RAG-05** RAG Integration & Chat UI → **v2.0.0** ✅
+  - ✅ RAG Orchestrator
+  - ✅ Reranking logic
+  - ✅ Context assembly
+  - ✅ Chat API integration
+  - **WebUI: RAG Chat Integration**
+    - ✅ Source selector в chat UI
+    - ✅ Multi-select sources для query
+    - ✅ RAG toggle switch (enable/disable per conversation)
+    - ✅ Top-K chunks и Min Score sliders
+    - ✅ Reranking checkbox
   - **Оценка:** 8-10 часов
 
+- [x] **BONUS** Chat Export/Import UI → **v2.0.0** ✅ **(ADDED)**
+  - ✅ Export dropdown в chat header
+  - ✅ Export as JSON/Markdown/Text
+  - ✅ Import modal с file upload
+  - ✅ Preserve timestamps/IDs options
+  - ✅ JSON validation перед import
+  - ✅ Auto-reload после успешного import
+  - **Оценка:** 4-6 часов (BONUS feature from v1.12.3 backend)
+
 ### 🎯 Ключевые возможности
+
+**Backend:**
 
 - 📄 Multi-format файлы (PDF, DOCX, CSV, TXT, изображения)
 - 🔌 Внешние API с Bearer token аутентификацией
@@ -537,9 +571,15 @@
 - 🧠 Semantic chunking с учетом контекста (512 tokens, 10% overlap)
 - 🔍 Vector search через pgvector (HNSW indexing)
 - ⚡ Async processing с worker pool
-- 🎨 UI-first approach для управления источниками
 - 🔐 AES-256 encryption для credentials
-- 📊 Analytics dashboard для RAG usage
+
+**WebUI:**
+
+- 🎨 **Data Sources Page** - полное управление источниками (create/edit/delete/sync)
+- 📊 **Processing Dashboard** - real-time мониторинг обработки документов
+- 🔬 **Search Testing** - интерактивное тестирование vector search
+- 💬 **Chat Integration** - source selector + RAG toggle в чате
+- 📈 **Analytics** - статистика использования RAG (queries, tokens, sources)
 
 ### 🏗️ Технический стек
 
@@ -557,6 +597,262 @@
 3. **API Integration:** Реал-тайм данные из внешних систем
 4. **Database Queries:** Прямые запросы к корп. БД с контекстом
 5. **Multi-source:** Комбинирование данных из разных источников
+
+---
+
+## 🏷️ Version 2.1.0 - AIGateway Rebranding
+
+**Фокус:** Ребрендинг проекта в **AIGateway Platform**  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 8-12 часов  
+**Статус:** 📋 Запланировано (0/4 задач)  
+**Версионирование:** v2.1.0
+
+**Стратегия:** Комплексное переименование проекта для отражения расширенных возможностей beyond простого Ollama proxy. Подготовка к multi-model architecture.
+
+### Задачи
+
+- [ ] **REBRAND-01** Documentation & README → **v2.1.0**
+  - 📝 README.md - новое описание AIGateway Platform
+  - 📝 Architecture.MD - обновление архитектурных диаграмм
+  - 📝 Contributing guide - обновление названия
+  - 📝 Все ссылки на "AIGateway Platform" → "AIGateway"
+  - **Оценка:** 2-3 часа
+
+- [ ] **REBRAND-02** Code & Configuration → **v2.1.0**
+  - 🔧 go.mod - module path rename
+  - 🔧 Package imports по всему проекту
+  - 🔧 Config files (dev.yaml, production.yaml)
+  - 🔧 Docker Compose & Kubernetes yamls
+  - 🔧 Environment variables (AIGATEWAY_*)
+  - **Оценка:** 3-4 часа
+
+- [ ] **REBRAND-03** WebUI Branding → **v2.1.0**
+  - 🎨 Logo & favicon (AIGateway branding)
+  - 🎨 Page titles & headers
+  - 🎨 Navigation labels
+  - 🎨 About System page
+  - 🎨 Footer copyright
+  - **Оценка:** 2-3 часа
+
+- [ ] **REBRAND-04** GitHub & Release → **v2.1.0**
+  - 📦 GitHub repository rename
+  - 📦 Docker Hub organization/image rename
+  - 📦 Release notes для v2.1.0
+  - 📦 Migration guide для existing users
+  - 📦 Update badges в README
+  - **Оценка:** 1-2 часа
+
+### 🎯 Цели ребрендинга
+
+1. **Позиционирование:** Не просто proxy, а полноценная AI infrastructure platform
+2. **Масштабируемость:** Название позволяет добавлять новые LLM providers
+3. **Enterprise Appeal:** Более профессиональное название для корпоративных клиентов
+4. **Community:** Привлечение более широкой аудитории разработчиков
+
+### 📋 Breaking Changes
+
+- ⚠️ **Module path:** `github.com/user/aigateway` → `github.com/user/aigateway`
+- ⚠️ **Environment variables:** `OLLAMA_PROXY_*` → `AIGATEWAY_*`
+- ⚠️ **Docker image:** `ollama-proxy:latest` → `aigateway:latest`
+- ℹ️ **Migration guide** будет предоставлен для smooth transition
+
+---
+
+## 🎯 Version 2.2.0 - Model Registry & Multi-Provider Foundation
+
+**Фокус:** Universal Model Registry + vLLM Integration  
+**Приоритет:** HIGH  
+**Оценка времени:** 20-28 часов  
+**Статус:** 📋 Запланировано (0/4 задач)  
+**Версионирование:** v2.2.1-v2.2.4  
+**Dependencies:** ⚠️ Требует v2.1.0 (Rebranding complete)
+
+**Стратегия:** Создание универсальной архитектуры для поддержки множественных model providers. Foundation для HuggingFace, OpenAI, Anthropic integration.
+
+### Задачи
+
+- [ ] **REGISTRY-01** Model Registry Core → [BACKLOG/REGISTRY-01_model_registry.md](BACKLOG/REGISTRY-01_model_registry.md) → **v2.2.1**
+  - Model metadata storage (DB schema)
+  - Model capabilities tracking (chat/embeddings/vision/function-calling)
+  - Provider abstraction layer
+  - Model registration API (POST /api/models/registry)
+  - Model discovery endpoint (GET /api/models/registry)
+  - Health check integration
+  - **Оценка:** 6-8 часов
+
+- [ ] **REGISTRY-02** Smart Model Router → [BACKLOG/REGISTRY-02_smart_router.md](BACKLOG/REGISTRY-02_smart_router.md) → **v2.2.2**
+  - Router middleware для model requests
+  - Provider selection logic (Ollama/vLLM/etc)
+  - Fallback chains (если primary provider down)
+  - Load balancing между providers
+  - Request tracing с provider info
+  - **Оценка:** 5-7 часов
+
+- [ ] **VLLM-01** vLLM Backend Integration → [BACKLOG/VLLM-01_integration.md](BACKLOG/VLLM-01_integration.md) → **v2.2.3**
+  - vLLM client implementation
+  - OpenAI-compatible API mapping
+  - Multi-GPU support configuration
+  - Model loading/unloading API
+  - Performance benchmarking
+  - Docker Compose integration
+  - **Оценка:** 6-8 часов
+  - **Documentation:** vLLM installation guide для Linux 2x GPU
+
+- [ ] **REGISTRY-03** Model Management WebUI → [BACKLOG/REGISTRY-03_webui.md](BACKLOG/REGISTRY-03_webui.md) → **v2.2.4**
+  - Model Registry dashboard
+  - Provider status cards (Ollama/vLLM/etc)
+  - Model registration form
+  - Model health monitoring
+  - Performance metrics per model
+  - Switch provider для specific model
+  - **Оценка:** 3-5 часов
+
+### 🎯 Ключевые возможности
+
+**Backend:**
+
+- 🗄️ **Universal Registry** - централизованное управление всеми моделями
+- 🔀 **Smart Routing** - автоматический выбор оптимального provider'а
+- 🚀 **vLLM Support** - fast inference для HuggingFace моделей
+- ⚡ **Multi-GPU** - распределение моделей на несколько GPU
+- 🔄 **Fallback Chains** - automatic failover между providers
+- 📊 **Provider Metrics** - performance tracking per provider
+
+**WebUI:**
+
+- 📋 **Model Registry Page** - unified view всех доступных моделей
+- 🎛️ **Provider Dashboard** - мониторинг Ollama, vLLM статусов
+- ⚙️ **Configuration** - model assignment к providers
+- 📈 **Performance Charts** - latency, throughput per provider
+
+### 🏗️ Технический стек
+
+- **Model Providers:**
+  - Ollama (existing) - local models, GGUF format
+  - vLLM (new) - HuggingFace models, GPU inference
+  - Future: TGI, LocalAI, OpenAI, Anthropic
+
+- **Architecture:**
+  - Provider abstraction interface
+  - Model registry database (SQLite/PostgreSQL)
+  - Smart router middleware
+  - Health check system
+
+### 📈 Use Cases
+
+1. **HuggingFace Models:** Запуск моделей которые не поддерживаются Ollama
+2. **GPU Optimization:** Использование vLLM для fast inference
+3. **Model Fallback:** Автоматический переход на backup provider
+4. **Multi-Model:** Разные модели на разных providers (Ollama + vLLM)
+5. **Load Balancing:** Распределение нагрузки между GPU/providers
+
+---
+
+## 🔐 Version 2.3.0 - Invitation-Only Registration System
+
+**Фокус:** Контролируемая регистрация пользователей через систему приглашений  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 6-8 часов  
+**Статус:** 📋 Запланировано (0/1 задачи)  
+**Версионирование:** v2.3.0  
+**Dependencies:** None (независимая функциональность)
+
+**Стратегия:** Реализация enterprise-grade системы управления доступом через пригласительные ссылки. Админы контролируют кто может зарегистрироваться в системе.
+
+### Задачи
+
+- [ ] **AUTH-03** Invitation-Only Registration System → [BACKLOG/AUTH-03_invitation_system.md](BACKLOG/AUTH-03_invitation_system.md) → **v2.3.0**
+  - **Backend API:**
+    - POST /api/admin/invitations - создание пригласительной ссылки
+    - GET /api/admin/invitations - список всех приглашений (активные/использованные/отозванные)
+    - DELETE /api/admin/invitations/:id - отзыв пригласительной ссылки
+    - GET /api/invitations/:token/validate - проверка валидности токена приглашения
+    - POST /api/auth/register - регистрация с опциональным токеном приглашения
+  - **Database Schema:**
+    - Таблица invitations: id, token (UUID), created_by_user_id, email (optional), expires_at, used_at, used_by_user_id, revoked_at, max_uses, current_uses
+    - Индексы: token (unique), created_by_user_id, status
+  - **Configuration:**
+    - `auth.registration.mode`: "open" | "invitation_only" | "disabled"
+    - `auth.registration.require_email_verification`: true/false
+    - `auth.invitations.default_expiry_days`: 7
+    - `auth.invitations.max_uses_default`: 1
+  - **Business Logic:**
+    - Админ генерирует уникальную ссылку с токеном (UUID v4)
+    - Опционально: привязка к конкретному email
+    - Опционально: срок действия (expires_at)
+    - Single-use по умолчанию (max_uses = 1)
+    - После успешной регистрации токен становится использованным
+    - Админ может отозвать неиспользованную ссылку
+  - **WebUI Components:**
+    - Admin Panel → "Ссылки-приглашения" (новая вкладка `/admin-invitations.html`)
+    - Таблица приглашений с фильтрами (Active/Used/Expired/Revoked)
+    - Кнопка "Create Invitation" с формой (email опционально, expiry date)
+    - Copy invitation link to clipboard
+    - Revoke button для активных приглашений
+    - Statistics: total created, used, expired, revoked
+    - Register page: проверка токена перед показом формы
+  - **Security:**
+    - Rate limiting на создание приглашений (защита от спама)
+    - Token должен быть cryptographically secure (UUID v4)
+    - Validation токена перед регистрацией
+    - Audit log для всех операций с приглашениями
+  - **Оценка:** 6-8 часов
+
+### 🎯 Ключевые возможности
+
+**Backend:**
+
+- 🔐 **Registration Modes** - гибкое переключение между открытой и закрытой регистрацией
+- 🎫 **Invitation Management** - полный CRUD для пригласительных ссылок
+- 📧 **Email Restriction** - опциональная привязка приглашения к email
+- ⏰ **Expiration Control** - настраиваемый срок действия приглашений
+- 🔄 **Multi-use Support** - возможность создавать многоразовые приглашения
+- 🚫 **Revocation** - отзыв неиспользованных приглашений
+- 📊 **Analytics** - статистика по использованию приглашений
+
+**WebUI:**
+
+- 📋 **Invitations Dashboard** - управление всеми приглашениями
+- ➕ **Quick Create** - быстрое создание приглашения с copy-to-clipboard
+- 🔍 **Filters & Search** - поиск по статусу, email, дате
+- 📈 **Statistics Cards** - visual metrics (success rate, active invitations)
+- ✅ **Registration Flow** - валидация токена перед показом формы регистрации
+
+### 🏗️ Configuration Example
+
+```yaml
+auth:
+  registration:
+    mode: "invitation_only"  # "open" | "invitation_only" | "disabled"
+    require_email_verification: false
+    
+  invitations:
+    enabled: true
+    default_expiry_days: 7    # Default expiry for new invitations
+    max_uses_default: 1       # Default max uses (single-use)
+    allow_email_restriction: true
+    
+    # Rate limits
+    rate_limit:
+      creation_per_admin_hour: 10
+      validation_per_ip_minute: 10
+```
+
+### 📈 Use Cases
+
+1. **Закрытая корпоративная установка:** Только HR/IT админы приглашают сотрудников
+2. **Beta Testing:** Контролируемый доступ для beta-тестеров
+3. **Community с модерацией:** Существующие участники приглашают коллег
+4. **Trial Access:** Временный доступ с expiration для демонстраций
+
+### 📋 Breaking Changes
+
+**None** - функциональность полностью опциональная:
+
+- По умолчанию `mode: "open"` - существующее поведение сохраняется
+- Новые endpoint'ы не влияют на существующую аутентификацию
+- Админы могут переключать режим в конфиге без миграций
 
 ---
 

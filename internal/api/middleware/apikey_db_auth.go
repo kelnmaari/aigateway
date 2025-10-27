@@ -11,9 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // APIKeyDBAuth middleware для аутентификации по API ключам из базы данных
@@ -169,3 +169,4 @@ func extractKeyID(apiKey string) string {
 	}
 	return parts[1]
 }
+

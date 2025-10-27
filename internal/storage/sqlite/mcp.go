@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // CreateMCPServer создает новую запись MCP сервера
@@ -277,3 +277,4 @@ func (s *SQLiteDB) ListMCPServers(ctx context.Context, req models.MCPServerListR
 		Offset:  offset,
 	}, nil
 }
+

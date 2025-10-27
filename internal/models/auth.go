@@ -10,3 +10,4 @@ type ChangePasswordRequest struct {
 type ChangePasswordResponse struct {
 	Message string `json:"message"`
 }
+

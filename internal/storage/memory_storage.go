@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // MemoryStorage реализует in-memory хранилище для тестов
@@ -439,3 +439,4 @@ func (s *ErrorStorage) HealthCheck(ctx context.Context) error {
 func (s *ErrorStorage) GetStorageStats(ctx context.Context) (map[string]interface{}, error) {
 	return nil, s.Err
 }
+

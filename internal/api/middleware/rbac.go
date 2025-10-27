@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/services/rbac"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/services/rbac"
+	"aigateway/internal/storage"
 )
 
 // RBACMiddleware provides RBAC (Role-Based Access Control) middleware for Gin
@@ -348,4 +348,5 @@ func (m *RBACMiddleware) RequireRole(roleName string) gin.HandlerFunc {
 		c.Abort()
 	}
 }
+
 

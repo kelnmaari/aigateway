@@ -461,3 +461,4 @@ curl -H "Authorization: Bearer admin-key" \
    // Хорошо:
    element.innerHTML = log.message; // реальное сообщение
    ```
+

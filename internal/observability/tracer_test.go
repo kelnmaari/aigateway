@@ -194,3 +194,4 @@ func TestTracerProvider_ContextPropagation(t *testing.T) {
 	extractedSpan := trace.SpanFromContext(ctx)
 	assert.NotNil(t, extractedSpan)
 }
+

@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/webfetch"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
+	"aigateway/internal/webfetch"
 )
 
 // WebFetchHandler обрабатывает web fetch запросы
@@ -306,3 +306,4 @@ func (h *WebFetchHandler) HandleBatchFetch(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+

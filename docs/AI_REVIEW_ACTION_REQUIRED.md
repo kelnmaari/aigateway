@@ -9,7 +9,7 @@
 
 ## ⚠️ Что нужно сделать СЕЙЧАС
 
-### 1. Перезапустите Ollama-OpenAI Proxy с новым билдом
+### 1. Перезапустите AIGateway Platform с новым билдом
 
 ```bash
 # Остановите старый процесс
@@ -210,4 +210,5 @@ AI review completed successfully!
 **Version:** 1.0  
 **Last Updated:** 2025-10-22  
 **Status:** Action Required
+
 

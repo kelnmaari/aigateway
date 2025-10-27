@@ -39,6 +39,24 @@ auth:
     secret: "dev-jwt-secret-change-this-in-production-use-at-least-32-chars"
     access_token_expiry: "15m"    # Access token живет 15 минут
     refresh_token_expiry: "168h"  # Refresh token живет 7 дней
+  
+  # User Registration (Version 2.3.0+: Invitation System)
+  registration:
+    mode: "open"  # "open" | "invitation_only" | "disabled"
+    require_email_verification: false  # Требовать верификацию email после регистрации
+    allow_username_login: true  # Разрешить логин по username (не только email)
+  
+  # Invitation System (Version 2.3.0+)
+  invitations:
+    enabled: true  # Включить систему приглашений
+    default_expiry_days: 7  # Срок действия приглашения по умолчанию (0 = без ограничения)
+    max_uses_default: 1  # Сколько раз можно использовать одно приглашение
+    allow_email_restriction: true  # Разрешить привязку приглашения к email
+    
+    # Rate limiting для создания приглашений
+    rate_limit:
+      creation_per_admin_hour: 10  # Максимум приглашений от одного админа в час
+      validation_per_ip_minute: 10  # Максимум проверок токена с одного IP в минуту
 
   # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
   oidc:
@@ -144,7 +162,7 @@ database:
   
   # SQLite Configuration (для development)
   sqlite:
-    path: "data/proxy.db"
+    path: "data/aigateway.db"
     journal_mode: "WAL"      # Write-Ahead Logging для лучшей concurrency
     busy_timeout: 5000        # ms - ожидание при locked БД
     cache_size: 10000         # KB - размер кеша SQLite
@@ -170,6 +188,14 @@ logging:
   max_backups: 5   # Количество старых файлов
   max_age: 30      # days - удалять файлы старше
   compress: true   # Сжимать старые логи (gzip)
+  
+  # Separate error log file (errors and warnings only)
+  error_log_enabled: true
+  error_log_file_path: "logs/proxy-errors.log"
+  error_log_max_size: 50      # MB (default: same as max_size)
+  error_log_max_backups: 10   # Keep more error log backups
+  error_log_max_age: 90       # days (keep errors longer)
+  error_log_compress: true
 
 models:
   # Модель по умолчанию для embeddings
@@ -438,3 +464,57 @@ web_fetch:
   # Cache
   cache_enabled: true
   cache_ttl: "1h"  # How long to cache fetched pages
+
+# 📚 RAG SYSTEM - Retrieval-Augmented Generation (Version 1.13.0+)
+rag:
+  enabled: false  # Включить RAG систему
+  
+  # Vector Store Configuration
+  vector_store:
+    type: "pgvector"  # Только pgvector поддерживается
+    connection_string: "postgres://postgres:postgres@localhost:5432/ollama_proxy?sslmode=disable"
+    dimensions: 1024  # Размерность embeddings (зависит от модели)
+    distance_metric: "cosine"  # cosine, l2, dot_product
+    hnsw_ef_construction: 200
+    hnsw_m: 16
+  
+  # File Storage for uploaded documents
+  file_storage:
+    type: "local"  # local или s3
+    local_path: "./data/rag_files"
+    max_file_size: "100MB"
+  
+  # Embeddings Configuration
+  embeddings:
+    provider: "ollama"
+    ollama_url: "http://localhost:11434"
+    model: "mxbai-embed-large"  # или nomic-embed-text
+    batch_size: 32
+    timeout: "30s"
+  
+  # Processing Configuration
+  processing:
+    workers: 4  # Количество worker threads для обработки
+    queue_size: 100
+    chunk_size: 512  # Размер чанков в токенах
+    chunk_overlap: 50  # Перекрытие между чанками
+    splitter_type: "semantic"  # semantic или simple
+  
+  # Retrieval Configuration
+  retrieval:
+    default_top_k: 5  # Количество chunks для retrieval
+    max_top_k: 20
+    min_similarity_score: 0.7  # Минимальный similarity score
+    rerank_enabled: true
+  
+  # Job Queue Configuration
+  queue:
+    type: "postgres"  # postgres или memory
+    cleanup_interval: "1h"
+    max_retries: 3
+    visibility_timeout: "5m"
+  
+  # Security Configuration
+  security:
+    encryption_key: "12345678901234567890123456789012"  # 32 bytes для AES-256 (замените в production!)
+    credentials_encryption_enabled: true

@@ -419,3 +419,4 @@ curl -X POST http://localhost:8080/api/auth/change-password \
 
 - [bcrypt package](https://pkg.go.dev/golang.org/x/crypto/bcrypt)
 - [OWASP Password Guidelines](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html#password-complexity)
+

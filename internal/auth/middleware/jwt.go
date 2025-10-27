@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/jwt"
+	"aigateway/internal/auth/jwt"
 )
 
 // JWTAuth middleware для проверки JWT токенов
@@ -175,3 +175,4 @@ func RequireJWTAuth(c *gin.Context) (string, bool) {
 	}
 	return userID, true
 }
+

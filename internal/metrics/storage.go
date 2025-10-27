@@ -321,3 +321,4 @@ func (ms *MetricsStorage) DecrementActiveRequests() {
 func (ms *MetricsStorage) GetActiveRequestsCount() int64 {
 	return atomic.LoadInt64(&ms.activeRequestsCount)
 }
+

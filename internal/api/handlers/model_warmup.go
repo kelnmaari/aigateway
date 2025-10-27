@@ -9,8 +9,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
 )
 
 // ModelWarmer обеспечивает предварительный прогрев моделей
@@ -155,3 +155,4 @@ func GetModelSize(modelName string) string {
 func intPtr(i int) *int {
 	return &i
 }
+

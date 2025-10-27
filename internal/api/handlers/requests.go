@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/request"
+	"aigateway/internal/config"
+	"aigateway/internal/request"
 )
 
 // RequestsHandler обрабатывает запросы для request monitoring (TUI-04)
@@ -139,3 +139,4 @@ func (h *RequestsHandler) ClearRequests(c *gin.Context) {
 		"message": "Request history cleared successfully",
 	})
 }
+

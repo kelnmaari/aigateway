@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/storage"
 )
 
 // TenantMembershipMiddleware проверяет, является ли пользователь членом tenant
@@ -132,3 +132,4 @@ func RequireTenantRole(db storage.Database, logger *logrus.Logger, allowedRoles 
 		c.Abort()
 	}
 }
+

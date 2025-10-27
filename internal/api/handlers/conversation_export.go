@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/services/export"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/services/export"
+	"aigateway/internal/storage"
 )
 
 // ConversationExportHandler обрабатывает export/import endpoints
@@ -285,4 +285,5 @@ func (h *ConversationExportHandler) ImportConversation(c *gin.Context) {
 
 	c.JSON(http.StatusOK, result)
 }
+
 

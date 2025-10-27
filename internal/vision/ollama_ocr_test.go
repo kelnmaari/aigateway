@@ -9,8 +9,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
 )
 
 // mockOllamaClient для тестирования
@@ -154,3 +154,4 @@ func TestOllamaOCR_SupportedModels(t *testing.T) {
 		}
 	}
 }
+

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================
@@ -771,3 +771,4 @@ idx = len(sorted) - 1
 }
 return sorted[idx]
 }
+

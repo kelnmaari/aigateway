@@ -298,3 +298,4 @@ func (e *PDFExtractor) MaxFileSize() int64 {
 	// PDF может быть большим
 	return 100 * 1024 * 1024 // 100MB
 }
+

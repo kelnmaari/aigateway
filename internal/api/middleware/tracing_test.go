@@ -162,3 +162,4 @@ func TestTracingMiddleware_SuccessStatus(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "Success", rr.Body.String())
 }
+

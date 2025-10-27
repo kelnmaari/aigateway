@@ -13,9 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	auditService "ollama-openai-proxy/internal/services/audit"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	auditService "aigateway/internal/services/audit"
+	"aigateway/internal/storage"
 )
 
 // BackupHandler обрабатывает backup и restore операции
@@ -406,3 +406,4 @@ func (h *BackupHandler) cleanupOldBackups() {
 		}
 	}
 }
+

@@ -5,6 +5,407 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+### Changed
+
+- **Repository name**: `ollama-openai-proxy` → `aigateway`
+- **Module path**: `ollama-openai-proxy` → `aigateway`
+- **Container name**: `ollama-openai-proxy` → `aigateway`
+- **Database file**: `proxy.db` → `aigateway.db` (optional rename)
+- **Log files**: `proxy.log` → `aigateway.log`
+
+- **Environment Variables (⚠️ Breaking Change)**: All `PROXY_*` → `AIGATEWAY_*`
+  - Example: `PROXY_SERVER_PORT` → `AIGATEWAY_SERVER_PORT`
+  - `PROXY_OLLAMA_URL` → `AIGATEWAY_OLLAMA_URL`
+  - `PROXY_DATABASE_TYPE` → `AIGATEWAY_DATABASE_TYPE`
+  - See [Migration Guide](docs/MIGRATION_GUIDE_v2.1.0.md) for complete mapping
+
+- **Documentation Updates**: 40+ files rebranded
+  - README.md - complete rewrite для AIGateway Platform
+  - Architecture.MD - updated diagrams with RAG System, Model Registry
+  - All docs/*.md files (20+ files)
+  - All BACKLOG/*.md files
+
+- **Code Changes**: Zero functional changes - pure rebranding
+  - go.mod module path updated
+  - All import statements across entire codebase
+  - Docker Compose configuration
+  - Dockerfile VERSION=2.1.0
+
+- **WebUI Branding**: Complete frontend rebranding
+  - All HTML page titles: "AIGateway Platform"
+  - Navigation labels и headers
+  - About System page
+  - Footer copyright
+
+### Why Rebranding?
+
+**Reasons for transition to "AIGateway":**
+
+1. **Expanded Scope**: No longer just an Ollama proxy
+  - Multi-provider support: vLLM (v2.2.0), future: OpenAI, Anthropic
+  - Model registry для unified API access
+
+2. **RAG System**: Built-in RAG capabilities
+  - Vector search, embeddings, document processing
+  - Enterprise-ready data integration
+
+3. **Enterprise Positioning**: "Gateway" better represents platform role
+  - Central AI infrastructure component
+  - Unified API для multiple backends
+
+4. **Scalability**: Name allows future expansion
+  - Cloud provider integration
+  - Custom model support
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed steps.
+
+**Quick Migration Checklist:**
+  - Update environment variables: `PROXY_*` → `AIGATEWAY_*`
+  - Update Docker image names
+  - Rename database file (optional): `proxy.db` → `aigateway.db`
+  - Update scripts/configs referencing old names
+  - Pull new Docker images: `aigateway:2.1.0`
+
+### Technical
+
+- **Module path**: `aigateway` (was `ollama-openai-proxy`)
+- **Import paths**: Updated throughout codebase (~150+ Go files)
+- **Docker Compose**: Service name `aigateway`, volumes `aigateway_data`/`aigateway_logs`
+- **Functional changes**: Zero - pure rebranding release
+- **Compilation**: Verified ✅
+- **Database schema**: Unchanged (backward compatible)
+
+---
+
+## [2.0.0] - 2025-10-27
+
+### 🚀 Major Features
+
+- **RAG System (Retrieval-Augmented Generation)**: Полная интеграция системы RAG для работы с внешними источниками данных
+  - Поддержка множественных типов источников данных:
+    - REST API с аутентификацией (Basic, Bearer Token, API Key)
+    - PostgreSQL базы данных с incremental sync
+    - File Upload для документов (PDF, TXT, MD, DOCX)
+    - Web Scraping для веб-страниц
+  - Semantic chunking с intelligent text splitting
+    - Поддержка параграфов и предложений
+    - Configurable chunk size и overlap
+    - Token estimation для оптимального размера chunks
+  - Vector embeddings через Ollama:
+    - Модели: `mxbai-embed-large`, `nomic-embed-text`
+    - Batch processing для производительности
+    - Настраиваемые размерности векторов
+  - PgVector для хранения и similarity search:
+    - Cosine similarity, L2 distance, dot product
+    - HNSW indexing для быстрого поиска
+    - Масштабируемое хранение векторов
+  - RAG Orchestrator с reranking:
+    - Keyword overlap scoring
+    - Metadata boosting
+    - Configurable Top-K chunks retrieval
+    - Min similarity score filtering
+  - Context assembly для LLM:
+    - Форматирование retrieved context
+    - Source attribution
+    - Token-aware context window management
+  - Query logging для analytics:
+    - Performance metrics (search time)
+    - Quality scoring
+    - Usage statistics по источникам
+
+- **RAG Management WebUI**: Полнофункциональный интерфейс управления RAG
+  - **User Dashboard** (`/rag-sources.html`):
+    - CRUD операции для личных RAG источников
+    - Real-time статус синхронизации
+    - Connection testing перед созданием источника
+    - Управление credentials с шифрованием
+    - Statistics: chunks count, tokens, last sync
+  - **Admin Panel** (`/admin-rag.html`):
+    - Просмотр всех RAG источников всех пользователей
+    - Фильтрация по user, type, status
+    - Bulk operations (sync, delete)
+    - Detailed metrics и analytics
+    - Pagination для больших списков
+  - **Chat Integration** (`/chat.html`):
+    - RAG toggle в UI чата
+    - Multi-select для выбора data sources
+    - Sliders для Top K chunks и Min Score
+    - Reranking checkbox
+    - Source attribution в ответах
+  - **RAG Disable Banner**: Информационная плашка когда RAG отключен администратором
+
+- **Chat Export/Import UI**: Полнофункциональный интерфейс экспорта и импорта conversations
+  - **Export Dropdown в Chat Header**:
+    - Export as JSON (structured data с metadata)
+    - Export as Markdown (readable format с форматированием)
+    - Export as Text (plain text без форматирования)
+    - Автоматическое скачивание файла с sanitized filename
+  - **Import Modal**:
+    - Upload JSON файла экспортированной conversation
+    - Опция "Preserve original timestamps" (сохранить оригинальные даты)
+    - Опция "Preserve original IDs" (сохранить оригинальные идентификаторы)
+    - Validation JSON структуры перед импортом
+    - Success notification с количеством imported messages
+    - Автоматический reload для отображения импортированной conversation
+
+- **Browser Testing Integration**: MCP browser extension для E2E тестирования
+  - Chrome browser automation через Playwright
+  - Accessibility snapshots для UI testing
+  - Screenshot capabilities
+  - Form interactions и validations
+  - Network requests monitoring
+
+### 🎨 UI/UX Improvements
+
+- **Modal Windows Centering**: Исправлено позиционирование модальных окон
+  - Модалки теперь появляются строго по центру экрана (horizontal + vertical)
+  - Flexbox-based centering для надежности
+  - Smooth animations с правильным transform
+  - Backdrop blur эффект
+  - Responsive design для mobile
+
+- **Consistent Dashboard Styling**: Единообразный dark theme на всех страницах
+  - Серый фон для content areas (`var(--bg-secondary)`)
+  - Темные карточки с прозрачностью (`var(--bg-tertiary)`)
+  - Улучшенная читаемость текста (explicit color definitions)
+  - Убраны белые полосы и артефакты
+  - Consistent borders и border-radius
+  - Применено на всех страницах:
+    - Dashboard, API Keys, RAG Sources, Admin RAG
+    - About System, Usage, Profile, Files
+    - MCP Catalog, Tenants, RBAC, Audit
+
+- **Login Page Redesign**: Двухколоночный layout с gradient background
+  - **Левая колонка**: Login form
+  - **Правая колонка**: System info panel
+    - System Status (Online badge с пульсацией)
+    - Version info
+    - Available Models list с размерами
+    - RAG System status
+  - Gradient background (blue → purple → pink)
+  - Dynamic model loading через `/api/v1/models`
+
+- **Error Messages Styling**: Улучшенный контраст и visibility
+  - Error messages: rgba(239, 68, 68) с border и shadow
+  - Success messages: rgba(16, 185, 129) с border и shadow
+  - Improved padding и font-weight
+  - Better readability на темном фоне
+
+- **RBAC Page Refactoring** (`/admin-rbac.html`):
+  - Удален Bootstrap, full custom CSS
+  - Custom tab navigation
+  - Dark theme compatibility
+  - Card styles с правильными цветами
+  - Fixed non-clickable buttons issue
+
+- **Audit Log Page Refactoring** (`/admin-audit.html`):
+  - Consistent styling с другими admin pages
+  - Improved table layout
+  - Better filters section
+  - Pagination controls
+
+### 🔐 Security & Authentication
+
+- **JWT Token Rotation**: Refresh token rotation для enhanced security
+  - Новый refresh token выдается при каждом обновлении access token
+  - Старый refresh token добавляется в blacklist
+  - Frontend обновляет оба токена при refresh
+  - Предотвращение token replay attacks
+
+- **Authentication Flow Fixes**: Исправлен logout loop
+  - `clearSessionAndRedirect()` вместо `logout()` при refresh failure
+  - Корректная очистка localStorage
+  - Правильный redirect на `/login.html`
+  - Предотвращение API calls с invalid tokens
+
+- **Public API Endpoints**: `/api/models` и `/api/v1/models` теперь публичные
+  - Доступны без аутентификации для Login page
+  - Display available models до входа в систему
+
+- **RAG Credentials Encryption**: AES-256 шифрование credentials
+  - Configurable encryption key в RAG config
+  - Безопасное хранение API keys, passwords, tokens
+  - Encrypt при создании, decrypt при использовании
+
+### 📊 Logging & Monitoring
+
+- **Separate Error Logging**: Dedicated error log file
+  - Новый config `logging.error_log_enabled`
+  - Отдельный файл для errors и warnings (`logs/proxy-errors.log`)
+  - Logrus hook с lumberjack rotation
+  - Configurable max_size, max_backups, max_age, compress
+  - Defaults наследуются из основной logging config
+  - Log rotation при старте сервера
+
+- **Audit Events Metadata Fix**: JSON serialization для metadata
+  - `map[string]interface{}` теперь корректно сохраняется
+  - JSON Marshal/Unmarshal в SQLite implementation
+  - Исправлена ошибка "unsupported type map[string]interface{}"
+
+### 🛠️ Technical Improvements
+
+- **API Client Enhancements** (`web/js/api.js`):
+  - Generic HTTP methods: `get()`, `post()`, `put()`, `delete()`
+  - RAG-specific methods: `getRAGSources()`, `createRAGSource()`, etc.
+  - RBAC methods: `getRBACRoles()`, `createRBACRole()`, etc.
+  - Audit methods: `getAuditLogs()`, `exportAuditLogs()`, etc.
+  - System methods: `getSystemInfo()`, `isRAGEnabled()`
+  - Improved token refresh logic
+  - Better error handling
+
+- **Context Parsing Fix**: User/Tenant ID prefix stripping
+  - JWT middleware добавляет "user_" и "tenant_" prefixes
+  - RAG handlers теперь корректно парсят с strip префиксов
+  - Исправлены UUID parsing errors
+
+- **CSS Conflicts Resolution**: 
+  - Удалено дублирующее `.modal` правило из `theme.css`
+  - Высокоприоритетные селекторы в `dashboard.css`
+  - `max-width: none !important` для override
+  - Правильный flexbox centering
+
+- **Navigation Component** (`web/js/components/navbar.js`):
+  - Добавлена поддержка `rag-sources.html` и `admin-rag.html`
+  - Правильное определение текущей страницы
+  - Active state для навигационных ссылок
+
+### 📚 Documentation
+
+- **RAG Deployment Guide** (`docs/RAG_DEPLOYMENT_GUIDE.md`):
+  - Prerequisites (PostgreSQL with pgvector, Ollama, embeddings models)
+  - Configuration examples
+  - Docker Compose setup
+  - Kubernetes deployment
+  - Troubleshooting guide
+
+- **RAG Config Guide** (`docs/RAG_CONFIG_GUIDE.md`):
+  - Detailed configuration options
+  - Performance tuning
+  - Security best practices
+  - Enable/Disable instructions
+
+- **RAG Testing Guide** (`docs/RAG_TESTING.md`):
+  - Go unit tests coverage
+  - Integration testing
+  - E2E Playwright tests
+
+- **Error Logging Guide** (`docs/ERROR_LOGGING.md`):
+  - Configuration instructions
+  - Usage examples
+  - Best practices
+
+### 🔧 Configuration
+
+- **RAG Configuration** (`rag` section в config):
+  - `enabled`: Enable/disable RAG subsystem
+  - `vector_store`: PgVector connection settings
+  - `file_storage`: Local/S3/Azure storage for documents
+  - `embeddings`: Ollama embeddings configuration
+  - `processing`: Worker pool settings, chunk sizes
+  - `retrieval`: Top-K, similarity threshold, reranking
+  - `queue`: PostgreSQL job queue settings
+  - `security`: Encryption key для credentials
+
+- **Logging Configuration Enhancements**:
+  - `error_log_enabled`: Enable separate error log
+  - `error_log_file_path`: Path to error log file
+  - `error_log_max_size`: Max size before rotation (MB)
+  - `error_log_max_backups`: Number of old error logs to keep
+  - `error_log_max_age`: Days to keep old error logs
+  - `error_log_compress`: Compress old error logs
+
+### 🗃️ Database
+
+- **RAG Schema Migrations**:
+  - `rag_data_sources`: Data source definitions
+  - `rag_documents`: Document metadata
+  - `rag_chunks`: Text chunks с embeddings
+  - `rag_jobs`: Processing job queue
+  - `rag_query_logs`: Query analytics
+  - PostgreSQL + SQLite support
+
+### 🧪 Testing
+
+- **Go Unit Tests**: Comprehensive test coverage
+  - `internal/rag/chunker/semantic_test.go`: 15+ tests
+  - `internal/rag/orchestrator/orchestrator_test.go`: 12+ tests
+  - `internal/services/rag/datasource_service_test.go`: 13+ tests
+  - `internal/api/handlers/chat_rag_test.go`: 8+ tests
+  - `internal/rag/embeddings/ollama_test.go`: 10+ tests
+  - `internal/rag/processor/worker_test.go`: 13+ tests
+
+- **Playwright E2E Tests**: Browser-based UI testing
+  - `tests/playwright/e2e/auth.spec.ts`: Authentication flows
+  - `tests/playwright/e2e/chat.spec.ts`: Chat functionality
+  - `tests/playwright/e2e/rag.spec.ts`: RAG UI interactions
+  - `tests/playwright/e2e/dashboard.spec.ts`: Dashboard navigation
+  - `tests/playwright/e2e/apikeys.spec.ts`: API key management
+  - Multi-browser support (Chrome, Firefox, Safari)
+  - Docker integration для CI/CD
+
+### 🐛 Bug Fixes
+
+- Fixed modal windows appearing off-center (left side instead of center)
+- Fixed logout loop when refresh token is blacklisted
+- Fixed `user_id` UUID parsing with "user_" prefix
+- Fixed audit events metadata serialization error
+- Fixed white-on-white text readability on About System page
+- Fixed RBAC page non-clickable buttons
+- Fixed MCP Catalog white spaces and styling issues
+- Fixed modal animations with flexbox centering
+- Fixed API error responses when RAG is disabled
+
+### ⚡ Performance
+
+- **Worker Pool для Document Processing**:
+  - Parallel chunking с configurable workers
+  - Metrics tracking (processed, failed, total time)
+  - Graceful shutdown
+
+- **Batch Embeddings**:
+  - Batch processing для Ollama API
+  - Reduced API calls overhead
+
+- **Connection Pooling**:
+  - HTTP client connection pooling для Ollama
+  - Database connection pooling для PostgreSQL
+
+### 🔄 Breaking Changes
+
+- **Version Jump**: 1.12.3 → 2.0.0 (major release)
+- **New Dependencies Required**:
+  - PostgreSQL with pgvector extension для RAG
+  - Ollama с embedding models для RAG
+- **Configuration Changes**: Новый раздел `rag` в config files
+- **Database Schema**: Новые таблицы для RAG system
+
+### 📦 Dependencies
+
+- Added `github.com/pgvector/pgvector-go` для vector operations
+- Added Playwright для E2E testing
+- Added lumberjack для log rotation
+- Enhanced Ollama client для embeddings support
+
+### 🎯 Next Steps
+
+- WebUI для RAG analytics и query logs
+- RAG performance metrics dashboard
+- Advanced reranking algorithms
+- Support для дополнительных embedding models
+- RAG templates для common use cases
+
+---
+
 ## [1.12.3] - 2025-10-26
 
 ### Added
@@ -1240,3 +1641,4 @@ User: Explain https://docs.python.org/3/library/asyncio.html
 - Custom metrics (Ollama latency, API keys) подготовлены для future versions
 - GPU monitoring работает только в Linux/macOS, Windows использует stub
 - Dashboard доступен только для admin users с валидным JWT
+

@@ -7,9 +7,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // Converter объединяет все конвертеры в единый интерфейс
@@ -315,3 +315,4 @@ func (c *Converter) GetConversionStats() map[string]interface{} {
 
 	return stats
 }
+

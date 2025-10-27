@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Ollama Proxy</title>
+    <title>Dashboard - AIGateway</title>
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/dashboard.css">
@@ -24,8 +24,10 @@
                 </div>
             </header>
 
-            <!-- Stats Cards -->
-            <div class="stats-grid" id="stats-grid">
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Stats Cards -->
+                <div class="stats-grid" id="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon" style="background: rgba(16, 163, 127, 0.1);">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)">
@@ -100,6 +102,12 @@
                         <p>Set up a new team workspace</p>
                     </a>
 
+                    <a href="/rag-sources.html" class="action-card">
+                        <div class="action-icon">📚</div>
+                        <h3>RAG Data Sources</h3>
+                        <p>Manage knowledge sources for RAG</p>
+                    </a>
+
                     <a href="/usage.html" class="action-card">
                         <div class="action-icon">📊</div>
                         <h3>View Usage</h3>
@@ -149,6 +157,7 @@
                     <div class="tenant-card loading">Loading tenants...</div>
                 </div>
             </section>
+            </div>
         </div>
     </main>
 
@@ -161,3 +170,5 @@
     <script src="/js/dashboard.js"></script>
 </body>
 </html>
+
+

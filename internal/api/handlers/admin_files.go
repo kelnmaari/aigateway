@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/filestorage"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/filestorage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // AdminFilesHandler обрабатывает административные операции с файлами (v1.10.0+)
@@ -200,3 +200,4 @@ func formatBytes(bytes int64) string {
 	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	return strconv.FormatFloat(float64(bytes)/float64(div), 'f', 1, 64) + " " + units[exp]
 }
+

@@ -8,7 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/storage"
 )
 
 // RetentionPolicy manages automatic cleanup of old audit events
@@ -127,4 +127,5 @@ func (r *RetentionPolicy) RunOnce() error {
 
 	return nil
 }
+
 

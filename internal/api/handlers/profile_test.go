@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // BenchmarkProfileChatCompletion профилирует chat completion под нагрузкой
@@ -116,3 +116,4 @@ func prepareEmbeddingRequest() []byte {
 	jsonBody, _ := json.Marshal(reqBody)
 	return jsonBody
 }
+

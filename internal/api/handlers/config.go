@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // ConfigHandler обрабатывает запросы конфигурации
@@ -186,3 +186,4 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+

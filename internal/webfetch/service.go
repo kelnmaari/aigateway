@@ -8,7 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/storage"
 )
 
 // Service high-level web fetch service
@@ -113,3 +113,4 @@ func (s *Service) storePage(ctx context.Context, url, urlHash string, page *WebP
 
 	return nil
 }
+

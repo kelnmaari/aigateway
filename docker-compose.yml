@@ -5,47 +5,47 @@ services:
   # Production Setup (SQLite)
   # ================================
   
-  # Основной прокси сервер
-  proxy:
+  # AIGateway Platform Server
+  aigateway:
     build:
       context: .
       dockerfile: docker/Dockerfile
       target: production
       args:
-        VERSION: "1.3.0"
+        VERSION: "2.1.0"
         BUILD_TIME: "${BUILD_TIME:-unknown}"
         GIT_COMMIT: "${GIT_COMMIT:-unknown}"
-    container_name: ollama-openai-proxy
+    container_name: aigateway
     ports:
       - "8080:8080"
     environment:
       # Server settings
-      - PROXY_SERVER_PORT=8080
-      - PROXY_SERVER_HOST=0.0.0.0
+      - AIGATEWAY_SERVER_PORT=8080
+      - AIGATEWAY_SERVER_HOST=0.0.0.0
       
       # Ollama settings
-      - PROXY_OLLAMA_URL=http://ollama:11434
-      - PROXY_OLLAMA_TIMEOUT=30s
+      - AIGATEWAY_OLLAMA_URL=http://ollama:11434
+      - AIGATEWAY_OLLAMA_TIMEOUT=30s
       
       # Logging
-      - PROXY_LOGGING_LEVEL=info
-      - PROXY_LOGGING_FORMAT=json
-      - PROXY_LOGGING_FILE=/app/logs/proxy.log
+      - AIGATEWAY_LOGGING_LEVEL=info
+      - AIGATEWAY_LOGGING_FORMAT=json
+      - AIGATEWAY_LOGGING_FILE=/app/logs/aigateway.log
       
-      # Authentication (Version 1.3.0)
-      - PROXY_AUTH_ENABLED=true
-      - PROXY_AUTH_ADMIN_KEY=${ADMIN_KEY:-sk-admin-change-me}
-      - PROXY_AUTH_JWT_SECRET=${JWT_SECRET:-change-this-in-production}
-      - PROXY_AUTH_JWT_ACCESS_TOKEN_EXPIRY=15m
-      - PROXY_AUTH_JWT_REFRESH_TOKEN_EXPIRY=168h
+      # Authentication
+      - AIGATEWAY_AUTH_ENABLED=true
+      - AIGATEWAY_AUTH_ADMIN_KEY=${ADMIN_KEY:-sk-admin-change-me}
+      - AIGATEWAY_AUTH_JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - AIGATEWAY_AUTH_JWT_ACCESS_TOKEN_EXPIRY=15m
+      - AIGATEWAY_AUTH_JWT_REFRESH_TOKEN_EXPIRY=168h
       
       # Database (SQLite for simple deployment)
-      - PROXY_DATABASE_TYPE=sqlite
-      - PROXY_DATABASE_SQLITE_PATH=/app/data/proxy.db
-      - PROXY_DATABASE_SQLITE_JOURNAL_MODE=WAL
+      - AIGATEWAY_DATABASE_TYPE=sqlite
+      - AIGATEWAY_DATABASE_SQLITE_PATH=/app/data/aigateway.db
+      - AIGATEWAY_DATABASE_SQLITE_JOURNAL_MODE=WAL
     volumes:
-      - proxy_data:/app/data
-      - proxy_logs:/app/logs
+      - AIGATEWAY_data:/app/data
+      - AIGATEWAY_logs:/app/logs
       - ./configs:/app/configs:ro
     depends_on:
       - ollama
@@ -101,31 +101,31 @@ services:
       - "8080:8080"
     environment:
       # Server settings
-      - PROXY_SERVER_PORT=8080
-      - PROXY_SERVER_HOST=0.0.0.0
+      - AIGATEWAY_SERVER_PORT=8080
+      - AIGATEWAY_SERVER_HOST=0.0.0.0
       
       # Ollama settings
-      - PROXY_OLLAMA_URL=http://ollama:11434
+      - AIGATEWAY_OLLAMA_URL=http://ollama:11434
       
       # Logging
-      - PROXY_LOGGING_LEVEL=info
-      - PROXY_LOGGING_FORMAT=json
+      - AIGATEWAY_LOGGING_LEVEL=info
+      - AIGATEWAY_LOGGING_FORMAT=json
       
       # Authentication
-      - PROXY_AUTH_ENABLED=true
-      - PROXY_AUTH_ADMIN_KEY=${ADMIN_KEY:-sk-admin-change-me}
-      - PROXY_AUTH_JWT_SECRET=${JWT_SECRET:-change-this-in-production-minimum-32-chars}
+      - AIGATEWAY_AUTH_ENABLED=true
+      - AIGATEWAY_AUTH_ADMIN_KEY=${ADMIN_KEY:-sk-admin-change-me}
+      - AIGATEWAY_AUTH_JWT_SECRET=${JWT_SECRET:-change-this-in-production-minimum-32-chars}
       
       # Database (PostgreSQL for production)
-      - PROXY_DATABASE_TYPE=postgresql
-      - PROXY_DATABASE_POSTGRESQL_HOST=postgres
-      - PROXY_DATABASE_POSTGRESQL_PORT=5432
-      - PROXY_DATABASE_POSTGRESQL_DATABASE=ollama_proxy
-      - PROXY_DATABASE_POSTGRESQL_USER=proxy_user
-      - PROXY_DATABASE_POSTGRESQL_PASSWORD=${DB_PASSWORD:-secure_password}
-      - PROXY_DATABASE_POSTGRESQL_SSL_MODE=require
+      - AIGATEWAY_DATABASE_TYPE=postgresql
+      - AIGATEWAY_DATABASE_POSTGRESQL_HOST=postgres
+      - AIGATEWAY_DATABASE_POSTGRESQL_PORT=5432
+      - AIGATEWAY_DATABASE_POSTGRESQL_DATABASE=ollama_proxy
+      - AIGATEWAY_DATABASE_POSTGRESQL_USER=AIGATEWAY_user
+      - AIGATEWAY_DATABASE_POSTGRESQL_PASSWORD=${DB_PASSWORD:-secure_password}
+      - AIGATEWAY_DATABASE_POSTGRESQL_SSL_MODE=require
     volumes:
-      - proxy_logs:/app/logs
+      - AIGATEWAY_logs:/app/logs
       - ./configs:/app/configs:ro
     depends_on:
       postgres:
@@ -152,7 +152,7 @@ services:
       - "5432:5432"
     environment:
       - POSTGRES_DB=ollama_proxy
-      - POSTGRES_USER=proxy_user
+      - POSTGRES_USER=AIGATEWAY_user
       - POSTGRES_PASSWORD=${DB_PASSWORD:-secure_password}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=en_US.UTF-8
     volumes:
@@ -162,7 +162,7 @@ services:
       - ollama_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U proxy_user -d ollama_proxy"]
+      test: ["CMD-SHELL", "pg_isready -U AIGATEWAY_user -d ollama_proxy"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -184,18 +184,18 @@ services:
       - "8080:8080"
       - "2345:2345"  # Delve debugger
     environment:
-      - PROXY_SERVER_PORT=8080
-      - PROXY_SERVER_HOST=0.0.0.0
-      - PROXY_OLLAMA_URL=http://ollama:11434
-      - PROXY_LOGGING_LEVEL=debug
-      - PROXY_LOGGING_FORMAT=text
-      - PROXY_AUTH_ENABLED=false
-      - PROXY_DATABASE_TYPE=sqlite
-      - PROXY_DATABASE_SQLITE_PATH=/app/data/proxy-dev.db
+      - AIGATEWAY_SERVER_PORT=8080
+      - AIGATEWAY_SERVER_HOST=0.0.0.0
+      - AIGATEWAY_OLLAMA_URL=http://ollama:11434
+      - AIGATEWAY_LOGGING_LEVEL=debug
+      - AIGATEWAY_LOGGING_FORMAT=text
+      - AIGATEWAY_AUTH_ENABLED=false
+      - AIGATEWAY_DATABASE_TYPE=sqlite
+      - AIGATEWAY_DATABASE_SQLITE_PATH=/app/data/proxy-dev.db
       - GO_ENV=development
     volumes:
       - .:/app
-      - proxy_data_dev:/app/data
+      - AIGATEWAY_data_dev:/app/data
       - go_cache:/root/.cache/go-build
       - go_mod_cache:/go/pkg/mod
     depends_on:
@@ -278,7 +278,7 @@ services:
       target: tui
     container_name: ollama-proxy-tui
     environment:
-      - PROXY_URL=http://proxy:8080
+      - AIGATEWAY_URL=http://proxy:8080
     depends_on:
       - proxy
     networks:
@@ -291,11 +291,11 @@ services:
 volumes:
   ollama_data:
     driver: local
-  proxy_data:
+  AIGATEWAY_data:
     driver: local
-  proxy_data_dev:
+  AIGATEWAY_data_dev:
     driver: local
-  proxy_logs:
+  AIGATEWAY_logs:
     driver: local
   postgres_data:
     driver: local
@@ -345,3 +345,4 @@ networks:
 # Полный стек:
 #   docker-compose --profile postgres --profile ollama --profile monitoring up
 #
+

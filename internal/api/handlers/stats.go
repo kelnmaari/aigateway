@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/metrics"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/metrics"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // GlobalStats хранит глобальную статистику приложения
@@ -284,3 +284,4 @@ func formatLastUsed(t *time.Time) string {
 	}
 	return t.Format("2006-01-02 15:04")
 }
+

@@ -463,3 +463,4 @@ internal/extractors/text_test.go             # Prepared
 
 **Готово!** 🎉 Version 1.10.0 полностью реализована и протестирована!
 
+

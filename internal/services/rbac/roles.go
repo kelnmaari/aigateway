@@ -3,7 +3,7 @@
 package rbac
 
 import (
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // RoleTemplate defines a role with its permissions (used for seeding)
@@ -126,4 +126,5 @@ func IsSystemRole(roleName string) bool {
 	}
 	return false
 }
+
 

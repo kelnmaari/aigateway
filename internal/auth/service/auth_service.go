@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/jwt"
-	"ollama-openai-proxy/internal/auth/password"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/jwt"
+	"aigateway/internal/auth/password"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // AuthService управляет аутентификацией пользователей
@@ -465,3 +465,4 @@ func generateSlug(username string) string {
 
 	return slug
 }
+

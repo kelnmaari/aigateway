@@ -99,3 +99,4 @@ func colorizeLogLine(entry LogEntry) string {
 		return entry.Raw
 	}
 }
+

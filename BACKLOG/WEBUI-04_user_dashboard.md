@@ -574,3 +574,4 @@ POST   /api/auth/switch-tenant       # Switch current tenant context
 **Автор:** AI Assistant  
 **Дата создания:** 2025-10-05  
 **Последнее обновление:** 2025-10-05
+

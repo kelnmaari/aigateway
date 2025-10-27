@@ -8,9 +8,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/auth/password"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/password"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // BootstrapService handles system initialization and first-time setup
@@ -186,3 +186,4 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *BootstrapRequest)
 		Message: "System initialized successfully. First superadmin created.",
 	}, nil
 }
+

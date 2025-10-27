@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
 )
 
 // MockOllamaClient предоставляет mock implementation для Ollama клиента
@@ -252,3 +252,4 @@ func MockHealthyOllamaClient() *MockOllamaClient {
 func MockFailingOllamaClient(errorMsg string) *MockOllamaClient {
 	return &MockOllamaClient{}
 }
+

@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
+	"aigateway/internal/models"
 )
 
 // StreamingChatHandler обрабатывает streaming chat completions
@@ -405,3 +405,4 @@ func (h *StreamingChatHandler) isLargeModel(modelName string) bool {
 
 	return false
 }
+

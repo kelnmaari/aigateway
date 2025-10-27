@@ -19,7 +19,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 var (
@@ -2507,3 +2507,4 @@ func (m Model) renderConfirmDialog() string {
 
 	return content.String()
 }
+

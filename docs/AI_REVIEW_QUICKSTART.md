@@ -4,7 +4,7 @@
 
 ### Шаг 1: Создайте API ключ
 ```bash
-# Откройте WebUI вашего Ollama-OpenAI Proxy
+# Откройте WebUI вашего AIGateway Platform
 http://your-proxy-host:8080
 
 # Создайте ключ:
@@ -33,7 +33,7 @@ Scopes: ✓ api
 ```bash
 GitLab → Settings → CI/CD → Variables
 
-# 1) API ключ для Ollama-OpenAI Proxy
+# 1) API ключ для AIGateway Platform
 Key:   OLLAMA_PROXY_API_KEY
 Value: (ключ из WebUI proxy)
 Flags: ✓ Mask variable
@@ -96,4 +96,5 @@ curl http://YOUR_PROXY_HOST:8080/v1/models \
 ---
 
 Подробная документация: `docs/AI_REVIEW_SETUP.md`
+
 

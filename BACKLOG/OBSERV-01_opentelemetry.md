@@ -512,3 +512,4 @@ router.Use(middleware.TracingMiddleware(tracerProvider.Tracer()))
 **Зависимости:** Нет  
 **Блокирует:** OBSERV-02 (будет использовать spans)
 
+

@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // Limiter управляет rate limiting для API ключей
@@ -427,3 +427,4 @@ func (tbc *TokenBucketCounter) GetRemaining() int64 {
 
 	return tbc.tokens
 }
+

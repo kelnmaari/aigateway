@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 func TestConvertCompletionToChatRequest(t *testing.T) {
@@ -500,3 +500,4 @@ func BenchmarkPromptToMessages(b *testing.B) {
 		_, _ = promptToMessages(prompt)
 	}
 }
+

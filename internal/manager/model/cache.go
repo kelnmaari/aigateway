@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
+	"aigateway/internal/client/ollama"
 )
 
 // CacheManager управляет кешированием моделей
@@ -193,3 +193,4 @@ func (m *Manager) GetCacheMetrics() map[string]interface{} {
 
 	return metrics
 }
+

@@ -1,4 +1,4 @@
-# 🔧 Troubleshooting Guide - Ollama-OpenAI Proxy v1.9.3
+# 🔧 Troubleshooting Guide - AIGateway Platform v1.9.3
 
 Решения распространенных проблем
 
@@ -623,7 +623,7 @@ cat go.mod
 
 **Problem:** `dlfcn.h: No such file or directory`
 
-**П<https://github.com/yourusername/ollama-openai-proxy/issues>
+**П<https://github.com/yourusername/aigateway/issues>
 
 **Solution:**
 
@@ -654,7 +654,7 @@ GOOS=windows GOARCH=amd64 go build -tags=nogpu \
 # 1. Очистите Docker cache
 docker system prune -a
 
-# 2<https://github.com/yourusername/ollama-openai-proxy/issues>
+# 2<https://github.com/yourusername/aigateway/issues>
 docker compose --profile build up --build
 
 # 3. Проверьте logs
@@ -685,7 +685,7 @@ docker compose logs -f
    ```
 
 3. **GitHub Issues:**
-   <https://github.com/yourusername/ollama-openai-proxy/issues>
+   <https://github.com/yourusername/aigateway/issues>
 
 4. **Provide details:**
    - Version: `cat VERSION`
@@ -708,3 +708,4 @@ docker compose logs -f
 
 **Version:** 1.9.3  
 **Last Updated:** 2025-10-14
+

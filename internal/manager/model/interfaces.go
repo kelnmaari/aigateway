@@ -4,7 +4,7 @@ package model
 import (
 	"context"
 
-	"ollama-openai-proxy/internal/client/ollama"
+	"aigateway/internal/client/ollama"
 )
 
 // OllamaClientInterface определяет интерфейс для Ollama клиентов
@@ -19,3 +19,4 @@ type OllamaClientInterface interface {
 	IsModelAvailable(ctx context.Context, modelName string) (bool, error)
 	Close()
 }
+

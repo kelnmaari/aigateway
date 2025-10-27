@@ -71,6 +71,24 @@ auth:
     secret: "CHANGE_ME_JWT_SECRET_KEY_456"
     access_token_expiry: "15m"
     refresh_token_expiry: "168h"
+  
+  # User Registration (Version 2.3.0+: Invitation System)
+  registration:
+    mode: "invitation_only"  # PRODUCTION: Рекомендуется "invitation_only" для контроля доступа
+    require_email_verification: true  # Требовать email verification в production
+    allow_username_login: true
+  
+  # Invitation System (Version 2.3.0+)
+  invitations:
+    enabled: true
+    default_expiry_days: 7  # Приглашения истекают через 7 дней
+    max_uses_default: 1  # Single-use invitations по умолчанию
+    allow_email_restriction: true  # Можно привязать к email
+    
+    # Rate limiting для защиты от спама
+    rate_limit:
+      creation_per_admin_hour: 10  # Макс 10 приглашений в час от админа
+      validation_per_ip_minute: 10  # Макс 10 проверок токена в минуту с IP
 
   # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
   oidc:
@@ -208,6 +226,14 @@ logging:
   max_backups: 10
   max_age: 90      # days
   compress: true
+  
+  # Separate error log file (recommended for production)
+  error_log_enabled: true
+  error_log_file_path: "/app/logs/proxy-errors.log"
+  error_log_max_size: 50      # MB
+  error_log_max_backups: 20   # Keep more error logs in production
+  error_log_max_age: 180      # days (6 months)
+  error_log_compress: true
   
   # Structured logging fields
   structured_fields:

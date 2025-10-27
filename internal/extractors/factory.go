@@ -6,7 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // NewExtractorRegistry создает Registry с extractors из конфигурации
@@ -132,3 +132,4 @@ func parseTimeout(timeoutStr string) (time.Duration, error) {
 
 	return timeout, nil
 }
+

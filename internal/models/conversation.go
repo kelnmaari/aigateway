@@ -117,3 +117,4 @@ type ConversationWithMessages struct {
 	*Conversation
 	Messages []*Message `json:"messages"`
 }
+

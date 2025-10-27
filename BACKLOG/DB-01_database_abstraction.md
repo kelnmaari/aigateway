@@ -65,7 +65,7 @@ package storage
 import (
     "context"
     "time"
-    "ollama-openai-proxy/internal/models"
+    "aigateway/internal/models"
 )
 
 type Database interface {
@@ -227,8 +227,8 @@ import (
     "fmt"
     
     _ "modernc.org/sqlite"  // Pure Go SQLite
-    "ollama-openai-proxy/internal/config"
-    "ollama-openai-proxy/internal/storage"
+    "aigateway/internal/config"
+    "aigateway/internal/storage"
 )
 
 type SQLiteDB struct {
@@ -303,8 +303,8 @@ import (
     "fmt"
     
     _ "github.com/lib/pq"
-    "ollama-openai-proxy/internal/config"
-    "ollama-openai-proxy/internal/storage"
+    "aigateway/internal/config"
+    "aigateway/internal/storage"
 )
 
 type PostgresDB struct {
@@ -585,9 +585,9 @@ import (
     "context"
     "fmt"
     
-    "ollama-openai-proxy/internal/config"
-    "ollama-openai-proxy/internal/storage/sqlite"
-    "ollama-openai-proxy/internal/storage/postgres"
+    "aigateway/internal/config"
+    "aigateway/internal/storage/sqlite"
+    "aigateway/internal/storage/postgres"
 )
 
 func NewDatabase(cfg config.DatabaseConfig) (Database, error) {
@@ -695,3 +695,4 @@ func main() {
 **Автор:** AI Assistant  
 **Дата создания:** 2025-10-05  
 **Последнее обновление:** 2025-10-05
+

@@ -223,3 +223,4 @@ func (c *StreamingClient) processGenerateStreamingRequest(ctx context.Context, r
 
 	return scanner.Err()
 }
+

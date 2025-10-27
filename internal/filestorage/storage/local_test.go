@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"ollama-openai-proxy/internal/filestorage"
+	"aigateway/internal/filestorage"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -503,3 +503,4 @@ func BenchmarkLocalStorage_Retrieve(b *testing.B) {
 		}
 	}
 }
+

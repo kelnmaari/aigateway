@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // APIKeyStorage определяет интерфейс для хранения API ключей
@@ -151,3 +151,4 @@ func ConnectionError(operation, message string, cause error) *StorageError {
 		cause,
 	)
 }
+

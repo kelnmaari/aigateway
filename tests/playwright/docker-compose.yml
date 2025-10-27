@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Main application server
+  app:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DATABASE_TYPE=sqlite
+      - DATABASE_PATH=/data/proxy.db
+      - LOG_LEVEL=info
+    volumes:
+      - app-data:/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Playwright test runner
+  playwright:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      - BASE_URL=http://app:8080
+      - CI=true
+    volumes:
+      - ./playwright-report:/tests/playwright-report
+      - ./test-results:/tests/test-results
+    networks:
+      - test-network
+    command: ["npx", "playwright", "test", "--project=chromium"]
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  app-data:
+

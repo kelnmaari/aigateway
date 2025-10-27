@@ -1,6 +1,6 @@
 # 🔐 Authentication API Documentation
 
-Complete authentication API reference for Ollama-OpenAI Proxy (v1.3.0+).
+Complete authentication API reference for AIGateway Platform (v1.3.0+).
 
 ## 📑 Table of Contents
 
@@ -490,4 +490,5 @@ NEW_ACCESS_TOKEN=$(echo $REFRESH_RESPONSE | jq -r '.access_token')
 ---
 
 *Last updated: v1.6.3*
+
 

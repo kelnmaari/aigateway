@@ -213,3 +213,4 @@ func (e *ErrorResponse) IsTemporaryError() bool {
 		e.Error == "model not loaded" ||
 		e.Error == "service unavailable"
 }
+

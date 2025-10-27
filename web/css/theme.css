@@ -517,16 +517,6 @@ tbody td {
     animation: fadeIn 0.3s ease;
 }
 
-.modal {
-    background: var(--card-bg);
-    border-radius: 12px;
-    max-width: 600px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-lg);
-    animation: slideUp 0.3s ease;
-}
 
 .modal-header {
     padding: var(--spacing-md);

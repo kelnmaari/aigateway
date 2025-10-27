@@ -211,3 +211,4 @@ func (m *Manager) CleanupBlacklist() int {
 func (m *Manager) GetBlacklistSize() int {
 	return len(m.tokenBlacklist)
 }
+

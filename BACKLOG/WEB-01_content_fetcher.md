@@ -208,7 +208,7 @@ web_fetcher:
   enabled: true
   timeout: 30s
   max_size: 10485760 # 10MB
-  user_agent: "Ollama-OpenAI-Proxy/1.8.0"
+  user_agent: "aigateway/1.8.0"
   blacklist_domains:
     - "example-spam.com"
     - "malicious-site.net"
@@ -363,4 +363,5 @@ if (urlMatch) {
 
 **Статус:** 📋 Planned for v1.8.0  
 **Последнее обновление:** 2025-10-11
+
 

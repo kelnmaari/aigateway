@@ -280,3 +280,4 @@ func normalizeText(text string) string {
 
 	return strings.TrimSpace(result.String())
 }
+

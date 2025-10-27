@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // ========================================
@@ -401,4 +401,5 @@ func (s *SQLiteDB) GetQuotaWithUsage(ctx context.Context, scope models.QuotaScop
 
 	return quota, usage, nil
 }
+
 

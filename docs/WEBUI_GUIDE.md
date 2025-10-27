@@ -1,4 +1,4 @@
-# 🌐 WebUI Guide - Ollama-OpenAI Proxy v1.9.3
+# 🌐 WebUI Guide - AIGateway Platform v1.9.3
 
 > **Enterprise-grade ChatGPT-like interface for local Ollama models**
 
@@ -659,7 +659,7 @@ http://localhost:8080/login
 
 ```
 ┌─────────────────────────────────────────┐
-│ Ollama-OpenAI Proxy                     │
+│ AIGateway Platform                     │
 │ Version: 1.9.3                          │
 │ Build Date: 2025-10-14                  │
 │ Go Version: 1.25+                       │
@@ -783,4 +783,5 @@ http://localhost:8080/login
 
 **Version:** 1.9.3  
 **Last Updated:** 2025-10-14  
-**Author:** Ollama-OpenAI Proxy Team
+**Author:** AIGateway Platform Team
+

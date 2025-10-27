@@ -762,3 +762,5 @@ document.addEventListener('DOMContentLoaded', () => {
     tenantsManager = new TenantsManager();
 });
 
+
+

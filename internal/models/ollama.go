@@ -81,3 +81,4 @@ type ModelDetailsResponse struct {
 	Modelfile     string                 `json:"modelfile,omitempty"`
 	Parameters    map[string]interface{} `json:"parameters,omitempty"`
 }
+

@@ -2,7 +2,7 @@
 
 ## 📋 Что реализовано
 
-Интеграция AI code review в GitLab CI/CD через Ollama-OpenAI Proxy.
+Интеграция AI code review в GitLab CI/CD через AIGateway Platform.
 
 ---
 
@@ -68,7 +68,7 @@ cp .ai-review.yaml.example .ai-review.yaml
 - **Вариант 3**: Фокус на ошибки и error handling
 - **Вариант 4**: Строгий reviewer (для критичного кода)
 - **Вариант 5**: Обучающий reviewer (для junior)
-- **Вариант 6**: Специфичный для Ollama-OpenAI Proxy проекта
+- **Вариант 6**: Специфичный для AIGateway Platform проекта
 
 Каждый вариант включает:
 - Inline review prompt
@@ -101,7 +101,7 @@ cp .ai-review.yaml.example .ai-review.yaml
 
 ### Шаг 1: Создайте API ключ
 ```bash
-# Откройте WebUI вашего Ollama-OpenAI Proxy
+# Откройте WebUI вашего AIGateway Platform
 http://your-proxy-host:8080
 
 # Создайте ключ:
@@ -130,7 +130,7 @@ Scopes: ✓ api, ✓ read_api, ✓ write_repository
 ```bash
 GitLab → Settings → CI/CD → Variables
 
-# 1) API ключ для Ollama-OpenAI Proxy
+# 1) API ключ для AIGateway Platform
 Key:   OLLAMA_PROXY_API_KEY
 Value: (ключ из шага 1)
 Flags: ✓ Mask variable
@@ -273,5 +273,6 @@ ai-review:thorough:
 
 **Version:** 1.0  
 **Created:** 2025-10-22  
-**Project:** Ollama-OpenAI Proxy
+**Project:** AIGateway Platform
+
 

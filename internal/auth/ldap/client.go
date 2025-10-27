@@ -14,7 +14,7 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // Client представляет LDAP client для аутентификации
@@ -326,4 +326,5 @@ func (c *Client) TestConnection() error {
 	c.logger.Info("LDAP connection test successful")
 	return nil
 }
+
 

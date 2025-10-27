@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/version"
+	"aigateway/internal/config"
+	"aigateway/internal/version"
 )
 
 var startTime = time.Now() // Application start time for uptime calculation
@@ -108,3 +108,4 @@ func (h *HealthHandler) Live(c *gin.Context) {
 	h.logger.Debug("Liveness check requested")
 	c.JSON(http.StatusOK, response)
 }
+

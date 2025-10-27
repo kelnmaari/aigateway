@@ -198,3 +198,4 @@ func TestRingBuffer_Labels(t *testing.T) {
 		t.Errorf("Expected method label 'GET', got '%s'", data[0].Labels["method"])
 	}
 }
+

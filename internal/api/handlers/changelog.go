@@ -9,19 +9,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/storage"
-	"ollama-openai-proxy/internal/version"
+	"aigateway/internal/config"
+	"aigateway/internal/storage"
+	"aigateway/internal/version"
 )
 
 // ChangelogHandler обрабатывает changelog endpoints
 type ChangelogHandler struct {
+	config *config.Config
 	db     storage.Database
 	logger *logrus.Logger
 }
 
 // NewChangelogHandler создает новый Changelog Handler
-func NewChangelogHandler(db storage.Database, logger *logrus.Logger) *ChangelogHandler {
+func NewChangelogHandler(cfg *config.Config, db storage.Database, logger *logrus.Logger) *ChangelogHandler {
 	return &ChangelogHandler{
+		config: cfg,
 		db:     db,
 		logger: logger,
 	}
@@ -33,10 +36,11 @@ func (h *ChangelogHandler) GetSystemInfo(c *gin.Context) {
 	h.logger.Debug("System info requested")
 
 	c.JSON(http.StatusOK, gin.H{
-		"version":    version.Version,
-		"git_commit": version.GitCommit,
-		"build_date": version.BuildDate,
-		"go_version": version.GoVersion,
+		"version":     version.Version,
+		"git_commit":  version.GitCommit,
+		"build_date":  version.BuildDate,
+		"go_version":  version.GoVersion,
+		"rag_enabled": h.config.RAG.Enabled, // v1.13.0: RAG system status
 	})
 }
 
@@ -84,3 +88,4 @@ func (h *ChangelogHandler) GetChangelog(c *gin.Context) {
 
 	c.JSON(http.StatusOK, changelog)
 }
+

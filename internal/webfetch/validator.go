@@ -202,3 +202,4 @@ func (v *URLValidator) isLocalhost(hostname string) bool {
 
 	return false
 }
+

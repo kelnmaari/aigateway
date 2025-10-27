@@ -4,7 +4,7 @@ package middleware
 import (
 	"time"
 
-	"ollama-openai-proxy/internal/api/handlers"
+	"aigateway/internal/api/handlers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -47,3 +47,4 @@ func StatsMiddleware() gin.HandlerFunc {
 		}
 	}
 }
+

@@ -239,3 +239,4 @@ func (e *DOCXExtractor) MaxFileSize() int64 {
 	// DOCX может быть довольно большим
 	return 50 * 1024 * 1024 // 50MB
 }
+

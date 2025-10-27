@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	oidcauth "ollama-openai-proxy/internal/auth/oidc"
-	"ollama-openai-proxy/internal/config"
+	oidcauth "aigateway/internal/auth/oidc"
+	"aigateway/internal/config"
 )
 
 // setupTestRouter creates a test Gin router with session middleware
@@ -258,4 +258,5 @@ func BenchmarkOIDCHandler_HandleLogout(b *testing.B) {
 		router.ServeHTTP(w, req)
 	}
 }
+
 

@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // GetChangelog возвращает changelog для конкретной версии
@@ -80,3 +80,4 @@ func (s *SQLiteDB) ListChangelogs(ctx context.Context) ([]*models.Changelog, err
 	s.logger.WithField("count", len(changelogs)).Debug("Listed changelogs")
 	return changelogs, nil
 }
+

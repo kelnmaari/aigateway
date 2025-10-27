@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // Note: Mock client defined in test_helpers.go
@@ -275,3 +275,4 @@ func TestHealthHandler_ContextCancellation(t *testing.T) {
 	// Assert - should still handle gracefully
 	require.NotEqual(t, 0, w.Code, "Handler should respond even with cancelled context")
 }
+

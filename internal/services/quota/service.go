@@ -10,8 +10,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // Service provides quota checking and usage tracking
@@ -339,4 +339,5 @@ func (s *Service) getQuotaTarget(userID string, tenantID *string) (models.QuotaS
 	}
 	return models.QuotaScopeUser, userID
 }
+
 

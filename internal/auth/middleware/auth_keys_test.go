@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/auth/apikey"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/apikey"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // setupTestRouter создает тестовый роутер с auth middleware
@@ -489,3 +489,4 @@ func BenchmarkAuthMiddleware_ValidateAPIKey(b *testing.B) {
 		router.ServeHTTP(w, httpReq)
 	}
 }
+

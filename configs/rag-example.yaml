@@ -1,0 +1,104 @@
+# RAG System Configuration Example (v1.13.0+)
+
+rag:
+  # Enable/Disable RAG subsystem
+  enabled: true
+  
+  # Vector Store Configuration
+  vector_store:
+    backend: "pgvector"  # or "qdrant"
+    
+    pgvector:
+      dimensions: 768              # 768 for nomic-embed-text, 1024 for mxbai-embed-large
+      index_type: "hnsw"           # or "ivfflat"
+      distance_metric: "cosine"    # or "l2", "inner_product"
+      hnsw_m: 16
+      hnsw_ef_construction: 64
+    
+    qdrant:
+      url: "http://localhost:6333"
+      collection: "ollama-proxy-vectors"
+      prefer_grpc: false
+      timeout: 30s
+  
+  # Embeddings Configuration
+  embeddings:
+    provider: "ollama"
+    model: "nomic-embed-text"      # or "mxbai-embed-large" (1024 dims)
+    dimensions: 768
+    batch_size: 32
+    timeout: 60s
+    parallel_workers: 2
+  
+  # Document Processing Configuration
+  processing:
+    chunk_size: 512                # tokens
+    chunk_overlap: 50              # tokens (10% overlap)
+    chunking_strategy: "semantic"  # or "fixed", "hierarchical"
+    
+    pdf:
+      ocr_enabled: true
+      ocr_lang: "rus+eng"
+    
+    docx:
+      extract_images: true
+      extract_tables: true
+    
+    csv:
+      max_rows: 100000
+      encoding: "utf-8"
+      delimiter: ","
+    
+    images:
+      vision_model: "llava"
+      max_size: "10MB"
+  
+  # Retrieval Configuration
+  retrieval:
+    top_k: 20
+    similarity_threshold: 0.7
+    rerank_enabled: true
+    rerank_top_n: 5
+    rerank_model: "llama3.1:8b"
+    max_context_tokens: 65536
+    context_strategy: "dynamic"     # or "fixed"
+  
+  # Job Queue Configuration
+  queue:
+    backend: "postgres"             # or "memory"
+    
+    memory:
+      buffer_size: 1000
+      num_workers: 4
+    
+    postgres:
+      poll_interval: 1s
+      visibility_timeout: 5m
+      max_attempts: 3
+      num_workers: 4
+      cleanup_completed_after: 24h
+  
+  # API Sources Configuration
+  api_sources:
+    default_timeout: 30s
+    max_retries: 3
+    rate_limit_per_source: 100      # requests per minute
+  
+  # Database Sources Configuration
+  db_sources:
+    max_connections_per_source: 5
+    query_timeout: 30s
+    max_rows: 10000
+  
+  # Security Configuration
+  security:
+    encrypt_credentials: true
+    encryption_key: "your-32-byte-encryption-key-here-change-this!!"  # MUST be 32 bytes for AES-256
+    allowed_db_drivers:
+      - "postgresql"
+    allowed_api_domains: []         # Empty = all allowed
+
+# Disable RAG example (minimal config)
+# rag:
+#   enabled: false
+

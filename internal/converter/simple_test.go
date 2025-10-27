@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/test"
+	"aigateway/internal/models"
+	"aigateway/internal/test"
 )
 
 func TestModelMapping_NormalizeModelName(t *testing.T) {
@@ -130,3 +130,4 @@ func TestCreateErrorResult(t *testing.T) {
 	assert.Equal(t, duration, result.Duration)
 	assert.Equal(t, err.Error(), result.Error)
 }
+

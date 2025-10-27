@@ -9,10 +9,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
+	"aigateway/internal/models"
 )
 
 // Manager управляет доступными моделями и их кешированием
@@ -533,3 +533,4 @@ func (m *Manager) GetAvailableModelNames(ctx context.Context) ([]string, error) 
 func (m *Manager) GetModelCapabilities(modelName string) (*models.ModelMappingConfig, error) {
 	return m.modelManager.GetModelCapabilities(modelName)
 }
+

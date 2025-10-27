@@ -3,8 +3,8 @@ package metrics
 import (
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/storage"
 )
 
 // CustomMonigoMetrics управляет сбором custom метрик для MoniGo dashboard
@@ -47,3 +47,4 @@ func (c *CustomMonigoMetrics) Start() {
 func (c *CustomMonigoMetrics) Stop() {
 	c.logger.Info("Custom MoniGo metrics collector stopped")
 }
+

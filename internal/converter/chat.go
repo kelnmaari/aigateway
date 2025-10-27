@@ -8,8 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/models"
 )
 
 // ChatConverter обрабатывает конвертацию chat completion запросов и ответов
@@ -291,3 +291,4 @@ func (c *ChatConverter) formatToolCallsAsText(toolCalls []models.ToolCall) strin
 
 	return fmt.Sprintf("Tool calls: %s", parts)
 }
+

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"ollama-openai-proxy/internal/auth/jwt"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/auth/jwt"
+	"aigateway/internal/storage"
 )
 
 // MonigoJWTAuth создает middleware для защиты MoniGo dashboard через JWT
@@ -104,3 +104,4 @@ func extractTokenFromAuthHeader(r *http.Request) string {
 
 	return parts[1]
 }
+

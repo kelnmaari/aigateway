@@ -410,3 +410,4 @@ func (h *LogsHandler) DownloadLogFile(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.File(filePath)
 }
+

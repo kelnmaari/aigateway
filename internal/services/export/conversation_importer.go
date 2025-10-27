@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -201,4 +201,5 @@ func (i *ConversationImporter) mergeIntoExisting(
 		MessagesImported: messagesImported,
 	}, nil
 }
+
 

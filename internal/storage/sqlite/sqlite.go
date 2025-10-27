@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // SQLiteDB представляет SQLite имплементацию Database interface
@@ -559,6 +559,36 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Version: 50,
 			Name:    "add_changelog_v1_12_3",
 			SQL:     s.getAddChangelogV1123Migration(),
+		},
+		{
+			Version: 51,
+			Name:    "create_rag_tables",
+			SQL:     s.getCreateRAGTablesMigration(),
+		},
+		{
+			Version: 52,
+			Name:    "add_changelog_v2_0_0",
+			SQL:     s.getAddChangelogV200Migration(),
+		},
+		{
+			Version: 53,
+			Name:    "update_changelog_v2_0_0_with_export_import",
+			SQL:     s.getUpdateChangelogV200WithExportImportMigration(),
+		},
+		{
+			Version: 54,
+			Name:    "add_changelog_v2_1_0",
+			SQL:     s.getAddChangelogV210Migration(),
+		},
+		{
+			Version: 55,
+			Name:    "update_changelog_v2_1_0_formatting",
+			SQL:     s.getUpdateChangelogV210FormattingMigration(),
+		},
+		{
+			Version: 56,
+			Name:    "update_changelog_v2_1_0_final_format",
+			SQL:     s.getUpdateChangelogV210FinalFormatMigration(),
 		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
@@ -3111,6 +3141,654 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 ### Security
 - **Access Control**: Verify conversation ownership при export/import
 - **User Isolation**: Импорт только в свой tenant/user scope');
+    `
+}
+
+// getCreateRAGTablesMigration returns SQL for creating RAG tables (v51 migration - v1.13.1)
+func (s *SQLiteDB) getCreateRAGTablesMigration() string {
+	return `
+-- ========================================
+-- RAG Data Sources Table (v1.13.1)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_data_sources (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    tenant_id TEXT,
+    
+    -- Основная информация
+    name TEXT NOT NULL,
+    description TEXT,
+    source_type TEXT NOT NULL CHECK (source_type IN ('file', 'api', 'database', 'web')),
+    
+    -- Конфигурация (JSON)
+    config TEXT NOT NULL DEFAULT '{}',
+    
+    -- Credentials (зашифрованные AES-256)
+    credentials_encrypted TEXT,
+    
+    -- Статус и метрики
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'error', 'syncing')),
+    last_sync_at DATETIME,
+    last_sync_status TEXT CHECK (last_sync_status IN ('success', 'failed', 'partial')),
+    last_error TEXT,
+    sync_frequency TEXT,  -- "6h", "daily", "weekly"
+    
+    -- Настройки индексации
+    indexing_config TEXT NOT NULL DEFAULT '{}',
+    
+    -- Статистика
+    total_chunks INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    last_chunk_count INTEGER,
+    
+    -- Метаданные
+    tags TEXT,  -- JSON array
+    is_shared INTEGER DEFAULT 0,
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_sources_user ON rag_data_sources(user_id);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_tenant ON rag_data_sources(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_type ON rag_data_sources(source_type);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_status ON rag_data_sources(status);
+
+-- ========================================
+-- RAG Documents Table (v1.13.1)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_documents (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    
+    -- Файл информация
+    filename TEXT,
+    mime_type TEXT,
+    size_bytes INTEGER,
+    
+    -- Хранилище
+    storage_backend TEXT,  -- 'local', 's3'
+    storage_path TEXT NOT NULL,
+    storage_bucket TEXT,  -- для S3
+    
+    -- Обработка
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    processing_started_at DATETIME,
+    processing_completed_at DATETIME,
+    processing_error TEXT,
+    
+    -- Метаданные документа
+    metadata TEXT DEFAULT '{}',
+    
+    -- Статистика
+    total_chunks INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (source_id) REFERENCES rag_data_sources(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_docs_source ON rag_documents(source_id);
+CREATE INDEX IF NOT EXISTS idx_rag_docs_status ON rag_documents(status);
+
+-- ========================================
+-- RAG Chunks Table (v1.13.1)
+-- Note: Embeddings будут добавлены в v1.13.3 после pgvector setup
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    
+    -- Chunk контент
+    chunk_text TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,  -- позиция в документе
+    chunk_tokens INTEGER NOT NULL,
+    
+    -- Метаданные чанка
+    metadata TEXT DEFAULT '{}',  -- page_number, headers, context, etc.
+    
+    -- Для overlap detection
+    start_offset INTEGER,
+    end_offset INTEGER,
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (document_id) REFERENCES rag_documents(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_id) REFERENCES rag_data_sources(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_document ON rag_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_source ON rag_chunks(source_id);
+
+-- ========================================
+-- RAG Jobs Queue (v1.13.1)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_type TEXT NOT NULL,  -- 'file_upload', 'api_sync', 'db_query', 'web_scrape'
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    
+    -- Данные
+    payload TEXT NOT NULL,  -- JSON
+    result TEXT,            -- JSON
+    
+    -- Приоритет и повторы
+    priority INTEGER DEFAULT 0,
+    attempts INTEGER DEFAULT 0,
+    max_attempts INTEGER DEFAULT 3,
+    
+    -- Timestamps
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    completed_at DATETIME,
+    
+    -- Ошибки
+    error TEXT,
+    
+    -- Для visibility timeout
+    locked_until DATETIME
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_jobs_status ON rag_jobs(status, priority DESC, created_at);
+CREATE INDEX IF NOT EXISTS idx_rag_jobs_type ON rag_jobs(job_type);
+
+-- ========================================
+-- RAG Query Logs (v1.13.1 - аналитика)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_query_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    conversation_id TEXT,
+    
+    -- Запрос
+    query_text TEXT NOT NULL,
+    
+    -- Использованные источники (JSON array of IDs)
+    source_ids TEXT,
+    
+    -- Результаты поиска
+    chunks_retrieved INTEGER,
+    chunks_used INTEGER,
+    
+    -- Метрики
+    search_time_ms INTEGER,
+    total_tokens_used INTEGER,
+    
+    -- Результат
+    response_quality_score REAL,  -- опционально, от пользователя
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_query_logs_user ON rag_query_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_rag_query_logs_created ON rag_query_logs(created_at DESC);
+    `
+}
+
+// getAddChangelogV200Migration returns SQL for adding changelog v2.0.0 (v52 migration)
+func (s *SQLiteDB) getAddChangelogV200Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.0.0', '2025-10-27', '## [2.0.0] - 2025-10-27
+
+### 🚀 Major Features
+
+- **RAG System (Retrieval-Augmented Generation)**: Полная интеграция системы RAG для работы с внешними источниками данных
+  - Поддержка REST API, PostgreSQL, File Upload, Web Scraping
+  - Semantic chunking с intelligent text splitting
+  - Vector embeddings через Ollama (mxbai-embed-large, nomic-embed-text)
+  - PgVector для similarity search с HNSW indexing
+  - RAG Orchestrator с reranking и context assembly
+  - Query logging для analytics
+
+- **RAG Management WebUI**: Полнофункциональный интерфейс управления RAG
+  - User Dashboard (/rag-sources.html) - CRUD операции для личных RAG источников
+  - Admin Panel (/admin-rag.html) - управление всеми источниками
+  - Chat Integration - RAG toggle, source selector, параметры в /chat.html
+
+- **Browser Testing Integration**: MCP browser extension для E2E тестирования
+  - Chrome automation, accessibility snapshots, screenshots
+
+### 🎨 UI/UX Improvements
+
+- **Modal Windows Centering**: Модалки теперь по центру экрана (horizontal + vertical)
+- **Consistent Dashboard Styling**: Единообразный dark theme на всех страницах
+- **Login Page Redesign**: Двухколоночный layout с gradient background и info panel
+- **Error Messages Styling**: Улучшенный контраст и visibility
+- **RBAC/Audit Page Refactoring**: Удален Bootstrap, full custom CSS
+
+### 🔐 Security & Authentication
+
+- **JWT Token Rotation**: Refresh token rotation для enhanced security
+- **Authentication Flow Fixes**: Исправлен logout loop
+- **Public API Endpoints**: /api/models доступен без аутентификации
+- **RAG Credentials Encryption**: AES-256 шифрование credentials
+
+### 📊 Logging & Monitoring
+
+- **Separate Error Logging**: Dedicated error log file с rotation
+- **Audit Events Metadata Fix**: JSON serialization для metadata
+
+### 🛠️ Technical Improvements
+
+- **API Client Enhancements**: Generic HTTP methods + RAG/RBAC/Audit methods
+- **Context Parsing Fix**: User/Tenant ID prefix stripping
+- **CSS Conflicts Resolution**: Исправлено позиционирование модалок
+- **Navigation Component**: Поддержка новых RAG страниц
+
+### 📚 Documentation
+
+- RAG Deployment Guide, Config Guide, Testing Guide
+- Error Logging Guide
+
+### 🔧 Configuration
+
+- **RAG Configuration**: Полная секция rag в config
+- **Logging Enhancements**: error_log_* настройки
+
+### 🗃️ Database
+
+- **RAG Schema**: rag_data_sources, rag_documents, rag_chunks, rag_jobs, rag_query_logs
+
+### 🧪 Testing
+
+- **Go Unit Tests**: 70+ tests для RAG components
+- **Playwright E2E Tests**: Browser-based UI testing
+
+### 🐛 Bug Fixes
+
+- Fixed modal windows appearing off-center
+- Fixed logout loop when refresh token is blacklisted
+- Fixed user_id UUID parsing with prefix
+- Fixed audit events metadata serialization error
+- Fixed white-on-white text readability
+- Fixed RBAC page non-clickable buttons
+- Fixed MCP Catalog styling issues
+
+### ⚡ Performance
+
+- Worker Pool для document processing
+- Batch embeddings для Ollama
+- Connection pooling для HTTP и PostgreSQL
+
+### 🔄 Breaking Changes
+
+- **Version Jump**: 1.12.3 → 2.0.0 (major release)
+- **New Dependencies**: PostgreSQL with pgvector, Ollama с embedding models
+- **Configuration Changes**: Новый раздел rag в config
+- **Database Schema**: Новые таблицы для RAG
+
+### 📦 Dependencies
+
+- Added github.com/pgvector/pgvector-go
+- Added Playwright для E2E testing
+- Added lumberjack для log rotation');
+    `
+}
+
+// getUpdateChangelogV200WithExportImportMigration returns SQL for updating changelog v2.0.0 with Export/Import UI info (v53 migration)
+func (s *SQLiteDB) getUpdateChangelogV200WithExportImportMigration() string {
+	return `
+UPDATE changelogs SET content = '## [2.0.0] - 2025-10-27
+
+### 🚀 Major Features
+
+- **RAG System (Retrieval-Augmented Generation)**: Полная интеграция системы RAG для работы с внешними источниками данных
+  - Поддержка REST API, PostgreSQL, File Upload, Web Scraping
+  - Semantic chunking с intelligent text splitting
+  - Vector embeddings через Ollama (mxbai-embed-large, nomic-embed-text)
+  - PgVector для similarity search с HNSW indexing
+  - RAG Orchestrator с reranking и context assembly
+  - Query logging для analytics
+
+- **RAG Management WebUI**: Полнофункциональный интерфейс управления RAG
+  - User Dashboard (/rag-sources.html) - CRUD операции для личных RAG источников
+  - Admin Panel (/admin-rag.html) - управление всеми источниками
+  - Chat Integration - RAG toggle, source selector, параметры в /chat.html
+
+- **Chat Export/Import UI**: Полнофункциональный интерфейс экспорта и импорта conversations
+  - Export Dropdown в Chat Header: JSON, Markdown, Text форматы
+  - Автоматическое скачивание файла с sanitized filename
+  - Import Modal: Upload JSON с опциями preserve timestamps/IDs
+  - Validation JSON структуры перед импортом
+  - Success notification с количеством imported messages
+
+- **Browser Testing Integration**: MCP browser extension для E2E тестирования
+  - Chrome automation, accessibility snapshots, screenshots
+
+### 🎨 UI/UX Improvements
+
+- **Modal Windows Centering**: Модалки теперь по центру экрана (horizontal + vertical)
+- **Consistent Dashboard Styling**: Единообразный dark theme на всех страницах
+- **Login Page Redesign**: Двухколоночный layout с gradient background и info panel
+- **Error Messages Styling**: Улучшенный контраст и visibility
+- **RBAC/Audit Page Refactoring**: Удален Bootstrap, full custom CSS
+- **Export/Import Dropdown**: Stylish dropdown menu с animations
+
+### 🔐 Security & Authentication
+
+- **JWT Token Rotation**: Refresh token rotation для enhanced security
+- **Authentication Flow Fixes**: Исправлен logout loop
+- **Public API Endpoints**: /api/models доступен без аутентификации
+- **RAG Credentials Encryption**: AES-256 шифрование credentials
+
+### 📊 Logging & Monitoring
+
+- **Separate Error Logging**: Dedicated error log file с rotation
+- **Audit Events Metadata Fix**: JSON serialization для metadata
+
+### 🛠️ Technical Improvements
+
+- **API Client Enhancements**: Generic HTTP methods + RAG/RBAC/Audit methods
+- **Context Parsing Fix**: User/Tenant ID prefix stripping
+- **CSS Conflicts Resolution**: Исправлено позиционирование модалок
+- **Navigation Component**: Поддержка новых RAG страниц
+- **Export API Integration**: Frontend integration для conversation export/import
+
+### 📚 Documentation
+
+- RAG Deployment Guide, Config Guide, Testing Guide
+- Error Logging Guide
+
+### 🔧 Configuration
+
+- **RAG Configuration**: Полная секция rag в config
+- **Logging Enhancements**: error_log_* настройки
+
+### 🗃️ Database
+
+- **RAG Schema**: rag_data_sources, rag_documents, rag_chunks, rag_jobs, rag_query_logs
+
+### 🧪 Testing
+
+- **Go Unit Tests**: 70+ tests для RAG components
+- **Playwright E2E Tests**: Browser-based UI testing
+
+### 🐛 Bug Fixes
+
+- Fixed modal windows appearing off-center
+- Fixed logout loop when refresh token is blacklisted
+- Fixed user_id UUID parsing with prefix
+- Fixed audit events metadata serialization error
+- Fixed white-on-white text readability
+- Fixed RBAC page non-clickable buttons
+- Fixed MCP Catalog styling issues
+
+### ⚡ Performance
+
+- Worker Pool для document processing
+- Batch embeddings для Ollama
+- Connection pooling для HTTP и PostgreSQL
+
+### 🔄 Breaking Changes
+
+- **Version Jump**: 1.12.3 → 2.0.0 (major release)
+- **New Dependencies**: PostgreSQL with pgvector, Ollama с embedding models
+- **Configuration Changes**: Новый раздел rag в config
+- **Database Schema**: Новые таблицы для RAG
+
+### 📦 Dependencies
+
+- Added github.com/pgvector/pgvector-go
+- Added Playwright для E2E testing
+- Added lumberjack для log rotation' 
+WHERE version = '2.0.0';
+    `
+}
+
+// getAddChangelogV210Migration returns SQL for adding changelog v2.1.0 (v54 migration)
+func (s *SQLiteDB) getAddChangelogV210Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.1.0', '2025-10-27', '## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+### Changed
+
+- **Project Identity**:
+  - Repository name: ollama-openai-proxy → aigateway
+  - Module path: ollama-openai-proxy → aigateway
+  - Container name: ollama-openai-proxy → aigateway
+  - Database file: proxy.db → aigateway.db
+  - Log files: proxy.log → aigateway.log
+
+- **Environment Variables** (Breaking Change ⚠️):
+  - All PROXY_* variables → AIGATEWAY_*
+  - Example: PROXY_SERVER_PORT → AIGATEWAY_SERVER_PORT
+
+- **Documentation**:
+  - ✅ README.md - complete rewrite для AIGateway Platform
+  - ✅ Architecture.MD - updated diagrams with RAG System, Model Registry
+  - ✅ All docs/*.md files - branding updates (20+ files)
+
+- **Code**:
+  - ✅ go.mod module path updated
+  - ✅ All import statements across entire codebase
+  - ✅ Docker Compose configuration
+  - ✅ Dockerfile с новым VERSION=2.1.0
+
+- **WebUI**:
+  - ✅ All HTML page titles: "AIGateway Platform"
+  - ✅ Navigation labels и headers
+  - ✅ About System page
+  - ✅ Footer copyright
+
+### Why Rebranding?
+
+1. **Expanded Scope**: No longer just an Ollama proxy - now supports multiple model providers (vLLM, future: OpenAI, Anthropic)
+2. **RAG System**: Built-in RAG capabilities make it more than a proxy
+3. **Enterprise Positioning**: "Gateway" better represents the platform''s role as AI infrastructure
+4. **Scalability**: Name allows for future expansion to cloud providers and custom models
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed migration steps.
+
+**Quick Migration Checklist:**
+- Update environment variables: PROXY_* → AIGATEWAY_*
+- Update Docker image names
+- Rename database file (optional): proxy.db → aigateway.db
+- Update any scripts/configs referencing old names
+- Pull new Docker images: aigateway:2.1.0
+
+### Technical
+
+- Module path: aigateway (was ollama-openai-proxy)
+- All import paths updated throughout codebase
+- Docker Compose volumes: aigateway_data, aigateway_logs
+- Zero functional changes - pure rebranding release');
+    `
+}
+
+// getUpdateChangelogV210FormattingMigration returns SQL for updating changelog v2.1.0 formatting (v55 migration)
+func (s *SQLiteDB) getUpdateChangelogV210FormattingMigration() string {
+	return `
+UPDATE changelogs 
+SET content = '## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+---
+
+### Changed
+
+#### **Project Identity**
+
+- Repository name: ollama-openai-proxy → aigateway
+- Module path: ollama-openai-proxy → aigateway  
+- Container name: ollama-openai-proxy → aigateway
+- Database file: proxy.db → aigateway.db
+- Log files: proxy.log → aigateway.log
+
+#### **Environment Variables** (Breaking Change ⚠️)
+
+- All PROXY_* variables → AIGATEWAY_*
+- Example: PROXY_SERVER_PORT → AIGATEWAY_SERVER_PORT
+- See [Migration Guide](docs/MIGRATION_GUIDE_v2.1.0.md) for complete variable mapping
+
+#### **Documentation**
+
+- ✅ README.md - complete rewrite для AIGateway Platform
+- ✅ Architecture.MD - updated diagrams with RAG System, Model Registry  
+- ✅ All docs/*.md files - branding updates (20+ files)
+- ✅ All BACKLOG/*.md files - task descriptions updated
+
+#### **Code**
+
+- ✅ go.mod module path updated
+- ✅ All import statements across entire codebase
+- ✅ Docker Compose configuration
+- ✅ Dockerfile с новым VERSION=2.1.0
+
+#### **WebUI**
+
+- ✅ All HTML page titles: "AIGateway Platform"
+- ✅ Navigation labels и headers
+- ✅ About System page
+- ✅ Footer copyright
+
+---
+
+### Why Rebranding?
+
+**Reasons for transition to "AIGateway":**
+
+1. **Expanded Scope**: No longer just an Ollama proxy - now supports multiple model providers (vLLM, future: OpenAI, Anthropic)
+
+2. **RAG System**: Built-in RAG capabilities make it more than a proxy
+
+3. **Enterprise Positioning**: "Gateway" better represents the platform''s role as AI infrastructure
+
+4. **Scalability**: Name allows for future expansion to cloud providers and custom models
+
+---
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed migration steps.
+
+**Quick Migration Checklist:**
+
+- Update environment variables: PROXY_* → AIGATEWAY_*
+- Update Docker image names
+- Rename database file (optional): proxy.db → aigateway.db
+- Update any scripts/configs referencing old names
+- Pull new Docker images: aigateway:2.1.0
+
+---
+
+### Technical
+
+- **Module path**: aigateway (was ollama-openai-proxy)
+- **Import paths**: Updated throughout codebase
+- **Docker volumes**: aigateway_data, aigateway_logs
+- **Functional changes**: Zero - pure rebranding release
+- **Compilation**: Verified ✅'
+WHERE version = '2.1.0';
+    `
+}
+
+// getUpdateChangelogV210FinalFormatMigration returns SQL for final v2.1.0 formatting fix (v56 migration)
+func (s *SQLiteDB) getUpdateChangelogV210FinalFormatMigration() string {
+	return `
+UPDATE changelogs SET content = '## [2.1.0] - 2025-10-27
+
+### 🏷️ Major Rebranding
+
+**Project renamed from "Ollama-OpenAI Proxy" to "AIGateway Platform"**
+
+### Changed
+
+- **Repository name**: ollama-openai-proxy → aigateway
+- **Module path**: ollama-openai-proxy → aigateway
+- **Container name**: ollama-openai-proxy → aigateway
+- **Database file**: proxy.db → aigateway.db (optional rename)
+- **Log files**: proxy.log → aigateway.log
+
+- **Environment Variables (⚠️ Breaking Change)**: All PROXY_* → AIGATEWAY_*
+  - Example: PROXY_SERVER_PORT → AIGATEWAY_SERVER_PORT
+  - PROXY_OLLAMA_URL → AIGATEWAY_OLLAMA_URL
+  - PROXY_DATABASE_TYPE → AIGATEWAY_DATABASE_TYPE
+  - See [Migration Guide](docs/MIGRATION_GUIDE_v2.1.0.md) for complete mapping
+
+- **Documentation Updates**: 40+ files rebranded
+  - README.md - complete rewrite для AIGateway Platform
+  - Architecture.MD - updated diagrams with RAG System, Model Registry
+  - All docs/*.md files (20+ files)
+  - All BACKLOG/*.md files
+
+- **Code Changes**: Zero functional changes - pure rebranding
+  - go.mod module path updated
+  - All import statements across entire codebase
+  - Docker Compose configuration
+  - Dockerfile VERSION=2.1.0
+
+- **WebUI Branding**: Complete frontend rebranding
+  - All HTML page titles: "AIGateway Platform"
+  - Navigation labels и headers
+  - About System page
+  - Footer copyright
+
+### Why Rebranding?
+
+**Reasons for transition to "AIGateway":**
+
+1. **Expanded Scope**: No longer just an Ollama proxy
+  - Multi-provider support: vLLM (v2.2.0), future: OpenAI, Anthropic
+  - Model registry для unified API access
+
+2. **RAG System**: Built-in RAG capabilities
+  - Vector search, embeddings, document processing
+  - Enterprise-ready data integration
+
+3. **Enterprise Positioning**: "Gateway" better represents platform role
+  - Central AI infrastructure component
+  - Unified API для multiple backends
+
+4. **Scalability**: Name allows future expansion
+  - Cloud provider integration
+  - Custom model support
+
+### 🔄 Migration Required
+
+**This is a BREAKING release.** Existing deployments need migration.
+
+See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed steps.
+
+**Quick Migration Checklist:**
+  - Update environment variables: PROXY_* → AIGATEWAY_*
+  - Update Docker image names
+  - Rename database file (optional): proxy.db → aigateway.db
+  - Update scripts/configs referencing old names
+  - Pull new Docker images: aigateway:2.1.0
+
+### Technical
+
+- **Module path**: aigateway (was ollama-openai-proxy)
+- **Import paths**: Updated throughout codebase (~150+ Go files)
+- **Docker Compose**: Service name aigateway, volumes aigateway_data/aigateway_logs
+- **Functional changes**: Zero - pure rebranding release
+- **Compilation**: Verified ✅
+- **Database schema**: Unchanged (backward compatible)'
+WHERE version = '2.1.0';
     `
 }
 

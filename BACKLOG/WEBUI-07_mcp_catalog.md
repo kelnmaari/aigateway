@@ -755,3 +755,4 @@ function showError(message) {
 - Version tracking
 - Compatibility matrix (какие модели поддерживают)
 - Auto-install для популярных серверов
+

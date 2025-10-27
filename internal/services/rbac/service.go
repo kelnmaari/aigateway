@@ -9,8 +9,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // Service provides RBAC functionality for permission checking
@@ -208,4 +208,5 @@ func matchPermission(pattern, permission string) bool {
 
 	return true
 }
+
 

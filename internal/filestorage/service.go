@@ -10,7 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/config"
 )
 
 // Service предоставляет высокоуровневые операции с файлами
@@ -182,3 +182,4 @@ func (s *Service) Exists(ctx context.Context, path string) (bool, error) {
 func (s *Service) GetSize(ctx context.Context, path string) (int64, error) {
 	return s.storage.GetSize(ctx, path)
 }
+

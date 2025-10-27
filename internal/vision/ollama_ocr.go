@@ -8,8 +8,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
 )
 
 // OllamaOCR реализация OCREngine через Ollama vision models
@@ -199,3 +199,4 @@ func detectLanguage(text string) string {
 
 	return "unknown"
 }
+

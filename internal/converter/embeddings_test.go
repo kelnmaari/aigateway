@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	ollamaapi "ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/models"
+	ollamaapi "aigateway/internal/client/ollama"
+	"aigateway/internal/models"
 )
 
 func TestConvertEmbeddingRequest(t *testing.T) {
@@ -346,3 +346,4 @@ func BenchmarkConvertEmbeddingResponseBatch(b *testing.B) {
 		_, _ = ConvertEmbeddingResponse(ollamaResp, "text-embedding-ada-002")
 	}
 }
+

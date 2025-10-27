@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/request"
-	"ollama-openai-proxy/internal/websocket"
+	"aigateway/internal/request"
+	"aigateway/internal/websocket"
 )
 
 // RequestTracker middleware отслеживает все запросы для monitoring
@@ -240,3 +240,4 @@ func requestInfoToMap(req *request.RequestInfo) map[string]interface{} {
 
 	return data
 }
+

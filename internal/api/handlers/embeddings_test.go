@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/config"
+	"aigateway/internal/models"
 )
 
 // TestEmbeddingsHandler_HandleEmbeddings_Success тестирует успешное создание embeddings
@@ -147,3 +147,4 @@ func TestEmbeddingsHandler_HandleEmbeddings_BatchInput(t *testing.T) {
 	// Batch embeddings могут возвращать разное количество в зависимости от реализации
 	assert.GreaterOrEqual(t, len(resp.Data), 1)
 }
+

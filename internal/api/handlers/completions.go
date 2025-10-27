@@ -10,9 +10,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/converter"
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/config"
+	"aigateway/internal/converter"
+	"aigateway/internal/models"
 )
 
 // CompletionsHandler обрабатывает запросы legacy completions API
@@ -253,3 +253,4 @@ func sendCompletionErrorChunk(w gin.ResponseWriter, message string) {
 	fmt.Fprintf(w, "data: %s\n\n", data)
 	w.Flush()
 }
+

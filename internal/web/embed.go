@@ -6,3 +6,4 @@ import (
 
 //go:embed all:static
 var StaticFiles embed.FS
+

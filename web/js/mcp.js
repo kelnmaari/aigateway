@@ -358,3 +358,5 @@ class MCPCatalog {
 // Initialize catalog
 const mcpCatalog = new MCPCatalog();
 
+
+

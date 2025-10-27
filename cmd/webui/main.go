@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
-	"ollama-openai-proxy/internal/web"
+	"aigateway/internal/web"
 )
 
 const (
@@ -350,3 +350,4 @@ func LoggerMiddleware() gin.HandlerFunc {
 		)
 	}
 }
+

@@ -84,3 +84,4 @@ func GetMCPCategories() []string {
 		string(MCPCategoryOther),
 	}
 }
+

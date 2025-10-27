@@ -101,3 +101,4 @@ func splitIntoColumns(content string, columns int, columnWidth int) string {
 
 	return strings.Join(result, "\n")
 }
+

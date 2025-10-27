@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"ollama-openai-proxy/internal/config"
-	"ollama-openai-proxy/internal/version"
+	"aigateway/internal/config"
+	"aigateway/internal/version"
 )
 
 // Setup настраивает логгер согласно конфигурации
@@ -51,6 +51,19 @@ func Setup(cfg *config.Config) *logrus.Logger {
 	// Настройка вывода логов
 	output := setupOutput(cfg.Logging)
 	logger.SetOutput(output)
+
+	// Настройка отдельного файла для ошибок и warnings
+	if cfg.Logging.ErrorLogEnabled && cfg.Logging.ErrorLogFilePath != "" {
+		errorHook := setupErrorLogHook(cfg.Logging, logger.Formatter)
+		if errorHook != nil {
+			logger.AddHook(errorHook)
+			logger.WithFields(logrus.Fields{
+				"error_log_file": cfg.Logging.ErrorLogFilePath,
+				"max_size":       cfg.Logging.ErrorLogMaxSize,
+				"max_backups":    cfg.Logging.ErrorLogMaxBackups,
+			}).Info("Separate error log file configured")
+		}
+	}
 
 	// Добавляем structured fields если настроены
 	if len(cfg.Logging.StructuredFields) > 0 {
@@ -183,3 +196,60 @@ func WithError(logger *logrus.Logger, err error) *logrus.Entry {
 func WithFields(logger *logrus.Logger, fields map[string]interface{}) *logrus.Entry {
 	return logger.WithFields(logrus.Fields(fields))
 }
+
+// setupErrorLogHook настраивает hook для записи error/warning логов в отдельный файл
+func setupErrorLogHook(cfg config.LoggingConfig, formatter logrus.Formatter) *ErrorLogHook {
+	if cfg.ErrorLogFilePath == "" {
+		logrus.Warn("Error log file path not specified, skipping error log hook")
+		return nil
+	}
+
+	// Создаем директорию если не существует
+	dir := filepath.Dir(cfg.ErrorLogFilePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		logrus.WithError(err).Warn("Failed to create error log directory, skipping error log hook")
+		return nil
+	}
+
+	// Используем defaults из основной конфигурации если не заданы отдельно
+	maxSize := cfg.ErrorLogMaxSize
+	if maxSize == 0 {
+		maxSize = cfg.MaxSize
+		if maxSize == 0 {
+			maxSize = 100 // default 100MB
+		}
+	}
+
+	maxBackups := cfg.ErrorLogMaxBackups
+	if maxBackups == 0 {
+		maxBackups = cfg.MaxBackups
+		if maxBackups == 0 {
+			maxBackups = 3 // default 3 backups
+		}
+	}
+
+	maxAge := cfg.ErrorLogMaxAge
+	if maxAge == 0 {
+		maxAge = cfg.MaxAge
+		if maxAge == 0 {
+			maxAge = 7 // default 7 days
+		}
+	}
+
+	compress := cfg.ErrorLogCompress || cfg.Compress
+
+	// 🔄 Переименовываем старый error log перед запуском
+	if err := rotatePreviousLog(cfg.ErrorLogFilePath); err != nil {
+		logrus.WithError(err).Warn("Failed to rotate previous error log file, continuing with current file")
+	}
+
+	return NewErrorLogHook(
+		cfg.ErrorLogFilePath,
+		maxSize,
+		maxBackups,
+		maxAge,
+		compress,
+		formatter,
+	)
+}
+

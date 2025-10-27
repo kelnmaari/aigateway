@@ -33,13 +33,16 @@
                 </div>
             </header>
 
-            <!-- Error/Success Messages -->
-            <div id="tenant-message" class="error-message" style="display: none;"></div>
-            <div id="tenant-success" class="success-message" style="display: none;"></div>
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Error/Success Messages -->
+                <div id="tenant-message" class="error-message" style="display: none;"></div>
+                <div id="tenant-success" class="success-message" style="display: none;"></div>
 
-            <!-- Tenants Grid -->
-            <div id="tenants-grid" class="tenants-grid">
-                <div class="tenant-card loading">Loading tenants...</div>
+                <!-- Tenants Grid -->
+                <div id="tenants-grid" class="tenants-grid">
+                    <div class="tenant-card loading">Loading tenants...</div>
+                </div>
             </div>
         </div>
     </main>

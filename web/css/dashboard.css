@@ -41,6 +41,34 @@
 }
 
 /* ===========================
+   Card Components
+   =========================== */
+.card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.card-header {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px 20px;
+}
+
+.card-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+}
+
+.card-body {
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ===========================
    Navigation (Admin Panel)
    =========================== */
 .navbar {
@@ -678,36 +706,46 @@
 /* ===========================
    Modals
    =========================== */
-.modal {
+/* Force modal to fill viewport - highest priority */
+div.modal,
+.modal,
+div#create-key-modal,
+div#key-created-modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    z-index: 10000 !important;
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+div.modal.show,
+.modal.show,
+div#create-key-modal.show,
+div#key-created-modal.show {
+    display: flex !important;
+}
+
+.modal .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 1000;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
+    background: transparent;
+    pointer-events: none;
 }
 
-.modal.show {
-    display: flex;
-}
-
-.modal-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-}
-
-.modal-content {
-    position: relative;
+.modal .modal-content {
+    position: relative !important;
     background: var(--bg-primary);
     border-radius: 12px;
     width: 90%;
@@ -715,13 +753,27 @@
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 10001;
+    margin: 0 !important;
+    animation: modalSlideIn 0.3s ease-out;
 }
 
-.modal-content.modal-large {
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal .modal-content.modal-large {
     max-width: 800px;
 }
 
-.modal-header {
+.modal .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -729,13 +781,13 @@
     border-bottom: 1px solid var(--border-color);
 }
 
-.modal-header h2 {
+.modal .modal-header h2 {
     margin: 0;
     font-size: 20px;
     font-weight: 600;
 }
 
-.modal-close {
+.modal .modal-close {
     background: none;
     border: none;
     font-size: 24px;
@@ -751,12 +803,12 @@
     transition: all 0.2s;
 }
 
-.modal-close:hover {
+.modal .modal-close:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
 }
 
-.modal-body {
+.modal .modal-body {
     padding: 24px;
 }
 
@@ -1073,7 +1125,7 @@
         overflow-x: auto;
     }
 
-    .modal-content {
+    .modal .modal-content {
         width: 95%;
         max-height: 95vh;
     }

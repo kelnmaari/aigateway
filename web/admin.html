@@ -22,13 +22,16 @@
             <p>System administration and management</p>
         </div>
 
-        <!-- Tabs -->
-        <div class="tabs">
+        <!-- Content Area with Background -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px); margin-top: 24px;">
+            <!-- Tabs -->
+            <div class="tabs">
             <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
             <button class="tab-btn" data-tab="users">Users</button>
             <button class="tab-btn" data-tab="apikeys">API Keys</button>
             <button class="tab-btn" data-tab="files">Files</button>
             <button class="tab-btn" data-tab="models">Models</button>
+            <button class="tab-btn" data-tab="rag">RAG Sources</button>
             <button class="tab-btn" data-tab="mcp">MCP Servers</button>
             <button class="tab-btn" data-tab="backups">Backups</button>
             <button class="tab-btn" data-tab="audit">Audit</button>
@@ -525,6 +528,44 @@
                 </div>
             </div>
 
+            <!-- RAG Sources Tab (v1.13.0+) -->
+            <div id="rag-tab" class="tab-pane">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>📚 RAG Data Sources Management</h2>
+                        <a href="/admin-rag.html" class="btn btn-primary" target="_blank">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke-width="2"/>
+                                <path d="M15 3h6v6M10 14L21 3" stroke-width="2"/>
+                            </svg>
+                            Open Full RAG Management
+                        </a>
+                    </div>
+                    <div class="info-card" style="margin-bottom: 24px; background: rgba(16, 163, 127, 0.1); border-left: 4px solid var(--accent-primary); padding: 16px;">
+                        <h3 style="margin-top: 0; color: var(--accent-primary);">RAG System Overview</h3>
+                        <p>Manage Retrieval-Augmented Generation (RAG) data sources for all users. RAG enhances AI responses with context from external knowledge bases.</p>
+                        <ul style="margin: 12px 0 0 20px;">
+                            <li>View and manage all RAG sources across users</li>
+                            <li>Monitor sync status and indexing progress</li>
+                            <li>View chunks and tokens statistics</li>
+                            <li>Delete or force sync sources</li>
+                            <li>Supported sources: REST API, PostgreSQL, Files, Web Scraping</li>
+                        </ul>
+                    </div>
+                    <div style="text-align: center; padding: 40px;">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="opacity: 0.3; margin-bottom: 16px;">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-width="2"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke-width="2"/>
+                        </svg>
+                        <h3>Full RAG Management Interface</h3>
+                        <p style="color: var(--text-secondary); margin-bottom: 24px;">Click the button above to open the dedicated RAG management interface</p>
+                        <a href="/admin-rag.html" class="btn btn-primary btn-lg" target="_blank">
+                            Open RAG Management →
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- System Tab (v1.9.3+) - Performance Monitoring Only -->
             <div id="system-tab" class="tab-pane">
                 <div class="section">
@@ -856,6 +897,7 @@
                     </div>
                 </form>
             </div>
+        </div>
         </div>
     </div>
     </main>

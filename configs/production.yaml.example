@@ -209,6 +209,14 @@ logging:
   max_age: 90      # days
   compress: true
   
+  # Separate error log file (recommended for production)
+  error_log_enabled: true
+  error_log_file_path: "/app/logs/proxy-errors.log"
+  error_log_max_size: 50      # MB
+  error_log_max_backups: 20   # Keep more error logs in production
+  error_log_max_age: 180      # days (6 months)
+  error_log_compress: true
+  
   # Structured logging fields
   structured_fields:
     service: "ollama-openai-proxy"

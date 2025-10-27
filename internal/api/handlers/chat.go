@@ -14,6 +14,7 @@ import (
 	"ollama-openai-proxy/internal/config"
 	"ollama-openai-proxy/internal/converter"
 	"ollama-openai-proxy/internal/models"
+	"ollama-openai-proxy/internal/rag/orchestrator"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/webfetch"
 )
@@ -29,9 +30,10 @@ type ChatHandler struct {
 	logger              *logrus.Logger
 	ollamaClient        OllamaClientInterface
 	converter           *converter.SimpleConverter
-	db                  storage.Database          // для model configs (v1.9.1+)
-	webfetchIntegration *webfetch.ChatIntegration // для автоматического fetch web content (v1.10.4+)
-	modelPreloader      ModelPreloader            // для tracking model usage (v1.12.1+)
+	db                  storage.Database              // для model configs (v1.9.1+)
+	webfetchIntegration *webfetch.ChatIntegration     // для автоматического fetch web content (v1.10.4+)
+	modelPreloader      ModelPreloader                // для tracking model usage (v1.12.1+)
+	ragOrchestrator     *orchestrator.RAGOrchestrator // для RAG system (v1.13.0+)
 }
 
 // NewChatHandler создает новый chat handler с упрощенными конвертерами
@@ -140,6 +142,22 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 	if err := h.enrichMessagesWithWebContent(c.Request.Context(), &req); err != nil {
 		h.logger.WithError(err).Warn("Failed to enrich messages with web content")
 		// Don't fail the request, just log the warning
+	}
+
+	// RAG System integration (v1.13.0+)
+	if req.RAGEnabled {
+		if err := h.enrichMessagesWithRAG(c.Request.Context(), &req); err != nil {
+			h.logger.WithError(err).Error("Failed to enrich messages with RAG context")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{
+					"message": "RAG processing failed: " + err.Error(),
+					"type":    "api_error",
+					"code":    "rag_error",
+				},
+			})
+			return
+		}
+		h.logger.Info("Successfully enriched message with RAG context")
 	}
 
 	// Проверка поддержки streaming
@@ -411,4 +429,95 @@ func (h *ChatHandler) handleStreamingCompletion(c *gin.Context, req *models.Chat
 
 	// Передаем обработку streaming handler'у
 	streamingHandler.HandleStreamingCompletion(c, req)
+}
+
+// SetRAGOrchestrator устанавливает RAG orchestrator (v1.13.0+)
+func (h *ChatHandler) SetRAGOrchestrator(orchestrator *orchestrator.RAGOrchestrator) {
+	h.ragOrchestrator = orchestrator
+}
+
+// enrichMessagesWithRAG обогащает сообщения контекстом из RAG (v1.13.0+)
+func (h *ChatHandler) enrichMessagesWithRAG(ctx context.Context, req *models.ChatCompletionRequest) error {
+	if h.ragOrchestrator == nil {
+		return fmt.Errorf("RAG orchestrator not initialized")
+	}
+
+	// Получаем последнее user message как query
+	var userQuery string
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == "user" {
+			// Extract text from content
+			if contentStr, ok := req.Messages[i].Content.(string); ok {
+				userQuery = contentStr
+				break
+			}
+		}
+	}
+
+	if userQuery == "" {
+		return fmt.Errorf("no user query found in messages")
+	}
+
+	// Получаем user_id из контекста
+	userID := ""
+	if val, exists := ctx.Value("user_id").(string); exists {
+		userID = val
+	}
+
+	// Получаем conversation_id если есть
+	convID := ""
+	if val, exists := ctx.Value("conversation_id").(string); exists {
+		convID = val
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"query":      userQuery,
+		"source_ids": req.RAGSourceIDs,
+		"top_k":      req.RAGTopK,
+		"rerank":     req.RAGRerank,
+	}).Info("Processing RAG query")
+
+	// Выполняем RAG query
+	ragResp, err := h.ragOrchestrator.Query(ctx, orchestrator.RAGRequest{
+		Query:      userQuery,
+		SourceIDs:  req.RAGSourceIDs,
+		TopK:       req.RAGTopK,
+		MinScore:   req.RAGMinScore,
+		UserID:     userID,
+		ConvID:     convID,
+		Rerank:     req.RAGRerank,
+	})
+
+	if err != nil {
+		return fmt.Errorf("RAG query failed: %w", err)
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"chunks":         ragResp.TotalChunks,
+		"context_tokens": ragResp.ContextTokens,
+		"search_time_ms": ragResp.SearchTime.Milliseconds(),
+	}).Info("RAG query completed")
+
+	// Если нет результатов, не добавляем context
+	if ragResp.TotalChunks == 0 {
+		h.logger.Warn("No RAG results found, proceeding without RAG context")
+		return nil
+	}
+
+	// Добавляем RAG context как system message в начало
+	systemMessage := models.ChatMessage{
+		Role:    "system",
+		Content: ragResp.Context,
+	}
+
+	// Вставляем system message в начало (перед первым user message)
+	req.Messages = append([]models.ChatMessage{systemMessage}, req.Messages...)
+
+	h.logger.WithFields(logrus.Fields{
+		"chunks_used":    ragResp.TotalChunks,
+		"context_tokens": ragResp.ContextTokens,
+		"sources":        len(ragResp.SourceChunks),
+	}).Info("RAG context added to messages")
+
+	return nil
 }

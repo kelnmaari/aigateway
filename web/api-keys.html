@@ -33,12 +33,14 @@
                 </div>
             </header>
 
-            <!-- Error/Success Messages -->
-            <div id="apikey-message" class="error-message" style="display: none;"></div>
-            <div id="apikey-success" class="success-message" style="display: none;"></div>
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Error/Success Messages -->
+                <div id="apikey-message" class="error-message" style="display: none;"></div>
+                <div id="apikey-success" class="success-message" style="display: none;"></div>
 
-            <!-- Tabs -->
-            <div class="tabs">
+                <!-- Tabs -->
+                <div class="tabs">
                 <button class="tab-btn active" data-tab="personal" id="personal-tab">
                     Personal Keys
                 </button>
@@ -49,7 +51,7 @@
 
             <!-- Personal Keys Tab Content -->
             <div class="tab-content active" id="personal-content">
-                <div class="table-container">
+                <div class="table-container" style="background: transparent; border: none;">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -80,7 +82,7 @@
                     </select>
                 </div>
 
-                <div class="table-container">
+                <div class="table-container" style="background: transparent; border: none;">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -99,6 +101,7 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
             </div>
         </div>
     </main>

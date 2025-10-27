@@ -4,10 +4,192 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Ollama Proxy</title>
+    <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body.auth-page {
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 50%, #ec4899 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-wrapper {
+            display: grid;
+            grid-template-columns: 480px 400px;
+            gap: 24px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .auth-box {
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .info-panel {
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .info-section {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 20px;
+        }
+
+        .info-section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .info-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .system-info {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .info-label {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .info-value {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+        }
+
+        .models-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .model-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .model-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .model-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .model-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .model-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .model-size {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 2px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #10b981;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 1024px) {
+            .login-wrapper {
+                grid-template-columns: 1fr;
+                max-width: 480px;
+            }
+
+            .info-panel {
+                display: none;
+            }
+        }
+    </style>
 </head>
 <body class="auth-page">
-    <div class="auth-container">
+    <div class="login-wrapper">
+        <!-- Login Form -->
         <div class="auth-box">
             <div class="auth-header">
                 <h1>🤖 Ollama Proxy</h1>
@@ -62,9 +244,113 @@
                 <p>Don't have an account? <a href="/register.html">Register</a></p>
             </div>
         </div>
+
+        <!-- Info Panel -->
+        <div class="info-panel">
+            <!-- System Status -->
+            <div class="info-section">
+                <h3>System Status</h3>
+                <div class="system-info">
+                    <div class="info-item">
+                        <span class="info-label">Status</span>
+                        <span class="status-badge">
+                            <span class="status-dot"></span>
+                            Online
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Version</span>
+                        <span class="info-value" id="system-version">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Models Available</span>
+                        <span class="info-value" id="models-count">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Models -->
+            <div class="info-section">
+                <h3>Available Models</h3>
+                <div id="models-list" class="models-list">
+                    <div class="loading-state">Loading models...</div>
+                </div>
+            </div>
+
+            <!-- RAG Status -->
+            <div class="info-section" id="rag-status-section">
+                <h3>Features</h3>
+                <div class="system-info">
+                    <div class="info-item">
+                        <span class="info-label">RAG System</span>
+                        <span class="info-value" id="rag-status">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Load system info
+        async function loadSystemInfo() {
+            try {
+                const response = await fetch('/api/system/info');
+                const data = await response.json();
+                
+                document.getElementById('system-version').textContent = data.version || 'Unknown';
+                
+                // RAG status
+                const ragStatus = data.rag_enabled ? '✓ Enabled' : '✗ Disabled';
+                document.getElementById('rag-status').textContent = ragStatus;
+                document.getElementById('rag-status').style.color = data.rag_enabled 
+                    ? 'rgba(16, 185, 129, 0.9)' 
+                    : 'rgba(239, 68, 68, 0.9)';
+            } catch (error) {
+                console.error('Failed to load system info:', error);
+                document.getElementById('system-version').textContent = 'Error';
+            }
+        }
+
+        // Load available models
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/v1/models');
+                const data = await response.json();
+                
+                const modelsList = document.getElementById('models-list');
+                const modelsCount = document.getElementById('models-count');
+                
+                if (!data.data || data.data.length === 0) {
+                    modelsList.innerHTML = '<div class="loading-state">No models available</div>';
+                    modelsCount.textContent = '0';
+                    return;
+                }
+                
+                modelsCount.textContent = data.data.length;
+                
+                // Display models
+                modelsList.innerHTML = data.data.map(model => {
+                    const sizeGB = model.size ? (model.size / (1024 * 1024 * 1024)).toFixed(2) : '?';
+                    const modelName = model.id || model.name;
+                    
+                    return `
+                        <div class="model-item">
+                            <div class="model-icon">🤖</div>
+                            <div class="model-info">
+                                <div class="model-name" title="${modelName}">${modelName}</div>
+                                <div class="model-size">${sizeGB} GB</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load models:', error);
+                document.getElementById('models-list').innerHTML = 
+                    '<div class="loading-state" style="color: rgba(239, 68, 68, 0.7);">Failed to load models</div>';
+                document.getElementById('models-count').textContent = '?';
+            }
+        }
+
         // Check system initialization status on page load
         async function checkInitStatus() {
             try {
@@ -82,8 +368,10 @@
             }
         }
         
-        // Run init check on page load
+        // Initialize
         checkInitStatus();
+        loadSystemInfo();
+        loadModels();
         
         // Login form handler
         document.getElementById('login-form').addEventListener('submit', async (e) => {

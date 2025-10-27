@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RBAC Management - Admin Panel</title>
     <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <style>
         .permission-badge {
@@ -44,58 +47,76 @@
         .custom-role-badge {
             background-color: #28a745;
         }
+        
+        /* Override Bootstrap card styles for dark theme */
+        .card {
+            background: var(--bg-tertiary) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .card-header {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            color: #ffffff !important;
+        }
+        
+        .card-body {
+            background: transparent !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        .role-card {
+            background: var(--bg-tertiary) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .permission-item {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        /* Fix text colors */
+        h5, h6, label, .form-label {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        .text-muted {
+            color: rgba(255, 255, 255, 0.6) !important;
+        }
     </style>
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/admin.html">
-                <i class="fas fa-shield-alt"></i> RBAC Management
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/admin.html">
-                            <i class="fas fa-arrow-left"></i> Back to Admin
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" id="logoutBtn">
-                            <i class="fas fa-sign-out-alt"></i> Logout
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
 
-    <div class="container-fluid mt-4">
-        <!-- Tab Navigation -->
-        <ul class="nav nav-tabs mb-4" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles" type="button" role="tab">
-                    <i class="fas fa-user-tag"></i> Roles Management
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="user-roles-tab" data-bs-toggle="tab" data-bs-target="#user-roles" type="button" role="tab">
-                    <i class="fas fa-users-cog"></i> User Roles
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="permissions-tab" data-bs-toggle="tab" data-bs-target="#permissions" type="button" role="tab">
-                    <i class="fas fa-key"></i> Permissions Reference
-                </button>
-            </li>
-        </ul>
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>🔐 RBAC Management</h1>
+                    <p class="page-description">Role-Based Access Control configuration</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/admin.html" class="btn btn-secondary">Back to Admin</a>
+                </div>
+            </header>
 
-        <!-- Tab Content -->
-        <div class="tab-content">
-            <!-- Roles Management Tab -->
-            <div class="tab-pane fade show active" id="roles" role="tabpanel">
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Tab Navigation -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="roles">Roles Management</button>
+                    <button class="tab-btn" data-tab="user-roles">User Roles</button>
+                    <button class="tab-btn" data-tab="permissions">Permissions Reference</button>
+                </div>
+
+                <!-- Roles Management Tab -->
+                <div class="tab-content active" id="roles-content">
                 <div class="row">
                     <div class="col-md-4">
                         <div class="card">
@@ -137,19 +158,18 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
 
-            <!-- User Roles Tab -->
-            <div class="tab-pane fade" id="user-roles" role="tabpanel">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>User Roles Management</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="userSelect" class="form-label">Select User</label>
-                                <select class="form-select" id="userSelect">
+                <!-- User Roles Tab -->
+                <div class="tab-content" id="user-roles-content" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>User Role Assignments</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-4">
+                                <label for="userSelector" class="form-label">Select User</label>
+                                <select class="form-select" id="userSelector">
                                     <option value="">-- Select User --</option>
                                 </select>
                             </div>
@@ -183,25 +203,25 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Permissions Reference Tab -->
-            <div class="tab-pane fade" id="permissions" role="tabpanel">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>System Permissions Reference</h5>
-                    </div>
-                    <div class="card-body" id="permissionsListContainer">
-                        <div class="text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                <!-- Permissions Reference Tab -->
+                <div class="tab-content" id="permissions-content" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>System Permissions Reference</h5>
+                        </div>
+                        <div class="card-body" id="permissionsListContainer">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- Create/Edit Role Modal -->
     <div class="modal fade" id="roleModal" tabindex="-1">
@@ -259,11 +279,44 @@
                 </div>
             </div>
         </div>
-    </div>
+            </div>
+        </div>
+    </main>
 
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="/js/components/navigation.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
     <script src="/js/admin-rbac.js"></script>
+    
+    <script>
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const targetTab = this.getAttribute('data-tab');
+                    
+                    // Remove active class from all buttons and contents
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabContents.forEach(c => {
+                        c.classList.remove('active');
+                        c.style.display = 'none';
+                    });
+                    
+                    // Add active class to clicked button and show corresponding content
+                    this.classList.add('active');
+                    const targetContent = document.getElementById(targetTab + '-content');
+                    if (targetContent) {
+                        targetContent.style.display = 'block';
+                        targetContent.classList.add('active');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
 

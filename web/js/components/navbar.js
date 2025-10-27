@@ -10,6 +10,7 @@ class TopNavbar {
         if (path.includes('chat.html')) return 'chat';
         if (path.includes('dashboard.html')) return 'dashboard';
         if (path.includes('files.html')) return 'files';
+        if (path.includes('rag-sources.html')) return 'rag-sources';
         if (path.includes('admin.html')) return 'admin';
         if (path.includes('profile.html')) return 'profile';
         if (path.includes('tenants.html')) return 'tenants';
@@ -79,6 +80,13 @@ class TopNavbar {
                             <path d="M13 2v7h7" stroke-width="2"/>
                         </svg>
                         Files
+                    </a>
+                    <a href="/rag-sources.html" class="nav-link ${this.currentPage === 'rag-sources' ? 'active' : ''}">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-width="2"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke-width="2"/>
+                        </svg>
+                        RAG Sources
                     </a>
                     <a href="/tenants.html" class="nav-link ${this.currentPage === 'tenants' ? 'active' : ''}">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">

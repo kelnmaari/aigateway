@@ -489,19 +489,31 @@
 ### Задачи
 
 - [ ] **RAG-01** Foundation & Data Sources Management → [BACKLOG/RAG-01_system_architecture.md](BACKLOG/RAG-01_system_architecture.md) → **v1.13.1**
-  - Database schema (sources, documents, chunks, jobs)
-  - Data sources CRUD API
-  - ~~File storage (Local + S3/MinIO)~~ ✅ *Переиспользуем из v1.10.0*
-  - WebUI: Data Sources management
-  - Basic in-memory queue
-  - **Оценка:** 12-16 часов (меньше т.к. storage готов)
+  - ✅ Database schema (sources, documents, chunks, jobs)
+  - ✅ Data sources CRUD API (7 endpoints)
+  - ✅ ~~File storage (Local + S3/MinIO)~~ *Переиспользуем из v1.10.0*
+  - ✅ Basic in-memory queue
+  - ✅ Server integration & routes
+  - 📋 **WebUI: Data Sources Management Page** (осталось)
+    - Grid view со списком sources
+    - Create/Edit/Delete modals
+    - Source type selector (file/api/database/web)
+    - Configuration forms per source type
+    - Status indicators & sync controls
+    - Tags & search filtering
+  - **Оценка:** 12-16 часов (backend ✅ done, WebUI 📋 pending ~4-6 часов)
 
 - [ ] **RAG-02** Document Processing Pipeline → **v1.13.2**
   - ~~PDF/DOCX/CSV extractors~~ ✅ *Переиспользуем из v1.10.0*
   - Semantic chunking engine (новое)
   - PostgreSQL job queue (новое)
   - Worker pool (async processing)
-  - Progress tracking UI (WebSocket из v1.10.0)
+  - **WebUI: Progress Tracking Dashboard**
+    - Real-time job status (WebSocket из v1.10.0)
+    - Processing queue visualization
+    - Document processing logs
+    - Chunk preview & statistics
+    - Error handling & retry controls
   - **Оценка:** 12-16 часов (меньше т.к. extractors готовы)
 
 - [ ] **RAG-03** Embeddings & Vector Search → **v1.13.3**
@@ -509,7 +521,13 @@
   - pgvector setup + HNSW indexing
   - Batch embedding processing
   - Vector search API
-  - Search testing UI
+  - **WebUI: Search Testing Interface**
+    - Query input с similarity threshold slider
+    - Top-K results selector
+    - Search results preview (chunks + metadata)
+    - Similarity score visualization
+    - Source filtering controls
+    - Export search results
   - **Оценка:** 12-16 часов
 
 - [ ] **RAG-04** External Data Sources → **v1.13.4**
@@ -525,11 +543,18 @@
   - Reranking logic
   - Context assembly (max 64k of 128k)
   - Chat API integration
-  - WebUI: Source selector in chat sidebar
-  - RAG metadata in responses
+  - **WebUI: RAG Chat Integration**
+    - Source selector в chat sidebar
+    - Multi-select sources для query
+    - RAG toggle switch (enable/disable per message)
+    - Retrieved chunks preview panel
+    - Context tokens usage indicator
+    - RAG metadata в message footer (sources used, chunks count)
   - **Оценка:** 8-10 часов
 
 ### 🎯 Ключевые возможности
+
+**Backend:**
 
 - 📄 Multi-format файлы (PDF, DOCX, CSV, TXT, изображения)
 - 🔌 Внешние API с Bearer token аутентификацией
@@ -537,9 +562,15 @@
 - 🧠 Semantic chunking с учетом контекста (512 tokens, 10% overlap)
 - 🔍 Vector search через pgvector (HNSW indexing)
 - ⚡ Async processing с worker pool
-- 🎨 UI-first approach для управления источниками
 - 🔐 AES-256 encryption для credentials
-- 📊 Analytics dashboard для RAG usage
+
+**WebUI:**
+
+- 🎨 **Data Sources Page** - полное управление источниками (create/edit/delete/sync)
+- 📊 **Processing Dashboard** - real-time мониторинг обработки документов
+- 🔬 **Search Testing** - интерактивное тестирование vector search
+- 💬 **Chat Integration** - source selector + RAG toggle в чате
+- 📈 **Analytics** - статистика использования RAG (queries, tokens, sources)
 
 ### 🏗️ Технический стек
 

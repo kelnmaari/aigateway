@@ -28,6 +28,13 @@ type ChatCompletionRequest struct {
 	// Дополнительные поля для функций
 	Functions    []Function  `json:"functions,omitempty"`     // Deprecated
 	FunctionCall interface{} `json:"function_call,omitempty"` // Deprecated
+	
+	// RAG System (v1.13.0+)
+	RAGEnabled  bool     `json:"rag_enabled,omitempty"`  // Включить RAG
+	RAGSourceIDs []string `json:"rag_source_ids,omitempty"` // Фильтр по источникам
+	RAGTopK     int      `json:"rag_top_k,omitempty"`    // Количество chunks для retrieval
+	RAGMinScore float64  `json:"rag_min_score,omitempty"` // Минимальный similarity score
+	RAGRerank   bool     `json:"rag_rerank,omitempty"`   // Применять reranking
 }
 
 // ChatMessage представляет сообщение в чате

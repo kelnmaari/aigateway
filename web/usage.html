@@ -25,11 +25,13 @@
                 <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
             </header>
 
-            <!-- Error/Success Messages -->
-            <div id="usage-message" class="error-message" style="display: none;"></div>
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Error/Success Messages -->
+                <div id="usage-message" class="error-message" style="display: none;"></div>
 
-            <!-- Time Period Selector -->
-            <div class="usage-controls">
+                <!-- Time Period Selector -->
+                <div class="usage-controls">
                 <div class="form-group" style="max-width: 300px;">
                     <label for="time-period">Time Period</label>
                     <select id="time-period" class="form-control">
@@ -180,6 +182,7 @@
                     </table>
                 </div>
             </section>
+            </div>
         </div>
     </main>
 

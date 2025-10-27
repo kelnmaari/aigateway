@@ -1,7 +1,6 @@
 // RBAC Management JavaScript
 // Version: 1.11.5+ (Enterprise Suite - Custom Roles & Permissions)
 
-const API_BASE = '/api/admin/rbac';
 let selectedRole = null;
 let allPermissions = [];
 let allRoles = [];
@@ -9,22 +8,23 @@ let allUsers = [];
 let allTenants = [];
 
 // Initialize
-$(document).ready(function() {
-    checkAuth();
+$(document).ready(async function() {
+    await checkAuth();
     initEventListeners();
-    loadInitialData();
+    await loadInitialData();
 });
 
-function checkAuth() {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        window.location.href = '/login.html';
-        return;
+async function checkAuth() {
+    try {
+        // Use api.js to verify authentication (will auto-redirect if failed)
+        await api.getCurrentUser();
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        // api.js will handle redirect to login
     }
 }
 
 function initEventListeners() {
-    $('#logoutBtn').on('click', handleLogout);
     $('#createRoleBtn').on('click', () => showRoleModal());
     $('#saveRoleBtn').on('click', saveRole);
     $('#editRoleBtn').on('click', () => showRoleModal(selectedRole));
@@ -36,18 +36,6 @@ function initEventListeners() {
     // Tab switch listeners
     $('#user-roles-tab').on('shown.bs.tab', loadUsersAndTenants);
     $('#permissions-tab').on('shown.bs.tab', loadPermissions);
-}
-
-function handleLogout() {
-    localStorage.removeItem('access_token');
-    window.location.href = '/login.html';
-}
-
-function getAuthHeaders() {
-    return {
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        'Content-Type': 'application/json'
-    };
 }
 
 // Load initial data
@@ -64,15 +52,7 @@ async function loadInitialData() {
 
 async function loadAllPermissions() {
     try {
-        const response = await fetch(`${API_BASE}/permissions`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load permissions');
-        }
-        
-        const data = await response.json();
+        const data = await api.getRBACPermissions();
         allPermissions = data.permissions || [];
         return allPermissions;
     } catch (error) {
@@ -147,15 +127,7 @@ function loadPermissions() {
 
 async function loadRoles() {
     try {
-        const response = await fetch(`${API_BASE}/roles?include_permissions=true`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load roles');
-        }
-        
-        const data = await response.json();
+        const data = await api.getRBACRoles(true);
         allRoles = data.roles || [];
         displayRoles(allRoles);
     } catch (error) {
@@ -400,17 +372,7 @@ async function createRole() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/roles`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(data)
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create role');
-        }
-        
+        await api.createRBACRole(data);
         showAlert('Role created successfully', 'success');
         bootstrap.Modal.getInstance(document.getElementById('roleModal')).hide();
         await loadRoles();
@@ -427,16 +389,7 @@ async function updateRole(roleId) {
     };
     
     try {
-        const response = await fetch(`${API_BASE}/roles/${roleId}`, {
-            method: 'PUT',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(data)
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to update role');
-        }
+        await api.updateRBACRole(roleId, data);
         
         // Update permissions separately
         await updateRolePermissions(roleId);
@@ -472,11 +425,7 @@ async function updateRolePermissions(roleId) {
     // Add new permissions
     for (const permId of toAdd) {
         try {
-            await fetch(`${API_BASE}/roles/${roleId}/permissions`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ permission_id: permId })
-            });
+            await api.addRolePermission(roleId, permId);
         } catch (error) {
             console.error(`Failed to add permission ${permId}:`, error);
         }
@@ -485,10 +434,7 @@ async function updateRolePermissions(roleId) {
     // Remove permissions
     for (const permId of toRemove) {
         try {
-            await fetch(`${API_BASE}/roles/${roleId}/permissions/${permId}`, {
-                method: 'DELETE',
-                headers: getAuthHeaders()
-            });
+            await api.removeRolePermission(roleId, permId);
         } catch (error) {
             console.error(`Failed to remove permission ${permId}:`, error);
         }
@@ -503,16 +449,7 @@ async function deleteRole() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/roles/${selectedRole.id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to delete role');
-        }
-        
+        await api.deleteRBACRole(selectedRole.id);
         showAlert('Role deleted successfully', 'success');
         selectedRole = null;
         $('#roleDetailsCard').hide();
@@ -538,15 +475,7 @@ async function loadUsersAndTenants() {
 
 async function loadUsers() {
     try {
-        const response = await fetch('/api/admin/users', {
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load users');
-        }
-        
-        const data = await response.json();
+        const data = await api.getAdminUsers();
         allUsers = data.users || [];
         
         // Populate select
@@ -562,15 +491,7 @@ async function loadUsers() {
 
 async function loadTenants() {
     try {
-        const response = await fetch('/api/admin/tenants', {
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load tenants');
-        }
-        
-        const data = await response.json();
+        const data = await api.getAdminTenants();
         allTenants = data.tenants || [];
         
         // Populate select
@@ -609,17 +530,8 @@ async function handleUserSelect() {
 
 async function loadUserRoles(userId) {
     try {
-        const response = await fetch(`${API_BASE}/users/${userId}/roles?include_details=true`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load user roles');
-        }
-        
-        const data = await response.json();
+        const data = await api.getUserRoles(userId, true);
         const userRoles = data.roles || [];
-        
         displayUserRoles(userId, userRoles);
     } catch (error) {
         console.error('Error loading user roles:', error);
@@ -682,19 +594,11 @@ async function assignRoleToUser() {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/users/${userId}/roles`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(data)
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to assign role');
-        }
-        
+        await api.assignUserRole(userId, data);
         showAlert('Role assigned successfully', 'success');
         await loadUserRoles(userId);
+        $('#roleToAssign').val('');
+        $('#tenantForRole').val('');
     } catch (error) {
         console.error('Error assigning role:', error);
         showAlert(error.message, 'danger');
@@ -706,22 +610,8 @@ async function removeUserRole(userId, roleId, tenantId) {
         return;
     }
     
-    let url = `${API_BASE}/users/${userId}/roles/${roleId}`;
-    if (tenantId) {
-        url += `?tenant_id=${tenantId}`;
-    }
-    
     try {
-        const response = await fetch(url, {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to remove role');
-        }
-        
+        await api.removeUserRole(userId, roleId, tenantId);
         showAlert('Role removed successfully', 'success');
         await loadUserRoles(userId);
     } catch (error) {

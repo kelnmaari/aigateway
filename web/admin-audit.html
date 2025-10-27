@@ -5,17 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audit Log - Ollama-OpenAI Proxy Admin</title>
     <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
 </head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1><span class="header-icon">🔐</span> Audit Log</h1>
-            <a href="/admin.html" class="btn btn-secondary">← Back to Admin</a>
-        </div>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
 
-        <!-- Content -->
-        <div class="content">
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>🔍 Audit Log</h1>
+                    <p class="page-description">System event monitoring and security audit trail</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/admin.html" class="btn btn-secondary">Back to Admin</a>
+                </div>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card danger">
@@ -134,11 +147,14 @@
                     </div>
                 </div>
             </div>
+            </div>
         </div>
-    </div>
+    </main>
 
     <script src="/js/auth-guard.js"></script>
-    <script src="/js/components/navigation.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
     <script src="/js/admin-audit.js"></script>
 </body>
 </html>

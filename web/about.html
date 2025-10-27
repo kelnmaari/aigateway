@@ -9,69 +9,85 @@
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="stylesheet" href="/css/notifications.css">
 </head>
-<body>
+<body class="dashboard-page">
     <!-- Top Navigation будет вставлен через navbar.js -->
+    <div id="navigation-placeholder"></div>
 
-    <div class="container" style="max-width: 1200px; margin: 80px auto 40px; padding: 0 20px;">
-        <h1 style="margin-bottom: 30px;">О Системе</h1>
-
-        <!-- System Info Card -->
-        <div class="card" style="margin-bottom: 30px;">
-            <div class="card-header">
-                <h2>Информация о версии</h2>
-            </div>
-            <div class="card-body">
-                <div id="system-info-loading" class="loading-state">
-                    <div class="spinner"></div>
-                    <p>Загрузка информации...</p>
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>О Системе</h1>
+                    <p class="page-description">Информация о версии и история изменений</p>
                 </div>
-                <div id="system-info-content" style="display: none;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                        <div>
-                            <strong>Версия:</strong>
-                            <p id="version-number" style="margin: 5px 0; font-size: 1.1em; color: var(--primary-color);"></p>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+                </div>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- System Info Card -->
+                <div class="card" style="margin-bottom: 30px;">
+                    <div class="card-header">
+                        <h2>Информация о версии</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="system-info-loading" class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Загрузка информации...</p>
                         </div>
-                        <div>
-                            <strong>Git Commit:</strong>
-                            <p id="git-commit" style="margin: 5px 0; font-family: monospace; color: var(--text-secondary);"></p>
+                        <div id="system-info-content" style="display: none;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                                <div>
+                                    <strong style="color: rgba(255, 255, 255, 0.7);">Версия:</strong>
+                                    <p id="version-number" style="margin: 5px 0; font-size: 1.1em; color: #48dbfb;"></p>
+                                </div>
+                                <div>
+                                    <strong style="color: rgba(255, 255, 255, 0.7);">Git Commit:</strong>
+                                    <p id="git-commit" style="margin: 5px 0; font-family: monospace; color: rgba(255, 255, 255, 0.9);"></p>
+                                </div>
+                                <div>
+                                    <strong style="color: rgba(255, 255, 255, 0.7);">Дата сборки:</strong>
+                                    <p id="build-date" style="margin: 5px 0; color: rgba(255, 255, 255, 0.9);"></p>
+                                </div>
+                                <div>
+                                    <strong style="color: rgba(255, 255, 255, 0.7);">Go версия:</strong>
+                                    <p id="go-version" style="margin: 5px 0; font-family: monospace; color: rgba(255, 255, 255, 0.9);"></p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <strong>Дата сборки:</strong>
-                            <p id="build-date" style="margin: 5px 0;"></p>
-                        </div>
-                        <div>
-                            <strong>Go версия:</strong>
-                            <p id="go-version" style="margin: 5px 0; font-family: monospace;"></p>
+                        <div id="system-info-error" class="error-state" style="display: none;">
+                            <p>Не удалось загрузить информацию о системе</p>
                         </div>
                     </div>
                 </div>
-                <div id="system-info-error" class="error-state" style="display: none;">
-                    <p>Не удалось загрузить информацию о системе</p>
-                </div>
-            </div>
-        </div>
 
-        <!-- Changelog Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>История изменений</h2>
-            </div>
-            <div class="card-body">
-                <div id="changelog-loading" class="loading-state">
-                    <div class="spinner"></div>
-                    <p>Загрузка changelog...</p>
-                </div>
-                <div id="changelog-content" style="display: none;">
-                    <div id="changelog-accordion">
-                        <!-- Changelog items will be inserted here -->
+                <!-- Changelog Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>История изменений</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="changelog-loading" class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Загрузка changelog...</p>
+                        </div>
+                        <div id="changelog-content" style="display: none;">
+                            <div id="changelog-accordion">
+                                <!-- Changelog items will be inserted here -->
+                            </div>
+                        </div>
+                        <div id="changelog-error" class="error-state" style="display: none;">
+                            <p>Не удалось загрузить историю изменений</p>
+                        </div>
                     </div>
                 </div>
-                <div id="changelog-error" class="error-state" style="display: none;">
-                    <p>Не удалось загрузить историю изменений</p>
-                </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script src="/js/api.js"></script>
     <script src="/js/utils/notifications.js"></script>

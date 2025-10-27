@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	ragconfig "ollama-openai-proxy/internal/rag/config"
 )
 
 // Config представляет конфигурацию всего приложения
@@ -26,7 +27,8 @@ type Config struct {
 	Observability ObservabilityConfig `mapstructure:"observability"` // Version 1.6.0+: Tracing and monitoring
 	FileStorage   FileStorageConfig   `mapstructure:"file_storage"`  // Version 1.10.0+: File storage and processing
 	Extractors    ExtractorsConfig    `mapstructure:"extractors"`    // Version 1.10.0+: Document extractors
-	WebFetch      WebFetchConfig      `mapstructure:"web_fetch"`     // Version 1.10.4+: Web content fetching
+	WebFetch      WebFetchConfig           `mapstructure:"web_fetch"`     // Version 1.10.4+: Web content fetching
+	RAG           ragconfig.RAGConfig      `mapstructure:"rag"`           // Version 1.13.0+: RAG system configuration
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -265,6 +267,14 @@ type LoggingConfig struct {
 	MaxBackups int    `mapstructure:"max_backups"`
 	MaxAge     int    `mapstructure:"max_age"` // days
 	Compress   bool   `mapstructure:"compress"`
+
+	// Error log file (separate file for errors and warnings)
+	ErrorLogEnabled  bool   `mapstructure:"error_log_enabled"`  // Enable separate error log file
+	ErrorLogFilePath string `mapstructure:"error_log_file_path"` // Path to error log file
+	ErrorLogMaxSize  int    `mapstructure:"error_log_max_size"`  // MB (default: same as MaxSize)
+	ErrorLogMaxBackups int  `mapstructure:"error_log_max_backups"` // (default: same as MaxBackups)
+	ErrorLogMaxAge   int    `mapstructure:"error_log_max_age"`   // days (default: same as MaxAge)
+	ErrorLogCompress bool   `mapstructure:"error_log_compress"`  // (default: same as Compress)
 
 	// Structured fields для JSON логирования
 	StructuredFields map[string]string `mapstructure:"structured_fields"`

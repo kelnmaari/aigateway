@@ -40,12 +40,29 @@ class API {
             this.accessToken = data.access_token;
             localStorage.setItem('access_token', data.access_token);
             
+            // CRITICAL: Update refresh token too (token rotation for security)
+            if (data.refresh_token) {
+                this.refreshToken = data.refresh_token;
+                localStorage.setItem('refresh_token', data.refresh_token);
+            }
+            
             return true;
         } catch (error) {
             console.error('Failed to refresh token:', error);
-            this.logout();
+            // Don't call logout() - just clear tokens and redirect
+            // This avoids calling /api/auth/logout when token is already invalid
+            this.clearSessionAndRedirect();
             return false;
         }
+    }
+
+    // Clear session without API call (used when tokens are already invalid)
+    clearSessionAndRedirect() {
+        console.log('Clearing session and redirecting to login');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login.html';
     }
 
     // Make authenticated request with token refresh
@@ -81,6 +98,52 @@ class API {
         }
     }
 
+    // ==================== HTTP Shorthand Methods ====================
+
+    async get(path) {
+        const response = await this.request(`${this.baseURL}${path}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || `GET ${path} failed`);
+        }
+        return response.json();
+    }
+
+    async post(path, data) {
+        const response = await this.request(`${this.baseURL}${path}`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || `POST ${path} failed`);
+        }
+        return response.json();
+    }
+
+    async put(path, data) {
+        const response = await this.request(`${this.baseURL}${path}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || `PUT ${path} failed`);
+        }
+        return response.json();
+    }
+
+    async delete(path) {
+        const response = await this.request(`${this.baseURL}${path}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || `DELETE ${path} failed`);
+        }
+        return response.ok;
+    }
+
     // ==================== Auth APIs ====================
 
     async getCurrentUser() {
@@ -100,7 +163,7 @@ class API {
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');
-            window.location.href = '/web/login.html';
+            window.location.href = '/login.html';
         }
     }
 
@@ -509,6 +572,188 @@ class API {
             throw new Error(error.error || 'Failed to delete tenant API key');
         }
         return true;
+    }
+    // ==================== RAG APIs (v1.13.0+) ====================
+
+    async getRAGSources(filters = {}) {
+        let query = '';
+        if (Object.keys(filters).length > 0) {
+            const params = new URLSearchParams();
+            if (filters.source_type) params.append('source_type', filters.source_type);
+            if (filters.status) params.append('status', filters.status);
+            if (filters.limit) params.append('limit', filters.limit);
+            if (filters.offset) params.append('offset', filters.offset);
+            query = '?' + params.toString();
+        }
+        
+        const response = await this.request(`${this.baseURL}/api/rag/sources${query}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch RAG sources');
+        }
+        return response.json();
+    }
+
+    async getRAGSource(sourceId) {
+        const response = await this.request(`${this.baseURL}/api/rag/sources/${sourceId}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch RAG source');
+        }
+        return response.json();
+    }
+
+    async createRAGSource(data) {
+        const response = await this.request(`${this.baseURL}/api/rag/sources`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create RAG source');
+        }
+        return response.json();
+    }
+
+    async updateRAGSource(sourceId, data) {
+        const response = await this.request(`${this.baseURL}/api/rag/sources/${sourceId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to update RAG source');
+        }
+        return response.json();
+    }
+
+    async deleteRAGSource(sourceId) {
+        const response = await this.request(`${this.baseURL}/api/rag/sources/${sourceId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete RAG source');
+        }
+        return true;
+    }
+
+    async testRAGConnection(data) {
+        const response = await this.request(`${this.baseURL}/api/rag/sources/test-connection`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Connection test failed');
+        }
+        return response.json();
+    }
+
+    async syncRAGSource(sourceId) {
+        const response = await this.request(`${this.baseURL}/api/rag/sources/${sourceId}/sync`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to sync RAG source');
+        }
+        return response.json();
+    }
+
+    // ==================== RBAC APIs (v1.11.5+) ====================
+
+    async getRBACPermissions() {
+        return this.get('/api/admin/rbac/permissions');
+    }
+
+    async getRBACRoles(includePermissions = true) {
+        return this.get(`/api/admin/rbac/roles?include_permissions=${includePermissions}`);
+    }
+
+    async createRBACRole(data) {
+        return this.post('/api/admin/rbac/roles', data);
+    }
+
+    async updateRBACRole(roleId, data) {
+        return this.put(`/api/admin/rbac/roles/${roleId}`, data);
+    }
+
+    async deleteRBACRole(roleId) {
+        return this.delete(`/api/admin/rbac/roles/${roleId}`);
+    }
+
+    async addRolePermission(roleId, permissionId) {
+        return this.post(`/api/admin/rbac/roles/${roleId}/permissions`, { permission_id: permissionId });
+    }
+
+    async removeRolePermission(roleId, permissionId) {
+        return this.delete(`/api/admin/rbac/roles/${roleId}/permissions/${permissionId}`);
+    }
+
+    async getUserRoles(userId, includeDetails = true) {
+        return this.get(`/api/admin/rbac/users/${userId}/roles?include_details=${includeDetails}`);
+    }
+
+    async assignUserRole(userId, data) {
+        return this.post(`/api/admin/rbac/users/${userId}/roles`, data);
+    }
+
+    async removeUserRole(userId, roleId, tenantId = null) {
+        let url = `/api/admin/rbac/users/${userId}/roles/${roleId}`;
+        if (tenantId) {
+            url += `?tenant_id=${tenantId}`;
+        }
+        return this.delete(url);
+    }
+
+    async getAdminUsers() {
+        return this.get('/api/admin/users');
+    }
+
+    async getAdminTenants() {
+        return this.get('/api/admin/tenants');
+    }
+
+    // ==================== Audit APIs (v1.11.5+) ====================
+
+    async getAuditStats() {
+        return this.get('/api/admin/audit/stats');
+    }
+
+    async getAuditLogs(filters = {}) {
+        const queryParams = new URLSearchParams(filters);
+        return this.get(`/api/admin/audit?${queryParams}`);
+    }
+
+    async exportAuditLogs(filters = {}) {
+        const queryParams = new URLSearchParams(filters);
+        const response = await this.request(`${this.baseURL}/api/admin/audit/export?${queryParams}`, {
+            method: 'GET'
+        });
+        return response; // Return raw response for file download
+    }
+
+    // ==================== System APIs ====================
+
+    async getSystemInfo() {
+        return this.get('/api/system/info');
+    }
+
+    // Check if RAG is enabled in system configuration
+    async isRAGEnabled() {
+        try {
+            const info = await this.getSystemInfo();
+            return info.rag_enabled === true;
+        } catch (error) {
+            console.error('Failed to check RAG status:', error);
+            return false; // Default to disabled if can't check
+        }
     }
 }
 

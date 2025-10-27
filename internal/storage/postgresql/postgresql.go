@@ -278,6 +278,11 @@ func (p *PostgreSQLDB) getMigrations() []migration {
 			Name:    "add_mcp_servers_table",
 			SQL:     p.getMCPServersMigration(),
 		},
+		{
+			Version: 3,
+			Name:    "create_rag_tables",
+			SQL:     p.getCreateRAGTablesMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -531,6 +536,197 @@ CREATE INDEX IF NOT EXISTS idx_mcp_servers_category ON mcp_servers(category);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_is_active ON mcp_servers(is_active);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_created_at ON mcp_servers(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_tags ON mcp_servers USING GIN (tags);
+	`
+}
+
+// getCreateRAGTablesMigration returns SQL for creating RAG tables (v3 migration - v1.13.1)
+func (p *PostgreSQLDB) getCreateRAGTablesMigration() string {
+	return `
+-- ========================================
+-- RAG Data Sources Table (v1.13.1)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_data_sources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    tenant_id TEXT,
+    
+    -- Основная информация
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    source_type VARCHAR(50) NOT NULL CHECK (source_type IN ('file', 'api', 'database', 'web')),
+    
+    -- Конфигурация (JSON для гибкости)
+    config JSONB NOT NULL DEFAULT '{}',
+    
+    -- Credentials (зашифрованные AES-256)
+    credentials_encrypted TEXT,
+    
+    -- Статус и метрики
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'error', 'syncing')),
+    last_sync_at TIMESTAMP,
+    last_sync_status VARCHAR(20) CHECK (last_sync_status IN ('success', 'failed', 'partial')),
+    last_error TEXT,
+    sync_frequency INTERVAL,  -- PostgreSQL INTERVAL: '6 hours', '1 day', '1 week'
+    
+    -- Настройки индексации
+    indexing_config JSONB DEFAULT '{}',
+    
+    -- Статистика
+    total_chunks INT DEFAULT 0,
+    total_tokens BIGINT DEFAULT 0,
+    last_chunk_count INT,
+    
+    -- Метаданные
+    tags TEXT[],
+    is_shared BOOLEAN DEFAULT false,
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_sources_user ON rag_data_sources(user_id);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_tenant ON rag_data_sources(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_type ON rag_data_sources(source_type);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_status ON rag_data_sources(status);
+CREATE INDEX IF NOT EXISTS idx_rag_sources_tags ON rag_data_sources USING GIN(tags);
+
+-- ========================================
+-- RAG Documents Table (v1.13.1)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_id UUID NOT NULL,
+    
+    -- Файл информация
+    filename VARCHAR(500),
+    mime_type VARCHAR(100),
+    size_bytes BIGINT,
+    
+    -- Хранилище
+    storage_backend VARCHAR(20),  -- 'local', 's3'
+    storage_path TEXT NOT NULL,
+    storage_bucket VARCHAR(255),  -- для S3
+    
+    -- Обработка
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    processing_started_at TIMESTAMP,
+    processing_completed_at TIMESTAMP,
+    processing_error TEXT,
+    
+    -- Метаданные документа
+    metadata JSONB DEFAULT '{}',
+    
+    -- Статистика
+    total_chunks INT DEFAULT 0,
+    total_tokens BIGINT DEFAULT 0,
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    FOREIGN KEY (source_id) REFERENCES rag_data_sources(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_docs_source ON rag_documents(source_id);
+CREATE INDEX IF NOT EXISTS idx_rag_docs_status ON rag_documents(status);
+
+-- ========================================
+-- RAG Chunks Table (v1.13.1)
+-- Note: Vector embeddings будут добавлены в v1.13.3 после pgvector setup
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL,
+    source_id UUID NOT NULL,
+    
+    -- Chunk контент
+    chunk_text TEXT NOT NULL,
+    chunk_index INT NOT NULL,  -- позиция в документе
+    chunk_tokens INT NOT NULL,
+    
+    -- Метаданные чанка
+    metadata JSONB DEFAULT '{}',  -- page_number, headers, context, etc.
+    
+    -- Для overlap detection
+    start_offset INT,
+    end_offset INT,
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    FOREIGN KEY (document_id) REFERENCES rag_documents(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_id) REFERENCES rag_data_sources(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_document ON rag_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_source ON rag_chunks(source_id);
+
+-- ========================================
+-- RAG Jobs Queue (v1.13.1)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_jobs (
+    id BIGSERIAL PRIMARY KEY,
+    job_type VARCHAR(50) NOT NULL,  -- 'file_upload', 'api_sync', 'db_query', 'web_scrape'
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    
+    -- Данные
+    payload JSONB NOT NULL,
+    result JSONB,
+    
+    -- Приоритет и повторы
+    priority INT DEFAULT 0,
+    attempts INT DEFAULT 0,
+    max_attempts INT DEFAULT 3,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT NOW(),
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    
+    -- Ошибки
+    error TEXT,
+    
+    -- Для visibility timeout
+    locked_until TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_jobs_status ON rag_jobs(status, priority DESC, created_at);
+CREATE INDEX IF NOT EXISTS idx_rag_jobs_type ON rag_jobs(job_type);
+
+-- ========================================
+-- RAG Query Logs (v1.13.1 - аналитика)
+-- ========================================
+CREATE TABLE IF NOT EXISTS rag_query_logs (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT,
+    conversation_id TEXT,
+    
+    -- Запрос
+    query_text TEXT NOT NULL,
+    
+    -- Использованные источники
+    source_ids UUID[],
+    
+    -- Результаты поиска
+    chunks_retrieved INT,
+    chunks_used INT,
+    
+    -- Метрики
+    search_time_ms INT,
+    total_tokens_used INT,
+    
+    -- Результат
+    response_quality_score FLOAT,  -- опционально, от пользователя
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rag_query_logs_user ON rag_query_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_rag_query_logs_created ON rag_query_logs(created_at DESC);
 	`
 }
 

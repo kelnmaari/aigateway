@@ -206,6 +206,14 @@ class ChatManager {
                 model: this.currentModel
             };
             
+            // Add RAG parameters if enabled (v1.13.0+)
+            if (window.ragManager) {
+                const ragParams = window.ragManager.getRAGParams();
+                if (ragParams) {
+                    Object.assign(requestParams, ragParams);
+                }
+            }
+            
             // Stream from API with parameters
             const stream = api.streamChatMessage(this.messages, requestParams);
             
@@ -497,6 +505,119 @@ class ChatManager {
     }
 }
 
-// Create global chat manager
+// RAG Manager (v1.13.0+)
+class RAGManager {
+    constructor() {
+        this.enabled = false;
+        this.selectedSources = [];
+        this.sources = [];
+    }
+
+    async init() {
+        // Check if RAG is enabled in system configuration
+        const ragEnabled = await api.isRAGEnabled();
+        if (!ragEnabled) {
+            // Hide entire RAG section
+            const ragSection = document.getElementById('rag-section');
+            if (ragSection) {
+                ragSection.style.display = 'none';
+            }
+            console.info('RAG system is disabled by administrator');
+            return;
+        }
+
+        this.ragToggle = document.getElementById('rag-enabled');
+        this.ragControls = document.getElementById('rag-controls');
+        this.ragSourcesSelect = document.getElementById('rag-sources');
+        this.ragTopKSlider = document.getElementById('rag-top-k');
+        this.ragTopKValue = document.getElementById('rag-top-k-value');
+        this.ragMinScoreSlider = document.getElementById('rag-min-score');
+        this.ragMinScoreValue = document.getElementById('rag-min-score-value');
+        this.ragRerankCheckbox = document.getElementById('rag-rerank');
+
+        this.setupEventListeners();
+        await this.loadSources();
+    }
+
+    setupEventListeners() {
+        // Toggle RAG
+        this.ragToggle.addEventListener('change', (e) => {
+            this.enabled = e.target.checked;
+            this.ragControls.style.display = this.enabled ? 'block' : 'none';
+        });
+
+        // Sync slider with number input
+        this.ragTopKSlider.addEventListener('input', (e) => {
+            this.ragTopKValue.value = e.target.value;
+        });
+        this.ragTopKValue.addEventListener('input', (e) => {
+            this.ragTopKSlider.value = e.target.value;
+        });
+
+        this.ragMinScoreSlider.addEventListener('input', (e) => {
+            this.ragMinScoreValue.value = e.target.value;
+        });
+        this.ragMinScoreValue.addEventListener('input', (e) => {
+            this.ragMinScoreSlider.value = e.target.value;
+        });
+    }
+
+    async loadSources() {
+        try {
+            const response = await api.getRAGSources();
+            this.sources = response.sources || [];
+            
+            // Populate select
+            this.ragSourcesSelect.innerHTML = '';
+            
+            if (this.sources.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No sources available';
+                option.disabled = true;
+                this.ragSourcesSelect.appendChild(option);
+            } else {
+                this.sources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source.id;
+                    option.textContent = `${source.name} (${source.source_type})`;
+                    this.ragSourcesSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load RAG sources:', error);
+        }
+    }
+
+    getRAGParams() {
+        // If RAG UI was not initialized (system disabled), return null
+        if (!this.ragToggle || !this.enabled) {
+            return null;
+        }
+
+        // Get selected sources
+        const selectedOptions = Array.from(this.ragSourcesSelect.selectedOptions);
+        const sourceIDs = selectedOptions.map(opt => opt.value).filter(v => v);
+
+        if (sourceIDs.length === 0) {
+            return null; // No sources selected
+        }
+
+        return {
+            rag_enabled: true,
+            rag_source_ids: sourceIDs,
+            rag_top_k: parseInt(this.ragTopKSlider.value),
+            rag_min_score: parseFloat(this.ragMinScoreSlider.value),
+            rag_rerank: this.ragRerankCheckbox.checked
+        };
+    }
+
+    isEnabled() {
+        return this.enabled;
+    }
+}
+
+// Create global managers
 window.chatManager = new ChatManager();
+window.ragManager = new RAGManager();
 

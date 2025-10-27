@@ -27,6 +27,11 @@ class App {
             // Initialize chat manager
             chatManager.init();
             
+            // Initialize RAG manager (v1.13.0+)
+            if (window.ragManager) {
+                await ragManager.init();
+            }
+            
             // Setup event listeners
             this.setupEventListeners();
             

@@ -1,0 +1,120 @@
+// Package sqlite provides RAG transaction methods for SQLite.
+package sqlite
+
+import (
+	"context"
+	"time"
+
+	"ollama-openai-proxy/internal/models"
+	"ollama-openai-proxy/internal/storage"
+)
+
+// RAG Data Sources (v1.13.0+)
+
+func (tx *sqliteTx) CreateRAGDataSource(ctx context.Context, source *models.RAGDataSource) error {
+	return tx.db.CreateRAGDataSource(ctx, source)
+}
+
+func (tx *sqliteTx) GetRAGDataSource(ctx context.Context, id string) (*models.RAGDataSource, error) {
+	return tx.db.GetRAGDataSource(ctx, id)
+}
+
+func (tx *sqliteTx) UpdateRAGDataSource(ctx context.Context, source *models.RAGDataSource) error {
+	return tx.db.UpdateRAGDataSource(ctx, source)
+}
+
+func (tx *sqliteTx) DeleteRAGDataSource(ctx context.Context, id string) error {
+	return tx.db.DeleteRAGDataSource(ctx, id)
+}
+
+func (tx *sqliteTx) ListRAGDataSources(ctx context.Context, filter *storage.RAGDataSourceFilter) ([]*models.RAGDataSource, int, error) {
+	return tx.db.ListRAGDataSources(ctx, filter)
+}
+
+// RAG Documents (v1.13.0+)
+
+func (tx *sqliteTx) CreateRAGDocument(ctx context.Context, doc *models.RAGDocument) error {
+	return tx.db.CreateRAGDocument(ctx, doc)
+}
+
+func (tx *sqliteTx) GetRAGDocument(ctx context.Context, id string) (*models.RAGDocument, error) {
+	return tx.db.GetRAGDocument(ctx, id)
+}
+
+func (tx *sqliteTx) UpdateRAGDocument(ctx context.Context, doc *models.RAGDocument) error {
+	return tx.db.UpdateRAGDocument(ctx, doc)
+}
+
+func (tx *sqliteTx) DeleteRAGDocument(ctx context.Context, id string) error {
+	return tx.db.DeleteRAGDocument(ctx, id)
+}
+
+func (tx *sqliteTx) ListRAGDocuments(ctx context.Context, filter *storage.RAGDocumentFilter) ([]*models.RAGDocument, error) {
+	return tx.db.ListRAGDocuments(ctx, filter)
+}
+
+// RAG Chunks (v1.13.0+)
+
+func (tx *sqliteTx) CreateRAGChunk(ctx context.Context, chunk *models.RAGChunk) error {
+	return tx.db.CreateRAGChunk(ctx, chunk)
+}
+
+func (tx *sqliteTx) GetRAGChunk(ctx context.Context, id string) (*models.RAGChunk, error) {
+	return tx.db.GetRAGChunk(ctx, id)
+}
+
+func (tx *sqliteTx) ListRAGChunksByDocument(ctx context.Context, documentID string) ([]*models.RAGChunk, error) {
+	return tx.db.ListRAGChunksByDocument(ctx, documentID)
+}
+
+func (tx *sqliteTx) ListRAGChunksBySource(ctx context.Context, sourceID string, limit, offset int) ([]*models.RAGChunk, error) {
+	return tx.db.ListRAGChunksBySource(ctx, sourceID, limit, offset)
+}
+
+func (tx *sqliteTx) DeleteRAGChunksByDocument(ctx context.Context, documentID string) error {
+	return tx.db.DeleteRAGChunksByDocument(ctx, documentID)
+}
+
+// RAG Jobs Queue (v1.13.0+)
+
+func (tx *sqliteTx) CreateRAGJob(ctx context.Context, job *models.RAGJob) error {
+	return tx.db.CreateRAGJob(ctx, job)
+}
+
+func (tx *sqliteTx) GetRAGJob(ctx context.Context, id string) (*models.RAGJob, error) {
+	return tx.db.GetRAGJob(ctx, id)
+}
+
+func (tx *sqliteTx) UpdateRAGJob(ctx context.Context, job *models.RAGJob) error {
+	return tx.db.UpdateRAGJob(ctx, job)
+}
+
+func (tx *sqliteTx) GetNextPendingRAGJob(ctx context.Context) (*models.RAGJob, error) {
+	return tx.db.GetNextPendingRAGJob(ctx)
+}
+
+func (tx *sqliteTx) CountRAGJobsByStatus(ctx context.Context, status string) (int, error) {
+	return tx.db.CountRAGJobsByStatus(ctx, status)
+}
+
+func (tx *sqliteTx) DeleteOldRAGJobs(ctx context.Context, cutoffTime time.Time, statuses []string) (int, error) {
+	return tx.db.DeleteOldRAGJobs(ctx, cutoffTime, statuses)
+}
+
+func (tx *sqliteTx) UnlockExpiredRAGJobs(ctx context.Context, now time.Time) (int, error) {
+	return tx.db.UnlockExpiredRAGJobs(ctx, now)
+}
+
+// RAG Query Logs (v1.13.0+)
+
+func (tx *sqliteTx) CreateRAGQueryLog(ctx context.Context, log *models.RAGQueryLog) error {
+	return tx.db.CreateRAGQueryLog(ctx, log)
+}
+
+func (tx *sqliteTx) GetRAGQueryLog(ctx context.Context, id int64) (*models.RAGQueryLog, error) {
+	return tx.db.GetRAGQueryLog(ctx, id)
+}
+
+func (tx *sqliteTx) ListRAGQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*models.RAGQueryLog, error) {
+	return tx.db.ListRAGQueryLogsByUser(ctx, userID, limit, offset)
+}

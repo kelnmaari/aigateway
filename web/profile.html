@@ -25,10 +25,12 @@
                 <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
             </header>
 
-            <div class="form-container">
-                <!-- Error/Success Messages -->
-                <div id="profile-message" class="error-message" style="display: none;"></div>
-                <div id="profile-success" class="success-message" style="display: none;"></div>
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <div class="form-container">
+                    <!-- Error/Success Messages -->
+                    <div id="profile-message" class="error-message" style="display: none;"></div>
+                    <div id="profile-success" class="success-message" style="display: none;"></div>
 
                 <!-- Profile Information -->
                 <div class="form-section">
@@ -149,6 +151,7 @@
                     <button class="btn btn-secondary" id="delete-account-btn" style="border-color: var(--error-color); color: var(--error-color);">
                         Delete Account
                     </button>
+                </div>
                 </div>
             </div>
         </div>

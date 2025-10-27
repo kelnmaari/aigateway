@@ -23,6 +23,7 @@ import (
 	"ollama-openai-proxy/internal/metrics"
 	"ollama-openai-proxy/internal/observability"
 	"ollama-openai-proxy/internal/services/model"
+	ragservice "ollama-openai-proxy/internal/services/rag"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/version"
 )
@@ -293,6 +294,31 @@ func main() {
 		fmt.Println("⚠️  MoniGo Performance Dashboard НЕ включен (требуется database + JWT)")
 	}
 
+	// Инициализация RAG Data Source Service (Version 1.13.1+)
+	var ragDataSourceService *ragservice.DataSourceService
+	if cfg.RAG.Enabled && db != nil {
+		appLogger.Info("Initializing RAG Data Source Service...")
+		
+		// Encryption key для credentials (32 bytes для AES-256)
+		encryptionKey := cfg.RAG.Security.EncryptionKey
+		if encryptionKey == "" {
+			appLogger.Warn("RAG encryption key not set, using default (NOT SECURE FOR PRODUCTION)")
+			encryptionKey = "12345678901234567890123456789012" // 32 bytes placeholder
+		}
+		
+		ragDataSourceService, err = ragservice.NewDataSourceService(
+			db, // DB implements RAGDataSourceRepository
+			encryptionKey,
+			appLogger,
+		)
+		if err != nil {
+			appLogger.WithError(err).Warn("Failed to initialize RAG Data Source Service")
+		} else {
+			appLogger.Info("✅ RAG Data Source Service initialized successfully")
+			fmt.Println("🧠 RAG System включен")
+		}
+	}
+
 	// Инициализация Model Preloader (Version 1.12.1+)
 	var modelPreloader *model.ModelPreloader
 	if cfg.Models.Preload.Enabled {
@@ -336,17 +362,18 @@ func main() {
 	}).Debug("Creating router with MoniGo configuration")
 
 	appRouter, err = router.NewWithOptions(router.NewOptions{
-		Config:             cfg,
-		Logger:             appLogger,
-		Version:            version.Version,
-		Database:           db,             // Может быть nil для legacy mode
-		JWTManager:         jwtManager,     // Может быть nil для legacy mode
-		TracerProvider:     tracerProvider, // Может быть nil если tracing отключен (v1.6.0+)
-		PerformanceMonitor: perfMonitor,    // Может быть nil если performance monitoring отключен (v1.6.2+)
-		LeakDetector:       leakDetector,   // Может быть nil если leak detection отключен (v1.6.2+)
-		MonigoPort:         monigoPort,     // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
-		GPUMonitor:         gpuMonitor,     // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
-		ModelPreloader:     modelPreloader, // Может быть nil если preloading отключен (v1.12.1+)
+		Config:               cfg,
+		Logger:               appLogger,
+		Version:              version.Version,
+		Database:             db,                    // Может быть nil для legacy mode
+		JWTManager:           jwtManager,            // Может быть nil для legacy mode
+		TracerProvider:       tracerProvider,        // Может быть nil если tracing отключен (v1.6.0+)
+		PerformanceMonitor:   perfMonitor,           // Может быть nil если performance monitoring отключен (v1.6.2+)
+		LeakDetector:         leakDetector,          // Может быть nil если leak detection отключен (v1.6.2+)
+		MonigoPort:           monigoPort,            // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
+		GPUMonitor:           gpuMonitor,            // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
+		ModelPreloader:       modelPreloader,        // Может быть nil если preloading отключен (v1.12.1+)
+		RAGDataSourceService: ragDataSourceService,  // Может быть nil если RAG отключен (v1.13.1+)
 	})
 
 	if err != nil {

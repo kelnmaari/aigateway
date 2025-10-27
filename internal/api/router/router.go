@@ -35,6 +35,7 @@ import (
 	"ollama-openai-proxy/internal/services/audit"
 	"ollama-openai-proxy/internal/services/model"
 	"ollama-openai-proxy/internal/services/quota"
+	ragservice "ollama-openai-proxy/internal/services/rag"
 	"ollama-openai-proxy/internal/services/rbac"
 	"ollama-openai-proxy/internal/storage"
 	"ollama-openai-proxy/internal/websocket"
@@ -94,6 +95,7 @@ type Router struct {
 	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
 	rbacHandler           *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
 	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
+	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -135,21 +137,25 @@ type Router struct {
 
 	// Model Preloading (Version 1.12.1+: Model Preloading & Warming)
 	modelPreloader *model.ModelPreloader
+	
+	// RAG System (Version 1.13.0+: RAG System)
+	ragDataSourceService *ragservice.DataSourceService
 }
 
 // NewOptions содержит опции для создания роутера
 type NewOptions struct {
-	Config             *config.Config
-	Logger             *logrus.Logger
-	Version            string
-	Database           storage.Database                  // Опциональная база данных для user auth
-	JWTManager         *jwt.Manager                      // Опциональный JWT manager
-	TracerProvider     *observability.TracerProvider     // Опциональный OpenTelemetry tracer (v1.6.0+)
-	PerformanceMonitor *observability.PerformanceMonitor // Опциональный performance monitor (v1.6.2+)
-	LeakDetector       *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
-	MonigoPort         int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
-	GPUMonitor         *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
-	ModelPreloader     *model.ModelPreloader             // Опциональный model preloader (v1.12.1+)
+	Config               *config.Config
+	Logger               *logrus.Logger
+	Version              string
+	Database             storage.Database                  // Опциональная база данных для user auth
+	JWTManager           *jwt.Manager                      // Опциональный JWT manager
+	TracerProvider       *observability.TracerProvider     // Опциональный OpenTelemetry tracer (v1.6.0+)
+	PerformanceMonitor   *observability.PerformanceMonitor // Опциональный performance monitor (v1.6.2+)
+	LeakDetector         *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
+	MonigoPort           int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
+	GPUMonitor           *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
+	ModelPreloader       *model.ModelPreloader             // Опциональный model preloader (v1.12.1+)
+	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -170,17 +176,18 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 	}
 
 	r := &Router{
-		config:             opts.Config,
-		logger:             opts.Logger,
-		ollamaClient:       ollamaClient,
-		version:            opts.Version,
-		db:                 opts.Database,
-		jwtManager:         opts.JWTManager,
-		performanceMonitor: opts.PerformanceMonitor,
-		leakDetector:       opts.LeakDetector,
-		monigoPort:         opts.MonigoPort,
-		gpuMonitor:         opts.GPUMonitor,
-		modelPreloader:     opts.ModelPreloader,
+		config:               opts.Config,
+		logger:               opts.Logger,
+		ollamaClient:         ollamaClient,
+		version:              opts.Version,
+		db:                   opts.Database,
+		jwtManager:           opts.JWTManager,
+		performanceMonitor:   opts.PerformanceMonitor,
+		leakDetector:         opts.LeakDetector,
+		monigoPort:           opts.MonigoPort,
+		gpuMonitor:           opts.GPUMonitor,
+		modelPreloader:       opts.ModelPreloader,
+		ragDataSourceService: opts.RAGDataSourceService,
 	}
 
 	// Setup tracer if provided
@@ -365,6 +372,7 @@ func (r *Router) setupRoutes() {
 	r.setupMonigoRoutes()         // MoniGo Performance Dashboard (v1.9.3+)
 	r.setupStatsRoutes()          // Для TUI
 	r.setupConfigRoutes()         // Для TUI Configuration Viewer
+	r.setupRAGRoutes()            // RAG System (v1.13.1+)
 	r.setupMetricsHistoryRoutes() // Для historical metrics (Phase 12.1)
 	r.setupRequestsRoutes()       // Для request monitoring (TUI-04)
 	r.setupWebSocketRoutes()      // Для real-time updates (Phase 12.2)
@@ -502,8 +510,35 @@ func (r *Router) setupFileRoutes() {
 		api.DELETE("/:id", r.fileHandler.DeleteFile)
 		api.POST("/search", r.fileHandler.SearchFiles)
 	}
+}
 
-	r.logger.Info("✅ File storage routes registered (/api/files)")
+// setupRAGRoutes настраивает RAG System routes (v1.13.1+)
+func (r *Router) setupRAGRoutes() {
+	if r.ragDataSourcesHandler == nil {
+		r.logger.Info("RAG System disabled - handler not initialized")
+		return
+	}
+
+	// RAG operations требуют аутентификации
+	api := r.engine.Group("/api/rag")
+	if r.jwtManager != nil {
+		api.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+	{
+		// Data Sources Management
+		sources := api.Group("/sources")
+		{
+			sources.POST("", r.ragDataSourcesHandler.CreateDataSource)
+			sources.GET("", r.ragDataSourcesHandler.ListDataSources)
+			sources.GET("/:id", r.ragDataSourcesHandler.GetDataSource)
+			sources.PUT("/:id", r.ragDataSourcesHandler.UpdateDataSource)
+			sources.DELETE("/:id", r.ragDataSourcesHandler.DeleteDataSource)
+			sources.POST("/test-connection", r.ragDataSourcesHandler.TestConnection)
+			sources.POST("/:id/sync", r.ragDataSourcesHandler.SyncSource)
+		}
+	}
+	
+	r.logger.Info("RAG System routes configured successfully")
 }
 
 // setupStatsRoutes настраивает эндпоинты статистики для TUI
@@ -517,8 +552,9 @@ func (r *Router) setupConfigRoutes() {
 	// Эндпоинт для TUI (без аутентификации, только для локального использования)
 	r.engine.GET("/api/config", r.configHandler.GetConfig)
 
-	// Публичный эндпоинт для списка моделей (для WebUI/TUI)
+	// Публичные эндпоинты для списка моделей (для WebUI/TUI/Login page)
 	r.engine.GET("/api/models", r.modelsHandler.List)
+	r.engine.GET("/api/v1/models", r.modelsHandler.List) // OpenAI-compatible path
 }
 
 // setupMetricsHistoryRoutes настраивает эндпоинты для historical metrics (Phase 12.1)
@@ -757,12 +793,14 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/tenants.html", "./web/tenants.html")
 	r.engine.StaticFile("/api-keys.html", "./web/api-keys.html")
 	r.engine.StaticFile("/files.html", "./web/files.html") // Files Management (v1.10.0)
+	r.engine.StaticFile("/rag-sources.html", "./web/rag-sources.html") // RAG Data Sources (v1.13.0)
 	r.engine.StaticFile("/usage.html", "./web/usage.html")
 	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
 	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
 	r.engine.StaticFile("/admin.html", "./web/admin.html") // Admin Panel (Version 1.3.0)
 	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html") // RBAC Management (v1.11.5)
 	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html") // Audit Log (v1.11.4)
+	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html") // RAG Management (v1.13.0)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
@@ -1104,6 +1142,11 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	if r.modelPreloader != nil {
 		r.modelPreloadHandler = handlers.NewModelPreloadHandler(logger, r.modelPreloader)
 	}
+	
+	// RAG Data Sources handler (v1.13.1+)
+	if r.ragDataSourceService != nil {
+		r.ragDataSourcesHandler = handlers.NewRAGDataSourcesHandler(r.ragDataSourceService, logger)
+	}
 
 	// Chat handler with database for model configs (v1.9.1+)
 	if r.db != nil {
@@ -1279,7 +1322,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 
 	// Changelog Handler (v1.4.11)
 	if r.db != nil {
-		r.changelogHandler = handlers.NewChangelogHandler(r.db, logger)
+		r.changelogHandler = handlers.NewChangelogHandler(r.config, r.db, logger)
 		logger.Info("Changelog handler initialized")
 	} else {
 		logger.Warn("Changelog handler NOT initialized: database is nil")

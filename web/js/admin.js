@@ -258,7 +258,7 @@ class AdminPanel {
         } catch (error) {
             console.error('Failed to load users:', error);
             document.getElementById('users-table').innerHTML = 
-                '<tr><td colspan="6" class="table-empty">Failed to load users</td></tr>';
+                '<tr><td colspan="9" class="table-empty">Failed to load users</td></tr>';
         }
     }
 
@@ -266,20 +266,33 @@ class AdminPanel {
         const tbody = document.getElementById('users-table');
         
         if (this.users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No users found</td></tr>';
             return;
         }
 
-        tbody.innerHTML = this.users.map(user => `
+        tbody.innerHTML = this.users.map(user => {
+            // Auth Provider Badge
+            const authProviderBadge = this.renderAuthProviderBadge(user.auth_provider);
+            
+            // RBAC Roles Badges
+            const rolesBadges = this.renderRolesBadges(user.roles);
+            
+            // Tenants Badges
+            const tenantsBadges = this.renderTenantsBadges(user.tenants);
+            
+            return `
             <tr>
                 <td>
                     <div style="font-weight: 500;">${this.escapeHtml(user.username)}</div>
                 </td>
                 <td>${this.escapeHtml(user.email)}</td>
+                <td>${authProviderBadge}</td>
+                <td>${rolesBadges}</td>
+                <td>${tenantsBadges}</td>
                 <td>
                     ${user.is_admin ? 
-                        '<span class="badge badge-warning">Admin</span>' : 
-                        '<span class="badge badge-secondary">User</span>'}
+                        '<span class="badge badge-warning">Yes</span>' : 
+                        '<span class="badge badge-secondary">No</span>'}
                 </td>
                 <td>
                     ${user.status === 'active' ? 
@@ -326,7 +339,8 @@ class AdminPanel {
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     }
 
     async loadAPIKeys() {
@@ -1475,6 +1489,72 @@ class AdminPanel {
         }
         
         return modelfile;
+    }
+
+    // Render Auth Provider Badge (v2.2.2+)
+    renderAuthProviderBadge(authProvider) {
+        if (!authProvider || authProvider === '' || authProvider === 'local') {
+            return '<span class="badge badge-auth-local">Local</span>';
+        } else if (authProvider === 'oidc') {
+            return '<span class="badge badge-auth-oidc">OIDC</span>';
+        } else if (authProvider === 'ldap') {
+            return '<span class="badge badge-auth-ldap">LDAP</span>';
+        } else {
+            return `<span class="badge badge-secondary">${this.escapeHtml(authProvider)}</span>`;
+        }
+    }
+
+    // Render RBAC Roles Badges (v2.2.2+)
+    renderRolesBadges(roles) {
+        if (!roles || roles.length === 0) {
+            return '<span style="color: var(--text-tertiary); font-size: 0.9em;">No roles</span>';
+        }
+        
+        const maxVisible = 2;
+        const visibleRoles = roles.slice(0, maxVisible);
+        const remainingCount = roles.length - maxVisible;
+        
+        const badges = visibleRoles.map(role => {
+            const tenantSuffix = role.tenant_id ? ' 🏢' : '';
+            return `<span class="badge badge-role" title="${this.escapeHtml(role.name)}">${this.escapeHtml(role.name)}${tenantSuffix}</span>`;
+        }).join(' ');
+        
+        if (remainingCount > 0) {
+            return `${badges} <span class="badge badge-count" title="${remainingCount} more roles">+${remainingCount}</span>`;
+        }
+        
+        return badges;
+    }
+
+    // Render Tenants Badges (v2.2.2+)
+    renderTenantsBadges(tenants) {
+        if (!tenants || tenants.length === 0) {
+            return '<span style="color: var(--text-tertiary); font-size: 0.9em;">No tenants</span>';
+        }
+        
+        const maxVisible = 2;
+        const visibleTenants = tenants.slice(0, maxVisible);
+        const remainingCount = tenants.length - maxVisible;
+        
+        const badges = visibleTenants.map(tenant => {
+            const roleClass = tenant.role === 'owner' ? 'badge-tenant-owner' : 'badge-tenant';
+            const roleIcon = tenant.role === 'owner' ? '👑' : '👤';
+            return `<span class="badge ${roleClass}" title="${this.escapeHtml(tenant.name)} (${tenant.role})">${roleIcon} ${this.escapeHtml(tenant.name)}</span>`;
+        }).join(' ');
+        
+        if (remainingCount > 0) {
+            return `${badges} <span class="badge badge-count" title="${remainingCount} more tenants">+${remainingCount}</span>`;
+        }
+        
+        return badges;
+    }
+
+    // Escape HTML to prevent XSS (v2.2.2+)
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     formatDate(dateString) {

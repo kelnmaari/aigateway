@@ -508,3 +508,74 @@ func (s *SQLiteDB) scanUser(row scanner) (*models.User, error) {
 	return &user, nil
 }
 
+
+// GetUsersWithDetails возвращает список пользователей с enriched данными (roles, tenants)
+// для админ-панели (v2.2.2+)
+func (s *SQLiteDB) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	// Получаем базовый список пользователей
+	users, err := s.ListUsers(ctx, filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	// Enriched users с ролями и тенантами
+	enrichedUsers := make([]*models.UserWithDetails, 0, len(users))
+
+	for _, user := range users {
+		userDetails := &models.UserWithDetails{
+			User: *user,
+		}
+
+		// Получаем роли пользователя
+		userRoles, err := s.GetUserRoles(ctx, user.ID)
+		if err != nil {
+			s.logger.WithError(err).WithField("user_id", user.ID).Warn("Failed to get user roles")
+		} else {
+			// Конвертируем в RoleInfo
+			roleInfos := make([]models.RoleInfo, 0, len(userRoles))
+			for _, ur := range userRoles {
+				// Получаем информацию о роли
+				role, err := s.GetRole(ctx, ur.RoleID)
+				if err != nil {
+					s.logger.WithError(err).WithField("role_id", ur.RoleID).Warn("Failed to get role details")
+					continue
+				}
+
+				roleInfos = append(roleInfos, models.RoleInfo{
+					ID:       role.ID,
+					Name:     role.Name,
+					TenantID: ur.TenantID,
+				})
+			}
+			userDetails.Roles = roleInfos
+		}
+
+		// Получаем тенанты пользователя
+		tenants, err := s.ListUserTenants(ctx, user.ID)
+		if err != nil {
+			s.logger.WithError(err).WithField("user_id", user.ID).Warn("Failed to get user tenants")
+		} else {
+			// Конвертируем в TenantInfo
+			tenantInfos := make([]models.TenantInfo, 0, len(tenants))
+			for _, tenant := range tenants {
+				tenantInfos = append(tenantInfos, models.TenantInfo{
+					ID:   tenant.ID,
+					Name: tenant.Name,
+					Slug: tenant.Slug,
+					Role: string(tenant.Type), // или Role из tenant_members
+				})
+			}
+			userDetails.Tenants = tenantInfos
+		}
+
+		enrichedUsers = append(enrichedUsers, userDetails)
+	}
+
+	s.logger.WithField("count", len(enrichedUsers)).Debug("Listed users with details")
+
+	return enrichedUsers, nil
+}

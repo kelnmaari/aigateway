@@ -2320,3 +2320,84 @@ body {
     }
 }
 
+
+/* ========================================
+   User Management Badges (v2.2.2+)
+   ======================================== */
+
+/* Auth Provider Badges */
+.badge-auth-local {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.badge-auth-oidc {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.badge-auth-ldap {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+/* RBAC Role Badges */
+.badge-role {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    color: #2d3748;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 500;
+    display: inline-block;
+    margin: 2px;
+}
+
+/* Tenant Badges */
+.badge-tenant {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+    color: #2d3748;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 500;
+    display: inline-block;
+    margin: 2px;
+}
+
+.badge-tenant-owner {
+    background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 500;
+    display: inline-block;
+    margin: 2px;
+}
+
+/* Count Badge (for "+N more") */
+.badge-count {
+    background: rgba(128, 128, 128, 0.2);
+    color: var(--text-secondary);
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 500;
+    display: inline-block;
+    margin: 2px;
+    border: 1px dashed rgba(128, 128, 128, 0.3);
+}
+

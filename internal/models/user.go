@@ -89,6 +89,32 @@ func (u *User) ToPublic() *UserPublic {
 	}
 }
 
+// UserWithDetails расширенная информация о пользователе для админ-панели (v2.2.2+)
+type UserWithDetails struct {
+	User
+	
+	// RBAC roles пользователя
+	Roles []RoleInfo `json:"roles,omitempty"`
+	
+	// Tenants в которых пользователь является участником
+	Tenants []TenantInfo `json:"tenants,omitempty"`
+}
+
+// RoleInfo краткая информация о роли для админ-панели
+type RoleInfo struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	TenantID *string `json:"tenant_id,omitempty"` // Nil для глобальных ролей
+}
+
+// TenantInfo краткая информация о tenant для админ-панели
+type TenantInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Role string `json:"role"` // owner/admin/member
+}
+
 // UserFilters представляет фильтры для списка пользователей
 type UserFilters struct {
 	Status   *UserStatus `json:"status,omitempty"`

@@ -99,6 +99,9 @@ type Database interface {
 	// ListUsers возвращает список пользователей с фильтрацией
 	ListUsers(ctx context.Context, filters models.UserFilters) ([]*models.User, error)
 
+	// GetUsersWithDetails возвращает список пользователей с enriched данными (roles, tenants) для админ-панели (v2.2.2+)
+	GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error)
+
 	// ========================================
 	// Tenants (AUTH-05: Multi-Tenancy)
 	// ========================================

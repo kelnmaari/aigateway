@@ -603,3 +603,8 @@ func (tx *sqliteTx) GetInvitationWithUsers(ctx context.Context, id string) (*mod
 func (tx *sqliteTx) ListAllTenants(ctx context.Context) ([]*models.Tenant, error) {
 	return tx.db.ListAllTenants(ctx)
 }
+
+// GetUsersWithDetails возвращает список пользователей с enriched данными (delegation to db)
+func (tx *sqliteTx) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
+	return tx.db.GetUsersWithDetails(ctx, filters)
+}

@@ -463,3 +463,9 @@ func (p *PostgreSQLDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject
 
 	return user, nil
 }
+
+// GetUsersWithDetails возвращает список пользователей с enriched данными (roles, tenants) для админ-панели (v2.2.2+)
+// PostgreSQL implementation stub
+func (p *PostgreSQLDB) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
+	return nil, fmt.Errorf("GetUsersWithDetails not implemented yet for PostgreSQL")
+}

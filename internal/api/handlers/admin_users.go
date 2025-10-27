@@ -52,30 +52,31 @@ type UpdateUserRequest struct {
 
 // ListUsers godoc
 // @Summary List all users (admin only)
-// @Description Gets a list of all users in the system
+// @Description Gets a list of all users with enriched data (roles, tenants, auth_provider)
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Success 200 {array} models.User
+// @Success 200 {array} models.UserWithDetails
 // @Failure 401 {object} gin.H
 // @Failure 403 {object} gin.H
 // @Failure 500 {object} gin.H
 // @Router /api/admin/users [get]
 // @Security BearerAuth
 func (h *AdminUserHandler) ListUsers(c *gin.Context) {
-	users, err := h.db.ListUsers(c.Request.Context(), models.UserFilters{})
+	// Get users with enriched data (roles, tenants) (v2.2.2+)
+	usersWithDetails, err := h.db.GetUsersWithDetails(c.Request.Context(), models.UserFilters{})
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to list users")
+		h.logger.WithError(err).Error("Failed to list users with details")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list users"})
 		return
 	}
 
 	// Remove password hashes from response
-	for _, user := range users {
-		user.PasswordHash = ""
+	for _, userDetails := range usersWithDetails {
+		userDetails.PasswordHash = ""
 	}
 
-	c.JSON(http.StatusOK, gin.H{"users": users, "total": len(users)})
+	c.JSON(http.StatusOK, gin.H{"users": usersWithDetails, "total": len(usersWithDetails)})
 }
 
 // GetUser godoc

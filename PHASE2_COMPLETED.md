@@ -247,7 +247,7 @@ Per 10,000 keys:       ~4 MB
 **Step 1: Initialize cache**
 ```go
 // В main.go или router setup
-import "ollama-openai-proxy/internal/cache"
+import "aigateway/internal/cache"
 
 keyCache := cache.NewAPIKeyCache(cache.DefaultConfig())
 defer keyCache.Close()
@@ -255,7 +255,7 @@ defer keyCache.Close()
 
 **Step 2: Use optimized middleware**
 ```go
-import "ollama-openai-proxy/internal/api/middleware"
+import "aigateway/internal/api/middleware"
 
 // Вместо:
 // router.Use(middleware.APIKeyDBAuth(cfg, db, logger))
@@ -387,4 +387,5 @@ router.Use(middleware.APIKeyDBAuth(cfg, db, logger))
 ---
 
 **Ready for production deployment!** 🚀
+
 

@@ -298,3 +298,4 @@ async function loadHistoricalMetrics() {
 **Статус:** 📋 Ready for Implementation  
 **Assignee:** TBD  
 **Sprint:** Version 1.2.0
+

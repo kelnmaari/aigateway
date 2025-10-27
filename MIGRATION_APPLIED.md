@@ -91,7 +91,7 @@ handlers.GlobalStats.AddDuration(duration)  // Thread-safe atomic operation
 ```bash
 $ go test -race ./internal/models/... -timeout=30s
 PASS
-ok      ollama-openai-proxy/internal/models     1.887s
+ok      aigateway/internal/models     1.887s
 
 # Все тесты прошли без race warnings
 ```
@@ -335,3 +335,4 @@ handlers.GlobalStats.TotalDuration += duration
 **Impact:** HIGH (3-10x performance improvement)  
 **Risk:** LOW (well tested, backward compatible)  
 **Next Version:** 1.8.0 (Hot/Cold Split)
+

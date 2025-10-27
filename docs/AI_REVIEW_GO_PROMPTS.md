@@ -266,12 +266,12 @@ prompts:
 
 ---
 
-## Вариант 6: Специфичный для вашего Ollama-OpenAI Proxy проекта
+## Вариант 6: Специфичный для вашего AIGateway Platform проекта
 
 ```yaml
 prompts:
   inline: |
-    Go code reviewer for Ollama-OpenAI Proxy project.
+    Go code reviewer for AIGateway Platform project.
     
     Project-specific checks:
     
@@ -413,4 +413,5 @@ func SQLInjection(userID string) {
 - **Go concurrency patterns**: https://go.dev/blog/pipelines
 - **Go code review comments**: https://github.com/golang/go/wiki/CodeReviewComments
 - **Secure Go coding**: https://github.com/OWASP/Go-SCP
+
 

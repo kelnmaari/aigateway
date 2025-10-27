@@ -1,6 +1,6 @@
 # VS Code Web + AI Agent Integration
 
-> **Идея:** Интеграция Ollama-OpenAI Proxy с web-based VS Code для создания агентского режима разработки
+> **Идея:** Интеграция AIGateway Platform с web-based VS Code для создания агентского режима разработки
 
 ## 📋 Оглавление
 
@@ -17,7 +17,7 @@
 
 ### Цель
 
-Создать web-based VS Code с AI агентом, использующим наш Ollama-OpenAI Proxy для:
+Создать web-based VS Code с AI агентом, использующим наш AIGateway Platform для:
 
 - Автоматического написания кода
 - Рефакторинга и оптимизации
@@ -186,7 +186,7 @@ ollama-agent-extension/
         "ollama.proxyUrl": {
           "type": "string",
           "default": "http://localhost:8080",
-          "description": "Ollama-OpenAI Proxy URL"
+          "description": "AIGateway Platform URL"
         },
         "ollama.apiKey": {
           "type": "string",
@@ -1089,3 +1089,4 @@ OLLAMA_DEFAULT_MODEL=qwen2.5-coder-tuned:7b
 - Работает offline
 
 Удачи в реализации! 🚀
+

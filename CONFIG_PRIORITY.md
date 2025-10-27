@@ -60,7 +60,7 @@ export PROXY_SERVER_HOST=192.168.1.100
 
 ```bash
 # Посмотреть переменные окружения сервиса
-systemctl show ollama-openai-proxy --property=Environment
+systemctl show aigateway --property=Environment
 
 # Пример вывода с проблемой:
 # Environment=GIN_MODE=release PROXY_SERVER_HOST=0.0.0.0
@@ -69,7 +69,7 @@ systemctl show ollama-openai-proxy --property=Environment
 Решение - отредактировать unit файл:
 
 ```bash
-sudo nano /etc/systemd/system/ollama-openai-proxy.service
+sudo nano /etc/systemd/system/aigateway.service
 ```
 
 Удалить или изменить строку:
@@ -86,7 +86,7 @@ Environment="PROXY_SERVER_HOST=192.168.1.100"
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart ollama-openai-proxy
+sudo systemctl restart aigateway
 ```
 
 ## 📊 Полный список поддерживаемых переменных
@@ -112,7 +112,7 @@ PROXY_OLLAMA_RETRY_ATTEMPTS=3
 
 ```bash
 PROXY_DATABASE_TYPE=sqlite
-PROXY_DATABASE_SQLITE_PATH=/opt/ollama-openai-proxy/data/proxy.db
+PROXY_DATABASE_SQLITE_PATH=/opt/aigateway/data/proxy.db
 PROXY_DATABASE_POSTGRES_HOST=localhost
 PROXY_DATABASE_POSTGRES_PORT=5432
 PROXY_DATABASE_POSTGRES_USER=proxy
@@ -134,7 +134,7 @@ PROXY_AUTH_JWT_EXPIRATION=24h
 ```bash
 PROXY_LOGGING_LEVEL=info
 PROXY_LOGGING_FORMAT=json
-PROXY_LOGGING_FILE=/opt/ollama-openai-proxy/logs/proxy.log
+PROXY_LOGGING_FILE=/opt/aigateway/logs/proxy.log
 ```
 
 ## 🐛 Отладка конфигурации
@@ -173,7 +173,7 @@ PROXY_LOGGING_FILE=/opt/ollama-openai-proxy/logs/proxy.log
 
 ```bash
 # config.yaml с защищенными правами
-chmod 600 /opt/ollama-openai-proxy/configs/config.yaml
+chmod 600 /opt/aigateway/configs/config.yaml
 ```
 
 **Вариант 2:** Переменные окружения (для Docker/Kubernetes)
@@ -210,16 +210,16 @@ Environment="PROXY_AUTH_ADMIN_KEY=my-secret-key"
 
 ```ini
 # Секреты в файле с ограниченными правами
-# /opt/ollama-openai-proxy/configs/config.yaml (chmod 600)
+# /opt/aigateway/configs/config.yaml (chmod 600)
 ```
 
 Или используйте `EnvironmentFile`:
 
 ```ini
-EnvironmentFile=/opt/ollama-openai-proxy/configs/secrets.env
+EnvironmentFile=/opt/aigateway/configs/secrets.env
 # Файл secrets.env:
 # PROXY_AUTH_ADMIN_KEY=my-secret-key
-# chmod 600 /opt/ollama-openai-proxy/configs/secrets.env
+# chmod 600 /opt/aigateway/configs/secrets.env
 ```
 
 ## 📚 Проверка текущей конфигурации
@@ -228,8 +228,9 @@ EnvironmentFile=/opt/ollama-openai-proxy/configs/secrets.env
 
 ```bash
 # Проверить какой хост используется
-journalctl -u ollama-openai-proxy -n 20 | grep "Server will bind"
+journalctl -u aigateway -n 20 | grep "Server will bind"
 
 # Вывод покажет:
 # 📍 Server will bind to: 192.168.1.100:8080
 ```
+

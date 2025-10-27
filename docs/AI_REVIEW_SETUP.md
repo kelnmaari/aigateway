@@ -1,4 +1,4 @@
-# AI Review через Ollama-OpenAI Proxy - Инструкция по настройке
+# AI Review через AIGateway Platform - Инструкция по настройке
 
 ## Быстрый старт
 
@@ -146,7 +146,7 @@ curl http://YOUR_PROXY_HOST:8080/v1/models \
 
 ```yaml
 # ===========================================================================
-# AI Review Configuration для Ollama-OpenAI Proxy
+# AI Review Configuration для AIGateway Platform
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -750,7 +750,7 @@ ai-review:security:
 
 ---
 
-## Интеграция с Ollama-OpenAI Proxy Features
+## Интеграция с AIGateway Platform Features
 
 ### Rate Limiting
 
@@ -786,7 +786,7 @@ ai-review:security:
 
 - **AI Review документация**: https://github.com/Nikita-Filonov/ai-review
 - **Ollama модели**: https://ollama.com/library
-- **Ollama-OpenAI Proxy**: `docs/API_DOCUMENTATION.md` в вашем проекте
+- **AIGateway Platform**: `docs/API_DOCUMENTATION.md` в вашем проекте
 
 ---
 
@@ -794,6 +794,7 @@ ai-review:security:
 
 При возникновении проблем:
 1. Проверьте логи GitLab CI job
-2. Проверьте логи Ollama-OpenAI Proxy: `logs/proxy-dev.log`
+2. Проверьте логи AIGateway Platform: `logs/proxy-dev.log`
 3. Проверьте артефакты AI Review: `.ai-review-artifacts/`
+
 

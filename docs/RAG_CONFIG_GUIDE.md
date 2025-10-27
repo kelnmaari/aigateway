@@ -391,3 +391,4 @@ func validateRAGConfig(cfg ragconfig.RAGConfig) error {
 **Last Updated:** 2025-10-26  
 **Enable/Disable:** Set `rag.enabled: false` to disable entire subsystem
 
+

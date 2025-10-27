@@ -204,8 +204,8 @@ package registry
 import (
     "context"
     "fmt"
-    "ollama-openai-proxy/internal/models/registry"
-    "ollama-openai-proxy/internal/storage"
+    "aigateway/internal/models/registry"
+    "aigateway/internal/storage"
 )
 
 type ModelRegistryService struct {
@@ -420,4 +420,5 @@ func TestRegisterModel(t *testing.T) {
 - REGISTRY-02: Smart Router integration
 - VLLM-01: vLLM provider implementation
 - REGISTRY-03: WebUI для registry management
+
 

@@ -1,6 +1,6 @@
 # 🚀 Performance Tuning Guide
 
-Complete guide to optimizing Ollama-OpenAI Proxy performance.
+Complete guide to optimizing AIGateway Platform performance.
 
 ## 📑 Table of Contents
 
@@ -22,7 +22,7 @@ Complete guide to optimizing Ollama-OpenAI Proxy performance.
 
 ## Overview
 
-This guide helps you optimize Ollama-OpenAI Proxy for maximum performance based on your hardware and use case.
+This guide helps you optimize AIGateway Platform for maximum performance based on your hardware and use case.
 
 ### Performance Metrics
 
@@ -863,5 +863,6 @@ ollama:
 
 ---
 
-**Need help optimizing?** [Open a discussion on GitHub](https://github.com/yourusername/ollama-openai-proxy/discussions)
+**Need help optimizing?** [Open a discussion on GitHub](https://github.com/yourusername/aigateway/discussions)
+
 

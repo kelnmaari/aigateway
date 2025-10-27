@@ -983,3 +983,4 @@ async function sendMessage(message) {
 **Статус:** 📋 Planned for v1.9.1 (приоритет перед VISION-01)  
 **Последнее обновление:** 2025-10-13
 
+

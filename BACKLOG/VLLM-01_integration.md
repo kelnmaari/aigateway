@@ -432,3 +432,4 @@ go test -bench=. ./internal/client/vllm/...
 - VLLM-02: Model hot-swap без downtime
 - VLLM-03: Advanced vLLM features (LoRA adapters, quantization)
 
+

@@ -1,6 +1,6 @@
 # 📡 API Documentation
 
-Complete API reference for Ollama-OpenAI Proxy.
+Complete API reference for AIGateway Platform.
 
 ## 📑 Table of Contents
 
@@ -25,7 +25,7 @@ Complete API reference for Ollama-OpenAI Proxy.
 
 ## Overview
 
-Ollama-OpenAI Proxy provides an **OpenAI-compatible API** for local Ollama models. All endpoints follow OpenAI API standards with additional features like function calling and embeddings.
+AIGateway Platform provides an **OpenAI-compatible API** for local Ollama models. All endpoints follow OpenAI API standards with additional features like function calling and embeddings.
 
 ### API Version
 
@@ -1337,5 +1337,6 @@ curl http://localhost:8080/metrics
 
 ---
 
-**Questions or issues?** [Open an issue on GitHub](https://github.com/yourusername/ollama-openai-proxy/issues)
+**Questions or issues?** [Open an issue on GitHub](https://github.com/yourusername/aigateway/issues)
+
 

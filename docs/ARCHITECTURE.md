@@ -1,6 +1,6 @@
 # 🏗️ Architecture Overview
 
-Complete architecture documentation for Ollama-OpenAI Proxy.
+Complete architecture documentation for AIGateway Platform.
 
 ## 📑 Table of Contents
 
@@ -19,7 +19,7 @@ Complete architecture documentation for Ollama-OpenAI Proxy.
 
 ## System Overview
 
-Ollama-OpenAI Proxy is a **production-ready Go application** that provides an **OpenAI-compatible API** for local Ollama models. It acts as a bridge between OpenAI API clients and local Ollama server, enabling seamless integration with existing tools and workflows.
+AIGateway Platform is a **production-ready Go application** that provides an **OpenAI-compatible API** for local Ollama models. It acts as a bridge between OpenAI API clients and local Ollama server, enabling seamless integration with existing tools and workflows.
 
 ### Key Principles
 
@@ -42,7 +42,7 @@ Ollama-OpenAI Proxy is a **production-ready Go application** that provides an **
                                  │ Authorization: Bearer sk-xxx
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                          OLLAMA-OPENAI PROXY                                  │
+│                          AIGateway Platform                                  │
 │                                                                               │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  HTTP Server (Gin Framework)                                            │  │
@@ -889,5 +889,6 @@ HTTP Transport Timeout (5m)
 
 ---
 
-**Questions about architecture?** [Open a discussion on GitHub](https://github.com/yourusername/ollama-openai-proxy/discussions)
+**Questions about architecture?** [Open a discussion on GitHub](https://github.com/yourusername/aigateway/discussions)
+
 

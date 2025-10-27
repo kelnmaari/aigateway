@@ -2,7 +2,7 @@
 
 **Version:** 1.11.6+ (Enterprise Suite - Prometheus Metrics Export)
 
-Данное руководство описывает настройку Prometheus и Grafana для мониторинга Ollama-OpenAI Proxy.
+Данное руководство описывает настройку Prometheus и Grafana для мониторинга AIGateway Platform.
 
 ## Оглавление
 
@@ -33,7 +33,7 @@ metrics:
 
 ### 2. Проверка Endpoint
 
-Запустите Ollama-OpenAI Proxy и проверьте доступность метрик:
+Запустите AIGateway Platform и проверьте доступность метрик:
 
 ```bash
 curl http://localhost:8080/metrics
@@ -163,7 +163,7 @@ docker run -d \
 
 ## Docker Compose Setup
 
-Для полного stack с Prometheus, Grafana и Ollama-OpenAI Proxy:
+Для полного stack с Prometheus, Grafana и AIGateway Platform:
 
 Создайте `docker-compose-monitoring.yml`:
 
@@ -171,9 +171,9 @@ docker run -d \
 version: '3.8'
 
 services:
-  # Ollama-OpenAI Proxy
+  # AIGateway Platform
   proxy:
-    image: ollama-openai-proxy:latest
+    image: aigateway:latest
     ports:
       - "8080:8080"
     volumes:
@@ -507,4 +507,5 @@ groups:
 
 **Версия:** 1.11.6+  
 **Последнее обновление:** 2025-10-25
+
 

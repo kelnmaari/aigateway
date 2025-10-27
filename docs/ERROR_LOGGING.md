@@ -98,7 +98,7 @@ Error log uses the same format as main log (text or JSON):
   "timestamp": "2025-10-27T04:50:00.000Z",
   "level": "error",
   "message": "Failed to connect to Ollama",
-  "service": "ollama-openai-proxy",
+  "service": "aigateway",
   "version": "1.13.0",
   "error": "connection refused"
 }
@@ -300,4 +300,5 @@ time="2025-10-27 04:50:10" level=error msg="Failed to connect to Ollama" error="
 ```
 
 Notice: **Only warnings and errors** appear in the error log.
+
 

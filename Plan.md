@@ -1,4 +1,4 @@
-# План разработки Ollama-OpenAI Proxy
+# План разработки AIGateway Platform
 
 ## Общий подход к разработке
 
@@ -8,7 +8,7 @@
 
 ### Задача 1.1: Создание структуры проекта → [CMD-01](BACKLOG/CMD-01_create_project_structure.md)
 
-- [x] Создать Go модуль (`go mod init ollama-openai-proxy`)
+- [x] Создать Go модуль (`go mod init aigateway`)
 - [x] Создать базовую структуру директорий согласно архитектуре
 - [x] Настроить `.gitignore` для Go проекта
 - [x] Создать базовый `Makefile` с командами build/test/run
@@ -1094,7 +1094,7 @@ internal/api/handlers/logs.go # Logs API (143 строки)
 ### 📁 Структура проекта
 
 ```
-ollama-openai-proxy/
+aigateway/
 ├── cmd/                          # Entry points (3)
 │   ├── server/                   # Main API server
 │   ├── tui/                      # Terminal UI
@@ -1252,3 +1252,4 @@ ollama-openai-proxy/
 - ✅ GitHub release
 - ✅ Client demos
 - ✅ Further development
+

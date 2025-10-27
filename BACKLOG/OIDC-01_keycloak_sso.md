@@ -491,3 +491,4 @@ function loginWithOIDC() {
 **Статус:** 📋 Planned for v1.9.0  
 **Последнее обновление:** 2025-10-11
 
+

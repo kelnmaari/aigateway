@@ -422,3 +422,4 @@ async function importConversation(file) {
 **Статус:** 📋 Planned for v1.8.0  
 **Последнее обновление:** 2025-10-11
 
+

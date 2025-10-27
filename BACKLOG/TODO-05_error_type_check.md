@@ -405,3 +405,4 @@ func TestHandleError(t *testing.T) {
 - Легко поддерживать
 - Централизованная обработка
 - Лучше logging и debugging
+

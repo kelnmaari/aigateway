@@ -192,3 +192,4 @@ func renderRequestsScreen() string {
 - Request tracking middleware (new)
 
 **Priority in 1.2.0:** #1 (most requested feature)
+

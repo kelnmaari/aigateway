@@ -616,7 +616,7 @@
   - 📝 README.md - новое описание AIGateway Platform
   - 📝 Architecture.MD - обновление архитектурных диаграмм
   - 📝 Contributing guide - обновление названия
-  - 📝 Все ссылки на "Ollama-OpenAI Proxy" → "AIGateway"
+  - 📝 Все ссылки на "AIGateway Platform" → "AIGateway"
   - **Оценка:** 2-3 часа
 
 - [ ] **REBRAND-02** Code & Configuration → **v2.1.0**
@@ -652,7 +652,7 @@
 
 ### 📋 Breaking Changes
 
-- ⚠️ **Module path:** `github.com/user/ollama-openai-proxy` → `github.com/user/aigateway`
+- ⚠️ **Module path:** `github.com/user/aigateway` → `github.com/user/aigateway`
 - ⚠️ **Environment variables:** `OLLAMA_PROXY_*` → `AIGATEWAY_*`
 - ⚠️ **Docker image:** `ollama-proxy:latest` → `aigateway:latest`
 - ℹ️ **Migration guide** будет предоставлен для smooth transition
@@ -1090,3 +1090,4 @@
 **Последнее обновление:** 2025-01-16  
 **Версия Roadmap:** 2.2  
 **Статус:** Active Development 🚀 (Version 1.9.0 ✅ Complete! → Planning v1.10.0-v1.13.0)
+

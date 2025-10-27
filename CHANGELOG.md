@@ -1559,3 +1559,4 @@ User: Explain https://docs.python.org/3/library/asyncio.html
 - Custom metrics (Ollama latency, API keys) подготовлены для future versions
 - GPU monitoring работает только в Linux/macOS, Windows использует stub
 - Dashboard доступен только для admin users с валидным JWT
+

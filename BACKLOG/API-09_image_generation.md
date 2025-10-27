@@ -88,7 +88,7 @@ import (
 	"fmt"
 	"io"
 
-	"ollama-openai-proxy/internal/models"
+	"aigateway/internal/models"
 )
 
 // GenerateImage отправляет запрос в Ollama для генерации изображения
@@ -220,9 +220,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"ollama-openai-proxy/internal/client/ollama"
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/client/ollama"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 type ImagesHandler struct {
@@ -573,4 +573,5 @@ data/
 **Блокирует:** Нет
 
 **Статус:** ⏸️ BLOCKED до появления поддержки в Ollama
+
 

@@ -278,3 +278,4 @@ await fetch('/api/v1/chat/completions', {
 
 **Статус:** 📋 Planned for v1.8.0  
 **Последнее обновление:** 2025-10-11
+

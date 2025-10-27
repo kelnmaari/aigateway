@@ -121,8 +121,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	
-	"ollama-openai-proxy/internal/models"
-	"ollama-openai-proxy/internal/storage"
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 type FineTuningHandler struct {
@@ -521,4 +521,5 @@ fine_tuning:
 **Сложность:** MEDIUM  
 **Зависимости:** Нет  
 **Блокирует:** Нет
+
 

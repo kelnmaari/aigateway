@@ -454,3 +454,4 @@ make test-coverage-check
 ⚠️  internal/metrics           :  45.7%
 ❌ internal/api/handlers      :   0.0% [no tests]
 ```
+

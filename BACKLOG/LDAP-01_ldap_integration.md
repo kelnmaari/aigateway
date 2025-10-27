@@ -548,3 +548,4 @@ document.getElementById('ldap-login-form').addEventListener('submit', async (e) 
 **Статус:** 📋 Planned for v1.9.0  
 **Последнее обновление:** 2025-10-11
 
+

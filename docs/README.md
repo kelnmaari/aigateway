@@ -1,4 +1,4 @@
-# 📚 Documentation Index - Ollama-OpenAI Proxy v1.9.3
+# 📚 Documentation Index - AIGateway Platform v1.9.3
 
 Полная документация проекта
 
@@ -84,7 +84,7 @@
 
 9. **[AI Review Setup](AI_REVIEW_SETUP.md)**
    - GitLab CI/CD интеграция
-   - AI code review через Ollama-OpenAI Proxy
+   - AI code review через AIGateway Platform
    - Настройка и конфигурация
    - Режимы работы (inline, summary, context)
    - Troubleshooting
@@ -227,9 +227,9 @@ Brief description
 
 ### Official Links
 
-- **GitHub Repository:** <https://github.com/yourusername/ollama-openai-proxy>
-- **Issue Tracker:** <https://github.com/yourusername/ollama-openai-proxy/issues>
-- **Discussions:** <https://github.com/yourusername/ollama-openai-proxy/discussions>
+- **GitHub Repository:** <https://github.com/yourusername/aigateway>
+- **Issue Tracker:** <https://github.com/yourusername/aigateway/issues>
+- **Discussions:** <https://github.com/yourusername/aigateway/discussions>
 
 ### Related Projects
 
@@ -241,7 +241,7 @@ Brief description
 
 - **Discord:** (coming soon)
 - **Reddit:** (coming soon)
-- **Stack Overflow:** Tag `ollama-openai-proxy`
+- **Stack Overflow:** Tag `aigateway`
 
 ---
 
@@ -289,7 +289,7 @@ Want to improve documentation?
 
 ## 📜 License
 
-Documentation is part of Ollama-OpenAI Proxy project:
+Documentation is part of AIGateway Platform project:
 
 - **License:** MIT
 - **See:** [LICENSE](../LICENSE)
@@ -298,14 +298,15 @@ Documentation is part of Ollama-OpenAI Proxy project:
 
 **Documentation Version:** 1.9.3  
 **Last Updated:** 2025-10-14  
-**Maintained by:** Ollama-OpenAI Proxy Team
+**Maintained by:** AIGateway Platform Team
 
 ---
 
 <div align="center">
 
-**[⬆ Back to Top](#-documentation-index---ollama-openai-proxy-v193)**
+**[⬆ Back to Top](#-documentation-index---aigateway-v193)**
 
 Made with ❤️ for the Open Source Community
 
 </div>
+

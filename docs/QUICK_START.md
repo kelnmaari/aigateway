@@ -1,4 +1,4 @@
-# 🚀 Quick Start Guide - Ollama-OpenAI Proxy v1.9.3
+# 🚀 Quick Start Guide - AIGateway Platform v1.9.3
 
 Начните работу за 5 минут!
 
@@ -38,8 +38,8 @@ ollama list
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/ollama-openai-proxy.git
-cd ollama-openai-proxy
+git clone https://github.com/yourusername/aigateway.git
+cd aigateway
 
 # Build & Start
 docker compose --profile build up --build
@@ -52,7 +52,7 @@ docker compose --profile build up --build
 
 ```bash
 # Download latest release
-# https://github.com/yourusername/ollama-openai-proxy/releases
+# https://github.com/yourusername/aigateway/releases
 
 # Linux/macOS
 chmod +x ollama-proxy-linux-amd64
@@ -65,8 +65,8 @@ ollama-proxy-windows-amd64.exe -config configs/dev.yaml
 ### Option 3: Build from Source
 
 ```bash
-git clone https://github.com/yourusername/ollama-openai-proxy.git
-cd ollama-openai-proxy
+git clone https://github.com/yourusername/aigateway.git
+cd aigateway
 
 # Install dependencies
 go mod tidy
@@ -322,10 +322,11 @@ nvidia-smi
 
 **Need help?**
 - [Troubleshooting Guide](TROUBLESHOOTING.md)
-- [GitHub Issues](https://github.com/yourusername/ollama-openai-proxy/issues)
+- [GitHub Issues](https://github.com/yourusername/aigateway/issues)
 
 ---
 
 **Version:** 1.9.3  
 **Last Updated:** 2025-10-14
+
 

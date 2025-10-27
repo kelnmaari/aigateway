@@ -614,3 +614,4 @@ curl http://localhost:8080/debug/pprof/goroutine?debug=1
 **Зависимости:** Опционально OBSERV-01  
 **Блокирует:** Нет
 
+

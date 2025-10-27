@@ -2,7 +2,7 @@
 
 ## 🎯 Цель
 
-Интеграция **nvidia/omni-embed-nemotron-3b** для мультимодальных embeddings (text + image + audio + video) с Ollama-OpenAI Proxy.
+Интеграция **nvidia/omni-embed-nemotron-3b** для мультимодальных embeddings (text + image + audio + video) с AIGateway Platform.
 
 ---
 
@@ -21,7 +21,7 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│ Ollama-OpenAI Proxy (Go)                │
+│ AIGateway Platform (Go)                │
 │ Port: 8080                              │
 │                                         │
 │ /v1/embeddings                          │
@@ -236,8 +236,8 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/sirupsen/logrus"
     
-    "ollama-openai-proxy/internal/config"
-    "ollama-openai-proxy/internal/models"
+    "aigateway/internal/config"
+    "aigateway/internal/models"
 )
 
 type MultimodalEmbeddingsHandler struct {
@@ -507,4 +507,5 @@ services:
 ---
 
 **Рекомендация:** Используйте Python microservice подход для максимальной гибкости!
+
 

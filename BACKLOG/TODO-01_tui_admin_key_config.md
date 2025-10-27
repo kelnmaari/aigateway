@@ -396,3 +396,4 @@ func TestNewTUIApp(t *testing.T) {
 - Конфиг файлы с real keys не коммитить в git
 - Использовать `.gitignore` для production configs
 - Рассмотреть encryption at rest для config файлов
+

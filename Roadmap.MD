@@ -1,11 +1,11 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 2.0.0 ✅ (Major Release - RAG System + Chat Export/Import UI)  
-> **Следующая версия:** 2.1.0 (Rebranding to AIGateway) 📋  
+> **Текущая версия:** 2.1.0 ✅ (Rebranding to AIGateway Platform)  
+> **Следующая версия:** 2.2.0 (Model Registry & Multi-Provider Foundation) 📋  
 > **План развития:** Version 2.0.0 - 2.5.0+  
-> **Статус:** Active Development (v2.0.0 Complete! Planning v2.1.0 Rebranding)  
+> **Статус:** Active Development (v2.1.0 Complete! Planning v2.2.0 Multi-Provider → v2.3.0 Invitation System)  
 > **Последнее обновление:** 2025-10-27  
-> **Новое:** 🎉 v2.0.0 релиз! RAG System, Chat Export/Import UI, Consistent Dark Theme. Next: Rebranding to AIGateway → Multi-Model Support (vLLM, HuggingFace)
+> **Новое:** 🎉 v2.1.0 релиз! Complete Rebranding to AIGateway. Next: Model Registry & vLLM → Invitation-Only Registration
 
 ---
 
@@ -749,6 +749,113 @@
 
 ---
 
+## 🔐 Version 2.3.0 - Invitation-Only Registration System
+
+**Фокус:** Контролируемая регистрация пользователей через систему приглашений  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 6-8 часов  
+**Статус:** 📋 Запланировано (0/1 задачи)  
+**Версионирование:** v2.3.0  
+**Dependencies:** None (независимая функциональность)
+
+**Стратегия:** Реализация enterprise-grade системы управления доступом через пригласительные ссылки. Админы контролируют кто может зарегистрироваться в системе.
+
+### Задачи
+
+- [ ] **AUTH-03** Invitation-Only Registration System → [BACKLOG/AUTH-03_invitation_system.md](BACKLOG/AUTH-03_invitation_system.md) → **v2.3.0**
+  - **Backend API:**
+    - POST /api/admin/invitations - создание пригласительной ссылки
+    - GET /api/admin/invitations - список всех приглашений (активные/использованные/отозванные)
+    - DELETE /api/admin/invitations/:id - отзыв пригласительной ссылки
+    - GET /api/invitations/:token/validate - проверка валидности токена приглашения
+    - POST /api/auth/register - регистрация с опциональным токеном приглашения
+  - **Database Schema:**
+    - Таблица invitations: id, token (UUID), created_by_user_id, email (optional), expires_at, used_at, used_by_user_id, revoked_at, max_uses, current_uses
+    - Индексы: token (unique), created_by_user_id, status
+  - **Configuration:**
+    - `auth.registration.mode`: "open" | "invitation_only" | "disabled"
+    - `auth.registration.require_email_verification`: true/false
+    - `auth.invitations.default_expiry_days`: 7
+    - `auth.invitations.max_uses_default`: 1
+  - **Business Logic:**
+    - Админ генерирует уникальную ссылку с токеном (UUID v4)
+    - Опционально: привязка к конкретному email
+    - Опционально: срок действия (expires_at)
+    - Single-use по умолчанию (max_uses = 1)
+    - После успешной регистрации токен становится использованным
+    - Админ может отозвать неиспользованную ссылку
+  - **WebUI Components:**
+    - Admin Panel → "Ссылки-приглашения" (новая вкладка `/admin-invitations.html`)
+    - Таблица приглашений с фильтрами (Active/Used/Expired/Revoked)
+    - Кнопка "Create Invitation" с формой (email опционально, expiry date)
+    - Copy invitation link to clipboard
+    - Revoke button для активных приглашений
+    - Statistics: total created, used, expired, revoked
+    - Register page: проверка токена перед показом формы
+  - **Security:**
+    - Rate limiting на создание приглашений (защита от спама)
+    - Token должен быть cryptographically secure (UUID v4)
+    - Validation токена перед регистрацией
+    - Audit log для всех операций с приглашениями
+  - **Оценка:** 6-8 часов
+
+### 🎯 Ключевые возможности
+
+**Backend:**
+
+- 🔐 **Registration Modes** - гибкое переключение между открытой и закрытой регистрацией
+- 🎫 **Invitation Management** - полный CRUD для пригласительных ссылок
+- 📧 **Email Restriction** - опциональная привязка приглашения к email
+- ⏰ **Expiration Control** - настраиваемый срок действия приглашений
+- 🔄 **Multi-use Support** - возможность создавать многоразовые приглашения
+- 🚫 **Revocation** - отзыв неиспользованных приглашений
+- 📊 **Analytics** - статистика по использованию приглашений
+
+**WebUI:**
+
+- 📋 **Invitations Dashboard** - управление всеми приглашениями
+- ➕ **Quick Create** - быстрое создание приглашения с copy-to-clipboard
+- 🔍 **Filters & Search** - поиск по статусу, email, дате
+- 📈 **Statistics Cards** - visual metrics (success rate, active invitations)
+- ✅ **Registration Flow** - валидация токена перед показом формы регистрации
+
+### 🏗️ Configuration Example
+
+```yaml
+auth:
+  registration:
+    mode: "invitation_only"  # "open" | "invitation_only" | "disabled"
+    require_email_verification: false
+    
+  invitations:
+    enabled: true
+    default_expiry_days: 7    # Default expiry for new invitations
+    max_uses_default: 1       # Default max uses (single-use)
+    allow_email_restriction: true
+    
+    # Rate limits
+    rate_limit:
+      creation_per_admin_hour: 10
+      validation_per_ip_minute: 10
+```
+
+### 📈 Use Cases
+
+1. **Закрытая корпоративная установка:** Только HR/IT админы приглашают сотрудников
+2. **Beta Testing:** Контролируемый доступ для beta-тестеров
+3. **Community с модерацией:** Существующие участники приглашают коллег
+4. **Trial Access:** Временный доступ с expiration для демонстраций
+
+### 📋 Breaking Changes
+
+**None** - функциональность полностью опциональная:
+
+- По умолчанию `mode: "open"` - существующее поведение сохраняется
+- Новые endpoint'ы не влияют на существующую аутентификацию
+- Админы могут переключать режим в конфиге без миграций
+
+---
+
 ## 🔮 Future / Deferred
 
 **Задачи для будущих версий** (без конкретного релиза)
@@ -1090,4 +1197,3 @@
 **Последнее обновление:** 2025-01-16  
 **Версия Roadmap:** 2.2  
 **Статус:** Active Development 🚀 (Version 1.9.0 ✅ Complete! → Planning v1.10.0-v1.13.0)
-

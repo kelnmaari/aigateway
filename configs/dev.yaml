@@ -39,6 +39,24 @@ auth:
     secret: "dev-jwt-secret-change-this-in-production-use-at-least-32-chars"
     access_token_expiry: "15m"    # Access token живет 15 минут
     refresh_token_expiry: "168h"  # Refresh token живет 7 дней
+  
+  # User Registration (Version 2.3.0+: Invitation System)
+  registration:
+    mode: "open"  # "open" | "invitation_only" | "disabled"
+    require_email_verification: false  # Требовать верификацию email после регистрации
+    allow_username_login: true  # Разрешить логин по username (не только email)
+  
+  # Invitation System (Version 2.3.0+)
+  invitations:
+    enabled: true  # Включить систему приглашений
+    default_expiry_days: 7  # Срок действия приглашения по умолчанию (0 = без ограничения)
+    max_uses_default: 1  # Сколько раз можно использовать одно приглашение
+    allow_email_restriction: true  # Разрешить привязку приглашения к email
+    
+    # Rate limiting для создания приглашений
+    rate_limit:
+      creation_per_admin_hour: 10  # Максимум приглашений от одного админа в час
+      validation_per_ip_minute: 10  # Максимум проверок токена с одного IP в минуту
 
   # OIDC/Keycloak SSO (Version 1.11.1+: Enterprise Suite)
   oidc:

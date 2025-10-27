@@ -123,6 +123,9 @@ type Database interface {
 
 	// ListUserTenants возвращает список tenants пользователя
 	ListUserTenants(ctx context.Context, userID string) ([]*models.Tenant, error)
+	
+	// ListAllTenants возвращает список всех tenants в системе (для админов)
+	ListAllTenants(ctx context.Context) ([]*models.Tenant, error)
 
 	// ========================================
 	// Tenant Members (AUTH-05: Multi-Tenancy)

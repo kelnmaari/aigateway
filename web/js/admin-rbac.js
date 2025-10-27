@@ -7,6 +7,22 @@ let allRoles = [];
 let allUsers = [];
 let allTenants = [];
 
+// Tab callback handlers (exported to window for inline script access)
+window.handlePermissionsTab = async function() {
+    console.log('handlePermissionsTab called');
+    // If permissions haven't loaded yet, try loading them
+    if (allPermissions.length === 0) {
+        console.log('Permissions not loaded, loading now...');
+        await loadAllPermissions();
+    }
+    loadPermissions();
+};
+
+window.handleUserRolesTab = async function() {
+    console.log('handleUserRolesTab called');
+    await loadUsersAndTenants();
+};
+
 // Initialize
 $(document).ready(async function() {
     await checkAuth();
@@ -35,7 +51,14 @@ function initEventListeners() {
     
     // Tab switch listeners
     $('#user-roles-tab').on('shown.bs.tab', loadUsersAndTenants);
-    $('#permissions-tab').on('shown.bs.tab', loadPermissions);
+    $('#permissions-tab').on('shown.bs.tab', async function() {
+        // If permissions haven't loaded yet, try loading them
+        if (allPermissions.length === 0) {
+            console.log('Permissions not loaded, loading now...');
+            await loadAllPermissions();
+        }
+        loadPermissions();
+    });
 }
 
 // Load initial data
@@ -52,21 +75,42 @@ async function loadInitialData() {
 
 async function loadAllPermissions() {
     try {
+        console.log('Loading permissions from API...');
         const data = await api.getRBACPermissions();
+        console.log('Permissions loaded:', data);
         allPermissions = data.permissions || [];
+        console.log('Total permissions:', allPermissions.length);
         return allPermissions;
     } catch (error) {
         console.error('Error loading permissions:', error);
-        showAlert('Failed to load permissions', 'danger');
+        showAlert('Failed to load permissions: ' + (error.message || error), 'danger');
         return [];
     }
 }
 
 function loadPermissions() {
+    console.log('loadPermissions() called, allPermissions count:', allPermissions.length);
     const container = $('#permissionsListContainer');
     
     if (allPermissions.length === 0) {
-        container.html('<p class="text-muted">No permissions available</p>');
+        container.html(`
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                <h4>No Permissions Available</h4>
+                <p>System permissions haven't been initialized yet.</p>
+                <div style="font-size: 0.9em; margin-top: 20px; padding: 20px; background: rgba(255, 193, 7, 0.1); border-radius: 8px; border-left: 4px solid #ffc107;">
+                    <p style="margin-bottom: 10px;"><strong>⚠️ Action Required:</strong></p>
+                    <p><strong>1.</strong> Restart the server to apply migration v59</p>
+                    <p><strong>2.</strong> Refresh this page (Ctrl+F5)</p>
+                    <p style="margin-top: 15px; font-size: 0.85em; color: var(--text-tertiary);">
+                        <strong>Expected permissions:</strong> API Keys, Users, Tenants, Chat, Models, System, Files, Conversations, Invitations, Roles (40+ permissions total)
+                    </p>
+                    <button onclick="location.reload()" class="btn btn-primary mt-3">
+                        <i class="fas fa-sync"></i> Refresh Page
+                    </button>
+                </div>
+            </div>
+        `);
         return;
     }
     
@@ -140,7 +184,16 @@ function displayRoles(roles) {
     const container = $('#rolesListContainer');
     
     if (roles.length === 0) {
-        container.html('<p class="text-muted">No roles found</p>');
+        container.html(`
+            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <div style="font-size: 48px; margin-bottom: 16px;">🎭</div>
+                <h5>No Roles Found</h5>
+                <p>Create your first custom role to get started with RBAC.</p>
+                <button onclick="$('#createRoleBtn').click()" class="btn btn-success mt-3">
+                    <i class="fas fa-plus"></i> Create Role
+                </button>
+            </div>
+        `);
         return;
     }
     
@@ -148,23 +201,28 @@ function displayRoles(roles) {
     roles.forEach(role => {
         const typeClass = role.type === 'system' ? 'system-role-badge' : 'custom-role-badge';
         const permCount = role.permissions ? role.permissions.length : 0;
+        const typeBadgeColor = role.type === 'system' ? 'secondary' : 'success';
+        const scopeBadge = role.scope === 'tenant' ? '<span class="badge bg-info ms-1"><i class="fas fa-building"></i> Tenant</span>' : '';
         
         html += `
             <div class="role-card card ${selectedRole && selectedRole.id === role.id ? 'selected' : ''}" 
-                 data-role-id="${role.id}">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="mb-1">${role.display_name}</h6>
-                            <small class="text-muted">${role.name}</small>
+                 data-role-id="${role.id}"
+                 style="cursor: pointer; transition: all 0.2s ease; margin-bottom: 12px;">
+                <div class="card-body" style="padding: 16px;">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div style="flex: 1;">
+                            <h6 class="mb-1" style="color: var(--text-primary); font-weight: 600; font-size: 1.05em;">${role.display_name}</h6>
+                            <small style="color: var(--text-secondary); font-family: 'Courier New', monospace; font-size: 0.85em;">${role.name}</small>
                         </div>
-                        <span class="badge ${typeClass}">${role.type}</span>
+                        <span class="badge bg-${typeBadgeColor}" style="font-size: 0.7em; padding: 4px 8px;">${role.type.toUpperCase()}</span>
                     </div>
-                    <div class="mt-2">
-                        <small>
-                            <i class="fas fa-shield-alt"></i> ${permCount} permissions
-                            ${role.scope === 'tenant' ? '<i class="fas fa-building ms-2"></i> Tenant' : ''}
-                        </small>
+                    ${role.description ? `<p class="mb-2" style="font-size: 0.9em; color: var(--text-tertiary); line-height: 1.4;">${role.description}</p>` : ''}
+                    <div class="d-flex align-items-center gap-2" style="color: var(--text-secondary); font-size: 0.875em;">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-shield-alt"></i> 
+                            <strong>${permCount}</strong> permission${permCount !== 1 ? 's' : ''}
+                        </span>
+                        ${scopeBadge}
                     </div>
                 </div>
             </div>
@@ -181,6 +239,26 @@ function displayRoles(roles) {
             selectRole(role);
         }
     });
+    
+    // Add hover effects
+    $('.role-card').hover(
+        function() {
+            if (!$(this).hasClass('selected')) {
+                $(this).css({
+                    'box-shadow': '0 4px 12px rgba(0,0,0,0.15)',
+                    'transform': 'translateY(-2px)'
+                });
+            }
+        },
+        function() {
+            if (!$(this).hasClass('selected')) {
+                $(this).css({
+                    'box-shadow': '',
+                    'transform': ''
+                });
+            }
+        }
+    );
 }
 
 function selectRole(role) {
@@ -480,12 +558,21 @@ async function loadUsers() {
         
         // Populate select
         const select = $('#userSelect');
-        select.empty().append('<option value="">-- Select User --</option>');
-        allUsers.forEach(user => {
-            select.append(`<option value="${user.id}">${user.username} (${user.email})</option>`);
-        });
+        select.empty();
+        
+        if (allUsers.length === 0) {
+            select.append('<option value="">No users available - create users first</option>');
+        } else {
+            select.append('<option value="">-- Select User --</option>');
+            allUsers.forEach(user => {
+                select.append(`<option value="${user.id}">${user.username} (${user.email})</option>`);
+            });
+        }
     } catch (error) {
         console.error('Error loading users:', error);
+        const select = $('#userSelect');
+        select.empty().append('<option value="">Error loading users</option>');
+        showAlert('Failed to load users: ' + (error.message || error), 'danger');
     }
 }
 

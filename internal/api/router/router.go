@@ -937,6 +937,12 @@ func (r *Router) setupAdminRoutes() {
 		admin.PATCH("/users/:id/enable", r.adminUserHandler.EnableUser)
 	}
 
+	// Tenant Management endpoints (for RBAC/admin)
+	if r.tenantHandler != nil {
+		r.logger.Info("Admin routes: Registering Tenant Management endpoints")
+		admin.GET("/tenants", r.tenantHandler.ListAllTenants)
+	}
+
 	// API Keys management (if available)
 	if r.adminHandler != nil {
 		r.logger.Info("Admin routes: Registering API Keys Management endpoints")

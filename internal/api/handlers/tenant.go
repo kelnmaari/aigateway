@@ -33,6 +33,27 @@ func NewTenantHandler(db storage.Database, logger *logrus.Logger, auditLogger *a
 	}
 }
 
+// ListAllTenants возвращает список всех tenants в системе (только для админов)
+// GET /api/admin/tenants
+func (h *TenantHandler) ListAllTenants(c *gin.Context) {
+	// List all tenants from database
+	tenants, err := h.db.ListAllTenants(c.Request.Context())
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list all tenants")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to list tenants",
+		})
+		return
+	}
+
+	h.logger.WithField("count", len(tenants)).Debug("Listed all tenants for admin")
+
+	c.JSON(http.StatusOK, gin.H{
+		"tenants": tenants,
+		"count":   len(tenants),
+	})
+}
+
 // CreateTenant создает новый organization tenant
 // POST /api/tenants
 func (h *TenantHandler) CreateTenant(c *gin.Context) {

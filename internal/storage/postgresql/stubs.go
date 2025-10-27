@@ -201,6 +201,10 @@ func (db *PostgreSQLDB) ListUserTenants(ctx context.Context, userID string) ([]*
 	return nil, fmt.Errorf("ListUserTenants not implemented yet")
 }
 
+func (db *PostgreSQLDB) ListAllTenants(ctx context.Context) ([]*models.Tenant, error) {
+	return nil, fmt.Errorf("ListAllTenants not implemented yet")
+}
+
 func (db *PostgreSQLDB) UpdateTenant(ctx context.Context, tenant *models.Tenant) error {
 	return fmt.Errorf("UpdateTenant not implemented yet")
 }

@@ -704,3 +704,43 @@ func (s *SQLiteDB) scanTenantMemberWithUserInfo(row scanner) (*models.TenantMemb
 	return &member, nil
 }
 
+// ListAllTenants возвращает список всех tenants (для админа)
+func (s *SQLiteDB) ListAllTenants(ctx context.Context) ([]*models.Tenant, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			id, name, slug, type, description, owner_id,
+			status, is_active, created_at, updated_at,
+			settings, metadata
+		FROM tenants
+		WHERE is_active = 1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tenants: %w", err)
+	}
+	defer rows.Close()
+
+	var tenants []*models.Tenant
+	for rows.Next() {
+		tenant, err := s.scanTenant(rows)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to scan tenant row")
+			continue
+		}
+		tenants = append(tenants, tenant)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating tenants: %w", err)
+	}
+
+	s.logger.WithField("count", len(tenants)).Debug("Listed all tenants")
+
+	return tenants, nil
+}

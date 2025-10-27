@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RBAC Management - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/dashboard.css">
@@ -23,7 +24,10 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         .role-card.selected {
-            border: 2px solid #007bff;
+            border: 2px solid var(--primary-color, #007bff) !important;
+            box-shadow: 0 4px 16px rgba(0, 123, 255, 0.3) !important;
+            transform: translateY(-2px) !important;
+            background: linear-gradient(135deg, rgba(0, 123, 255, 0.05), rgba(0, 123, 255, 0.02)) !important;
         }
         .permission-grid {
             display: grid;
@@ -111,8 +115,8 @@
                 <!-- Tab Navigation -->
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="roles">Roles Management</button>
-                    <button class="tab-btn" data-tab="user-roles">User Roles</button>
-                    <button class="tab-btn" data-tab="permissions">Permissions Reference</button>
+                    <button class="tab-btn" data-tab="user-roles" data-callback="handleUserRolesTab">User Roles</button>
+                    <button class="tab-btn" data-tab="permissions" data-callback="handlePermissionsTab">Permissions Reference</button>
                 </div>
 
                 <!-- Roles Management Tab -->
@@ -168,8 +172,8 @@
                         </div>
                         <div class="card-body">
                             <div class="form-group mb-4">
-                                <label for="userSelector" class="form-label">Select User</label>
-                                <select class="form-select" id="userSelector">
+                                <label for="userSelect" class="form-label">Select User</label>
+                                <select class="form-select" id="userSelect">
                                     <option value="">-- Select User --</option>
                                 </select>
                             </div>
@@ -284,6 +288,7 @@
     </main>
 
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/utils/notifications.js"></script>
     <script src="/js/components/navbar.js"></script>
@@ -296,8 +301,9 @@
             const tabContents = document.querySelectorAll('.tab-content');
             
             tabBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', async function() {
                     const targetTab = this.getAttribute('data-tab');
+                    const callback = this.getAttribute('data-callback');
                     
                     // Remove active class from all buttons and contents
                     tabBtns.forEach(b => b.classList.remove('active'));
@@ -312,6 +318,11 @@
                     if (targetContent) {
                         targetContent.style.display = 'block';
                         targetContent.classList.add('active');
+                    }
+                    
+                    // Trigger tab-specific callback if exists
+                    if (callback && typeof window[callback] === 'function') {
+                        await window[callback]();
                     }
                 });
             });

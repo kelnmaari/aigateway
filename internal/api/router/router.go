@@ -96,6 +96,7 @@ type Router struct {
 	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
 	rbacHandler           *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
 	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
+	invitationHandler     *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
 	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
 
 	// WebSocket components
@@ -199,7 +200,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 
 	// Setup Auth Service если есть database и JWT manager
 	if r.db != nil && r.jwtManager != nil {
-		r.authService = authService.NewAuthService(r.db, r.jwtManager, opts.Logger)
+		r.authService = authService.NewAuthService(r.db, r.jwtManager, opts.Config, opts.Logger)
 		r.bootstrapService = authService.NewBootstrapService(r.db, opts.Config.Auth.AdminKey, opts.Logger)
 		opts.Logger.Info("User Authentication and Bootstrap services initialized")
 	}
@@ -384,6 +385,7 @@ func (r *Router) setupRoutes() {
 	r.setupWebUIRoutes()          // WebUI static files (Version 1.3.0+)
 	r.setupOpenAIRoutes()
 	r.setupAdminRoutes()
+	r.setupInvitationsRoutes()    // Invitation System (AUTH-03, v2.2.0)
 	r.setupMCPRoutes()  // MCP Servers Catalog (v1.4.5)
 	r.setupGPURoutes()  // GPU Monitoring (v1.9.3)
 	r.setupFileRoutes() // File Storage & Processing (v1.10.0)
@@ -806,6 +808,7 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
 	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
 	r.engine.StaticFile("/admin.html", "./web/admin.html") // Admin Panel (Version 1.3.0)
+	r.engine.StaticFile("/admin-invitations.html", "./web/admin-invitations.html") // Invitations Management (AUTH-03, v2.2.0)
 	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html") // RBAC Management (v1.11.5)
 	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html") // Audit Log (v1.11.4)
 	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html") // RAG Management (v1.13.0)
@@ -1139,6 +1142,48 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 	return nil
 }
 
+// setupInvitationsRoutes настраивает Invitation System endpoints (AUTH-03, v2.2.0)
+func (r *Router) setupInvitationsRoutes() {
+	if r.invitationHandler == nil {
+		r.logger.Warn("Invitation handler not initialized, skipping invitation routes")
+		return
+	}
+
+	r.logger.Info("Setting up invitation routes")
+
+	// Public route for invitation validation (no auth required)
+	publicInvitations := r.engine.Group("/api/invitations")
+	{
+		publicInvitations.GET("/:token/validate", r.invitationHandler.ValidateInvitation)
+	}
+
+	// Admin routes (requires admin auth)
+	adminInvitations := r.engine.Group("/api/admin/invitations")
+
+	// Use JWT authentication for admin routes
+	if r.jwtManager != nil && r.db != nil {
+		r.logger.Info("Invitation admin routes: Using JWT authentication with admin role check")
+		adminInvitations.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		adminInvitations.Use(middleware.RequireAdmin(r.db, r.logger))
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		// Fallback to API Key auth (legacy mode)
+		r.logger.Info("Invitation admin routes: Using API Key authentication (legacy)")
+		adminInvitations.Use(middleware.APIKeyDBAuth(r.config, r.db, r.logger))
+	} else {
+		r.logger.Warn("Invitation admin routes: No authentication configured!")
+	}
+
+	{
+		adminInvitations.POST("", r.invitationHandler.CreateInvitation)            // Create invitation
+		adminInvitations.GET("", r.invitationHandler.ListInvitations)              // List invitations
+		adminInvitations.GET("/stats", r.invitationHandler.GetInvitationStats)     // Get statistics
+		adminInvitations.GET("/:id", r.invitationHandler.GetInvitationDetails)     // Get invitation details with user info
+		adminInvitations.DELETE("/:id", r.invitationHandler.RevokeInvitation)      // Revoke invitation
+	}
+
+	r.logger.Info("Invitation routes configured successfully")
+}
+
 // setupHandlers инициализирует все handlers
 func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollamaClient *ollama.ClientWithCircuitBreaker) {
 	logger.WithField("db_is_nil", r.db == nil).Info("DEBUG: setupHandlers called")
@@ -1277,6 +1322,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		// Quota Handler initialization
 		r.quotaHandler = handlers.NewQuotaHandler(r.db, r.quotaService, logger)
 		logger.Info("Quota handler initialized successfully")
+
+		// Invitation Handler initialization (AUTH-03, v2.2.0)
+		r.invitationHandler = handlers.NewInvitationHandler(r.db, cfg, logger)
+		logger.Info("Invitation handler initialized successfully")
 
 		// Quota Middleware initialization
 		r.quotaMiddleware = middleware.NewQuotaMiddleware(r.quotaService, logger)

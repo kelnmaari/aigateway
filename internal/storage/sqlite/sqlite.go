@@ -590,6 +590,16 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "update_changelog_v2_1_0_final_format",
 			SQL:     s.getUpdateChangelogV210FinalFormatMigration(),
 		},
+		{
+			Version: 57,
+			Name:    "add_invitations_table",
+			SQL:     s.getAddInvitationsTableMigration(),
+		},
+		{
+			Version: 58,
+			Name:    "add_changelog_v2_2_0",
+			SQL:     s.getAddChangelogV220Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -3790,6 +3800,138 @@ See [MIGRATION_GUIDE_v2.1.0.md](docs/MIGRATION_GUIDE_v2.1.0.md) for detailed ste
 - **Database schema**: Unchanged (backward compatible)'
 WHERE version = '2.1.0';
     `
+}
+
+// getAddInvitationsTableMigration returns SQL for invitations table (v57, AUTH-03, v2.2.0)
+func (s *SQLiteDB) getAddInvitationsTableMigration() string {
+	return `
+-- ========================================
+-- Invitations Table (AUTH-03: Invitation-Only Registration System, v2.2.0)
+-- ========================================
+CREATE TABLE IF NOT EXISTS invitations (
+	id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+	token TEXT UNIQUE NOT NULL,
+	
+	-- Creation metadata
+	created_by_user_id TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	
+	-- Constraints
+	email TEXT,                      -- Optional: bind to specific email
+	expires_at TIMESTAMP,            -- Optional: expiration date
+	max_uses INTEGER NOT NULL DEFAULT 1,  -- Default: single-use
+	
+	-- Usage tracking
+	current_uses INTEGER NOT NULL DEFAULT 0,
+	used_at TIMESTAMP,               -- First successful registration
+	used_by_user_id TEXT,
+	
+	-- Revocation
+	revoked_at TIMESTAMP,
+	revoked_by_user_id TEXT,
+	revoke_reason TEXT,
+	
+	-- Foreign keys
+	FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (used_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+	
+	-- Constraints
+	CHECK (current_uses <= max_uses)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_invitations_token ON invitations(token);
+CREATE INDEX idx_invitations_created_by ON invitations(created_by_user_id);
+CREATE INDEX idx_invitations_status ON invitations(expires_at, revoked_at, current_uses, max_uses);
+CREATE INDEX idx_invitations_email ON invitations(email) WHERE email IS NOT NULL;
+	`
+}
+
+// getAddChangelogV220Migration returns SQL for adding changelog v2.2.0 (v58 migration)
+func (s *SQLiteDB) getAddChangelogV220Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.2.0', '2025-10-28', '## [2.2.0] - 2025-10-28
+
+### Added
+
+- **Invitation-Only Registration System (AUTH-03)**: Полная система управления приглашениями для контролируемой регистрации пользователей
+  - Database schema с таблицей invitations (migration v57 для SQLite, v4 для PostgreSQL)
+  - REST API endpoints для создания, просмотра, отзыва и валидации приглашений
+  - Admin WebUI: /admin-invitations.html - страница управления приглашениями с фильтрацией и статистикой
+  - Поддержка ограничений: по email, сроку действия, количеству использований
+  - Детальная информация о пользователях: кто создал, кто использовал, кто отозвал приглашение
+  - Регистрация по приглашению: обновлен /register.html с поддержкой invitation tokens
+
+- **Invitation Management Features**:
+  - Создание приглашений с настраиваемыми параметрами (email restriction, expiry, max uses)
+  - Автоматическая генерация уникальных invitation links
+  - Статистика приглашений (Active, Pending, Used, Expired, Revoked)
+  - Фильтрация по статусу, email, создателю
+  - View modal с полной информацией включая user details через LEFT JOIN
+  - One-click копирование invitation links и tokens
+
+- **Configuration Options**: Новые настройки в configs/dev.yaml
+  - auth.registration.mode: "open" | "invitation_only" | "disabled"
+  - auth.invitations.enabled: включение системы приглашений
+  - auth.invitations.default_expiry_days: срок действия по умолчанию
+  - auth.invitations.max_uses_default: количество использований
+  - Rate limits для создания и валидации приглашений
+
+### Changed
+
+- **WebUI Improvements**:
+  - Улучшен контраст текста в статистических карточках (белый текст на цветных градиентах)
+  - Markdown форматирование для пользовательских сообщений в ChatUI
+  - WYSIWYG-подобная панель форматирования текста при выделении (bold, italic, code, lists)
+  - Сохранение переносов строк в сообщениях чата (white-space: pre-wrap)
+
+- **Registration Flow**: Обновлен процесс регистрации с проверкой invitation tokens
+  - Валидация токена перед показом формы регистрации
+  - Автоматическое использование приглашения после успешной регистрации
+  - Email restriction check для приглашений привязанных к конкретному email
+
+### Fixed
+
+- **Database Schema**: Исправлена ошибка с колонкой display_name → full_name в запросах с JOIN к таблице users
+- **Invitation Links**: Исправлена генерация ссылок - добавлено .html расширение (/register.html?invite=...)
+
+### Technical
+
+- **Backend (Go)**:
+  - Новые модели: Invitation, InvitationWithUsers, UserInfo, InvitationStatus
+  - Storage layer: полная реализация CRUD операций для SQLite и PostgreSQL
+  - Handler: InvitationHandler с 6 endpoint''ами (create, list, stats, details, revoke, validate)
+  - AuthService: интеграция invitation token validation в процесс регистрации
+  - Transaction delegation: добавлены методы в sqliteTx и postgresqlTx
+
+- **Database Migrations**:
+  - SQLite migration v57: создание таблицы invitations с индексами
+  - PostgreSQL migration v4: аналогичная схема для PostgreSQL
+  - LEFT JOIN queries для получения информации о пользователях
+
+- **API Endpoints**:
+  - POST /api/admin/invitations - создание приглашения
+  - GET /api/admin/invitations - список приглашений с фильтрацией
+  - GET /api/admin/invitations/stats - статистика
+  - GET /api/admin/invitations/:id - детальная информация с user info
+  - DELETE /api/admin/invitations/:id - отзыв приглашения
+  - GET /api/invitations/:token/validate - публичная валидация токена
+
+- **Frontend**:
+  - web/admin-invitations.html (623 строки) - полнофункциональная админ-панель
+  - web/js/api.js - 6 новых методов для работы с invitations API
+  - web/register.html - поддержка ?invite= query parameter
+  - Formatting toolbar для ChatUI с keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+K, Ctrl+L)
+
+### Security
+
+- **Access Control**: Все admin endpoints защищены JWT authentication + RequireAdmin middleware
+- **Rate Limiting**: Настраиваемые лимиты для создания приглашений и валидации токенов
+- **Token Security**: UUID v4 tokens для приглашений, проверка валидности перед использованием
+- **Email Verification**: Опциональная привязка приглашения к конкретному email');
+	`
 }
 
 // ========================================

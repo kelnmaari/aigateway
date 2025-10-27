@@ -412,6 +412,34 @@ type Database interface {
 	GetRAGDocument(ctx context.Context, id string) (*models.RAGDocument, error)
 	UpdateRAGDocument(ctx context.Context, doc *models.RAGDocument) error
 	DeleteRAGDocument(ctx context.Context, id string) error
+	
+	// ========================================
+	// Invitations (AUTH-03: Invitation-Only Registration System, v2.2.0)
+	// ========================================
+
+	// CreateInvitation создает новое приглашение
+	CreateInvitation(ctx context.Context, invitation *models.Invitation) error
+
+	// GetInvitation получает приглашение по ID
+	GetInvitation(ctx context.Context, id string) (*models.Invitation, error)
+
+	// GetInvitationWithUsers получает приглашение с информацией о пользователях
+	GetInvitationWithUsers(ctx context.Context, id string) (*models.InvitationWithUsers, error)
+
+	// GetInvitationByToken получает приглашение по токену
+	GetInvitationByToken(ctx context.Context, token string) (*models.Invitation, error)
+
+	// ListInvitations возвращает список приглашений с фильтрацией
+	ListInvitations(ctx context.Context, filter models.InvitationListFilter) ([]*models.Invitation, error)
+
+	// UseInvitation увеличивает счетчик использований приглашения
+	UseInvitation(ctx context.Context, token string, userID string) error
+
+	// RevokeInvitation отзывает приглашение
+	RevokeInvitation(ctx context.Context, id string, revokedByUserID string, reason string) error
+
+	// GetInvitationStats возвращает статистику по приглашениям
+	GetInvitationStats(ctx context.Context) (*models.InvitationStats, error)
 	ListRAGDocuments(ctx context.Context, filter *RAGDocumentFilter) ([]*models.RAGDocument, error)
 
 	// RAG Chunks

@@ -12,6 +12,7 @@ import (
 
 	"aigateway/internal/auth/jwt"
 	"aigateway/internal/auth/password"
+	"aigateway/internal/config"
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
 )
@@ -20,24 +21,27 @@ import (
 type AuthService struct {
 	db         storage.Database
 	jwtManager *jwt.Manager
+	config     *config.Config // AUTH-03: Config для проверки registration mode (v2.2.0)
 	logger     *logrus.Logger
 }
 
 // NewAuthService создает новый Auth Service
-func NewAuthService(db storage.Database, jwtManager *jwt.Manager, logger *logrus.Logger) *AuthService {
+func NewAuthService(db storage.Database, jwtManager *jwt.Manager, cfg *config.Config, logger *logrus.Logger) *AuthService {
 	return &AuthService{
 		db:         db,
 		jwtManager: jwtManager,
+		config:     cfg,
 		logger:     logger,
 	}
 }
 
 // RegisterRequest запрос на регистрацию
 type RegisterRequest struct {
-	Username    string `json:"username" binding:"required"`
-	Email       string `json:"email" binding:"required"`
-	Password    string `json:"password" binding:"required"`
-	DisplayName string `json:"display_name,omitempty"`
+	Username       string `json:"username" binding:"required"`
+	Email          string `json:"email" binding:"required"`
+	Password       string `json:"password" binding:"required"`
+	DisplayName    string `json:"display_name,omitempty"`
+	InvitationToken string `json:"invitation_token,omitempty"` // AUTH-03: Invitation system (v2.2.0)
 }
 
 // RegisterResponse ответ на регистрацию
@@ -49,6 +53,50 @@ type RegisterResponse struct {
 
 // Register регистрирует нового пользователя
 func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error) {
+	// AUTH-03: Check registration mode (v2.2.0)
+	registrationMode := s.config.Auth.Registration.Mode
+	if registrationMode == "disabled" {
+		return nil, password.ValidationError{
+			Field:   "registration",
+			Message: "registration is disabled",
+		}
+	}
+
+	// AUTH-03: Check invitation token requirement (v2.2.0)
+	if registrationMode == "invitation_only" {
+		if req.InvitationToken == "" {
+			return nil, password.ValidationError{
+				Field:   "invitation_token",
+				Message: "invitation token is required",
+			}
+		}
+
+		// Validate invitation token
+		invitation, err := s.db.GetInvitationByToken(ctx, req.InvitationToken)
+		if err != nil {
+			return nil, password.ValidationError{
+				Field:   "invitation_token",
+				Message: "invalid invitation token",
+			}
+		}
+
+		// Check if invitation is valid
+		if !invitation.IsValid() {
+			return nil, password.ValidationError{
+				Field:   "invitation_token",
+				Message: fmt.Sprintf("invitation is not valid: %s", invitation.GetStatus()),
+			}
+		}
+
+		// Check email restriction
+		if !invitation.CanBeUsedByEmail(req.Email) {
+			return nil, password.ValidationError{
+				Field:   "invitation_token",
+				Message: "this invitation is restricted to a different email address",
+			}
+		}
+	}
+
 	// Validate input
 	if err := password.ValidateUsername(req.Username); err != nil {
 		return nil, err
@@ -150,6 +198,14 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Regis
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// AUTH-03: Use invitation if provided (v2.2.0)
+	if req.InvitationToken != "" {
+		if err := s.db.UseInvitation(ctx, req.InvitationToken, user.ID); err != nil {
+			s.logger.WithError(err).Warn("Failed to mark invitation as used")
+			// Don't fail registration if invitation update fails
+		}
 	}
 
 	// Generate JWT tokens

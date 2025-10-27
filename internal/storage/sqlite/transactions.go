@@ -562,3 +562,38 @@ func (tx *sqliteTx) GetQuotaWithUsage(ctx context.Context, scope models.QuotaSco
 	return tx.db.GetQuotaWithUsage(ctx, scope, targetID)
 }
 
+// ========================================
+// Invitations (AUTH-03, v2.2.0)
+// ========================================
+
+func (tx *sqliteTx) CreateInvitation(ctx context.Context, invitation *models.Invitation) error {
+	return tx.db.CreateInvitation(ctx, invitation)
+}
+
+func (tx *sqliteTx) GetInvitationByToken(ctx context.Context, token string) (*models.Invitation, error) {
+	return tx.db.GetInvitationByToken(ctx, token)
+}
+
+func (tx *sqliteTx) ListInvitations(ctx context.Context, filter models.InvitationListFilter) ([]*models.Invitation, error) {
+	return tx.db.ListInvitations(ctx, filter)
+}
+
+func (tx *sqliteTx) UseInvitation(ctx context.Context, token string, usedByUserID string) error {
+	return tx.db.UseInvitation(ctx, token, usedByUserID)
+}
+
+func (tx *sqliteTx) RevokeInvitation(ctx context.Context, id string, revokedByUserID string, reason string) error {
+	return tx.db.RevokeInvitation(ctx, id, revokedByUserID, reason)
+}
+
+func (tx *sqliteTx) GetInvitationStats(ctx context.Context) (*models.InvitationStats, error) {
+	return tx.db.GetInvitationStats(ctx)
+}
+
+func (tx *sqliteTx) GetInvitation(ctx context.Context, id string) (*models.Invitation, error) {
+	return tx.db.GetInvitation(ctx, id)
+}
+
+func (tx *sqliteTx) GetInvitationWithUsers(ctx context.Context, id string) (*models.InvitationWithUsers, error) {
+	return tx.db.GetInvitationWithUsers(ctx, id)
+}

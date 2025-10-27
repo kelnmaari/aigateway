@@ -16,8 +16,11 @@
 
             <div id="error-message" class="error-message" style="display: none;"></div>
             <div id="success-message" class="success-message" style="display: none;"></div>
+            <div id="invitation-info" class="info-message" style="display: none;"></div>
 
             <form id="register-form" class="auth-form">
+                <!-- Hidden invitation token field (AUTH-03) -->
+                <input type="hidden" id="invitation_token" name="invitation_token" value="">
                 <div class="form-group">
                     <label for="username">Username</label>
                     <input 
@@ -95,7 +98,70 @@
         </div>
     </div>
 
+    <script src="/js/api.js"></script>
     <script>
+        // AUTH-03: Check for invitation token in URL
+        let invitationToken = null;
+        let invitationEmail = null;
+
+        async function checkInvitationToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('invite');
+            
+            if (!token) {
+                // No invitation token - check if registration is open
+                // For now, allow registration without token (will be validated by backend)
+                return;
+            }
+
+            invitationToken = token;
+            document.getElementById('invitation_token').value = token;
+
+            try {
+                // Validate invitation token
+                const response = await api.validateInvitation(token);
+                
+                if (response.valid) {
+                    // Show invitation info
+                    const infoDiv = document.getElementById('invitation-info');
+                    infoDiv.style.display = 'block';
+                    infoDiv.textContent = '✅ Valid invitation token detected';
+                    
+                    // Pre-fill email if restricted
+                    if (response.invitation && response.invitation.email) {
+                        invitationEmail = response.invitation.email;
+                        const emailInput = document.getElementById('email');
+                        emailInput.value = invitationEmail;
+                        emailInput.readOnly = true;
+                        infoDiv.textContent = `✅ Valid invitation for ${invitationEmail}`;
+                    }
+                } else {
+                    // Invalid invitation
+                    const errorDiv = document.getElementById('error-message');
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = response.error || 'Invalid or expired invitation token';
+                    
+                    // Disable form
+                    document.getElementById('register-form').style.opacity = '0.5';
+                    document.getElementById('register-form').style.pointerEvents = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to validate invitation:', error);
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = 'Failed to validate invitation token';
+                
+                // Disable form
+                document.getElementById('register-form').style.opacity = '0.5';
+                document.getElementById('register-form').style.pointerEvents = 'none';
+            }
+        }
+
+        // Check invitation token on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkInvitationToken();
+        });
+
         // Register form handler
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -123,18 +189,26 @@
                 const username = document.getElementById('username').value;
                 const email = document.getElementById('email').value;
                 const display_name = document.getElementById('display_name').value;
+                const invitation_token = document.getElementById('invitation_token').value;
+                
+                const payload = {
+                    username,
+                    email,
+                    password,
+                    display_name: display_name || username
+                };
+
+                // Include invitation token if present (AUTH-03)
+                if (invitation_token) {
+                    payload.invitation_token = invitation_token;
+                }
                 
                 const response = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        username,
-                        email,
-                        password,
-                        display_name: display_name || username
-                    })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
@@ -144,8 +218,8 @@
                 }
                 
                 // Save tokens
-                localStorage.setItem('access_token', data.access_token);
-                localStorage.setItem('refresh_token', data.refresh_token);
+                localStorage.setItem('access_token', data.token.access_token);
+                localStorage.setItem('refresh_token', data.token.refresh_token);
                 localStorage.setItem('user', JSON.stringify(data.user));
                 
                 successDiv.textContent = 'Account created successfully! Redirecting...';
@@ -164,6 +238,18 @@
             }
         });
     </script>
+
+    <style>
+        .info-message {
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            background-color: #10b98120;
+            color: #10b981;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+    </style>
 </body>
 </html>
 

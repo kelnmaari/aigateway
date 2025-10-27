@@ -55,6 +55,175 @@ class ChatManager {
             attachBtn.addEventListener('click', () => fileInput.click());
             fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         }
+
+        // Formatting toolbar handlers
+        this.setupFormattingToolbar();
+    }
+
+    // Setup formatting toolbar for markdown
+    setupFormattingToolbar() {
+        const toolbar = document.getElementById('formatting-toolbar');
+        if (!toolbar) return;
+
+        // Show toolbar on text selection
+        this.messageInput.addEventListener('mouseup', () => this.handleTextSelection());
+        this.messageInput.addEventListener('keyup', () => this.handleTextSelection());
+
+        // Keyboard shortcuts
+        this.messageInput.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey)) {
+                switch(e.key.toLowerCase()) {
+                    case 'b':
+                        e.preventDefault();
+                        this.applyFormat('bold');
+                        break;
+                    case 'i':
+                        e.preventDefault();
+                        this.applyFormat('italic');
+                        break;
+                    case 'k':
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            this.applyFormat('codeblock');
+                        } else {
+                            this.applyFormat('code');
+                        }
+                        break;
+                    case 'l':
+                        e.preventDefault();
+                        this.applyFormat('link');
+                        break;
+                }
+            }
+        });
+
+        // Toolbar button clicks
+        toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const format = btn.dataset.format;
+                this.applyFormat(format);
+            });
+        });
+
+        // Hide toolbar on click outside
+        document.addEventListener('mousedown', (e) => {
+            if (!toolbar.contains(e.target) && e.target !== this.messageInput) {
+                this.hideFormattingToolbar();
+            }
+        });
+    }
+
+    // Handle text selection in message input
+    handleTextSelection() {
+        const selection = window.getSelection();
+        const selectedText = this.messageInput.value.substring(
+            this.messageInput.selectionStart,
+            this.messageInput.selectionEnd
+        );
+
+        const toolbar = document.getElementById('formatting-toolbar');
+        
+        if (selectedText.length > 0 && this.messageInput === document.activeElement) {
+            // Position toolbar above selection
+            const rect = this.messageInput.getBoundingClientRect();
+            const selectionStart = this.messageInput.selectionStart;
+            
+            // Simple positioning - above textarea
+            toolbar.style.left = `${rect.left + 20}px`;
+            toolbar.style.top = `${rect.top - 50}px`;
+            
+            // Show toolbar with animation
+            toolbar.style.display = 'flex';
+            setTimeout(() => toolbar.classList.add('visible'), 10);
+        } else {
+            this.hideFormattingToolbar();
+        }
+    }
+
+    // Hide formatting toolbar
+    hideFormattingToolbar() {
+        const toolbar = document.getElementById('formatting-toolbar');
+        if (toolbar) {
+            toolbar.classList.remove('visible');
+            setTimeout(() => {
+                if (!toolbar.classList.contains('visible')) {
+                    toolbar.style.display = 'none';
+                }
+            }, 200);
+        }
+    }
+
+    // Apply markdown formatting
+    applyFormat(format) {
+        const start = this.messageInput.selectionStart;
+        const end = this.messageInput.selectionEnd;
+        const selectedText = this.messageInput.value.substring(start, end);
+        
+        if (!selectedText && format !== 'ul' && format !== 'ol' && format !== 'codeblock') {
+            return; // Need selection for inline formats
+        }
+
+        let before = '', after = '', replacement = '';
+        
+        switch(format) {
+            case 'bold':
+                before = '**';
+                after = '**';
+                replacement = `${before}${selectedText || 'bold text'}${after}`;
+                break;
+            case 'italic':
+                before = '*';
+                after = '*';
+                replacement = `${before}${selectedText || 'italic text'}${after}`;
+                break;
+            case 'code':
+                before = '`';
+                after = '`';
+                replacement = `${before}${selectedText || 'code'}${after}`;
+                break;
+            case 'codeblock':
+                const lang = selectedText ? '' : 'javascript';
+                replacement = `\n\`\`\`${lang}\n${selectedText || '// your code here'}\n\`\`\`\n`;
+                break;
+            case 'link':
+                const url = prompt('Enter URL:', 'https://');
+                if (url) {
+                    replacement = `[${selectedText || 'link text'}](${url})`;
+                }
+                break;
+            case 'ul':
+                const ulLines = selectedText.split('\n').filter(l => l.trim());
+                replacement = ulLines.length > 0 
+                    ? ulLines.map(line => `- ${line}`).join('\n')
+                    : '- List item';
+                break;
+            case 'ol':
+                const olLines = selectedText.split('\n').filter(l => l.trim());
+                replacement = olLines.length > 0
+                    ? olLines.map((line, i) => `${i + 1}. ${line}`).join('\n')
+                    : '1. List item';
+                break;
+        }
+
+        if (replacement !== undefined) {
+            const newValue = 
+                this.messageInput.value.substring(0, start) +
+                replacement +
+                this.messageInput.value.substring(end);
+            
+            this.messageInput.value = newValue;
+            
+            // Restore focus and selection
+            this.messageInput.focus();
+            const newCursorPos = start + replacement.length;
+            this.messageInput.setSelectionRange(newCursorPos, newCursorPos);
+            
+            // Trigger input event for auto-resize
+            this.messageInput.dispatchEvent(new Event('input'));
+            
+            // Hide toolbar
+            this.hideFormattingToolbar();
+        }
     }
 
     // Start new conversation
@@ -269,15 +438,12 @@ class ChatManager {
         const messageDiv = this.createMessageElement(message.role);
         const contentDiv = messageDiv.querySelector('.message-content');
         
-        if (message.role === 'user') {
-            contentDiv.textContent = message.content;
-            
-            // Show attached files if any (FILE-STORAGE-01: Phase 4)
-            if (message.file_ids && message.file_ids.length > 0) {
-                this.renderMessageFiles(messageDiv, message.file_ids);
-            }
-        } else {
-            contentDiv.innerHTML = marked.parse(message.content);
+        // Parse markdown for all messages (user + assistant)
+        contentDiv.innerHTML = marked.parse(message.content);
+        
+        // Show attached files if any (FILE-STORAGE-01: Phase 4)
+        if (message.role === 'user' && message.file_ids && message.file_ids.length > 0) {
+            this.renderMessageFiles(messageDiv, message.file_ids);
         }
     }
 

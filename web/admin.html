@@ -28,6 +28,7 @@
             <div class="tabs">
             <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
             <button class="tab-btn" data-tab="users">Users</button>
+            <button class="tab-btn" data-tab="invitations">Invitations</button>
             <button class="tab-btn" data-tab="apikeys">API Keys</button>
             <button class="tab-btn" data-tab="files">Files</button>
             <button class="tab-btn" data-tab="models">Models</button>
@@ -127,6 +128,97 @@
                             <tr><td colspan="6" class="table-empty">Loading users...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Invitations Tab (AUTH-03, v2.2.0) -->
+            <div id="invitations-tab" class="tab-pane">
+                <div class="section">
+                    <div class="section-header">
+                        <h2>✉️ Invitation System</h2>
+                        <a href="/admin-invitations.html" class="btn btn-primary">
+                            <i class="fas fa-external-link-alt"></i> Open Invitations Manager
+                        </a>
+                    </div>
+                    
+                    <div class="info-card">
+                        <i class="fas fa-user-plus"></i>
+                        <div>
+                            <strong>Invitation-Only Registration</strong>
+                            <p>Control user registration through invitation links. Create invitations with email restrictions, expiration dates, and usage limits. Perfect for closed beta, private communities, or controlled access.</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="stats-grid" style="margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value" id="invitations-active-count">-</div>
+                                <div class="stat-label">Active Invitations</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value" id="invitations-pending-count">-</div>
+                                <div class="stat-label">Pending</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value" id="invitations-used-count">-</div>
+                                <div class="stat-label">Used</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div>
+                                <div class="stat-value" id="invitations-expired-count">-</div>
+                                <div class="stat-label">Expired</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="section">
+                        <h3>Quick Actions</h3>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;">
+                            <a href="/admin-invitations.html" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Create Invitation
+                            </a>
+                            <a href="/admin-invitations.html" class="btn btn-secondary">
+                                <i class="fas fa-list"></i> View All Invitations
+                            </a>
+                            <button class="btn btn-secondary" onclick="loadInvitationsPreview()">
+                                <i class="fas fa-sync"></i> Refresh Stats
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Recent Invitations Preview -->
+                    <div class="section" style="margin-top: 2rem;">
+                        <h3>Recent Invitations</h3>
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Token</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Usage</th>
+                                        <th>Expires</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invitations-preview-table">
+                                    <tr><td colspan="6" class="table-empty">Loading invitations...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="text-align: center; margin-top: 16px;">
+                            <a href="/admin-invitations.html" class="btn btn-secondary">
+                                View All Invitations →
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -913,6 +1005,78 @@
     <script src="/js/gpu-monitor.js"></script>
     <script src="/js/admin.js"></script>
     <script src="/js/admin-files.js"></script>
+    
+    <!-- Invitations Tab Script (AUTH-03, v2.2.0) -->
+    <script>
+        // Load invitations preview
+        async function loadInvitationsPreview() {
+            try {
+                // Load stats
+                const stats = await api.getInvitationStats();
+                document.getElementById('invitations-active-count').textContent = stats.active_count || 0;
+                document.getElementById('invitations-pending-count').textContent = stats.pending_count || 0;
+                document.getElementById('invitations-used-count').textContent = (stats.total_count || 0) - (stats.pending_count || 0) - (stats.expired_count || 0) - (stats.revoked_count || 0);
+                document.getElementById('invitations-expired-count').textContent = stats.expired_count || 0;
+
+                // Load recent invitations
+                const response = await api.listInvitations('limit=10');
+                const invitations = response.invitations || [];
+                
+                const tbody = document.getElementById('invitations-preview-table');
+                if (invitations.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No invitations found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = invitations.map(inv => {
+                    const status = getInvitationStatusBadge(inv);
+                    const expiresText = inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : 'Never';
+                    const createdText = new Date(inv.created_at).toLocaleDateString();
+                    
+                    return `
+                        <tr>
+                            <td><code style="font-size: 12px;">${inv.token.substring(0, 16)}...</code></td>
+                            <td>${inv.email || '<span style="color: var(--text-tertiary);">Any email</span>'}</td>
+                            <td>${status}</td>
+                            <td>${inv.current_uses} / ${inv.max_uses}</td>
+                            <td>${expiresText}</td>
+                            <td>${createdText}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load invitations preview:', error);
+                document.getElementById('invitations-preview-table').innerHTML = 
+                    '<tr><td colspan="6" class="table-empty">Error loading invitations</td></tr>';
+            }
+        }
+
+        function getInvitationStatusBadge(inv) {
+            if (inv.revoked_at) {
+                return '<span style="display: inline-block; padding: 4px 8px; background: #ef444420; color: #ef4444; border-radius: 4px; font-size: 12px;">Revoked</span>';
+            }
+            if (inv.current_uses >= inv.max_uses) {
+                return '<span style="display: inline-block; padding: 4px 8px; background: #10b98120; color: #10b981; border-radius: 4px; font-size: 12px;">Used</span>';
+            }
+            if (inv.expires_at && new Date(inv.expires_at) < new Date()) {
+                return '<span style="display: inline-block; padding: 4px 8px; background: #f59e0b20; color: #f59e0b; border-radius: 4px; font-size: 12px;">Expired</span>';
+            }
+            if (inv.current_uses > 0) {
+                return '<span style="display: inline-block; padding: 4px 8px; background: #3b82f620; color: #3b82f6; border-radius: 4px; font-size: 12px;">Partial</span>';
+            }
+            return '<span style="display: inline-block; padding: 4px 8px; background: #6b728020; color: #9ca3af; border-radius: 4px; font-size: 12px;">Pending</span>';
+        }
+
+        // Auto-load when invitations tab is selected
+        document.addEventListener('DOMContentLoaded', () => {
+            const invitationsTab = document.querySelector('[data-tab="invitations"]');
+            if (invitationsTab) {
+                invitationsTab.addEventListener('click', () => {
+                    loadInvitationsPreview();
+                });
+            }
+        });
+    </script>
 </body>
 </html>
 

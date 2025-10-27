@@ -283,6 +283,11 @@ func (p *PostgreSQLDB) getMigrations() []migration {
 			Name:    "create_rag_tables",
 			SQL:     p.getCreateRAGTablesMigration(),
 		},
+		{
+			Version: 4,
+			Name:    "add_invitations_table",
+			SQL:     p.getAddInvitationsTableMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -727,6 +732,52 @@ CREATE TABLE IF NOT EXISTS rag_query_logs (
 
 CREATE INDEX IF NOT EXISTS idx_rag_query_logs_user ON rag_query_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_rag_query_logs_created ON rag_query_logs(created_at DESC);
+	`
+}
+
+// getAddInvitationsTableMigration returns SQL for invitations table (v4, AUTH-03, v2.2.0)
+func (p *PostgreSQLDB) getAddInvitationsTableMigration() string {
+	return `
+-- ========================================
+-- Invitations Table (AUTH-03: Invitation-Only Registration System, v2.2.0)
+-- ========================================
+CREATE TABLE IF NOT EXISTS invitations (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	token UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
+	
+	-- Creation metadata
+	created_by_user_id TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+	
+	-- Constraints
+	email VARCHAR(255),              -- Optional: bind to specific email
+	expires_at TIMESTAMP,            -- Optional: expiration date
+	max_uses INT NOT NULL DEFAULT 1, -- Default: single-use
+	
+	-- Usage tracking
+	current_uses INT NOT NULL DEFAULT 0,
+	used_at TIMESTAMP,               -- First successful registration
+	used_by_user_id TEXT,
+	
+	-- Revocation
+	revoked_at TIMESTAMP,
+	revoked_by_user_id TEXT,
+	revoke_reason TEXT,
+	
+	-- Foreign keys
+	FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (used_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (revoked_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+	
+	-- Constraints
+	CHECK (current_uses <= max_uses)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_invitations_token ON invitations(token);
+CREATE INDEX IF NOT EXISTS idx_invitations_created_by ON invitations(created_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_status ON invitations(expires_at, revoked_at, current_uses, max_uses);
+CREATE INDEX IF NOT EXISTS idx_invitations_email ON invitations(email) WHERE email IS NOT NULL;
 	`
 }
 

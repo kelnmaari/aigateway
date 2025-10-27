@@ -739,6 +739,36 @@ class API {
         return response; // Return raw response for file download
     }
 
+    // ==================== Invitations APIs (AUTH-03, v2.2.0) ====================
+
+    async createInvitation(data) {
+        return this.post('/api/admin/invitations', data);
+    }
+
+    async listInvitations(queryString = '') {
+        return this.get(`/api/admin/invitations${queryString ? '?' + queryString : ''}`);
+    }
+
+    async getInvitationStats() {
+        return this.get('/api/admin/invitations/stats');
+    }
+
+    async getInvitationDetails(id) {
+        return this.get(`/api/admin/invitations/${id}`);
+    }
+
+    async revokeInvitation(id, data = {}) {
+        return this.delete(`/api/admin/invitations/${id}`, data);
+    }
+
+    async validateInvitation(token, email = null) {
+        let url = `/api/invitations/${token}/validate`;
+        if (email) {
+            url += `?email=${encodeURIComponent(email)}`;
+        }
+        return this.get(url);
+    }
+
     // ==================== System APIs ====================
 
     async getSystemInfo() {

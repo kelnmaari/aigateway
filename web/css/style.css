@@ -571,6 +571,8 @@ body {
 .message-content {
     flex: 1;
     line-height: 1.7;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .message-content p {
@@ -759,6 +761,56 @@ body {
 .send-btn {
     padding: 12px;
     flex-shrink: 0;
+}
+
+/* Markdown Formatting Toolbar */
+.formatting-toolbar {
+    position: fixed;
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.formatting-toolbar.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.toolbar-btn:active {
+    transform: scale(0.95);
+}
+
+.toolbar-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 /* Scrollbar Styling */

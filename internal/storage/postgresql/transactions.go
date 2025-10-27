@@ -454,3 +454,39 @@ func (tx *postgresqlTx) GetQuotaWithUsage(ctx context.Context, scope models.Quot
 	return tx.db.GetQuotaWithUsage(ctx, scope, targetID)
 }
 
+// ========================================
+// Invitations (AUTH-03, v2.2.0)
+// ========================================
+
+func (tx *postgresqlTx) CreateInvitation(ctx context.Context, invitation *models.Invitation) error {
+	return tx.db.CreateInvitation(ctx, invitation)
+}
+
+func (tx *postgresqlTx) GetInvitationByToken(ctx context.Context, token string) (*models.Invitation, error) {
+	return tx.db.GetInvitationByToken(ctx, token)
+}
+
+func (tx *postgresqlTx) ListInvitations(ctx context.Context, filter models.InvitationListFilter) ([]*models.Invitation, error) {
+	return tx.db.ListInvitations(ctx, filter)
+}
+
+func (tx *postgresqlTx) UseInvitation(ctx context.Context, token string, usedByUserID string) error {
+	return tx.db.UseInvitation(ctx, token, usedByUserID)
+}
+
+func (tx *postgresqlTx) RevokeInvitation(ctx context.Context, id string, revokedByUserID string, reason string) error {
+	return tx.db.RevokeInvitation(ctx, id, revokedByUserID, reason)
+}
+
+func (tx *postgresqlTx) GetInvitationStats(ctx context.Context) (*models.InvitationStats, error) {
+	return tx.db.GetInvitationStats(ctx)
+}
+
+func (tx *postgresqlTx) GetInvitation(ctx context.Context, id string) (*models.Invitation, error) {
+	return tx.db.GetInvitation(ctx, id)
+}
+
+func (tx *postgresqlTx) GetInvitationWithUsers(ctx context.Context, id string) (*models.InvitationWithUsers, error) {
+	return tx.db.GetInvitationWithUsers(ctx, id)
+}
+

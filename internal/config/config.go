@@ -89,6 +89,12 @@ type AuthConfig struct {
 	StoragePath string `mapstructure:"storage_path"`
 	AdminKey    string `mapstructure:"admin_key"`
 
+	// Registration settings (AUTH-03: Invitation-Only Registration, v2.2.0)
+	Registration RegistrationConfig `mapstructure:"registration"`
+
+	// Invitations settings (AUTH-03, v2.2.0)
+	Invitations InvitationsConfig `mapstructure:"invitations"`
+
 	// Rate limiting настройки
 	RateLimiting struct {
 		Enabled                  bool `mapstructure:"enabled"`
@@ -748,6 +754,39 @@ type WebFetchConfig struct {
 	// Cache
 	CacheEnabled bool   `mapstructure:"cache_enabled"`
 	CacheTTL     string `mapstructure:"cache_ttl"` // e.g., "1h"
+}
+
+// RegistrationConfig конфигурация регистрации пользователей (AUTH-03, v2.2.0)
+type RegistrationConfig struct {
+	// Mode: "open" | "invitation_only" | "disabled"
+	Mode string `mapstructure:"mode"`
+	
+	// Require email verification after registration
+	RequireEmailVerification bool `mapstructure:"require_email_verification"`
+}
+
+// InvitationsConfig конфигурация системы приглашений (AUTH-03, v2.2.0)
+type InvitationsConfig struct {
+	// Enable invitations system
+	Enabled bool `mapstructure:"enabled"`
+	
+	// Default expiry in days (0 = never expires)
+	DefaultExpiryDays int `mapstructure:"default_expiry_days"`
+	
+	// Default max uses per invitation
+	MaxUsesDefault int `mapstructure:"max_uses_default"`
+	
+	// Allow email restriction for invitations
+	AllowEmailRestriction bool `mapstructure:"allow_email_restriction"`
+	
+	// Rate limits
+	RateLimit struct {
+		// Max invitations per admin per hour
+		CreationPerAdminHour int `mapstructure:"creation_per_admin_hour"`
+		
+		// Max validation requests per IP per minute
+		ValidationPerIPMinute int `mapstructure:"validation_per_ip_minute"`
+	} `mapstructure:"rate_limit"`
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

@@ -1,11 +1,11 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 2.1.0 ✅ (Rebranding to AIGateway Platform)  
-> **Следующая версия:** 2.2.0 (Model Registry & Multi-Provider Foundation) 📋  
+> **Текущая версия:** 2.2.0 ✅ (Invitation-Only Registration System)  
+> **Следующая версия:** 2.3.0 (Model Registry & Multi-Provider Foundation) 📋  
 > **План развития:** Version 2.0.0 - 2.5.0+  
-> **Статус:** Active Development (v2.1.0 Complete! Planning v2.2.0 Multi-Provider → v2.3.0 Invitation System)  
-> **Последнее обновление:** 2025-10-27  
-> **Новое:** 🎉 v2.1.0 релиз! Complete Rebranding to AIGateway. Next: Model Registry & vLLM → Invitation-Only Registration
+> **Статус:** Active Development (v2.2.0 Complete! ✅ Planning v2.3.0 Multi-Provider)  
+> **Последнее обновление:** 2025-10-28  
+> **Новое:** 🎉 v2.1.0 релиз! Complete Rebranding to AIGateway. Next: Invitation-Only Registration → Model Registry & vLLM
 
 ---
 
@@ -612,14 +612,14 @@
 
 ### Задачи
 
-- [ ] **REBRAND-01** Documentation & README → **v2.1.0**
+- [x] **REBRAND-01** Documentation & README → **v2.1.0**
   - 📝 README.md - новое описание AIGateway Platform
   - 📝 Architecture.MD - обновление архитектурных диаграмм
   - 📝 Contributing guide - обновление названия
   - 📝 Все ссылки на "AIGateway Platform" → "AIGateway"
   - **Оценка:** 2-3 часа
 
-- [ ] **REBRAND-02** Code & Configuration → **v2.1.0**
+- [x] **REBRAND-02** Code & Configuration → **v2.1.0**
   - 🔧 go.mod - module path rename
   - 🔧 Package imports по всему проекту
   - 🔧 Config files (dev.yaml, production.yaml)
@@ -627,7 +627,7 @@
   - 🔧 Environment variables (AIGATEWAY_*)
   - **Оценка:** 3-4 часа
 
-- [ ] **REBRAND-03** WebUI Branding → **v2.1.0**
+- [x] **REBRAND-03** WebUI Branding → **v2.1.0**
   - 🎨 Logo & favicon (AIGateway branding)
   - 🎨 Page titles & headers
   - 🎨 Navigation labels
@@ -635,7 +635,7 @@
   - 🎨 Footer copyright
   - **Оценка:** 2-3 часа
 
-- [ ] **REBRAND-04** GitHub & Release → **v2.1.0**
+- [x] **REBRAND-04** GitHub & Release → **v2.1.0**
   - 📦 GitHub repository rename
   - 📦 Docker Hub organization/image rename
   - 📦 Release notes для v2.1.0
@@ -659,110 +659,21 @@
 
 ---
 
-## 🎯 Version 2.2.0 - Model Registry & Multi-Provider Foundation
-
-**Фокус:** Universal Model Registry + vLLM Integration  
-**Приоритет:** HIGH  
-**Оценка времени:** 20-28 часов  
-**Статус:** 📋 Запланировано (0/4 задач)  
-**Версионирование:** v2.2.1-v2.2.4  
-**Dependencies:** ⚠️ Требует v2.1.0 (Rebranding complete)
-
-**Стратегия:** Создание универсальной архитектуры для поддержки множественных model providers. Foundation для HuggingFace, OpenAI, Anthropic integration.
-
-### Задачи
-
-- [ ] **REGISTRY-01** Model Registry Core → [BACKLOG/REGISTRY-01_model_registry.md](BACKLOG/REGISTRY-01_model_registry.md) → **v2.2.1**
-  - Model metadata storage (DB schema)
-  - Model capabilities tracking (chat/embeddings/vision/function-calling)
-  - Provider abstraction layer
-  - Model registration API (POST /api/models/registry)
-  - Model discovery endpoint (GET /api/models/registry)
-  - Health check integration
-  - **Оценка:** 6-8 часов
-
-- [ ] **REGISTRY-02** Smart Model Router → [BACKLOG/REGISTRY-02_smart_router.md](BACKLOG/REGISTRY-02_smart_router.md) → **v2.2.2**
-  - Router middleware для model requests
-  - Provider selection logic (Ollama/vLLM/etc)
-  - Fallback chains (если primary provider down)
-  - Load balancing между providers
-  - Request tracing с provider info
-  - **Оценка:** 5-7 часов
-
-- [ ] **VLLM-01** vLLM Backend Integration → [BACKLOG/VLLM-01_integration.md](BACKLOG/VLLM-01_integration.md) → **v2.2.3**
-  - vLLM client implementation
-  - OpenAI-compatible API mapping
-  - Multi-GPU support configuration
-  - Model loading/unloading API
-  - Performance benchmarking
-  - Docker Compose integration
-  - **Оценка:** 6-8 часов
-  - **Documentation:** vLLM installation guide для Linux 2x GPU
-
-- [ ] **REGISTRY-03** Model Management WebUI → [BACKLOG/REGISTRY-03_webui.md](BACKLOG/REGISTRY-03_webui.md) → **v2.2.4**
-  - Model Registry dashboard
-  - Provider status cards (Ollama/vLLM/etc)
-  - Model registration form
-  - Model health monitoring
-  - Performance metrics per model
-  - Switch provider для specific model
-  - **Оценка:** 3-5 часов
-
-### 🎯 Ключевые возможности
-
-**Backend:**
-
-- 🗄️ **Universal Registry** - централизованное управление всеми моделями
-- 🔀 **Smart Routing** - автоматический выбор оптимального provider'а
-- 🚀 **vLLM Support** - fast inference для HuggingFace моделей
-- ⚡ **Multi-GPU** - распределение моделей на несколько GPU
-- 🔄 **Fallback Chains** - automatic failover между providers
-- 📊 **Provider Metrics** - performance tracking per provider
-
-**WebUI:**
-
-- 📋 **Model Registry Page** - unified view всех доступных моделей
-- 🎛️ **Provider Dashboard** - мониторинг Ollama, vLLM статусов
-- ⚙️ **Configuration** - model assignment к providers
-- 📈 **Performance Charts** - latency, throughput per provider
-
-### 🏗️ Технический стек
-
-- **Model Providers:**
-  - Ollama (existing) - local models, GGUF format
-  - vLLM (new) - HuggingFace models, GPU inference
-  - Future: TGI, LocalAI, OpenAI, Anthropic
-
-- **Architecture:**
-  - Provider abstraction interface
-  - Model registry database (SQLite/PostgreSQL)
-  - Smart router middleware
-  - Health check system
-
-### 📈 Use Cases
-
-1. **HuggingFace Models:** Запуск моделей которые не поддерживаются Ollama
-2. **GPU Optimization:** Использование vLLM для fast inference
-3. **Model Fallback:** Автоматический переход на backup provider
-4. **Multi-Model:** Разные модели на разных providers (Ollama + vLLM)
-5. **Load Balancing:** Распределение нагрузки между GPU/providers
-
----
-
-## 🔐 Version 2.3.0 - Invitation-Only Registration System
+## 🔐 Version 2.2.0 - Invitation-Only Registration System
 
 **Фокус:** Контролируемая регистрация пользователей через систему приглашений  
-**Приоритет:** MEDIUM  
+**Приоритет:** HIGH  
 **Оценка времени:** 6-8 часов  
-**Статус:** 📋 Запланировано (0/1 задачи)  
-**Версионирование:** v2.3.0  
-**Dependencies:** None (независимая функциональность)
+**Статус:** ✅ Завершено 100% (1/1 задача)  
+**Версионирование:** v2.2.0  
+**Dependencies:** None (независимая функциональность)  
+**Завершено:** 2025-10-28
 
 **Стратегия:** Реализация enterprise-grade системы управления доступом через пригласительные ссылки. Админы контролируют кто может зарегистрироваться в системе.
 
 ### Задачи
 
-- [ ] **AUTH-03** Invitation-Only Registration System → [BACKLOG/AUTH-03_invitation_system.md](BACKLOG/AUTH-03_invitation_system.md) → **v2.3.0**
+- [x] **AUTH-03** Invitation-Only Registration System → [BACKLOG/AUTH-03_invitation_system.md](BACKLOG/AUTH-03_invitation_system.md) → **v2.2.0** ✅ **ЗАВЕРШЕНО**
   - **Backend API:**
     - POST /api/admin/invitations - создание пригласительной ссылки
     - GET /api/admin/invitations - список всех приглашений (активные/использованные/отозванные)
@@ -839,20 +750,103 @@ auth:
       validation_per_ip_minute: 10
 ```
 
+### 📊 Use Cases
+
+1. **Enterprise Deployment:** Закрытая регистрация для корпоративных пользователей
+2. **Beta Testing:** Контролируемое приглашение тестировщиков
+3. **Email-Restricted:** Приглашение только конкретного email адреса
+4. **Time-Limited:** Приглашения с коротким сроком действия (24ч)
+5. **Multi-Use Links:** Одно приглашение для команды (max_uses > 1)
+
+---
+
+## 🎯 Version 2.3.0 - Model Registry & Multi-Provider Foundation
+
+**Фокус:** Universal Model Registry + vLLM Integration  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 20-28 часов  
+**Статус:** 📋 Запланировано (0/4 задач)  
+**Версионирование:** v2.3.1-v2.3.4  
+**Dependencies:** ⚠️ Требует v2.1.0 (Rebranding complete)
+
+**Стратегия:** Создание универсальной архитектуры для поддержки множественных model providers. Foundation для HuggingFace, OpenAI, Anthropic integration.
+
+### Задачи
+
+- [ ] **REGISTRY-01** Model Registry Core → [BACKLOG/REGISTRY-01_model_registry.md](BACKLOG/REGISTRY-01_model_registry.md) → **v2.3.1**
+  - Model metadata storage (DB schema)
+  - Model capabilities tracking (chat/embeddings/vision/function-calling)
+  - Provider abstraction layer
+  - Model registration API (POST /api/models/registry)
+  - Model discovery endpoint (GET /api/models/registry)
+  - Health check integration
+  - **Оценка:** 6-8 часов
+
+- [ ] **REGISTRY-02** Smart Model Router → [BACKLOG/REGISTRY-02_smart_router.md](BACKLOG/REGISTRY-02_smart_router.md) → **v2.3.2**
+  - Router middleware для model requests
+  - Provider selection logic (Ollama/vLLM/etc)
+  - Fallback chains (если primary provider down)
+  - Load balancing между providers
+  - Request tracing с provider info
+  - **Оценка:** 5-7 часов
+
+- [ ] **VLLM-01** vLLM Backend Integration → [BACKLOG/VLLM-01_integration.md](BACKLOG/VLLM-01_integration.md) → **v2.3.3**
+  - vLLM client implementation
+  - OpenAI-compatible API mapping
+  - Multi-GPU support configuration
+  - Model loading/unloading API
+  - Performance benchmarking
+  - Docker Compose integration
+  - **Оценка:** 6-8 часов
+  - **Documentation:** vLLM installation guide для Linux 2x GPU
+
+- [ ] **REGISTRY-03** Model Management WebUI → [BACKLOG/REGISTRY-03_webui.md](BACKLOG/REGISTRY-03_webui.md) → **v2.3.4**
+  - Model Registry dashboard
+  - Provider status cards (Ollama/vLLM/etc)
+  - Model registration form
+  - Model health monitoring
+  - Performance metrics per model
+  - Switch provider для specific model
+  - **Оценка:** 3-5 часов
+
+### 🎯 Ключевые возможности
+
+**Backend:**
+
+- 🗄️ **Universal Registry** - централизованное управление всеми моделями
+- 🔀 **Smart Routing** - автоматический выбор оптимального provider'а
+- 🚀 **vLLM Support** - fast inference для HuggingFace моделей
+- ⚡ **Multi-GPU** - распределение моделей на несколько GPU
+- 🔄 **Fallback Chains** - automatic failover между providers
+- 📊 **Provider Metrics** - performance tracking per provider
+
+**WebUI:**
+
+- 📋 **Model Registry Page** - unified view всех доступных моделей
+- 🎛️ **Provider Dashboard** - мониторинг Ollama, vLLM статусов
+- ⚙️ **Configuration** - model assignment к providers
+- 📈 **Performance Charts** - latency, throughput per provider
+
+### 🏗️ Технический стек
+
+- **Model Providers:**
+  - Ollama (existing) - local models, GGUF format
+  - vLLM (new) - HuggingFace models, GPU inference
+  - Future: TGI, LocalAI, OpenAI, Anthropic
+
+- **Architecture:**
+  - Provider abstraction interface
+  - Model registry database (SQLite/PostgreSQL)
+  - Smart router middleware
+  - Health check system
+
 ### 📈 Use Cases
 
-1. **Закрытая корпоративная установка:** Только HR/IT админы приглашают сотрудников
-2. **Beta Testing:** Контролируемый доступ для beta-тестеров
-3. **Community с модерацией:** Существующие участники приглашают коллег
-4. **Trial Access:** Временный доступ с expiration для демонстраций
-
-### 📋 Breaking Changes
-
-**None** - функциональность полностью опциональная:
-
-- По умолчанию `mode: "open"` - существующее поведение сохраняется
-- Новые endpoint'ы не влияют на существующую аутентификацию
-- Админы могут переключать режим в конфиге без миграций
+1. **HuggingFace Models:** Запуск моделей которые не поддерживаются Ollama
+2. **GPU Optimization:** Использование vLLM для fast inference
+3. **Model Fallback:** Автоматический переход на backup provider
+4. **Multi-Model:** Разные модели на разных providers (Ollama + vLLM)
+5. **Load Balancing:** Распределение нагрузки между GPU/providers
 
 ---
 

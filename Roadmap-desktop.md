@@ -1,108 +1,285 @@
 # AIGateway Desktop - Development Roadmap
 
 > **Platform:** Wails v2 (Go + WebView)  
-> **Current Status:** Planning Phase 🎯  
+> **Architecture:** 🎯 **Thin Client** → Remote AIGateway Server  
+> **Current Status:** Planning Phase 📋  
 > **Target:** Cross-platform desktop app (Windows, macOS, Linux)  
-> **Vision:** Lightweight AI-powered IDE with integrated chat, RAG, and MCP support  
-> **Last Updated:** 2025-10-28
+> **Vision:** Native desktop UI для AIGateway с local file system integration  
+> **Last Updated:** 2025-10-28  
+> **Related:** [Roadmap.MD](Roadmap.MD) v2.4.0 - Server-side Desktop Support
 
 ---
 
 ## 🎯 Project Vision
 
-Создать нативное desktop-приложение на базе **Wails v2**, которое объединит:
+Создать **тонкий нативный desktop-клиент** на базе **Wails v2** для AIGateway Platform.
 
-- 💬 **AI Chat** - интерфейс для общения с LLM моделями
-- 📝 **Code Editor** - Monaco Editor для редактирования кода с AI-подсказками
-- 📚 **RAG Integration** - работа с документами и knowledge base
-- 🔌 **MCP Servers** - управление Model Context Protocol серверами
-- 🗂️ **File Explorer** - навигация по проектам и файлам
+### Desktop App = Rich UI Client (НЕ standalone server!)
+
+```
+┌──────────────────────────────────────┐
+│   Desktop App (Wails - Thin Client)  │
+│  ┌────────────────────────────────┐  │
+│  │  Native UI (WebView)           │  │
+│  │  • Chat Interface              │  │
+│  │  • Monaco Editor               │  │
+│  │  • File Explorer               │  │
+│  └────────────────────────────────┘  │
+│  ┌────────────────────────────────┐  │
+│  │  Local Features (Go)           │  │
+│  │  • File System Access          │  │
+│  │  • HTTP Client to Server       │  │
+│  │  • Local Cache                 │  │
+│  │  • API Key Storage             │  │
+│  └────────────────────────────────┘  │
+└──────────────┬───────────────────────┘
+               │ HTTPS + API Key
+               │ (auto-generated)
+               ▼
+┌──────────────────────────────────────┐
+│  AIGateway Server (Remote)           │
+│  • AI Chat Processing                │
+│  • RAG Search & Indexing             │
+│  • MCP Servers Management            │
+│  • User Management                   │
+│  • Database (PostgreSQL/SQLite)      │
+│  └────────┬─────────────────────────┘
+│           ▼
+│  ┌────────────────────────────┐
+│  │  Ollama / vLLM            │
+│  │  (LLM Inference)          │
+│  └────────────────────────────┘
+└──────────────────────────────────────┘
+```
+
+**Desktop App делает:**
+
+- 💻 **Native UI** - красивый интерфейс без браузера
+- 📁 **File System Access** - работа с локальными файлами и проектами
+- 📝 **Monaco Editor** - code editing с syntax highlighting
+- 🎯 **System Integration** - tray icon, global hotkeys, native notifications
+- 💾 **Local Cache** - offline mode с синхронизацией при reconnect
+- 🔐 **Secure Auth** - auto-generated API keys для каждого device
+- 📤 **File Upload** - загрузка локальных файлов в RAG на server
+
+**Remote Server делает:**
+
+- 🤖 **All AI Logic** - chat processing, embeddings, inference
+- 🗄️ **Database** - все данные хранятся централизованно
+- 🔐 **Authentication** - user management, permissions, RBAC
+- 📊 **Rate Limiting** - контроль использования API
+- 🔌 **Ollama/vLLM** - LLM inference engines
+- 📚 **RAG Processing** - vector search, indexing
+- 🔌 **MCP Servers** - Model Context Protocol management
 
 **Ключевые преимущества**:
 
-- ⚡ Быстрая работа (нативная Go интеграция)
-- 🪶 Маленький размер (~10-20 MB vs Electron ~150 MB)
-- 💾 Низкое потребление памяти (~50-100 MB vs Electron ~300 MB)
-- 🔐 Прямой доступ к файловой системе
-- 🚀 Без HTTP overhead (прямые Go calls из JavaScript)
-- 📦 Один .exe файл со всем необходимым
+- ⚡ **Производительность** - WebView ~50 MB vs Chromium ~150 MB (Electron)
+- 💾 **Память** - ~100 MB vs ~300 MB (Electron)
+- 🔐 **Security** - один раз login → permanent API key для device
+- 📱 **Multi-Device** - один аккаунт на web, desktop, mobile
+- 🌐 **Scalability** - server независимо масштабируется
+- 🔄 **Updates** - server обновляется без переустановки desktop app
+- 📦 **Размер** - ~10-20 MB installer (без embedded server!)
 
 ---
 
-## 🛠️ Technology Stack
+## 🔐 Authentication Architecture
 
-### Core Framework
+### One-Time Password Flow → Long-Lived API Key
 
-- **Wails v2** - Go + WebView2 (Windows) / WKWebView (macOS) / WebKitGTK (Linux)
-- **Go 1.25** - Backend language
-- **Svelte** - Frontend framework (легковесный, быстрый)
+```
+┌─────────────────────────────────────────────────────────┐
+│ 1. First Launch (User Login)                            │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  Desktop App                     AIGateway Server       │
+│  ───────────                     ─────────────────      │
+│                                                          │
+│  Login Screen                                            │
+│  ┌──────────────────────┐                               │
+│  │ Server URL:          │                               │
+│  │ [aigateway.com]      │                               │
+│  │                      │                               │
+│  │ Username: [user]     │                               │
+│  │ Password: [****]     │   POST /api/auth/login        │
+│  │                      │  ─────────────────────────>   │
+│  │      [Login]         │   {username, password}        │
+│  └──────────────────────┘                               │
+│                                  │                       │
+│                                  ▼                       │
+│                            Verify credentials            │
+│                            Generate JWT token            │
+│                                  │                       │
+│                      <───────────┘                       │
+│                     { token: "eyJhbG..." }               │
+│                                                          │
+│  Store JWT temporarily                                   │
+│  (in memory, not persisted)                              │
+│                                                          │
+│                        POST /api/auth/devices/register   │
+│                       ───────────────────────────>       │
+│                       Authorization: Bearer eyJhbG...    │
+│                       {                                  │
+│                         "device_name": "Desktop-Win",    │
+│                         "device_info": {                 │
+│                           "os": "windows",               │
+│                           "hostname": "PC-123",          │
+│                           "app_version": "0.1.0"         │
+│                         }                                │
+│                       }                                  │
+│                                  │                       │
+│                                  ▼                       │
+│                         Create API Key for device        │
+│                         Name: "Desktop App - Windows..." │
+│                         Models: ["*"]                    │
+│                         Never expires (or 90 days)       │
+│                                  │                       │
+│                      <───────────┘                       │
+│                     {                                    │
+│                       "api_key": "sk-desktop_abc123",    │
+│                       "key_id": "key_xyz",               │
+│                       "device_id": "device_123"          │
+│                     }                                    │
+│                                                          │
+│  Discard JWT token                                       │
+│  Save API Key to:                                        │
+│  ~/.aigateway/config.json                                │
+│  {                                                       │
+│    "server_url": "https://aigateway.com",                │
+│    "api_key": "sk-desktop_abc123",                       │
+│    "key_id": "key_xyz",                                  │
+│    "device_id": "device_123"                             │
+│  }                                                       │
+│                                                          │
+│  → Navigate to Chat Screen                               │
+└─────────────────────────────────────────────────────────┘
 
-### UI Components
+┌─────────────────────────────────────────────────────────┐
+│ 2. Subsequent Launches (Automatic Auth)                 │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  Load API Key from config.json                           │
+│                                                          │
+│                       GET /api/health                    │
+│                       ───────────────────────────>       │
+│                       Authorization: Bearer sk-desktop...│
+│                                  │                       │
+│                                  ▼                       │
+│                         Verify API Key                   │
+│                         Update last_seen_at              │
+│                                  │                       │
+│                      <───────────┘                       │
+│                     { "status": "ok" }                   │
+│                                                          │
+│  → Navigate to Chat Screen                               │
+└─────────────────────────────────────────────────────────┘
 
-- **Monaco Editor** - Code editor (VS Code движок)
-- **Existing Web Assets** - Переиспользование `web/` компонентов
-- **Tailwind CSS** - Styling (или существующий style.css)
-- **Marked.js** - Markdown rendering для chat
+┌─────────────────────────────────────────────────────────┐
+│ 3. All API Requests (Using API Key)                     │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│                       POST /api/chat/completions         │
+│                       ───────────────────────────>       │
+│                       Authorization: Bearer sk-desktop...│
+│                       { "message": "Hello", ... }        │
+│                                  │                       │
+│                                  ▼                       │
+│                         Validate API Key                 │
+│                         Check rate limits                │
+│                         Process request                  │
+│                                  │                       │
+│                      <───────────┘                       │
+│                     { "response": "..." }                │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
 
-### Go Backend Integration
-
-- **Direct Bindings** - JavaScript → Go без HTTP
-- **Embedded Server** - AIGateway server как библиотека (не child process)
-- **SQLite** - Embedded database (shared with main server)
-- **Ollama Client** - Прямая интеграция с локальным Ollama
+┌─────────────────────────────────────────────────────────┐
+│ 4. Device Management (Web UI)                           │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  User opens Web UI → Devices Page                        │
+│                                                          │
+│  Devices List:                                           │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ Desktop App - Windows - 2025-10-28  [Revoke]    │   │
+│  │ Last seen: 5 min ago  •  Active                  │   │
+│  │                                                  │   │
+│  │ Desktop App - MacOS - 2025-10-15    [Revoke]    │   │
+│  │ Last seen: 2 days ago  •  Inactive               │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  User clicks [Revoke] →                                  │
+│                       DELETE /api/auth/devices/key_xyz   │
+│                       ───────────────────────────>       │
+│                                  │                       │
+│                                  ▼                       │
+│                         Revoke API Key                   │
+│                                  │                       │
+│                      <───────────┘                       │
+│                     { "success": true }                  │
+│                                                          │
+│  Desktop App получает 401 Unauthorized на next request   │
+│  → Shows Login Screen                                    │
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 📅 Release Roadmap
 
-### Version 0.1.0 - MVP Desktop Wrapper (2 недели) 🎯 PRIORITY 1
+### Version 0.1.0 - MVP Thin Client (2 недели) 🎯 PRIORITY 1
 
-**Фокус:** Базовое Wails приложение с chat интерфейсом
+**Фокус:** Базовое Wails приложение с authentication и chat
 
 **Цели:**
 
-- ✅ Работающий Wails app с embedded WebView
-- ✅ Базовый chat интерфейс (переиспользование `web/chat.html`)
-- ✅ Прямые Go bindings для chat API
-- ✅ Системный tray icon
-- ✅ Горячие клавиши (Ctrl+Shift+A для открытия)
+- ✅ HTTP client к remote AIGateway server
+- ✅ Auto-generated API keys authentication
+- ✅ Базовый chat интерфейс
+- ✅ System tray integration
+- ✅ Config persistence (~/.aigateway/config.json)
 
 **Задачи:**
 
-- [ ] **DESK-001** Инициализация Wails проекта → `aigateway-desktop/`
-  - Создать структуру проекта
-  - Настроить `wails.json` конфигурацию
-  - Symlink к `internal/` для переиспользования кода
+- [ ] **CLIENT-001** Wails Project Setup
+  - Инициализация: `wails init -n aigateway-desktop -t svelte`
+  - Project structure
+  - Build configuration для Windows/macOS/Linux
+  - Icon и app metadata
   
-- [ ] **DESK-002** Embedded AIGateway Server
-  - Импортировать `internal/server` как библиотеку
-  - Инициализация DB, handlers, config при старте app
-  - Graceful shutdown при закрытии приложения
+- [ ] **CLIENT-002** Authentication Flow
+  - Login screen (Server URL + Username/Password)
+  - POST /api/auth/login → получение JWT
+  - POST /api/auth/devices/register → создание API Key
+  - API Key storage в ~/.aigateway/config.json
+  - Auto-login на subsequent launches
   
-- [ ] **DESK-003** Chat UI (Svelte component)
-  - Портировать `web/chat.html` → `ChatPanel.svelte`
-  - Прямые Go bindings: `SendMessage(message, model) -> response`
-  - Streaming support через Wails events
-  - Markdown rendering для AI ответов
+- [ ] **CLIENT-003** HTTP Client Layer
+  - Go HTTP client с timeout/retry logic
+  - Authorization header с API Key
+  - Error handling (401 → re-login, 429 → rate limit)
+  - Request/Response logging
   
-- [ ] **DESK-004** System Integration
+- [ ] **CLIENT-004** Chat UI (Svelte)
+  - Портирование web/chat.html → ChatPanel.svelte
+  - Message list с markdown rendering (marked.js)
+  - Model selection dropdown (GET /api/models)
+  - Send message → POST /api/chat/completions
+  
+- [ ] **CLIENT-005** System Integration
   - System tray icon с context menu (Show/Hide/Quit)
-  - Global hotkey registration (Ctrl+Shift+A)
+  - Global hotkey (Ctrl+Shift+A) для show/hide
   - Window state persistence (размер, позиция)
-  - Auto-start при входе в систему (опционально)
-  
-- [ ] **DESK-005** Models Management
-  - Список доступных моделей (Ollama discovery)
-  - Переключение между моделями в UI
-  - Индикатор статуса Ollama (running/stopped)
+  - Start minimized to tray (опционально)
 
 **Acceptance Criteria:**
 
-- ✅ Приложение запускается и показывает chat UI
-- ✅ Можно отправить сообщение и получить ответ от LLM
-- ✅ Работает system tray и hotkeys
-- ✅ Размер .exe < 30 MB
-- ✅ Потребление памяти < 150 MB
+- ✅ User может войти с username/password
+- ✅ API Key автоматически создается и сохраняется
+- ✅ Chat работает через HTTP к remote server
+- ✅ System tray + hotkey функционируют
+- ✅ Размер .exe < 30 MB, память < 150 MB
 
 **Время:** ~10-14 дней
 
@@ -110,365 +287,250 @@
 
 ### Version 0.2.0 - File System Integration (2 недели) 🎯 PRIORITY 2
 
-**Фокус:** Работа с локальными файлами и проектами
+**Фокус:** Работа с локальными файлами
 
 **Задачи:**
 
-- [ ] **DESK-006** File Explorer Component
-  - Tree view для навигации по папкам
-  - Open folder dialog (Wails native)
-  - Recent projects list
-  - Context menu (Open, Delete, Rename, etc.)
+- [ ] **CLIENT-006** File Picker
+  - Wails native file dialog (OpenFileDialog)
+  - Drag & drop files в chat window
+  - File info display (name, size, type)
   
-- [ ] **DESK-007** File Viewer/Editor (basic)
-  - Просмотр текстовых файлов
-  - Syntax highlighting для популярных языков
-  - Basic text editing (без Monaco пока)
-  - Save/Save As functionality
+- [ ] **CLIENT-007** File Upload to RAG
+  - Чтение файла локально
+  - POST /api/rag/index с file content
+  - Progress indicator для больших файлов
+  - Batch upload (multiple files)
   
-- [ ] **DESK-008** Project Settings
-  - Сохранение настроек проекта (.aigateway/config.json)
-  - Default model для проекта
-  - Exclude patterns для indexing
-  - Git integration (detect .git folder)
+- [ ] **CLIENT-008** Project Management
+  - Open folder dialog
+  - Recent projects list (stored locally)
+  - Auto-indexing prompt для новых проектов
+  
+- [ ] **CLIENT-009** Basic File Viewer
+  - Display text files в read-only mode
+  - Syntax highlighting для code files
+  - File tree navigation (left sidebar)
 
 **Acceptance Criteria:**
 
-- ✅ Можно открыть папку и увидеть файлы
-- ✅ Можно открыть файл на просмотр/редактирование
-- ✅ Сохранение изменений в файлы
-- ✅ Recent projects list
+- ✅ User может выбрать файл через dialog
+- ✅ Файл загружается на server для RAG indexing
+- ✅ Recent projects saved locally
+- ✅ Basic file browsing работает
 
 **Время:** ~10-14 дней
 
 ---
 
-### Version 0.3.0 - RAG Integration (2-3 недели) 🎯 PRIORITY 3
+### Version 0.3.0 - Monaco Editor Integration (3 недели) 🎯 PRIORITY 3
 
-**Фокус:** Индексация файлов проекта и контекстный поиск
-
-**Задачи:**
-
-- [ ] **DESK-009** RAG Sources Management
-  - UI для управления RAG sources
-  - Drag & drop файлов/папок для индексации
-  - Progress bar при индексации
-  - Список проиндексированных файлов с метками
-  
-- [ ] **DESK-010** Auto-indexing
-  - Автоматическая индексация при открытии проекта
-  - Watch mode для отслеживания изменений в файлах
-  - Incremental indexing (только измененные файлы)
-  - Background processing (не блокирует UI)
-  
-- [ ] **DESK-011** RAG Search Integration
-  - Контекстный поиск в chat
-  - Автоматическое добавление relevant files в context
-  - UI индикатор использованных RAG файлов
-  - Preview найденных фрагментов кода
-  
-- [ ] **DESK-012** Advanced RAG Features
-  - Semantic search по содержимому файлов
-  - Фильтрация по типам файлов
-  - Exclude patterns (node_modules, .git, etc.)
-  - Manual context selection (выбор файлов для chat)
-
-**Acceptance Criteria:**
-
-- ✅ Можно проиндексировать папку с проектом
-- ✅ Chat использует RAG для ответов
-- ✅ Видно какие файлы были использованы
-- ✅ Автоматическая переиндексация при изменениях
-
-**Время:** ~14-21 день
-
----
-
-### Version 0.4.0 - Monaco Editor Integration (3 недели) 🎯 PRIORITY 4
-
-**Фокус:** Полноценный code editor как в VS Code
+**Фокус:** Полноценный code editor
 
 **Задачи:**
 
-- [ ] **DESK-013** Monaco Editor Setup
+- [ ] **CLIENT-010** Monaco Editor Setup
   - Интеграция Monaco Editor в Svelte
   - Multi-tab support (открытие нескольких файлов)
-  - Split view (вертикальный/горизонтальный)
-  - Theme support (dark/light/custom)
+  - Theme support (dark/light)
+  - Language detection по расширению
   
-- [ ] **DESK-014** Language Support
+- [ ] **CLIENT-011** Editor Features
   - Syntax highlighting для 50+ языков
-  - IntelliSense (автодополнение) из Monaco
-  - Code folding
-  - Minimap
-  - Line numbers, breadcrumbs
+  - Code completion (IntelliSense из Monaco)
+  - Find & Replace
+  - Code folding, minimap
   
-- [ ] **DESK-015** Editor Features
-  - Find & Replace (в файле и во всех файлах)
-  - Go to definition (если есть LSP)
-  - Multi-cursor editing
-  - Code formatting (prettier/gofmt)
-  - Diff viewer для git changes
+- [ ] **CLIENT-012** File Editing
+  - Edit local files
+  - Save/Save As functionality
+  - Unsaved changes indicator
+  - Auto-save (опционально)
   
-- [ ] **DESK-016** Chat + Editor Integration
-  - Выделение кода → отправка в chat (context menu)
-  - AI suggestions inline (hover tooltips)
-  - Apply AI changes to code (diff view)
-  - Code explanations при наведении
+- [ ] **CLIENT-013** Chat Integration
+  - Send code snippet to chat (выделение → context menu)
+  - "Explain this code" action
+  - Apply AI suggestions к файлу (diff view)
 
 **Acceptance Criteria:**
 
-- ✅ Полноценный code editor с Monaco
-- ✅ Можно редактировать несколько файлов одновременно
-- ✅ Интеграция с chat (send code snippet)
-- ✅ Базовые editor shortcuts работают
+- ✅ Monaco Editor полностью функционален
+- ✅ Можно редактировать несколько файлов
+- ✅ Интеграция с chat работает
+- ✅ Performance не деградирует (< 200 MB memory)
 
 **Время:** ~21 день
 
 ---
 
-### Version 0.5.0 - AI Code Features (3-4 недели) 🎯 PRIORITY 5
+### Version 0.4.0 - WebSocket Streaming (2 недели) 🎯 PRIORITY 4
 
-**Фокус:** Cursor-like функционал для кода
+**Фокус:** Real-time streaming responses
+
+**Зависимости:** Требует server v2.4.3 (WebSocket endpoint)
 
 **Задачи:**
 
-- [ ] **DESK-017** Inline AI Suggestions
-  - Streaming suggestions при наборе кода
-  - Ghost text для предложений (Tab to accept)
-  - Context из открытых файлов
-  - Debouncing для оптимизации
+- [ ] **CLIENT-014** WebSocket Client
+  - Подключение к /ws/chat?token={api_key}
+  - Auto-reconnect logic
+  - Ping/Pong для keep-alive
   
-- [ ] **DESK-018** Code Actions
-  - "Explain this code" action
-  - "Fix this code" action  
-  - "Add comments" action
-  - "Write tests" action
-  - "Refactor" suggestions
+- [ ] **CLIENT-015** Streaming UI
+  - Отображение partial responses в real-time
+  - Typing indicator
+  - Stop generation button
   
-- [ ] **DESK-019** Multi-line Edits
-  - AI генерирует изменения в нескольких местах
-  - Diff view для preview changes
-  - Accept/Reject отдельных изменений
-  - Undo/Redo stack
-  
-- [ ] **DESK-020** Chat-driven Development
-  - "Apply this to MyFile.go" команда в chat
-  - AI генерирует полные функции/классы
-  - Automatic imports добавление
-  - Test generation из chat
+- [ ] **CLIENT-016** Fallback to HTTP
+  - Detect если WebSocket unavailable
+  - Fallback to POST /api/chat/completions
+  - Graceful degradation
 
 **Acceptance Criteria:**
 
-- ✅ Inline suggestions работают
-- ✅ Code actions доступны через context menu
-- ✅ Можно применить AI изменения к коду
-- ✅ Chat может редактировать файлы
+- ✅ WebSocket streaming работает
+- ✅ Auto-reconnect на disconnect
+- ✅ Fallback to HTTP если WS fail
 
-**Время:** ~21-28 дней
-
----
-
-### Version 0.6.0 - MCP Integration (2-3 недели) 🎯 PRIORITY 6
-
-**Фокус:** Model Context Protocol servers management
-
-**Задачи:**
-
-- [ ] **DESK-021** MCP Servers Discovery
-  - Автоматическое обнаружение локальных MCP servers
-  - Configuration UI для добавления servers
-  - Connection status indicator
-  - Logs viewer для debugging
-  
-- [ ] **DESK-022** MCP Operations
-  - Listing available tools/resources
-  - Calling MCP tools из chat
-  - Resource preview (files, URLs, etc.)
-  - Error handling и retry logic
-  
-- [ ] **DESK-023** Built-in MCP Servers
-  - File System MCP (browse local files)
-  - Git MCP (git operations)
-  - Web Search MCP (опционально)
-  - Memory MCP (persistent context)
-  
-- [ ] **DESK-024** MCP Configuration
-  - Add/Remove/Edit MCP servers
-  - Enable/Disable servers
-  - Custom env variables
-  - Stdio/HTTP transport support
-
-**Acceptance Criteria:**
-
-- ✅ Можно добавить и подключить MCP server
-- ✅ Chat может использовать MCP tools
-- ✅ Видны логи и ошибки MCP
-- ✅ Built-in File System MCP работает
-
-**Время:** ~14-21 день
+**Время:** ~14 дней
 
 ---
 
-### Version 0.7.0 - Terminal Integration (1-2 недели) 🎯 PRIORITY 7
+### Version 0.5.0 - Advanced Features (3 недели) 🎯 PRIORITY 5
 
-**Фокус:** Встроенный терминал как в VS Code
+**Фокус:** Terminal, Git, Settings
 
 **Задачи:**
 
-- [ ] **DESK-025** Terminal Component (xterm.js)
-  - Embedded terminal в нижней панели
+- [ ] **CLIENT-017** Embedded Terminal (xterm.js)
+  - Terminal в bottom panel
   - Multiple terminal tabs
-  - Split terminal view
-  - Shell selection (bash/zsh/powershell/cmd)
+  - Shell selection (bash/powershell)
   
-- [ ] **DESK-026** Terminal Features
-  - Copy/Paste support
-  - Find in terminal
-  - Clear terminal
-  - Persistent history
-  - Working directory sync с opened folder
-
-**Acceptance Criteria:**
-
-- ✅ Работающий terminal внизу UI
-- ✅ Можно выполнять команды
-- ✅ Multiple terminals support
-
-**Время:** ~7-14 дней
-
----
-
-### Version 0.8.0 - Git Integration (2 недели) 🎯 PRIORITY 8
-
-**Фокус:** Source control интеграция
-
-**Задачи:**
-
-- [ ] **DESK-027** Git Status
-  - Source Control panel (левый sidebar)
-  - Changed files list
+- [ ] **CLIENT-018** Git Integration
+  - Detect .git folder
+  - Show git status в file tree
   - Diff viewer для changes
-  - Stage/Unstage files
   
-- [ ] **DESK-028** Git Operations
-  - Commit changes
-  - Push/Pull
-  - Branch management (create/switch/delete)
-  - Merge conflicts resolver
+- [ ] **CLIENT-019** Settings UI
+  - Server configuration
+  - Theme selection
+  - Keyboard shortcuts
+  - Auto-start preferences
   
-- [ ] **DESK-029** Git History
-  - Commit history viewer
-  - Blame annotations в editor
-  - File history
+- [ ] **CLIENT-020** Device Management
+  - Show all user devices (GET /api/auth/devices)
+  - Self-revoke button
+  - Device info display
 
 **Acceptance Criteria:**
 
-- ✅ Видны git changes
-- ✅ Можно commit и push
-- ✅ Branch switching работает
+- ✅ Terminal работает
+- ✅ Git status видно
+- ✅ Settings UI функционален
+
+**Время:** ~21 день
+
+---
+
+### Version 0.6.0 - Offline Mode & Cache (2 недели) 🎯 PRIORITY 6
+
+**Фокус:** Local caching и offline support
+
+**Задачи:**
+
+- [ ] **CLIENT-021** Local Cache (SQLite)
+  - Cache chat history локально
+  - Cache user info, models list
+  - TTL для cached data
+  
+- [ ] **CLIENT-022** Offline Queue
+  - Queue requests когда offline
+  - Auto-sync при reconnect
+  - Conflict resolution
+  
+- [ ] **CLIENT-023** Sync Status
+  - Online/offline indicator
+  - Sync progress bar
+  - Last synced timestamp
+
+**Acceptance Criteria:**
+
+- ✅ App работает offline (readonly)
+- ✅ Queue накапливает requests
+- ✅ Auto-sync при online
 
 **Время:** ~14 дней
 
 ---
 
-### Version 0.9.0 - Polish & Performance (2 недели) 🎯 PRIORITY 9
+### Version 0.7.0 - Polish & Packaging (2 недели) 🎯 PRIORITY 7
 
-**Фокус:** Оптимизация и улучшение UX
-
-**Задачи:**
-
-- [ ] **DESK-030** Performance Optimization
-  - Lazy loading для Monaco Editor
-  - Virtual scrolling для file tree
-  - Debouncing для search/indexing
-  - Memory profiling и оптимизация
-  
-- [ ] **DESK-031** UI/UX Improvements
-  - Keyboard shortcuts panel
-  - Command palette (Ctrl+Shift+P)
-  - Settings UI (preferences)
-  - Themes customization
-  
-- [ ] **DESK-032** Error Handling
-  - Graceful error messages
-  - Crash reporting (опционально)
-  - Logs export
-  - Debug mode
-
-**Acceptance Criteria:**
-
-- ✅ UI отзывчивый и быстрый
-- ✅ Понятные error messages
-- ✅ Settings UI работает
-
-**Время:** ~14 дней
-
----
-
-### Version 1.0.0 - Production Release (2 недели) 🎯 MILESTONE
-
-**Фокус:** Готовность к production использованию
+**Фокус:** Production-ready release
 
 **Задачи:**
 
-- [ ] **DESK-033** Packaging & Distribution
-  - Windows .exe с installer (NSIS/WiX)
-  - macOS .app с DMG
-  - Linux AppImage/deb/rpm
-  - Code signing для Windows/macOS
+- [ ] **CLIENT-024** Packaging
+  - Windows installer (NSIS/WiX)
+  - macOS .app + DMG
+  - Linux AppImage
+  - Code signing
   
-- [ ] **DESK-034** Auto-updates
-  - Update checker при старте
+- [ ] **CLIENT-025** Auto-Updates
+  - Update checker
   - Download & install updates
   - Release notes display
-  - Rollback mechanism
   
-- [ ] **DESK-035** Documentation
-  - User guide (README.md)
+- [ ] **CLIENT-026** Error Handling
+  - Graceful error messages
+  - Crash reporting (optional)
+  - Logs export
+  
+- [ ] **CLIENT-027** Documentation
+  - User guide
   - Keyboard shortcuts reference
-  - Settings documentation
-  - FAQ и troubleshooting
-  
-- [ ] **DESK-036** Testing
-  - E2E tests (playwright/tauri-driver)
-  - Unit tests для Go bindings
-  - Performance benchmarks
-  - Cross-platform testing
+  - Troubleshooting FAQ
 
 **Acceptance Criteria:**
 
-- ✅ Installable packages для всех платформ
+- ✅ Installers для всех платформ
 - ✅ Auto-update работает
-- ✅ Полная документация
-- ✅ Test coverage > 70%
+- ✅ Error handling polished
 
 **Время:** ~14 дней
 
 ---
 
-## 🚀 Post 1.0 Features (Future Roadmap)
+### Version 1.0.0 - Production Release 🎯 MILESTONE
 
-### Version 1.1.0+ - Advanced Features
+**Total Development Time:** ~5-6 месяцев
 
-**Потенциальные фичи:**
+**Requirements:**
 
-- [ ] **Multi-workspace** support (несколько проектов одновременно)
-- [ ] **Remote SSH** editing (как VS Code Remote)
-- [ ] **Collaboration** (real-time code sharing)
-- [ ] **Local AI Models** (встроенный Ollama без внешнего сервера)
-- [ ] **Plugin System** (пользовательские расширения)
-- [ ] **Jupyter Notebooks** support
-- [ ] **Database Explorer** (SQL queries, schema viewer)
-- [ ] **Docker Integration** (container management)
-- [ ] **Cloud Sync** (настройки между устройствами)
-- [ ] **Mobile Companion App** (просмотр проектов на телефоне)
+- ✅ All v0.1.0-v0.7.0 features implemented
+- ✅ Test coverage > 70%
+- ✅ Performance benchmarks pass
+- ✅ Security audit complete
+- ✅ Documentation complete
+- ✅ Cross-platform testing done
 
 ---
 
-## 📐 Architecture Overview
+## 🚀 Post 1.0 Features
 
-### Project Structure
+### Future Enhancements
+
+- [ ] **Multi-Workspace** support
+- [ ] **Collaboration** features (real-time code sharing)
+- [ ] **Plugin System** для extensions
+- [ ] **Jupyter Notebooks** support
+- [ ] **Database Explorer** для SQL queries
+- [ ] **Docker Integration** (container management)
+- [ ] **Mobile Companion App** (iOS/Android viewer)
+
+---
+
+## 📐 Project Structure
 
 ```
 aigateway-desktop/
@@ -477,82 +539,39 @@ aigateway-desktop/
 ├── wails.json                 # Wails configuration
 ├── build/                     # Build artifacts
 │   ├── bin/
-│   │   └── aigateway-desktop.exe
-│   └── windows/              # Platform-specific resources
-│       └── icon.ico
+│   │   ├── aigateway-desktop.exe      (Windows)
+│   │   ├── aigateway-desktop.app      (macOS)
+│   │   └── aigateway-desktop          (Linux)
+│   └── appicon.png
 ├── frontend/                  # Svelte app
 │   ├── src/
 │   │   ├── App.svelte
 │   │   ├── lib/
 │   │   │   ├── components/
-│   │   │   │   ├── Chat.svelte
-│   │   │   │   ├── Editor.svelte
+│   │   │   │   ├── LoginScreen.svelte
+│   │   │   │   ├── ChatPanel.svelte
+│   │   │   │   ├── EditorPanel.svelte
 │   │   │   │   ├── FileExplorer.svelte
-│   │   │   │   ├── RAGPanel.svelte
-│   │   │   │   ├── MCPPanel.svelte
-│   │   │   │   └── Terminal.svelte
-│   │   │   └── stores/
-│   │   │       ├── chat.js
-│   │   │       ├── files.js
-│   │   │       └── settings.js
+│   │   │   │   ├── Terminal.svelte
+│   │   │   │   └── Settings.svelte
+│   │   │   ├── stores/
+│   │   │   │   ├── auth.js
+│   │   │   │   ├── chat.js
+│   │   │   │   └── files.js
+│   │   │   └── api/
+│   │   │       └── client.js      # HTTP client wrapper
 │   │   └── assets/
-│   │       ├── styles/          # Копия web/css/
+│   │       ├── styles/
 │   │       └── images/
-│   ├── wailsjs/                # Auto-generated Go bindings
+│   ├── wailsjs/              # Auto-generated Go bindings
 │   └── package.json
-├── internal/                   # Symlink → ../internal (shared)
-│   ├── models/
-│   ├── storage/
-│   ├── api/
-│   └── services/
-└── configs/                    # App configurations
+├── internal/
+│   ├── auth/                 # Authentication logic
+│   ├── http/                 # HTTP client
+│   ├── cache/                # Local caching
+│   └── config/               # Config management
+└── configs/
     └── default.yaml
-```
-
-### Go ↔ Frontend Communication
-
-```go
-// app.go - Go bindings
-type App struct {
-    ctx      context.Context
-    server   *server.Server
-    db       storage.Database
-    ollama   *ollama.Client
-}
-
-// Exposed to JavaScript
-func (a *App) SendChatMessage(message, model string) (*models.ChatResponse, error)
-func (a *App) GetModels() ([]models.Model, error)
-func (a *App) IndexFile(path string) error
-func (a *App) SearchRAG(query string) ([]models.RAGResult, error)
-func (a *App) GetMCPServers() ([]models.MCPServer, error)
-```
-
-```javascript
-// Frontend (Svelte)
-import { SendChatMessage, GetModels } from '../wailsjs/go/main/App';
-
-async function sendMessage() {
-    const response = await SendChatMessage(message, selectedModel);
-    messages = [...messages, response];
-}
-```
-
-### Event System (для streaming)
-
-```go
-// Go → Frontend events
-runtime.EventsEmit(a.ctx, "chat:stream", chunk)
-runtime.EventsEmit(a.ctx, "rag:progress", progress)
-```
-
-```javascript
-// Frontend listens
-import { EventsOn } from '../wailsjs/runtime/runtime';
-
-EventsOn('chat:stream', (chunk) => {
-    currentResponse += chunk;
-});
 ```
 
 ---
@@ -564,84 +583,89 @@ EventsOn('chat:stream', (chunk) => {
 - ✅ App размер < 30 MB
 - ✅ Memory usage < 150 MB (idle)
 - ✅ Startup time < 3 seconds
-- ✅ First message response < 1 second (after LLM processing)
+- ✅ Login flow < 5 seconds
 
 ### Version 1.0.0 (Production)
 
 - ✅ App размер < 50 MB
-- ✅ Memory usage < 200 MB (with Monaco + file indexing)
+- ✅ Memory usage < 200 MB (с Monaco)
 - ✅ Startup time < 5 seconds
-- ✅ 100+ concurrent files open without lag
-- ✅ RAG indexing 1000 files in < 30 seconds
+- ✅ File upload 1 MB file < 2 seconds
+- ✅ Chat latency < 100ms (network excluded)
 - ✅ Zero crashes per week average
 
 ---
 
-## ⚠️ Risks & Mitigation
+## ⚠️ Risks & Dependencies
+
+### Dependencies on Server
+
+| Desktop Feature | Requires Server Version | API Endpoint |
+|-----------------|-------------------------|--------------|
+| Authentication | v2.2.0+ | POST /api/auth/login |
+| Auto API Keys | v2.4.1 | POST /api/auth/devices/register |
+| Device Management | v2.4.2 | GET/DELETE /api/auth/devices |
+| WebSocket Streaming | v2.4.3 | /ws/chat |
+| Device UI | v2.4.4 | Web UI updates |
 
 ### Technical Risks
 
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| WebView различия между платформами | High | Medium | Тестирование на всех OS, fallback UI |
-| Monaco Editor performance в WebView | Medium | Low | Lazy loading, virtual scrolling |
-| Wails breaking changes | Medium | Low | Pin версии, follow updates |
-| Go bindings overhead | Low | Low | Benchmarking, optimization |
-| Large file indexing блокирует UI | High | Medium | Background workers, progress indicators |
-
-### Product Risks
-
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| Users prefer web version | High | Medium | Unique desktop features (hotkeys, file access) |
-| Ollama не установлен | High | High | Bundled Ollama или clear setup guide |
-| Сложная установка | Medium | Low | Single .exe installer |
-| Competition (Cursor, Windsurf) | High | High | Focus on open-source, local-first, privacy |
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Server unavailable | High | Local cache + offline mode |
+| API Key revoked | Medium | Graceful re-login flow |
+| WebSocket failures | Low | Fallback to HTTP |
+| Cross-platform bugs | Medium | Extensive testing on all OS |
 
 ---
 
-## 📚 Resources & Links
+## 🔗 Links & Resources
 
-### Wails Documentation
+### Related Documentation
 
-- [Wails v2 Docs](https://wails.io/docs/introduction)
+- [Roadmap.MD](Roadmap.MD) - Server roadmap (v2.4.0 Desktop Support)
+- [Architecture.MD](Architecture.MD) - System architecture
+- [API.md](docs/API.md) - API documentation
+
+### Wails Resources
+
+- [Wails Documentation](https://wails.io/docs/introduction)
 - [Go Bindings Guide](https://wails.io/docs/reference/runtime/intro)
-- [Frontend Integration](https://wails.io/docs/guides/application-development)
+- [Svelte Integration](https://wails.io/docs/guides/frontend)
 
 ### Similar Projects
 
-- [Cursor](https://cursor.sh/) - AI-first code editor (closed-source)
-- [Windsurf](https://codeium.com/windsurf) - Codeium IDE
-- [VS Code](https://github.com/microsoft/vscode) - Reference implementation
-
-### Libraries to Use
-
-- [Monaco Editor](https://microsoft.github.io/monaco-editor/)
-- [xterm.js](https://xtermjs.org/) - Terminal emulator
-- [simple-git](https://github.com/steveukx/git-js) - Git integration
-- [chokidar](https://github.com/paulmillr/chokidar) - File watching
+- [Cursor](https://cursor.sh/) - AI code editor (inspiration)
+- [VS Code](https://code.visualstudio.com/) - Reference UX
+- [Windsurf](https://codeium.com/windsurf) - Competitor
 
 ---
 
-## 🎉 Conclusion
+## 🎉 Summary
 
-**Estimated Timeline:**
+**Desktop App = Thin Client** к существующему AIGateway Server
+
+**Архитектура:**
+
+- 🖥️ Desktop: UI + File System + Local Cache
+- 🌐 Server: AI Logic + Database + Auth
+
+**Authentication:**
+
+- 🔐 One-time login → permanent API Key для device
+- 📱 Multi-device support через Device Management
+
+**Timeline:**
 
 - MVP (v0.1.0): 2 weeks
-- Beta (v0.5.0): 3-4 months
+- Beta (v0.4.0): 2-3 months  
 - Production (v1.0.0): 5-6 months
-
-**Team Requirements:**
-
-- 1x Go developer (backend integration)
-- 1x Frontend developer (Svelte + Monaco)
-- 0.5x UI/UX designer (part-time)
 
 **Next Steps:**
 
-1. Initialize Wails project: `wails init -n aigateway-desktop -t svelte`
-2. Setup project structure and symlinks
-3. Start with **DESK-001** (MVP Chat UI)
-4. Weekly releases for rapid iteration
+1. Implement server v2.4.1 (Auto API Keys) - **PREREQUISITE**
+2. Initialize Wails project: `wails init -n aigateway-desktop`
+3. Start with CLIENT-001 (Project Setup)
+4. Weekly releases для rapid iteration
 
-**Let's build the future of AI-powered development tools! 🚀**
+Let's build the best AI desktop client! 🚀

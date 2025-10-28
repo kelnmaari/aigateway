@@ -75,3 +75,4 @@ monigo/
 /monigo/cache.dat
 # AI Review artifacts
 .ai-review-artifacts/
+/aigateway-desktop/

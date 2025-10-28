@@ -536,3 +536,33 @@ func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 
 **Дата создания:** 2025-10-28  
 **Последнее обновление:** 2025-10-28
+
+---
+
+## 📚 Client Integration Documentation
+
+**Created:** Server API Integration Guide для Desktop Client
+
+**Location:** `G:\golang\aigateway-desktop\SERVER_API_INTEGRATION.md`
+
+**Содержит:**
+
+- ✅ Authentication Flow (Login → Device Registration → API Key)
+- ✅ All REST API endpoints (DESKTOP-01, DESKTOP-02)
+  - POST /api/auth/login
+  - POST /api/auth/devices/register
+  - GET /api/auth/devices (list)
+  - GET /api/auth/devices/:id (details)
+  - PATCH /api/auth/devices/:id (update name)
+  - DELETE /api/auth/devices/:id (revoke)
+- ✅ WebSocket Chat Streaming (DESKTOP-03)
+  - ws://server/ws/chat?token={api_key}
+  - Message types: chat_request, chat_chunk, chat_done, chat_error, ping/pong
+  - Connection management: reconnection, heartbeat, graceful shutdown
+- ✅ Error Handling (HTTP codes, APIError type)
+- ✅ Best Practices (API key storage, retries, logging, device fingerprinting)
+- ✅ Go Code Examples для всех endpoints
+- ✅ Testing examples (integration tests)
+- ✅ References to server BACKLOG files
+
+**Purpose:** Полная документация для разработки desktop client на Wails, включая все endpoints, authentication flow, WebSocket integration, и best practices.

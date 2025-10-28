@@ -243,36 +243,52 @@
 
 **Задачи:**
 
-- [ ] **CLIENT-001** Wails Project Setup
+- [x] **CLIENT-001** Wails Project Setup ✅
   - Инициализация: `wails init -n aigateway-desktop -t svelte`
   - Project structure
   - Build configuration для Windows/macOS/Linux
   - Icon и app metadata
+  - **Status:** Завершено 2025-10-28
   
-- [ ] **CLIENT-002** Authentication Flow
+- [x] **CLIENT-002** Authentication Flow ✅
   - Login screen (Server URL + Username/Password)
   - POST /api/auth/login → получение JWT
   - POST /api/auth/devices/register → создание API Key
   - API Key storage в ~/.aigateway/config.json
   - Auto-login на subsequent launches
+  - Device fingerprinting для unique identification
+  - CheckAuthStatus() для explicit auth state management
+  - **Status:** Завершено 2025-10-28
   
-- [ ] **CLIENT-003** HTTP Client Layer
-  - Go HTTP client с timeout/retry logic
+- [x] **CLIENT-003** HTTP Client Layer ✅
+  - Go HTTP client с timeout/retry logic (exponential backoff)
   - Authorization header с API Key
-  - Error handling (401 → re-login, 429 → rate limit)
-  - Request/Response logging
+  - Error handling (401 → re-login, 429 → rate limit, 5xx → retry)
+  - Request/Response logging (опционально)
+  - Connection pooling (MaxIdleConns=100)
+  - Custom error types (HTTPError, IsUnauthorized, IsRateLimited, IsServerError)
+  - Callbacks для 401 и 429 events
+  - **Status:** Завершено 2025-10-28
   
-- [ ] **CLIENT-004** Chat UI (Svelte)
+- [x] **CLIENT-004** Chat UI (Svelte) ✅
   - Портирование web/chat.html → ChatPanel.svelte
   - Message list с markdown rendering (marked.js)
   - Model selection dropdown (GET /api/models)
   - Send message → POST /api/chat/completions
+  - Typing indicator animation
+  - Auto-scroll to bottom (smart scroll - не прилипает)
+  - Clear chat function
+  - Input focus retention после отправки
+  - **Status:** Завершено 2025-10-28
   
-- [ ] **CLIENT-005** System Integration
-  - System tray icon с context menu (Show/Hide/Quit)
-  - Global hotkey (Ctrl+Shift+A) для show/hide
-  - Window state persistence (размер, позиция)
-  - Start minimized to tray (опционально)
+- [x] **CLIENT-005** System Integration ✅
+  - Window state persistence (размер, позиция, maximized) - CLIENT-005.1
+  - System tray icon с context menu (Show/Hide/Quit) - CLIENT-005.2
+  - Global hotkey (Ctrl+Shift+A / Cmd+Shift+A) для show/hide - CLIENT-005.3
+  - Auto-cleanup on shutdown
+  - **Cross-platform:** Windows ✅ | macOS ✅ | Linux ✅
+  - **Libraries:** `getlantern/systray` (tray), `golang.design/x/hotkey` (hotkeys)
+  - **Status:** Завершено 2025-10-28
 
 **Acceptance Criteria:**
 

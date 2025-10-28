@@ -66,6 +66,7 @@ type ChatErrorMessage struct {
 // OllamaClientInterface интерфейс для Ollama клиента
 type OllamaClientInterface interface {
 	ChatCompletion(ctx context.Context, req *ollama.ChatRequest) (*ollama.ChatResponse, error)
+	ChatCompletionStream(ctx context.Context, req *ollama.ChatRequest) (<-chan *ollama.ChatResponse, <-chan error)
 }
 
 // ChatHandler обрабатывает chat requests через WebSocket
@@ -127,21 +128,8 @@ func (h *ChatHandler) processChatRequest(client *Client, req *ChatRequestMessage
 	// Enable streaming
 	ollamaReq.Stream = true
 
-	// Create streaming client
-	baseClient, ok := h.ollamaClient.(*ollama.Client)
-	if !ok {
-		h.sendError(client, req.RequestID, "Invalid Ollama client type", "internal_error")
-		return
-	}
-
-	streamingClient := ollama.NewStreamingClient(baseClient)
-	if streamingClient == nil {
-		h.sendError(client, req.RequestID, "Failed to create streaming client", "internal_error")
-		return
-	}
-
-	// Start streaming
-	responseChan, errorChan := streamingClient.ChatCompletionStream(ctx, ollamaReq)
+	// Start streaming directly via interface (DESKTOP-03 fix)
+	responseChan, errorChan := h.ollamaClient.ChatCompletionStream(ctx, ollamaReq)
 
 	// Process streaming response
 	h.processStreamingResponse(client, req.RequestID, responseChan, errorChan)

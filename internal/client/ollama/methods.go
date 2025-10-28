@@ -130,6 +130,12 @@ func (c *Client) ChatCompletion(ctx context.Context, req *ChatRequest) (*ChatRes
 	return &chatResponse, nil
 }
 
+// ChatCompletionStream создает streaming клиент и вызывает ChatCompletionStream (DESKTOP-03)
+func (c *Client) ChatCompletionStream(ctx context.Context, req *ChatRequest) (<-chan *ChatResponse, <-chan error) {
+	streamingClient := NewStreamingClient(c)
+	return streamingClient.ChatCompletionStream(ctx, req)
+}
+
 // Generate отправляет generate запрос в Ollama (для простой генерации текста)
 func (c *Client) Generate(ctx context.Context, req *GenerateRequest) (*GenerateResponse, error) {
 	httpReq, err := c.makeRequest(ctx, "POST", "/api/generate", req)

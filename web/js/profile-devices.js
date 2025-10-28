@@ -104,6 +104,9 @@ class DeviceManager {
             const deviceCard = this.createDeviceCard(device);
             devicesList.appendChild(deviceCard);
         });
+
+        // DESKTOP-04: Enable bulk selection after rendering
+        this.enableBulkSelection();
     }
 
     // Create device card
@@ -121,18 +124,29 @@ class DeviceManager {
         }
 
         card.className = cardClasses.join(' ');
+        card.setAttribute('data-device-id', device.id);
+        
         card.innerHTML = `
             <div style="padding: 20px;">
                 <div style="display: flex; gap: 16px;">
+                    <!-- DESKTOP-04: Bulk Selection Checkbox -->
+                    ${!device.is_current_device ? `
+                        <div style="flex-shrink: 0; padding-top: 4px;">
+                            <input type="checkbox" class="device-checkbox" data-device-id="${device.id}" 
+                                   style="width: 18px; height: 18px; cursor: pointer;" 
+                                   onclick="event.stopPropagation()">
+                        </div>
+                    ` : '<div style="width: 18px;"></div>'}
+                    
                     <!-- Device Icon -->
-                    <div style="flex-shrink: 0;">
+                    <div style="flex-shrink: 0; cursor: pointer;" onclick="deviceManager.openDeviceDetails('${device.id}')">
                         <span class="${this.getDeviceIcon(device.device_os)} device-icon"></span>
                     </div>
 
                     <!-- Device Info -->
                     <div style="flex: 1; min-width: 0;">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
-                            <div style="flex: 1; min-width: 0;">
+                            <div style="flex: 1; min-width: 0; cursor: pointer;" onclick="deviceManager.openDeviceDetails('${device.id}')">
                                 <h5 class="card-title" style="margin-bottom: 4px;">
                                     ${this.escapeHtml(device.device_name || 'Unknown Device')}
                                     ${device.is_current_device ? '<span class="badge badge-current" style="margin-left: 8px;">This Device</span>' : ''}
@@ -166,12 +180,15 @@ class DeviceManager {
                         ` : ''}
 
                         <!-- Actions -->
-                        <div style="margin-top: 16px; display: flex; gap: 8px;">
-                            <button class="btn btn-sm btn-outline-primary" onclick="deviceManager.openRenameModal('${device.id}')">
+                        <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); deviceManager.openDeviceDetails('${device.id}')">
+                                👁️ View Details
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); deviceManager.openRenameModal('${device.id}')">
                                 ✏️ Rename
                             </button>
                             ${!device.is_current_device ? `
-                                <button class="btn btn-sm btn-outline-danger" onclick="deviceManager.openDeleteModal('${device.id}')">
+                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deviceManager.openDeleteModal('${device.id}')">
                                     🗑️ Remove
                                 </button>
                             ` : ''}
@@ -349,6 +366,242 @@ class DeviceManager {
             console.error('Failed to remove device:', error);
             toast.error(`Failed to remove device: ${error.message}`);
         }
+    }
+
+    // DESKTOP-04: Open device details modal
+    openDeviceDetails(deviceId) {
+        const device = this.devices.find(d => d.id === deviceId);
+        if (!device) {
+            toast.error('Device not found');
+            return;
+        }
+
+        const modalHTML = this.renderDeviceDetailsHTML(device);
+        
+        // Use notifications.js modal system
+        const modalContainer = document.createElement('div');
+        modalContainer.className = 'modal-overlay';
+        modalContainer.innerHTML = modalHTML;
+        document.body.appendChild(modalContainer);
+
+        // Close button handler
+        modalContainer.querySelector('.modal-close').addEventListener('click', () => {
+            modalContainer.remove();
+        });
+
+        // Click outside to close
+        modalContainer.addEventListener('click', (e) => {
+            if (e.target === modalContainer) {
+                modalContainer.remove();
+            }
+        });
+
+        // Rename button
+        modalContainer.querySelector('.btn-rename').addEventListener('click', () => {
+            modalContainer.remove();
+            this.openRenameModal(deviceId);
+        });
+
+        // Revoke button (if not current device)
+        if (!device.is_current_device) {
+            modalContainer.querySelector('.btn-revoke').addEventListener('click', () => {
+                modalContainer.remove();
+                this.openDeleteModal(deviceId);
+            });
+        }
+    }
+
+    // Render device details HTML
+    renderDeviceDetailsHTML(device) {
+        const isInactive = this.isDeviceInactive(device);
+        
+        return `
+            <div class="modal-content device-details-modal" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h3>🖥️ Device Details</h3>
+                    <button class="modal-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary);">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Device Icon & Name -->
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <span class="${this.getDeviceIcon(device.device_os)} device-icon" style="font-size: 4rem;"></span>
+                        <h4 style="margin-top: 12px; color: var(--text-primary);">
+                            ${this.escapeHtml(device.device_name || 'Unknown Device')}
+                            ${device.is_current_device ? '<span class="badge badge-current" style="margin-left: 8px;">This Device</span>' : ''}
+                        </h4>
+                        <span class="badge ${this.getStatusBadgeClass(device.status, isInactive)}">
+                            ${this.getStatusText(device.status, isInactive)}
+                        </span>
+                    </div>
+
+                    <!-- Details Grid -->
+                    <div class="details-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                        <div class="detail-item">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Operating System</div>
+                            <div style="color: var(--text-primary);">💻 ${this.getOSName(device.device_os)}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Version</div>
+                            <div style="color: var(--text-primary);">🏷️ v${this.escapeHtml(device.device_version || '0.0.0')}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Hostname</div>
+                            <div style="color: var(--text-primary);">🖥️ ${this.escapeHtml(device.device_hostname || 'Unknown')}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">API Key ID</div>
+                            <div style="color: var(--text-primary); font-family: monospace; font-size: 0.85rem;">🔑 ${device.id.substring(0, 16)}...</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">First Seen</div>
+                            <div style="color: var(--text-primary);">📅 ${this.formatDate(device.created_at)}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Last Seen</div>
+                            <div class="last-seen ${this.getLastSeenClass(device.last_seen_at)}" style="font-size: 14px;">
+                                🕒 ${this.formatLastSeen(device.last_seen_at)}
+                            </div>
+                        </div>
+
+                        ${device.expires_at ? `
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Expires At</div>
+                                <div style="color: var(--text-primary);">⏰ ${this.formatDate(device.expires_at)}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Usage Stats (if available) -->
+                    ${device.usage ? `
+                        <div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 24px;">
+                            <h5 style="margin-bottom: 12px; color: var(--text-primary);">📊 Usage Statistics</h5>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 14px;">
+                                <div>
+                                    <span style="color: var(--text-secondary);">Total Requests:</span>
+                                    <strong style="color: var(--text-primary); margin-left: 8px;">${device.usage.total_requests || 0}</strong>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-secondary);">Total Tokens:</span>
+                                    <strong style="color: var(--text-primary); margin-left: 8px;">${device.usage.total_tokens || 0}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn btn-sm btn-outline-primary btn-rename">
+                        ✏️ Rename
+                    </button>
+                    ${!device.is_current_device ? `
+                        <button class="btn btn-sm btn-outline-danger btn-revoke">
+                            🗑️ Revoke Access
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-secondary modal-close">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // DESKTOP-04: Bulk operations
+    enableBulkSelection() {
+        const checkboxes = document.querySelectorAll('.device-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                this.updateBulkActionsBar();
+            });
+        });
+    }
+
+    updateBulkActionsBar() {
+        const selectedIds = this.getSelectedDeviceIds();
+        const bulkActionsBar = document.getElementById('bulkActionsBar');
+        const selectedCount = document.getElementById('selectedCount');
+
+        if (selectedIds.length > 0) {
+            bulkActionsBar.style.display = 'flex';
+            selectedCount.textContent = `${selectedIds.length} device${selectedIds.length > 1 ? 's' : ''} selected`;
+        } else {
+            bulkActionsBar.style.display = 'none';
+        }
+    }
+
+    getSelectedDeviceIds() {
+        const checkboxes = document.querySelectorAll('.device-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.dataset.deviceId);
+    }
+
+    async bulkRevokeDevices() {
+        const selectedIds = this.getSelectedDeviceIds();
+        if (selectedIds.length === 0) {
+            toast.warning('No devices selected');
+            return;
+        }
+
+        // Check if current device is in selection
+        const currentDeviceSelected = selectedIds.some(id => {
+            const device = this.devices.find(d => d.id === id);
+            return device && device.is_current_device;
+        });
+
+        if (currentDeviceSelected) {
+            toast.error('Cannot revoke current device in bulk operation');
+            return;
+        }
+
+        const confirmed = await modal.danger(
+            `Are you sure you want to revoke ${selectedIds.length} device(s)? This action cannot be undone.`,
+            'Bulk Revoke Devices'
+        );
+
+        if (!confirmed) return;
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const deviceId of selectedIds) {
+            try {
+                const response = await api.request(`${api.baseURL}/api/auth/devices/${deviceId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason: 'Bulk revoke by user' })
+                });
+
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                }
+            } catch (error) {
+                console.error(`Failed to revoke device ${deviceId}:`, error);
+                errorCount++;
+            }
+        }
+
+        if (successCount > 0) {
+            toast.success(`Successfully revoked ${successCount} device(s)`);
+        }
+        if (errorCount > 0) {
+            toast.error(`Failed to revoke ${errorCount} device(s)`);
+        }
+
+        this.clearSelection();
+        this.loadDevices();
+    }
+
+    clearSelection() {
+        const checkboxes = document.querySelectorAll('.device-checkbox:checked');
+        checkboxes.forEach(cb => cb.checked = false);
+        this.updateBulkActionsBar();
     }
 }
 

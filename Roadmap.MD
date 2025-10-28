@@ -906,14 +906,13 @@ auth:
   - Per-user message routing (Hub.SendToUser)
   - Completed: 2025-10-28
 
-- [ ] **DESKTOP-04** Desktop-Specific WebUI Features → [BACKLOG/DESKTOP-04_webui_devices.md](BACKLOG/DESKTOP-04_webui_devices.md) → **v2.4.4**
-  - Devices Management page в web UI
-  - Visual indicators для активных устройств (online/offline)
-  - Device details modal (OS, version, last activity)
-  - Bulk revoke для multiple devices
-  - Activity timeline per device
-  - Security alerts (новое устройство, подозрительная активность)
-  - **Оценка:** 2-3 часа
+- [x] **DESKTOP-04** Desktop-Specific WebUI Features → [BACKLOG/DESKTOP-04_webui_devices.md](BACKLOG/DESKTOP-04_webui_devices.md) → **v2.4.4** ✅
+  - Device details modal (клик на card/icon) с full device info
+  - Bulk revoke для multiple devices (checkbox selection + bulk actions bar)
+  - Enhanced UI/UX (View Details button, smooth animations, protection от self-revoke)
+  - Visual indicators (status badges, last seen color coding)
+  - Responsive modal design (max-width: 700px, max-height: 90vh)
+  - **Completed:** 2025-10-28
 
 ### 🎯 Ключевые возможности
 

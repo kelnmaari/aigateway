@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.4] - 2025-10-28
+
+### Added
+
+- **Desktop-Specific WebUI Features** (DESKTOP-04): Enhanced device management experience
+  - **Device Details Modal** 🔍:
+    - Full-screen modal с полной информацией об устройстве
+    - Клик на device card или icon открывает modal
+    - Display: OS, version, hostname, API key ID, first/last seen dates
+    - Usage statistics (total requests, tokens) если доступны
+    - Action buttons: Rename, Revoke Access (если не current device), Close
+    - Responsive design с smooth animations (fadeIn, slideIn)
+  - **Bulk Device Revoke** 📦:
+    - Checkbox selection на всех device cards (кроме current device)
+    - Bulk actions bar появляется при selection (fixed bottom, slide up animation)
+    - Selected count display (e.g. "3 devices selected")
+    - Bulk revoke button с confirmation modal
+    - Protection: нельзя bulk revoke current device
+    - Cancel button для сброса selection
+    - Success/error toast notifications после bulk operation
+  - **Enhanced UI/UX**:
+    - "View Details" button на каждой device card
+    - event.stopPropagation() для всех кнопок (предотвращение случайного открытия modal)
+    - CSS animations: fadeIn, slideIn, slideUp
+    - Modal overlay с click-outside-to-close
+    - Grid layout для device details (2 columns)
+    - Color-coded badges: active/inactive/expired
+
+### Changed
+
+- **Device Cards Layout**: Добавлен checkbox слева (18x18px) для bulk selection
+- **Device Icon**: Стал кликабельным для открытия details modal
+- **Device Name/Hostname**: Стали кликабельными для открытия details modal
+- **Actions**: Добавлена кнопка "View Details" (secondary style)
+
+### Technical
+
+- **Frontend (HTML/CSS/JS)**:
+  - `web/profile-devices.html` - Bulk actions bar, modal CSS (animations: fadeIn, slideIn, slideUp)
+  - `web/js/profile-devices.js` - Device Details Modal (180+ lines new code)
+    - `openDeviceDetails(deviceId)` - открывает modal с device info
+    - `renderDeviceDetailsHTML(device)` - генерирует HTML для modal
+    - `enableBulkSelection()` - включает bulk selection checkboxes
+    - `updateBulkActionsBar()` - обновляет bulk actions bar visibility
+    - `getSelectedDeviceIds()` - возвращает массив selected device IDs
+    - `bulkRevokeDevices()` - массовое удаление с confirmation
+    - `clearSelection()` - сброс всех checkboxes
+- **CSS Enhancements**:
+  - `.modal-overlay` - full-screen overlay с backdrop
+  - `.device-details-modal` - responsive modal (max-width: 700px, max-height: 90vh)
+  - `.modal-header/.modal-body/.modal-footer` - структура modal
+  - `@keyframes fadeIn, slideIn, slideUp` - smooth animations
+  - `.btn-outline-secondary` - новый button style для "View Details"
+- **Security**:
+  - Current device НЕ может быть selected для bulk revoke
+  - Bulk revoke проверяет наличие current device в selection
+  - Each revoke operation проходит через DELETE endpoint с owner verification
+- **Performance**:
+  - Modal рендерится on-demand (не в DOM by default)
+  - Bulk operations асинхронные (Promise.all можно добавить в future)
+  - Event delegation для checkboxes
+- **Backward Compatibility**:
+  - Existing "Rename" и "Remove" buttons продолжают работать
+  - API endpoints НЕ изменились
+  - Только frontend updates (HTML/CSS/JS)
+
 ## [2.4.3] - 2025-10-28
 
 ### Added

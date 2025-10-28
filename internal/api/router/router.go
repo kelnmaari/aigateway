@@ -108,6 +108,7 @@ type Router struct {
 	// WebSocket components
 	wsHub              *websocket.Hub
 	wsHandler          *websocket.Handler
+	wsChatHandler      *websocket.ChatHandler // Chat handler for desktop (DESKTOP-03)
 	eventBroadcaster   *websocket.EventBroadcaster
 	metricsBroadcaster *websocket.MetricsBroadcaster
 
@@ -615,13 +616,17 @@ func (r *Router) setupRequestsRoutes() {
 
 // setupWebSocketRoutes настраивает WebSocket endpoint для real-time updates (Phase 12.2)
 func (r *Router) setupWebSocketRoutes() {
-	// WebSocket endpoint
+	// WebSocket endpoint (metrics, без auth)
 	r.engine.GET("/ws", r.wsHandler.HandleWebSocket)
+
+	// WebSocket endpoint для chat с API key auth (DESKTOP-03 v2.4.3)
+	r.engine.GET("/ws/chat", r.wsHandler.HandleChatWebSocket)
 
 	r.logger.WithFields(logrus.Fields{
 		"endpoint":       "/ws",
+		"chat_endpoint":  "/ws/chat",
 		"clients_active": r.wsHub.GetActiveClientsCount(),
-	}).Info("WebSocket endpoint configured")
+	}).Info("WebSocket endpoints configured")
 }
 
 // setupSystemRoutes настраивает System endpoints (bootstrap, init-status) (Version 1.3.0+)
@@ -1559,6 +1564,13 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// WebSocket Handler
 	r.wsHandler = websocket.NewHandler(r.wsHub, logger)
 
+	// Chat Handler для WebSocket (DESKTOP-03 v2.4.3)
+	r.wsChatHandler = websocket.NewChatHandler(cfg, logger, r.ollamaClient, r.wsHub)
+
+	// Настраиваем WebSocket handler (DESKTOP-03)
+	r.wsHandler.SetDatabase(r.db)
+	r.wsHandler.SetChatHandler(r.wsChatHandler)
+
 	// Event Broadcaster
 	r.eventBroadcaster = websocket.NewEventBroadcaster(r.wsHub)
 
@@ -1571,7 +1583,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	)
 	r.metricsBroadcaster.Start()
 
-	logger.Info("WebSocket Hub and Metrics Storage initialized")
+	logger.Info("WebSocket Hub, Chat Handler and Metrics Storage initialized")
 }
 
 // setupFileStorage инициализирует file storage и extractors (v1.10.0)

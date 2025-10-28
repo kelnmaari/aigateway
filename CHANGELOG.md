@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.3] - 2025-10-28
+
+### Added
+
+- **WebSocket Streaming для Desktop** (DESKTOP-03): Real-time chat через WebSocket с API key authentication
+  - **WebSocket Chat Endpoint**: `GET /ws/chat?token={api_key}`
+    - API key authentication через query parameter
+    - Bcrypt validation для безопасности (проверка всех ключей)
+    - Device tracking: автоматическое обновление `last_seen_at` при WebSocket activity
+    - Connection upgrade с HTTP to WebSocket protocol
+  - **Chat Message Types**:
+    - `chat_request` - chat запрос от desktop client (с model, messages, streaming params)
+    - `chat_chunk` - streaming chunk от сервера (content, role, done flag)
+    - `chat_done` - финальное сообщение (message_id, total_tokens, finish_reason)
+    - `chat_error` - ошибка (error message, error code)
+    - `ping`/`pong` - heartbeat для keep-alive
+  - **Per-User Message Routing**: `Hub.SendToUser(userID, message)` для targeted messaging
+  - **ChatHandler**: Обработчик chat requests через WebSocket
+    - Ollama integration через StreamingClient
+    - Async request processing (non-blocking)
+    - Token counting и метрики
+    - Error handling с graceful fallback
+  - **WebSocket Handler Enhancements**:
+    - `HandleChatWebSocket()` - новый endpoint с API key auth
+    - `SetDatabase()` - DI для API key validation
+    - `SetChatHandler()` - DI для chat request routing
+    - Message routing по типу (chat_request, ping)
+  - **Hub Updates**:
+    - `userClients map[string][]*Client` - per-user client tracking
+    - `SendToClient(clientID, message)` - individual client messaging
+    - Automatic cleanup при disconnect
+
+### Technical
+
+- **Backend (Go)**:
+  - `internal/websocket/chat_handler.go` - Chat handler для WebSocket streaming (267 lines)
+  - `internal/websocket/handler.go` - API key auth, message routing, pong response
+  - `internal/websocket/hub.go` - Per-user client tracking, SendToUser/SendToClient methods
+  - `internal/api/router/router.go` - Route `/ws/chat`, ChatHandler initialization
+  - Message types: `ChatRequestMessage`, `ChatChunkMessage`, `ChatDoneMessage`, `ChatErrorMessage`
+- **Security**:
+  - API key validation: bcrypt verification против всех активных ключей
+  - Status check: только `active` ключи permitted
+  - Expiration check: `auto_expire_at` validation
+- **Performance**:
+  - Ping/Pong heartbeat: 54s interval (existing from v1.10.2)
+  - Async request processing: non-blocking goroutines
+  - Efficient message routing: per-user client maps
+- **Backward Compatibility**:
+  - SSE endpoints (`/v1/chat/completions` с `stream=true`) продолжают работать
+  - WebSocket `/ws` для metrics (без auth) не изменен
+- **Documentation**: `BACKLOG/DESKTOP-03_websocket_streaming.md` с примерами интеграции
+
 ## [2.4.2] - 2025-10-28
 
 ### Added

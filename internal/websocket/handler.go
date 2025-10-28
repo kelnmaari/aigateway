@@ -1,6 +1,8 @@
 package websocket
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -8,6 +10,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
+
+	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 const (
@@ -22,6 +27,13 @@ const (
 
 	// Maximum message size allowed from peer
 	maxMessageSize = 512 * 1024 // 512 KB
+)
+
+const (
+	// Message types for WebSocket communication
+	MessageTypeChatRequest = "chat_request"
+	MessageTypePing        = "ping"
+	MessageTypePong        = "pong"
 )
 
 var upgrader = websocket.Upgrader{
@@ -65,8 +77,15 @@ func (g *GorillaCon) SetWriteDeadline(t time.Time) error {
 
 // Handler обрабатывает WebSocket connections
 type Handler struct {
-	hub    *Hub
-	logger *logrus.Logger
+	hub         *Hub
+	logger      *logrus.Logger
+	db          storage.Database // For API key validation
+	chatHandler ChatHandlerInterface
+}
+
+// ChatHandlerInterface интерфейс для обработки chat requests
+type ChatHandlerInterface interface {
+	HandleChatRequest(client *Client, message []byte)
 }
 
 // NewHandler создает новый WebSocket handler
@@ -81,7 +100,17 @@ func NewHandler(hub *Hub, logger *logrus.Logger) *Handler {
 	}
 }
 
-// HandleWebSocket обрабатывает WebSocket upgrade и connection
+// SetDatabase устанавливает database для API key validation (DESKTOP-03)
+func (h *Handler) SetDatabase(db storage.Database) {
+	h.db = db
+}
+
+// SetChatHandler устанавливает chat handler (DESKTOP-03)
+func (h *Handler) SetChatHandler(chatHandler ChatHandlerInterface) {
+	h.chatHandler = chatHandler
+}
+
+// HandleWebSocket обрабатывает WebSocket upgrade и connection (для metrics, без auth)
 func (h *Handler) HandleWebSocket(c *gin.Context) {
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -108,6 +137,134 @@ func (h *Handler) HandleWebSocket(c *gin.Context) {
 	// Запускаем reader и writer в отдельных горутинах
 	go h.writePump(client)
 	go h.readPump(client)
+}
+
+// HandleChatWebSocket обрабатывает WebSocket upgrade с API key auth (DESKTOP-03)
+// Endpoint: /ws/chat?token={api_key}
+func (h *Handler) HandleChatWebSocket(c *gin.Context) {
+	// 1. Authenticate via API key from query param
+	apiKeyStr := c.Query("token")
+	if apiKeyStr == "" {
+		h.logger.Warn("WebSocket connection rejected: missing token")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing API key token"})
+		return
+	}
+
+	// 2. Validate API key
+	apiKey, err := h.validateAPIKey(c.Request.Context(), apiKeyStr)
+	if err != nil {
+		h.logger.WithError(err).Warn("WebSocket connection rejected: invalid API key")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired API key"})
+		return
+	}
+
+	// 3. Update last_seen_at for device tracking
+	if apiKey.DeviceFingerprint != nil && *apiKey.DeviceFingerprint != "" {
+		go h.updateDeviceLastSeen(apiKey.ID)
+	}
+
+	// 4. Upgrade HTTP to WebSocket
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to upgrade to WebSocket")
+		return
+	}
+
+	// 5. Create authenticated client
+	client := &Client{
+		ID:   generateClientID(),
+		Hub:  h.hub,
+		Conn: &GorillaCon{Conn: conn},
+		Send: make(chan []byte, 256),
+		UserInfo: map[string]string{
+			"ip":          c.ClientIP(),
+			"user_agent":  c.Request.UserAgent(),
+			"user_id":     stringValue(apiKey.UserID),
+			"api_key_id":  apiKey.ID,
+			"device_name": stringValue(apiKey.DeviceName),
+			"device_os":   stringValue(apiKey.DeviceOS),
+		},
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"client_id":   client.ID,
+		"user_id":     stringValue(apiKey.UserID),
+		"device_name": stringValue(apiKey.DeviceName),
+	}).Info("WebSocket client authenticated via API key")
+
+	// 6. Register client
+	h.hub.register <- client
+
+	// 7. Start pumps
+	go h.writePump(client)
+	go h.readPump(client)
+}
+
+// validateAPIKey проверяет API key и возвращает его данные
+func (h *Handler) validateAPIKey(ctx context.Context, plainKey string) (*models.APIKey, error) {
+	if h.db == nil {
+		return nil, fmt.Errorf("database not configured")
+	}
+
+	// Проверка формата ключа
+	if !models.IsValidAPIKeyFormat(plainKey) {
+		return nil, fmt.Errorf("invalid API key format")
+	}
+
+	// Получаем все ключи и проверяем каждый с помощью bcrypt
+	// (мы не можем искать по хешу, т.к. bcrypt генерирует разные хеши для одного значения)
+	allKeys, err := h.db.ListAPIKeys(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get API keys: %w", err)
+	}
+
+	// Ищем ключ, проверяя plain key против каждого хеша
+	var matchedKey *models.APIKey
+	for _, key := range allKeys {
+		if key.VerifyKey(plainKey) {
+			matchedKey = key
+			break
+		}
+	}
+
+	if matchedKey == nil {
+		return nil, fmt.Errorf("API key not found")
+	}
+
+	// Check status
+	if matchedKey.Status != models.APIKeyStatusActive {
+		return nil, fmt.Errorf("API key is not active: %s", matchedKey.Status)
+	}
+
+	// Check expiration
+	if matchedKey.AutoExpireAt != nil && matchedKey.AutoExpireAt.Before(time.Now()) {
+		return nil, fmt.Errorf("API key has expired")
+	}
+
+	return matchedKey, nil
+}
+
+// updateDeviceLastSeen обновляет last_seen_at для device API key
+func (h *Handler) updateDeviceLastSeen(apiKeyID string) {
+	if h.db == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.db.UpdateAPIKeyLastSeen(ctx, apiKeyID); err != nil {
+		h.logger.WithError(err).WithField("api_key_id", apiKeyID).
+			Debug("Failed to update device last_seen_at")
+	}
+}
+
+// stringValue returns string value from pointer (for logging)
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // readPump читает сообщения от клиента
@@ -178,13 +335,65 @@ func (h *Handler) writePump(client *Client) {
 
 // handleClientMessage обрабатывает сообщения от клиента
 func (h *Handler) handleClientMessage(client *Client, message []byte) {
-	h.logger.WithFields(logrus.Fields{
-		"client_id": client.ID,
-		"message":   string(message),
-	}).Debug("Received message from client")
+	// Limit message preview for logging
+	messagePreview := string(message)
+	if len(messagePreview) > 100 {
+		messagePreview = messagePreview[:100] + "..."
+	}
 
-	// В базовой реализации просто логируем
-	// В будущем можно добавить обработку команд от клиента
+	h.logger.WithFields(logrus.Fields{
+		"client_id":       client.ID,
+		"message_preview": messagePreview,
+	}).Debug("Received message from WebSocket client")
+
+	// Parse message type
+	var baseMsg struct {
+		Type string `json:"type"`
+	}
+
+	if err := json.Unmarshal(message, &baseMsg); err != nil {
+		h.logger.WithError(err).Error("Failed to parse WebSocket message")
+		return
+	}
+
+	// Route message based on type
+	switch baseMsg.Type {
+	case MessageTypeChatRequest:
+		// Handle chat request (DESKTOP-03)
+		if h.chatHandler != nil {
+			h.chatHandler.HandleChatRequest(client, message)
+		} else {
+			h.logger.Warn("Chat handler not configured, ignoring chat_request")
+		}
+
+	case MessageTypePing:
+		// Respond with pong
+		h.sendPong(client)
+
+	default:
+		h.logger.WithField("type", baseMsg.Type).Warn("Unknown WebSocket message type")
+	}
+}
+
+// sendPong отправляет pong response
+func (h *Handler) sendPong(client *Client) {
+	pong := map[string]interface{}{
+		"type":      MessageTypePong,
+		"timestamp": time.Now(),
+	}
+
+	data, err := json.Marshal(pong)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to marshal pong message")
+		return
+	}
+
+	select {
+	case client.Send <- data:
+		// Pong sent successfully
+	default:
+		h.logger.Warn("Failed to send pong (buffer full)")
+	}
 }
 
 // generateClientID генерирует уникальный ID для клиента

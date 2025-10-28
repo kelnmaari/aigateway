@@ -645,6 +645,11 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v2_4_1_and_v2_4_2",
 			SQL:     s.getAddChangelogV241And242Migration(),
 		},
+		{
+			Version: 68,
+			Name:    "add_changelog_v2_4_3",
+			SQL:     s.getAddChangelogV243Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -4405,6 +4410,32 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - **Database Migration v66**: device_name, device_os, device_hostname, device_version, device_fingerprint, last_seen_at, auto_expire_at
 - **Backend**: DeviceHandler, device queries, registration endpoint
 - **Testing**: Unit tests для device registration');
+	`
+}
+
+// getAddChangelogV243Migration returns SQL for adding changelog v2.4.3 (v68 migration)
+func (s *SQLiteDB) getAddChangelogV243Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.4.3', '2025-10-28', '## [2.4.3] - 2025-10-28
+
+### Added
+
+- **WebSocket Streaming для Desktop** (DESKTOP-03): Real-time chat через WebSocket
+  - **WebSocket Chat Endpoint**: GET /ws/chat?token={api_key}
+    - API key authentication через query parameter
+    - Bcrypt validation для безопасности
+    - Device tracking: last_seen_at updates
+  - **Chat Message Types**: chat_request, chat_chunk, chat_done, chat_error, ping/pong
+  - **Per-User Message Routing**: Hub.SendToUser для targeted messaging
+  - **ChatHandler**: Ollama integration, async processing, token counting
+
+### Technical
+
+- **Backend**: chat_handler.go (267 lines), handler.go updates, hub.go per-user tracking
+- **Security**: Bcrypt validation, status/expiration checks
+- **Performance**: Ping/Pong heartbeat (54s), async processing
+- **Backward Compatibility**: SSE endpoints продолжают работать');
 	`
 }
 

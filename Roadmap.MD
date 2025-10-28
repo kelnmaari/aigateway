@@ -896,14 +896,15 @@ auth:
   - Self-revoke prevention и owner verification
   - **Оценка:** 3-4 часа → **Completed: 2025-10-28**
 
-- [ ] **DESKTOP-03** WebSocket Streaming для Desktop → [BACKLOG/DESKTOP-03_websocket_streaming.md](BACKLOG/DESKTOP-03_websocket_streaming.md) → **v2.4.3**
-  - WebSocket endpoint: /ws/chat?token={api_key}
-  - Server-Sent Events (SSE) как альтернатива
-  - Streaming chat responses через WebSocket
-  - Binary protocol для эффективности
-  - Reconnection logic на server-side
-  - Ping/Pong для keep-alive
-  - **Оценка:** 4-5 часов
+- [x] **DESKTOP-03** WebSocket Streaming для Desktop → [BACKLOG/DESKTOP-03_websocket_streaming.md](BACKLOG/DESKTOP-03_websocket_streaming.md) → **v2.4.3** ✅
+  - WebSocket endpoint: /ws/chat?token={api_key} с API key authentication
+  - API key validation через bcrypt (existing keys)
+  - Device tracking: last_seen_at updates при WebSocket activity
+  - Chat request/response message types (chat_request, chat_chunk, chat_done, chat_error)
+  - Streaming chat responses через WebSocket с Ollama integration
+  - Ping/Pong для keep-alive (уже реализовано в v1.10.2)
+  - Per-user message routing (Hub.SendToUser)
+  - Completed: 2025-10-28
 
 - [ ] **DESKTOP-04** Desktop-Specific WebUI Features → [BACKLOG/DESKTOP-04_webui_devices.md](BACKLOG/DESKTOP-04_webui_devices.md) → **v2.4.4**
   - Devices Management page в web UI

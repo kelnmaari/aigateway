@@ -30,6 +30,9 @@ type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
 
+	// Per-user client tracking (DESKTOP-03)
+	userClients map[string][]*Client // user_id -> clients
+
 	// Broadcast канал для отправки сообщений всем клиентам
 	broadcast chan []byte
 
@@ -72,12 +75,13 @@ func NewHub(logger *logrus.Logger) *Hub {
 	}
 
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte, 256),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		stopChan:   make(chan struct{}),
-		logger:     logger,
+		clients:     make(map[*Client]bool),
+		userClients: make(map[string][]*Client),
+		broadcast:   make(chan []byte, 256),
+		register:    make(chan *Client),
+		unregister:  make(chan *Client),
+		stopChan:    make(chan struct{}),
+		logger:      logger,
 	}
 }
 
@@ -117,6 +121,12 @@ func (h *Hub) Stop() {
 func (h *Hub) registerClient(client *Client) {
 	h.mu.Lock()
 	h.clients[client] = true
+
+	// Track user's clients for targeted messaging (DESKTOP-03)
+	if userID := client.UserInfo["user_id"]; userID != "" {
+		h.userClients[userID] = append(h.userClients[userID], client)
+	}
+
 	h.mu.Unlock()
 
 	h.stats.mu.Lock()
@@ -126,6 +136,8 @@ func (h *Hub) registerClient(client *Client) {
 
 	h.logger.WithFields(logrus.Fields{
 		"client_id":         client.ID,
+		"user_id":           client.UserInfo["user_id"],
+		"device_name":       client.UserInfo["device_name"],
 		"active_clients":    h.GetActiveClientsCount(),
 		"total_connections": h.stats.TotalConnections,
 	}).Info("WebSocket client connected")
@@ -137,6 +149,21 @@ func (h *Hub) unregisterClient(client *Client) {
 	if _, ok := h.clients[client]; ok {
 		delete(h.clients, client)
 		close(client.Send)
+
+		// Remove from user's clients (DESKTOP-03)
+		if userID := client.UserInfo["user_id"]; userID != "" {
+			userClients := h.userClients[userID]
+			for i, c := range userClients {
+				if c == client {
+					h.userClients[userID] = append(userClients[:i], userClients[i+1:]...)
+					break
+				}
+			}
+			// Clean up empty slice
+			if len(h.userClients[userID]) == 0 {
+				delete(h.userClients, userID)
+			}
+		}
 	}
 	h.mu.Unlock()
 
@@ -146,6 +173,7 @@ func (h *Hub) unregisterClient(client *Client) {
 
 	h.logger.WithFields(logrus.Fields{
 		"client_id":      client.ID,
+		"user_id":        client.UserInfo["user_id"],
 		"active_clients": h.GetActiveClientsCount(),
 	}).Info("WebSocket client disconnected")
 }
@@ -231,5 +259,54 @@ func (h *Hub) GetClients() []*Client {
 	}
 
 	return clients
+}
+
+// SendToUser отправляет сообщение всем клиентам конкретного user (DESKTOP-03)
+func (h *Hub) SendToUser(userID string, message []byte) {
+	h.mu.RLock()
+	clients := h.userClients[userID]
+	h.mu.RUnlock()
+
+	if len(clients) == 0 {
+		h.logger.WithField("user_id", userID).Debug("No active clients for user")
+		return
+	}
+
+	for _, client := range clients {
+		select {
+		case client.Send <- message:
+			// Message sent successfully
+		default:
+			// Client buffer full, disconnect slow client
+			h.logger.WithFields(logrus.Fields{
+				"user_id":   userID,
+				"client_id": client.ID,
+			}).Warn("Client buffer full, disconnecting")
+			go func(c *Client) {
+				h.unregister <- c
+			}(client)
+		}
+	}
+}
+
+// SendToClient отправляет сообщение конкретному клиенту (DESKTOP-03)
+func (h *Hub) SendToClient(clientID string, message []byte) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for client := range h.clients {
+		if client.ID == clientID {
+			select {
+			case client.Send <- message:
+				return true
+			default:
+				h.logger.WithField("client_id", clientID).Warn("Client buffer full")
+				return false
+			}
+		}
+	}
+
+	h.logger.WithField("client_id", clientID).Debug("Client not found")
+	return false
 }
 

@@ -440,28 +440,38 @@
 
 **Задачи:**
 
-- [ ] **CLIENT-014** WebSocket Client
-  - Подключение к /ws/chat?token={api_key}
-  - Auto-reconnect logic
-  - Ping/Pong для keep-alive
+- [x] **CLIENT-014** WebSocket Client ✅
+  - ✅ Подключение к /ws/chat?token={api_key}
+  - ✅ Auto-reconnect logic (exponential backoff)
+  - ✅ Ping/Pong для keep-alive (30s interval)
+  - ✅ Event-based API (connect, disconnect, error, message, reconnecting, maxReconnectsReached)
+  - **Status:** Завершено 2025-10-28
   
-- [ ] **CLIENT-015** Streaming UI
-  - Отображение partial responses в real-time
-  - Typing indicator
-  - Stop generation button
+- [x] **CLIENT-015** Streaming UI ✅
+  - ✅ Отображение partial responses в real-time
+  - ✅ Typing indicator (3 bouncing dots)
+  - ✅ Stop generation button (⏹️)
+  - ✅ Smooth text append без flickering
+  - **Status:** Завершено 2025-10-28
   
-- [ ] **CLIENT-016** Fallback to HTTP
-  - Detect если WebSocket unavailable
-  - Fallback to POST /api/chat/completions
-  - Graceful degradation
+- [x] **CLIENT-016** Fallback to HTTP ✅
+  - ✅ Detect WebSocket unavailability (max reconnects reached)
+  - ✅ Automatic fallback to POST `/v1/chat/completions`
+  - ✅ Graceful degradation с user notification
+  - ✅ Connection status indicator (🟢 WebSocket / 🟠 HTTP / 🔵 Connecting)
+  - ✅ Manual retry mechanism (click на HTTP indicator)
+  - ✅ `connectionMode` state tracking
+  - **Status:** Завершено 2025-10-28
 
 **Acceptance Criteria:**
 
-- ✅ WebSocket streaming работает
-- ✅ Auto-reconnect на disconnect
-- ✅ Fallback to HTTP если WS fail
+- ✅ WebSocket streaming работает (real-time character-by-character)
+- ✅ Auto-reconnect на disconnect (10 attempts, exponential backoff)
+- ✅ Fallback to HTTP если WS fail (automatic + manual retry)
+- ✅ UI indicator показывает connection status
+- ✅ Graceful degradation без потери функциональности
 
-**Время:** ~14 дней
+**Время:** ~14 дней (Завершено 2025-10-28)
 
 ---
 

@@ -156,7 +156,21 @@ func (h *ChatHandler) processStreamingResponse(
 					"total_tokens":     totalTokens,
 				}).Debug("WebSocket chat streaming completed")
 
-				h.sendDone(client, requestID, totalTokens, "stop")
+				// Try to send done message, but ignore errors (client may be disconnected)
+				_ = h.sendMessage(client, &ChatDoneMessage{
+					Type:      MessageTypeChatDone,
+					RequestID: requestID,
+					Payload: struct {
+						MessageID    string `json:"message_id"`
+						TotalTokens  int    `json:"total_tokens"`
+						FinishReason string `json:"finish_reason"`
+					}{
+						MessageID:    requestID,
+						TotalTokens:  totalTokens,
+						FinishReason: "stop",
+					},
+					Timestamp: time.Now(),
+				})
 				return
 			}
 
@@ -177,8 +191,14 @@ func (h *ChatHandler) processStreamingResponse(
 			}
 
 			if err := h.sendMessage(client, &chunkMsg); err != nil {
-				h.logger.WithError(err).Error("Failed to send chunk to WebSocket client")
-				return
+				// Client disconnected or send failed - stop streaming gracefully
+				h.logger.WithFields(logrus.Fields{
+					"error":       err,
+					"request_id":  requestID,
+					"client_id":   client.ID,
+					"chunks_sent": chunksProcessed,
+				}).Warn("Client disconnected during streaming, stopping gracefully")
+				return // Exit goroutine - don't try to send more
 			}
 
 			chunksProcessed++
@@ -203,17 +223,28 @@ func (h *ChatHandler) processStreamingResponse(
 }
 
 // sendMessage отправляет JSON message через WebSocket
+// Gracefully handles closed channels (CLIENT-016 fix)
 func (h *ChatHandler) sendMessage(client *Client, msg interface{}) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
+	// Protect against sending to closed channel
+	defer func() {
+		if r := recover(); r != nil {
+			h.logger.WithFields(logrus.Fields{
+				"client_id": client.ID,
+				"panic":     r,
+			}).Warn("Recovered from panic when sending message (client disconnected)")
+		}
+	}()
+
 	select {
 	case client.Send <- data:
 		return nil
-	default:
-		return fmt.Errorf("client send buffer full")
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("send timeout: client may be disconnected")
 	}
 }
 

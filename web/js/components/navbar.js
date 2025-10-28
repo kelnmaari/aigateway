@@ -12,6 +12,7 @@ class TopNavbar {
         if (path.includes('files.html')) return 'files';
         if (path.includes('rag-sources.html')) return 'rag-sources';
         if (path.includes('admin.html')) return 'admin';
+        if (path.includes('profile-devices.html')) return 'profile-devices';
         if (path.includes('profile.html')) return 'profile';
         if (path.includes('tenants.html')) return 'tenants';
         if (path.includes('api-keys.html')) return 'api-keys';
@@ -126,11 +127,42 @@ class TopNavbar {
                                 <span id="navbar-user-name">${this.currentUser.full_name || this.currentUser.username}</span>
                             </button>
                             <div class="dropdown-menu" id="navbar-user-dropdown">
-                                <a href="/profile.html" class="dropdown-item">Profile Settings</a>
-                                <a href="/usage.html" class="dropdown-item">Usage & Billing</a>
-                                <a href="/about.html" class="dropdown-item">О Системе</a>
+                                <a href="/profile.html" class="dropdown-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-width="2"/>
+                                        <circle cx="12" cy="7" r="4" stroke-width="2"/>
+                                    </svg>
+                                    Profile Settings
+                                </a>
+                                <a href="/profile-devices.html" class="dropdown-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                        <rect x="2" y="7" width="20" height="14" rx="2" stroke-width="2"/>
+                                        <path d="M16 2v5M8 2v5" stroke-width="2"/>
+                                    </svg>
+                                    My Devices
+                                </a>
+                                <a href="/usage.html" class="dropdown-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    Usage & Billing
+                                </a>
+                                <a href="/about.html" class="dropdown-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                        <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                                        <path d="M12 16v-4m0-4h.01" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    О Системе
+                                </a>
                                 <hr class="dropdown-divider">
-                                <button class="dropdown-item" id="navbar-logout-btn">Logout</button>
+                                <button class="dropdown-item" id="navbar-logout-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/>
+                                        <polyline points="16 17 21 12 16 7" stroke-width="2"/>
+                                        <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
+                                    </svg>
+                                    Logout
+                                </button>
                             </div>
                         </div>
                     </div>

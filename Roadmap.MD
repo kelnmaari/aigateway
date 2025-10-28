@@ -878,23 +878,23 @@ auth:
 
 ### Задачи
 
-- [ ] **DESKTOP-01** Auto-Generated API Keys System → [BACKLOG/DESKTOP-01_auto_api_keys.md](BACKLOG/DESKTOP-01_auto_api_keys.md) → **v2.4.1**
+- [x] **DESKTOP-01** Auto-Generated API Keys System → [BACKLOG/DESKTOP-01_auto_api_keys.md](BACKLOG/DESKTOP-01_auto_api_keys.md) → **v2.4.1** ✅
   - Endpoint для auto-creation API keys: POST /api/auth/devices/register
   - Device metadata в API keys (os, hostname, app_version)
   - Device naming convention: "Desktop App - {OS} - {Date}"
   - Automatic expiry для device keys (опционально, 90 days)
   - Device fingerprinting для duplicate detection
-  - Last seen timestamp update на каждый request
-  - **Оценка:** 3-4 часа
+  - Last seen timestamp update на каждый request (prepared for future integration)
+  - **Оценка:** 3-4 часа → **Completed: 2025-10-28**
 
-- [ ] **DESKTOP-02** Device Management API → [BACKLOG/DESKTOP-02_device_management.md](BACKLOG/DESKTOP-02_device_management.md) → **v2.4.2**
+- [x] **DESKTOP-02** Device Management API → [BACKLOG/DESKTOP-02_device_management.md](BACKLOG/DESKTOP-02_device_management.md) → **v2.4.2** ✅
   - GET /api/auth/devices - список всех устройств пользователя
   - GET /api/auth/devices/:id - информация об устройстве
   - DELETE /api/auth/devices/:id - revoke device key
-  - PATCH /api/auth/devices/:id/rename - переименование устройства
-  - Device activity tracking (last_ip, last_location, usage stats)
-  - Push notification на новое устройство (опционально)
-  - **Оценка:** 3-4 часа
+  - PATCH /api/auth/devices/:id - переименование устройства
+  - WebUI страница /profile-devices.html для device management
+  - Self-revoke prevention и owner verification
+  - **Оценка:** 3-4 часа → **Completed: 2025-10-28**
 
 - [ ] **DESKTOP-03** WebSocket Streaming для Desktop → [BACKLOG/DESKTOP-03_websocket_streaming.md](BACKLOG/DESKTOP-03_websocket_streaming.md) → **v2.4.3**
   - WebSocket endpoint: /ws/chat?token={api_key}

@@ -43,6 +43,15 @@ type APIKey struct {
 	RevokedReason string                 `json:"revoked_reason,omitempty"` // Причина отзыва
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 
+	// Device metadata (Version 2.4.0+: Desktop Client Support)
+	DeviceName        *string    `json:"device_name,omitempty" db:"device_name"`               // User-friendly device name
+	DeviceOS          *string    `json:"device_os,omitempty" db:"device_os"`                   // OS: windows, darwin, linux
+	DeviceHostname    *string    `json:"device_hostname,omitempty" db:"device_hostname"`       // System hostname
+	DeviceVersion     *string    `json:"device_version,omitempty" db:"device_version"`         // Desktop app version
+	DeviceFingerprint *string    `json:"device_fingerprint,omitempty" db:"device_fingerprint"` // SHA256 hash for unique ID
+	LastSeenAt        *time.Time `json:"last_seen_at,omitempty" db:"last_seen_at"`             // Last API request timestamp
+	AutoExpireAt      *time.Time `json:"auto_expire_at,omitempty" db:"auto_expire_at"`         // Auto-expiry for device keys
+
 	// Статистика использования
 	Usage APIKeyUsage `json:"usage"`
 }
@@ -132,6 +141,15 @@ type APIKeyPublic struct {
 	RevokedReason string                 `json:"revoked_reason,omitempty"`
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 	Usage         APIKeyUsage            `json:"usage"`
+
+	// Device metadata (Version 2.4.0+: Desktop Client Support)
+	DeviceName        *string    `json:"device_name,omitempty"`
+	DeviceOS          *string    `json:"device_os,omitempty"`
+	DeviceHostname    *string    `json:"device_hostname,omitempty"`
+	DeviceVersion     *string    `json:"device_version,omitempty"`
+	DeviceFingerprint *string    `json:"device_fingerprint,omitempty"`
+	LastSeenAt        *time.Time `json:"last_seen_at,omitempty"`
+	AutoExpireAt      *time.Time `json:"auto_expire_at,omitempty"`
 
 	// Enriched fields for admin display (not stored in DB)
 	OwnerUsername string `json:"owner_username,omitempty"` // Username of owner (Version 1.3.0+)
@@ -535,3 +553,183 @@ func (k *APIKeyPublic) IsActive() bool {
 	return k.Status == APIKeyStatusActive && !k.IsExpired()
 }
 
+// ========================================
+// Device Registration (Version 2.4.0+)
+// ========================================
+
+// DeviceRegistrationRequest represents device registration request from desktop client
+type DeviceRegistrationRequest struct {
+	DeviceName        string `json:"device_name"`                                             // User-friendly name (optional, auto-generated if empty)
+	DeviceOS          string `json:"device_os" binding:"required,oneof=windows darwin linux"` // Operating system
+	DeviceHostname    string `json:"device_hostname"`                                         // System hostname
+	DeviceVersion     string `json:"device_version"`                                          // Desktop app version
+	DeviceFingerprint string `json:"device_fingerprint" binding:"required,min=32"`            // SHA256 hash for unique identification
+	AutoExpireDays    int    `json:"auto_expire_days,omitempty"`                              // Auto-expiry in days (default: 90)
+}
+
+// DeviceRegistrationResponse represents device registration response
+type DeviceRegistrationResponse struct {
+	APIKey      string     `json:"api_key"`                // Plain API key (returned only once!)
+	KeyID       string     `json:"key_id"`                 // Key ID
+	DeviceName  string     `json:"device_name"`            // Registered device name
+	DeviceOS    string     `json:"device_os"`              // Operating system
+	CreatedAt   time.Time  `json:"created_at"`             // Creation timestamp
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`   // Expiration date (if auto-expire enabled)
+	LastSeenAt  *time.Time `json:"last_seen_at,omitempty"` // Last seen timestamp (for existing devices)
+	IsNewDevice bool       `json:"is_new_device"`          // True if new device, false if existing
+	Message     string     `json:"message,omitempty"`      // Optional message
+}
+
+// Validate validates DeviceRegistrationRequest
+func (r *DeviceRegistrationRequest) Validate() error {
+	// DeviceOS validation
+	validOS := map[string]bool{
+		"windows": true,
+		"darwin":  true,
+		"linux":   true,
+	}
+	if !validOS[r.DeviceOS] {
+		return fmt.Errorf("invalid device_os: %s (must be windows, darwin, or linux)", r.DeviceOS)
+	}
+
+	// DeviceFingerprint validation
+	if len(r.DeviceFingerprint) < 32 {
+		return fmt.Errorf("device_fingerprint too short (minimum 32 characters)")
+	}
+	if len(r.DeviceFingerprint) > 128 {
+		return fmt.Errorf("device_fingerprint too long (maximum 128 characters)")
+	}
+
+	// DeviceName validation (optional)
+	if len(r.DeviceName) > 100 {
+		return fmt.Errorf("device_name too long (maximum 100 characters)")
+	}
+
+	// AutoExpireDays validation
+	if r.AutoExpireDays < 0 {
+		return fmt.Errorf("auto_expire_days cannot be negative")
+	}
+	if r.AutoExpireDays > 365 {
+		return fmt.Errorf("auto_expire_days cannot exceed 365 days")
+	}
+
+	return nil
+}
+
+// GenerateDeviceName generates auto device name if not provided
+func GenerateDeviceName(os, hostname string) string {
+	osName := map[string]string{
+		"windows": "Windows",
+		"darwin":  "macOS",
+		"linux":   "Linux",
+	}[os]
+
+	if osName == "" {
+		osName = "Unknown"
+	}
+
+	if hostname != "" {
+		return fmt.Sprintf("Desktop (%s) - %s", osName, hostname)
+	}
+
+	return fmt.Sprintf("Desktop %s - %s", osName, time.Now().Format("Jan 02"))
+}
+
+// IsDeviceKey checks if API key is a device key
+func (k *APIKey) IsDeviceKey() bool {
+	return k.DeviceFingerprint != nil && *k.DeviceFingerprint != ""
+}
+
+// IsDeviceKey checks if public API key is a device key
+func (k *APIKeyPublic) IsDeviceKey() bool {
+	return k.DeviceFingerprint != nil && *k.DeviceFingerprint != ""
+}
+
+// ========================================
+// Device Management (Version 2.4.2+)
+// ========================================
+
+// DeviceInfo represents device information for management API
+type DeviceInfo struct {
+	ID                string       `json:"id"`                 // API Key ID
+	DeviceName        string       `json:"device_name"`        // User-friendly name
+	DeviceOS          string       `json:"device_os"`          // windows, darwin, linux
+	DeviceHostname    string       `json:"device_hostname"`    // System hostname
+	DeviceVersion     string       `json:"device_version"`     // App version
+	DeviceFingerprint string       `json:"device_fingerprint"` // SHA256 hash (first 16 chars for display)
+	CreatedAt         time.Time    `json:"created_at"`         // Registration date
+	LastSeenAt        *time.Time   `json:"last_seen_at"`       // Last API request
+	ExpiresAt         *time.Time   `json:"expires_at"`         // Auto-expiry date
+	IsCurrentDevice   bool         `json:"is_current_device"`  // Is this the device making request?
+	Status            string       `json:"status"`             // active, expired, revoked
+	Usage             *APIKeyUsage `json:"usage,omitempty"`    // Usage statistics (optional, for detailed view)
+}
+
+// ListDevicesResponse represents response for listing devices
+type ListDevicesResponse struct {
+	Devices      []DeviceInfo `json:"devices"`
+	Total        int          `json:"total"`
+	CurrentCount int          `json:"current_count"` // Active devices
+}
+
+// UpdateDeviceNameRequest represents request for updating device name
+type UpdateDeviceNameRequest struct {
+	DeviceName string `json:"device_name" binding:"required,min=1,max=100"`
+}
+
+// DeviceFilters represents filters for listing devices
+type DeviceFilters struct {
+	Status string // active, expired, all
+	Sort   string // last_seen, created_at, name
+	Order  string // asc, desc
+}
+
+// ToDeviceInfo converts APIKey to DeviceInfo
+func (k *APIKey) ToDeviceInfo(currentKeyID string) DeviceInfo {
+	info := DeviceInfo{
+		ID:              k.ID,
+		DeviceName:      safeStringDeref(k.DeviceName),
+		DeviceOS:        safeStringDeref(k.DeviceOS),
+		DeviceHostname:  safeStringDeref(k.DeviceHostname),
+		DeviceVersion:   safeStringDeref(k.DeviceVersion),
+		CreatedAt:       k.CreatedAt,
+		LastSeenAt:      k.LastSeenAt,
+		ExpiresAt:       k.AutoExpireAt,
+		IsCurrentDevice: k.ID == currentKeyID,
+		Status:          string(k.Status),
+	}
+
+	// Show only first 16 chars of fingerprint for display
+	if k.DeviceFingerprint != nil && len(*k.DeviceFingerprint) > 16 {
+		info.DeviceFingerprint = (*k.DeviceFingerprint)[:16]
+	} else if k.DeviceFingerprint != nil {
+		info.DeviceFingerprint = *k.DeviceFingerprint
+	}
+
+	// Determine status
+	if k.IsExpired() {
+		info.Status = "expired"
+	} else if k.Status == APIKeyStatusRevoked {
+		info.Status = "revoked"
+	} else if k.Status == APIKeyStatusActive {
+		info.Status = "active"
+	}
+
+	return info
+}
+
+// ToDeviceInfoWithUsage converts APIKey to DeviceInfo with usage statistics
+func (k *APIKey) ToDeviceInfoWithUsage(currentKeyID string) DeviceInfo {
+	info := k.ToDeviceInfo(currentKeyID)
+	usage := k.Usage
+	info.Usage = &usage
+	return info
+}
+
+// safeStringDeref safely dereferences string pointer
+func safeStringDeref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

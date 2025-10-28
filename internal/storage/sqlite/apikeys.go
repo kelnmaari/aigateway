@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"aigateway/internal/models"
+	"aigateway/internal/storage"
 )
 
 // ========================================
@@ -59,8 +60,10 @@ func (s *SQLiteDB) CreateAPIKey(ctx context.Context, key *models.APIKey) error {
 			status, created_at, updated_at,
 			expires_at, last_used_at,
 			revoked_at, revoked_reason,
-			metadata, usage
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			metadata, usage,
+			device_name, device_os, device_hostname, device_version, device_fingerprint,
+			last_seen_at, auto_expire_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = s.db.ExecContext(ctx, query,
@@ -83,6 +86,13 @@ func (s *SQLiteDB) CreateAPIKey(ctx context.Context, key *models.APIKey) error {
 		key.RevokedReason,
 		metadataJSON,
 		usageJSON,
+		key.DeviceName,
+		key.DeviceOS,
+		key.DeviceHostname,
+		key.DeviceVersion,
+		key.DeviceFingerprint,
+		key.LastSeenAt,
+		key.AutoExpireAt,
 	)
 
 	if err != nil {
@@ -569,5 +579,374 @@ func (s *SQLiteDB) scanAPIKey(row scanner) (*models.APIKey, error) {
 	}
 
 	return &key, nil
+}
+
+// FindAPIKeyByDeviceFingerprint finds API key by device fingerprint for specific user (Version 2.4.0+)
+func (s *SQLiteDB) FindAPIKeyByDeviceFingerprint(ctx context.Context, userID, fingerprint string) (*models.APIKey, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			id, name, description, key_hash, user_id, tenant_id, scope,
+			models, permissions, rate_limits, status,
+			created_at, updated_at, expires_at, last_used_at,
+			revoked_at, revoked_reason, metadata, usage,
+			device_name, device_os, device_hostname, device_version, device_fingerprint,
+			last_seen_at, auto_expire_at
+		FROM api_keys 
+		WHERE user_id = ? AND device_fingerprint = ? AND status = 'active'
+		LIMIT 1
+	`
+
+	var key models.APIKey
+	var description, userIDNullable, tenantID sql.NullString
+	var expiresAt, lastUsedAt, revokedAt sql.NullTime
+	var revokedReason sql.NullString
+	var modelsJSON, permissionsJSON, rateLimitsJSON, metadataJSON, usageJSON []byte
+
+	// Device fields
+	var deviceName, deviceOS, deviceHostname, deviceVersion, deviceFingerprint sql.NullString
+	var lastSeenAt, autoExpireAt sql.NullTime
+
+	err := s.db.QueryRowContext(ctx, query, userID, fingerprint).Scan(
+		&key.ID,
+		&key.Name,
+		&description,
+		&key.KeyHash,
+		&userIDNullable,
+		&tenantID,
+		&key.Scope,
+		&modelsJSON,
+		&permissionsJSON,
+		&rateLimitsJSON,
+		&key.Status,
+		&key.CreatedAt,
+		&key.UpdatedAt,
+		&expiresAt,
+		&lastUsedAt,
+		&revokedAt,
+		&revokedReason,
+		&metadataJSON,
+		&usageJSON,
+		&deviceName,
+		&deviceOS,
+		&deviceHostname,
+		&deviceVersion,
+		&deviceFingerprint,
+		&lastSeenAt,
+		&autoExpireAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, storage.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query device: %w", err)
+	}
+
+	// Handle nullable fields
+	if description.Valid {
+		key.Description = description.String
+	}
+	if userIDNullable.Valid {
+		key.UserID = &userIDNullable.String
+	}
+	if tenantID.Valid {
+		key.TenantID = &tenantID.String
+	}
+	if expiresAt.Valid {
+		key.ExpiresAt = &expiresAt.Time
+	}
+	if lastUsedAt.Valid {
+		key.LastUsedAt = &lastUsedAt.Time
+	}
+	if revokedAt.Valid {
+		key.RevokedAt = &revokedAt.Time
+	}
+	if revokedReason.Valid {
+		key.RevokedReason = revokedReason.String
+	}
+
+	// Device fields
+	if deviceName.Valid {
+		key.DeviceName = &deviceName.String
+	}
+	if deviceOS.Valid {
+		key.DeviceOS = &deviceOS.String
+	}
+	if deviceHostname.Valid {
+		key.DeviceHostname = &deviceHostname.String
+	}
+	if deviceVersion.Valid {
+		key.DeviceVersion = &deviceVersion.String
+	}
+	if deviceFingerprint.Valid {
+		key.DeviceFingerprint = &deviceFingerprint.String
+	}
+	if lastSeenAt.Valid {
+		key.LastSeenAt = &lastSeenAt.Time
+	}
+	if autoExpireAt.Valid {
+		key.AutoExpireAt = &autoExpireAt.Time
+	}
+
+	// Deserialize JSON fields
+	if err := json.Unmarshal(modelsJSON, &key.Models); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal models: %w", err)
+	}
+
+	if err := json.Unmarshal(permissionsJSON, &key.Permissions); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal permissions: %w", err)
+	}
+
+	if err := json.Unmarshal(rateLimitsJSON, &key.RateLimits); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal rate_limits: %w", err)
+	}
+
+	if err := json.Unmarshal(usageJSON, &key.Usage); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal usage: %w", err)
+	}
+
+	if len(metadataJSON) > 0 {
+		if err := json.Unmarshal(metadataJSON, &key.Metadata); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+	}
+
+	return &key, nil
+}
+
+// UpdateAPIKeyLastSeen updates last_seen_at timestamp for device API key (Version 2.4.0+)
+func (s *SQLiteDB) UpdateAPIKeyLastSeen(ctx context.Context, keyID string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `
+		UPDATE api_keys 
+		SET last_seen_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND device_fingerprint IS NOT NULL
+	`
+
+	result, err := s.db.ExecContext(ctx, query, keyID)
+	if err != nil {
+		return fmt.Errorf("failed to update last_seen_at: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		// Not an error, just no device key to update
+		return nil
+	}
+
+	return nil
+}
+
+// ListDeviceAPIKeys lists all device API keys for a user (Version 2.4.2+)
+func (s *SQLiteDB) ListDeviceAPIKeys(ctx context.Context, userID string, filters models.DeviceFilters) ([]*models.APIKey, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			id, name, description, key_hash, user_id, tenant_id, scope,
+			models, permissions, rate_limits, status,
+			created_at, updated_at, expires_at, last_used_at,
+			revoked_at, revoked_reason, metadata, usage,
+			device_name, device_os, device_hostname, device_version, device_fingerprint,
+			last_seen_at, auto_expire_at
+		FROM api_keys 
+		WHERE user_id = ? AND device_fingerprint IS NOT NULL
+	`
+
+	// Add status filter
+	args := []interface{}{userID}
+	if filters.Status == "active" {
+		query += " AND status = 'active'"
+	} else if filters.Status == "expired" {
+		query += " AND (status = 'expired' OR (auto_expire_at IS NOT NULL AND auto_expire_at < CURRENT_TIMESTAMP))"
+	}
+	// "all" - no additional filter
+
+	// Add sorting
+	sortColumn := "last_seen_at"
+	if filters.Sort == "created_at" {
+		sortColumn = "created_at"
+	} else if filters.Sort == "name" {
+		sortColumn = "device_name"
+	}
+
+	sortOrder := "DESC"
+	if filters.Order == "asc" {
+		sortOrder = "ASC"
+	}
+
+	query += fmt.Sprintf(" ORDER BY %s %s", sortColumn, sortOrder)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query device keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []*models.APIKey
+
+	for rows.Next() {
+		var key models.APIKey
+		var description, userIDNullable, tenantID sql.NullString
+		var expiresAt, lastUsedAt, revokedAt sql.NullTime
+		var revokedReason sql.NullString
+		var modelsJSON, permissionsJSON, rateLimitsJSON, metadataJSON, usageJSON []byte
+
+		// Device fields
+		var deviceName, deviceOS, deviceHostname, deviceVersion, deviceFingerprint sql.NullString
+		var lastSeenAt, autoExpireAt sql.NullTime
+
+		err := rows.Scan(
+			&key.ID,
+			&key.Name,
+			&description,
+			&key.KeyHash,
+			&userIDNullable,
+			&tenantID,
+			&key.Scope,
+			&modelsJSON,
+			&permissionsJSON,
+			&rateLimitsJSON,
+			&key.Status,
+			&key.CreatedAt,
+			&key.UpdatedAt,
+			&expiresAt,
+			&lastUsedAt,
+			&revokedAt,
+			&revokedReason,
+			&metadataJSON,
+			&usageJSON,
+			&deviceName,
+			&deviceOS,
+			&deviceHostname,
+			&deviceVersion,
+			&deviceFingerprint,
+			&lastSeenAt,
+			&autoExpireAt,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan device key: %w", err)
+		}
+
+		// Handle nullable fields
+		if description.Valid {
+			key.Description = description.String
+		}
+		if userIDNullable.Valid {
+			key.UserID = &userIDNullable.String
+		}
+		if tenantID.Valid {
+			key.TenantID = &tenantID.String
+		}
+		if expiresAt.Valid {
+			key.ExpiresAt = &expiresAt.Time
+		}
+		if lastUsedAt.Valid {
+			key.LastUsedAt = &lastUsedAt.Time
+		}
+		if revokedAt.Valid {
+			key.RevokedAt = &revokedAt.Time
+		}
+		if revokedReason.Valid {
+			key.RevokedReason = revokedReason.String
+		}
+
+		// Device fields
+		if deviceName.Valid {
+			key.DeviceName = &deviceName.String
+		}
+		if deviceOS.Valid {
+			key.DeviceOS = &deviceOS.String
+		}
+		if deviceHostname.Valid {
+			key.DeviceHostname = &deviceHostname.String
+		}
+		if deviceVersion.Valid {
+			key.DeviceVersion = &deviceVersion.String
+		}
+		if deviceFingerprint.Valid {
+			key.DeviceFingerprint = &deviceFingerprint.String
+		}
+		if lastSeenAt.Valid {
+			key.LastSeenAt = &lastSeenAt.Time
+		}
+		if autoExpireAt.Valid {
+			key.AutoExpireAt = &autoExpireAt.Time
+		}
+
+		// Deserialize JSON fields
+		if err := json.Unmarshal(modelsJSON, &key.Models); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal models: %w", err)
+		}
+
+		if err := json.Unmarshal(permissionsJSON, &key.Permissions); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal permissions: %w", err)
+		}
+
+		if err := json.Unmarshal(rateLimitsJSON, &key.RateLimits); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal rate_limits: %w", err)
+		}
+
+		if err := json.Unmarshal(usageJSON, &key.Usage); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal usage: %w", err)
+		}
+
+		if len(metadataJSON) > 0 {
+			if err := json.Unmarshal(metadataJSON, &key.Metadata); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+			}
+		}
+
+		keys = append(keys, &key)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating device keys: %w", err)
+	}
+
+	return keys, nil
+}
+
+// UpdateDeviceName updates device name for a device API key (Version 2.4.2+)
+func (s *SQLiteDB) UpdateDeviceName(ctx context.Context, keyID, userID, newName string) error {
+	if s.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `
+		UPDATE api_keys 
+		SET device_name = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND user_id = ? AND device_fingerprint IS NOT NULL
+	`
+
+	result, err := s.db.ExecContext(ctx, query, newName, keyID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update device name: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return storage.ErrNotFound
+	}
+
+	return nil
 }
 

@@ -635,6 +635,16 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v2_3_1",
 			SQL:     s.getAddChangelogV231Migration(),
 		},
+		{
+			Version: 66,
+			Name:    "add_device_fields_to_api_keys",
+			SQL:     s.getAddDeviceFieldsToAPIKeysMigration(),
+		},
+		{
+			Version: 67,
+			Name:    "add_changelog_v2_4_1_and_v2_4_2",
+			SQL:     s.getAddChangelogV241And242Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -4317,6 +4327,84 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - **Frontend**: Добавлена система подтабов (.sub-tabs, .sub-tab-btn, .sub-tab-pane)
 - **JavaScript**: Логика переключения подтабов, loadAuditPreview() функция
 - **CSS**: Стили для визуального разделения основных табов и подтабов');
+	`
+}
+
+// getAddDeviceFieldsToAPIKeysMigration returns SQL for adding device fields to api_keys table (v66 migration)
+func (s *SQLiteDB) getAddDeviceFieldsToAPIKeysMigration() string {
+	return `
+-- ========================================
+-- Add Device Fields to api_keys (Migration v66)
+-- Version 2.4.0: Desktop Client Support
+-- ========================================
+
+-- Add device metadata columns
+ALTER TABLE api_keys ADD COLUMN device_name TEXT;
+ALTER TABLE api_keys ADD COLUMN device_os TEXT;
+ALTER TABLE api_keys ADD COLUMN device_hostname TEXT;
+ALTER TABLE api_keys ADD COLUMN device_version TEXT;
+ALTER TABLE api_keys ADD COLUMN device_fingerprint TEXT;
+ALTER TABLE api_keys ADD COLUMN last_seen_at DATETIME;
+ALTER TABLE api_keys ADD COLUMN auto_expire_at DATETIME;
+
+-- Create indices for device-related queries
+CREATE INDEX IF NOT EXISTS idx_api_keys_device_fingerprint ON api_keys(device_fingerprint);
+CREATE INDEX IF NOT EXISTS idx_api_keys_last_seen ON api_keys(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_api_keys_device_os ON api_keys(device_os);
+
+-- Note: device_fingerprint будет использоваться для duplicate detection
+-- last_seen_at автоматически обновляется middleware при каждом API request
+	`
+}
+
+// getAddChangelogV241And242Migration returns SQL for adding changelogs v2.4.1 and v2.4.2 (v67 migration)
+func (s *SQLiteDB) getAddChangelogV241And242Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.4.2', '2025-10-28', '## [2.4.2] - 2025-10-28
+
+### Added
+
+- **Device Management API** (DESKTOP-02): Полное управление устройствами desktop client
+  - **REST API Endpoints**:
+    - GET /api/auth/devices - список устройств пользователя с фильтрацией (status, sort, order)
+    - DELETE /api/auth/devices/:id - revoke device API key с защитой от self-revoke
+    - PATCH /api/auth/devices/:id - обновление user-friendly имени устройства
+  - **Device Management WebUI** (/profile-devices.html):
+    - Список всех зарегистрированных устройств с карточками
+    - Визуальные индикаторы: OS icons, статус (Active/Inactive/Expired)
+    - Highlight текущего устройства с badge "This Device"
+    - Фильтры: status, сортировка, order
+    - Действия: Rename device, Remove device
+  - **Security**: Owner verification, Self-revoke prevention, JWT auth
+
+### Technical
+
+- **Backend**: Device management handlers, storage queries, route registration
+- **Frontend**: profile-devices.html, DeviceManager class, navbar integration
+- **Database**: Использует device fields из migration v66'),
+
+('2.4.1', '2025-10-28', '## [2.4.1] - 2025-10-28
+
+### Added
+
+- **Auto-Generated API Keys System** (DESKTOP-01): Автоматическая регистрация desktop устройств
+  - **Device Registration API**:
+    - POST /api/auth/devices/register - auto-creation API keys
+    - Device metadata: OS, hostname, app version, fingerprint (SHA256)
+    - Auto-expiry для device keys (default 90 days)
+    - Duplicate detection по device fingerprint
+  - **Authentication Flow**:
+    1. Desktop app login → JWT token
+    2. JWT → POST /api/auth/devices/register → API key
+    3. API key сохраняется локально
+    4. JWT discarded (security best practice)
+
+### Technical
+
+- **Database Migration v66**: device_name, device_os, device_hostname, device_version, device_fingerprint, last_seen_at, auto_expire_at
+- **Backend**: DeviceHandler, device queries, registration endpoint
+- **Testing**: Unit tests для device registration');
 	`
 }
 

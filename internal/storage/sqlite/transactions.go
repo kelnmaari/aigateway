@@ -350,6 +350,22 @@ func (tx *sqliteTx) GetAPIKeyByHash(ctx context.Context, hash string) (*models.A
 	return tx.db.GetAPIKeyByHash(ctx, hash)
 }
 
+func (tx *sqliteTx) FindAPIKeyByDeviceFingerprint(ctx context.Context, userID, fingerprint string) (*models.APIKey, error) {
+	return tx.db.FindAPIKeyByDeviceFingerprint(ctx, userID, fingerprint)
+}
+
+func (tx *sqliteTx) UpdateAPIKeyLastSeen(ctx context.Context, keyID string) error {
+	return tx.db.UpdateAPIKeyLastSeen(ctx, keyID)
+}
+
+func (tx *sqliteTx) ListDeviceAPIKeys(ctx context.Context, userID string, filters models.DeviceFilters) ([]*models.APIKey, error) {
+	return tx.db.ListDeviceAPIKeys(ctx, userID, filters)
+}
+
+func (tx *sqliteTx) UpdateDeviceName(ctx context.Context, keyID, userID, newName string) error {
+	return tx.db.UpdateDeviceName(ctx, keyID, userID, newName)
+}
+
 func (tx *sqliteTx) UpdateAPIKey(ctx context.Context, key *models.APIKey) error {
 	return tx.db.UpdateAPIKey(ctx, key)
 }

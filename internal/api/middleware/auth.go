@@ -46,6 +46,11 @@ func APIKeyAuth(cfg *config.Config, logger *logrus.Logger) gin.HandlerFunc {
 		// TODO: Добавить проверку прав доступа к моделям
 		// TODO: Добавить rate limiting
 
+		// Version 2.4.0+: Update last_seen_at for device keys
+		// Note: This is a placeholder for now. When proper API key validation is implemented,
+		// this logic should be moved there to update last_seen_at only for verified device keys.
+		// Storage layer UpdateAPIKeyLastSeen is implemented and ready to use.
+
 		// Для MVP пропускаем все запросы
 		c.Set("api_key", apiKey)
 		c.Next()

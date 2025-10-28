@@ -145,6 +145,22 @@ func (db *PostgreSQLDB) GetAPIKeyByHash(ctx context.Context, hashedKey string) (
 	return nil, fmt.Errorf("GetAPIKeyByHash not implemented yet")
 }
 
+func (db *PostgreSQLDB) FindAPIKeyByDeviceFingerprint(ctx context.Context, userID, fingerprint string) (*models.APIKey, error) {
+	return nil, fmt.Errorf("FindAPIKeyByDeviceFingerprint not implemented yet")
+}
+
+func (db *PostgreSQLDB) UpdateAPIKeyLastSeen(ctx context.Context, keyID string) error {
+	return fmt.Errorf("UpdateAPIKeyLastSeen not implemented yet")
+}
+
+func (db *PostgreSQLDB) ListDeviceAPIKeys(ctx context.Context, userID string, filters models.DeviceFilters) ([]*models.APIKey, error) {
+	return nil, fmt.Errorf("ListDeviceAPIKeys not implemented yet")
+}
+
+func (db *PostgreSQLDB) UpdateDeviceName(ctx context.Context, keyID, userID, newName string) error {
+	return fmt.Errorf("UpdateDeviceName not implemented yet")
+}
+
 func (db *PostgreSQLDB) DeleteAPIKey(ctx context.Context, id string) error {
 	return fmt.Errorf("DeleteAPIKey not implemented yet")
 }

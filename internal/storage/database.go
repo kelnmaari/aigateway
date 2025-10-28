@@ -28,9 +28,15 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"aigateway/internal/models"
+)
+
+// Common errors
+var (
+	ErrNotFound = errors.New("not found")
 )
 
 // Database представляет unified интерфейс для работы с БД
@@ -182,6 +188,18 @@ type Database interface {
 
 	// ListTenantAPIKeys возвращает API ключи tenant
 	ListTenantAPIKeys(ctx context.Context, tenantID string) ([]*models.APIKey, error)
+
+	// FindAPIKeyByDeviceFingerprint finds API key by device fingerprint (Version 2.4.0+)
+	FindAPIKeyByDeviceFingerprint(ctx context.Context, userID, fingerprint string) (*models.APIKey, error)
+
+	// UpdateAPIKeyLastSeen updates last_seen_at timestamp (Version 2.4.0+)
+	UpdateAPIKeyLastSeen(ctx context.Context, keyID string) error
+
+	// ListDeviceAPIKeys lists all device API keys for a user (Version 2.4.2+)
+	ListDeviceAPIKeys(ctx context.Context, userID string, filters models.DeviceFilters) ([]*models.APIKey, error)
+
+	// UpdateDeviceName updates device name (Version 2.4.2+)
+	UpdateDeviceName(ctx context.Context, keyID, userID, newName string) error
 
 	// ========================================
 	// Conversations (WEBUI-03: Chat Interface)

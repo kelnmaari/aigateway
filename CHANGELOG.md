@@ -5,6 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2] - 2025-10-28
+
+### Added
+
+- **Device Management API** (DESKTOP-02): Полное управление устройствами desktop client
+  - **REST API Endpoints**:
+    - `GET /api/auth/devices` - список устройств пользователя с фильтрацией (status, sort, order)
+    - `GET /api/auth/devices/:id` - детальная информация об устройстве с usage статистикой
+    - `DELETE /api/auth/devices/:id` - revoke device API key с защитой от self-revoke
+    - `PATCH /api/auth/devices/:id` - обновление user-friendly имени устройства
+  - **Device Management WebUI** (`/profile-devices.html`):
+    - Список всех зарегистрированных устройств с карточками
+    - Визуальные индикаторы: OS icons (🪟 Windows, 🍎 macOS, 🐧 Linux), статус (Active/Inactive/Expired)
+    - Highlight текущего устройства с badge "This Device"
+    - Фильтры: status (active/expired/all), сортировка (last_seen/created_at/name), order (asc/desc)
+    - Статистика: Total Devices, Active Devices, Current Device
+    - Действия: Rename device (prompt), Remove device (confirmation modal)
+    - Last seen timestamp с цветовой индикацией (green - recent, red - inactive >30 days)
+    - Адаптивный grid layout (CSS Grid с auto-fill/auto-fit)
+    - Темная тема с CSS переменными (без Bootstrap)
+  - **Security Features**:
+    - Owner verification - пользователь может управлять только своими устройствами
+    - Self-revoke prevention - нельзя удалить текущее устройство
+    - JWT authentication для всех device management endpoints
+  - **Data Models** (`DeviceInfo`, `ListDevicesResponse`, `UpdateDeviceNameRequest`, `DeviceFilters`)
+
+### Technical
+
+- **Backend (Go)**:
+  - `internal/api/handlers/device_handler.go` - Device management handlers (380+ lines)
+  - `internal/storage/sqlite/apikeys.go` - Device-specific queries (`ListDeviceAPIKeys`, `UpdateDeviceName`)
+  - `internal/storage/database.go` - Interface updates для device management methods
+  - `internal/models/apikey.go` - Helper methods (`ToDeviceInfo()`, `IsDeviceKey()`, `GenerateDeviceName()`)
+  - Route registration в `/api/auth/devices` group с JWT middleware
+- **Frontend (HTML/CSS/JS)**:
+  - `web/profile-devices.html` - Device management page (297 lines, CSS Grid layout)
+  - `web/js/profile-devices.js` - DeviceManager class (367 lines, follows Dashboard/ProfileManager pattern)
+  - `web/js/components/navbar.js` - Добавлена ссылка "My Devices" в user dropdown
+  - `web/chat.html` - Добавлены кнопки "Devices" и "Profile" в sidebar footer
+  - Использует `modal.danger()` и `toast.*` из `notifications.js`
+  - Emoji icons вместо Bootstrap Icons для совместимости с темной темой
+- **Database**: Использует существующие device fields из migration v66 (DESKTOP-01)
+- **Testing**: Unit tests для device management endpoints (pending full test suite fix)
+
+## [2.4.1] - 2025-10-28
+
+### Added
+
+- **Auto-Generated API Keys System** (DESKTOP-01): Автоматическая регистрация desktop устройств
+  - **Device Registration API**:
+    - `POST /api/auth/devices/register` - auto-creation API keys для desktop client
+    - Device metadata: OS (windows/darwin/linux), hostname, app version, fingerprint (SHA256)
+    - Automatic device naming: "Desktop App - {OS} - {Date}" с fallback на hostname
+    - Auto-expiry для device keys (default 90 days, настраиваемый)
+    - Duplicate detection по device fingerprint (SHA256 hash device-specific info)
+  - **Authentication Flow for Desktop**:
+    1. Desktop app логинится username/password → получает JWT token
+    2. JWT token используется для `POST /api/auth/devices/register` → получает API key
+    3. API key сохраняется локально и используется для всех последующих запросов
+    4. JWT token discarded (security best practice)
+  - **Device Tracking**:
+    - `last_seen_at` timestamp (prepared for automatic updates in middleware)
+    - Device fingerprint для unique identification и duplicate prevention
+    - Separate device keys отображаются как отдельные устройства в management UI
+- **Data Model Extensions**:
+  - `APIKey` struct: added 7 device fields (device_name, device_os, device_hostname, device_version, device_fingerprint, last_seen_at, auto_expire_at)
+  - `DeviceRegistrationRequest` / `DeviceRegistrationResponse` structs
+  - Helper methods: `IsDeviceKey()`, `GenerateDeviceName()`
+
+### Technical
+
+- **Backend (Go)**:
+  - `internal/api/handlers/device_handler.go` - DeviceHandler with RegisterDevice method
+  - `internal/storage/sqlite/apikeys.go` - Device-related queries (`FindAPIKeyByDeviceFingerprint`, `UpdateAPIKeyLastSeen`)
+  - `internal/storage/database.go` - Interface updates для device methods
+  - `internal/models/apikey.go` - Device metadata fields и validation
+  - Route: `POST /api/auth/devices/register` в `authProtected` group (JWT auth required)
+- **Database Migration v66** (`add_device_fields_to_api_keys`):
+  - Added columns: device_name, device_os, device_hostname, device_version, device_fingerprint, last_seen_at, auto_expire_at
+  - Indices: idx_api_keys_device_fingerprint, idx_api_keys_last_seen, idx_api_keys_device_os
+- **PostgreSQL**: Stub implementations в `internal/storage/postgresql/stubs.go`
+- **Testing**: Unit tests для device registration endpoint
+- **Documentation**: API endpoints documented в `device_handler.go` Swagger comments
+
 ## [2.3.1] - 2025-10-28
 
 ### Changed

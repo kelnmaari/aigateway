@@ -69,6 +69,7 @@ type Router struct {
 	healthHandler         *handlers.HealthHandler
 	systemHandler         *handlers.SystemHandler       // System endpoints (bootstrap, init-status)
 	authHandler           *handlers.AuthHandler         // Auth endpoints (login, register, etc)
+	deviceHandler         *handlers.DeviceHandler       // Device management (Version 2.4.0+)
 	userHandler           *handlers.UserHandler         // User management
 	tenantHandler         *handlers.TenantHandler       // Tenant management
 	conversationHandler       *handlers.ConversationHandler       // Conversation management (Version 1.3.0)
@@ -700,6 +701,23 @@ func (r *Router) setupAuthRoutes() {
 		{
 			authProtected.POST("/logout", r.authHandler.Logout)
 			authProtected.GET("/me", r.authHandler.Me)
+
+			// Device registration endpoint (Version 2.4.0+: Desktop Client Support)
+			if r.deviceHandler != nil {
+				authProtected.POST("/devices/register", r.deviceHandler.RegisterDevice)
+			}
+		}
+
+		// Device management endpoints (Version 2.4.2+: Device Management API)
+		if r.deviceHandler != nil && r.jwtManager != nil {
+			devices := r.engine.Group("/api/auth/devices")
+			devices.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+			{
+				devices.GET("", r.deviceHandler.ListDevices)
+				devices.GET("/:id", r.deviceHandler.GetDevice)
+				devices.DELETE("/:id", r.deviceHandler.DeleteDevice)
+				devices.PATCH("/:id", r.deviceHandler.UpdateDeviceName)
+			}
 		}
 
 		// User management endpoints
@@ -813,6 +831,7 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/chat.html", "./web/chat.html") // Chat interface (renamed from index.html)
 	r.engine.StaticFile("/dashboard.html", "./web/dashboard.html")
 	r.engine.StaticFile("/profile.html", "./web/profile.html")
+	r.engine.StaticFile("/profile-devices.html", "./web/profile-devices.html") // Device Management (DESKTOP-02, v2.4.2)
 	r.engine.StaticFile("/tenants.html", "./web/tenants.html")
 	r.engine.StaticFile("/api-keys.html", "./web/api-keys.html")
 	r.engine.StaticFile("/files.html", "./web/files.html") // Files Management (v1.10.0)
@@ -1333,6 +1352,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 
 	if r.authService != nil && r.db != nil {
 		r.authHandler = handlers.NewAuthHandler(r.authService, logger, r.auditLogger)
+		r.deviceHandler = handlers.NewDeviceHandler(r.db, logger) // Version 2.4.0+: Device management
 		r.userHandler = handlers.NewUserHandler(r.db, logger, r.auditLogger)
 		r.tenantHandler = handlers.NewTenantHandler(r.db, logger, r.auditLogger)
 		r.conversationHandler = handlers.NewConversationHandler(r.db)

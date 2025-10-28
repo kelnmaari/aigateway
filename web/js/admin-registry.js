@@ -30,7 +30,7 @@ async function loadStats() {
         renderStats();
     } catch (error) {
         console.error('Failed to load stats:', error);
-        notifications.error('Failed to load statistics');
+        toast.error('Failed to load statistics');
     }
 }
 
@@ -51,7 +51,7 @@ async function loadProviders() {
         updateProviderFilters();
     } catch (error) {
         console.error('Failed to load providers:', error);
-        notifications.error('Failed to load providers');
+        toast.error('Failed to load providers');
         document.getElementById('providers-container').innerHTML = 
             '<p style="color: var(--error-color);">Failed to load providers. Please try again.</p>';
     }
@@ -138,14 +138,14 @@ function getHealthLabel(status) {
 // Check provider health
 async function checkProviderHealth(providerId) {
     try {
-        notifications.info('Checking provider health...');
+        toast.info('Checking provider health...');
         const response = await api.get('/api/admin/registry/providers/health');
-        notifications.success('Health check completed');
+        toast.success('Health check completed');
         await loadProviders();
         await loadStats();
     } catch (error) {
         console.error('Health check failed:', error);
-        notifications.error('Health check failed');
+        toast.error('Health check failed');
     }
 }
 
@@ -157,7 +157,7 @@ async function loadModels() {
         renderModels(models);
     } catch (error) {
         console.error('Failed to load models:', error);
-        notifications.error('Failed to load models');
+        toast.error('Failed to load models');
         document.getElementById('models-table-body').innerHTML = 
             '<tr><td colspan="8" style="text-align: center; color: var(--error-color);">Failed to load models</td></tr>';
     }
@@ -242,16 +242,16 @@ async function runDiscovery() {
     btn.innerHTML = '<span class="spinner"></span> Discovering...';
     
     try {
-        notifications.info('Discovering models from providers...');
+        toast.info('Discovering models from providers...');
         const response = await api.post('/api/admin/registry/discover', {});
         
-        notifications.success(`Discovery complete! Found ${response.discovered} new models`);
+        toast.success(`Discovery complete! Found ${response.discovered} new models`);
         
         await loadModels();
         await loadStats();
     } catch (error) {
         console.error('Discovery failed:', error);
-        notifications.error('Model discovery failed: ' + (error.message || 'Unknown error'));
+        toast.error('Model discovery failed: ' + (error.message || 'Unknown error'));
     } finally {
         btn.disabled = false;
         btn.innerHTML = '🔍 Discover Models';
@@ -304,13 +304,13 @@ async function createProvider(event) {
     
     try {
         await api.post('/api/admin/registry/providers', data);
-        notifications.success('Provider created successfully');
+        toast.success('Provider created successfully');
         closeCreateProviderModal();
         await loadProviders();
         await loadStats();
     } catch (error) {
         console.error('Failed to create provider:', error);
-        notifications.error('Failed to create provider: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to create provider: ' + (error.message || 'Unknown error'));
     }
 }
 
@@ -322,13 +322,13 @@ async function deleteProvider(providerId, providerName) {
     
     try {
         await api.delete(`/api/admin/registry/providers/${providerId}`);
-        notifications.success('Provider deleted successfully');
+        toast.success('Provider deleted successfully');
         await loadProviders();
         await loadModels();
         await loadStats();
     } catch (error) {
         console.error('Failed to delete provider:', error);
-        notifications.error('Failed to delete provider: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to delete provider: ' + (error.message || 'Unknown error'));
     }
 }
 
@@ -368,13 +368,13 @@ async function createModel(event) {
     
     try {
         await api.post('/api/admin/registry/models', data);
-        notifications.success('Model registered successfully');
+        toast.success('Model registered successfully');
         closeCreateModelModal();
         await loadModels();
         await loadStats();
     } catch (error) {
         console.error('Failed to register model:', error);
-        notifications.error('Failed to register model: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to register model: ' + (error.message || 'Unknown error'));
     }
 }
 
@@ -386,18 +386,18 @@ async function deleteModel(modelId, modelName) {
     
     try {
         await api.delete(`/api/admin/registry/models/${modelId}`);
-        notifications.success('Model deleted successfully');
+        toast.success('Model deleted successfully');
         await loadModels();
         await loadStats();
     } catch (error) {
         console.error('Failed to delete model:', error);
-        notifications.error('Failed to delete model: ' + (error.message || 'Unknown error'));
+        toast.error('Failed to delete model: ' + (error.message || 'Unknown error'));
     }
 }
 
 // Edit provider (placeholder - can be expanded)
 function editProvider(providerId) {
-    notifications.info('Edit provider feature coming soon!');
+    toast.info('Edit provider feature coming soon!');
     // TODO: Implement edit modal similar to create
 }
 

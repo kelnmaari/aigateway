@@ -1,11 +1,12 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 2.2.0 ✅ (Invitation-Only Registration System)  
+> **Текущая версия:** 2.2.2 ✅ (Enhanced User Management)  
 > **Следующая версия:** 2.3.0 (Model Registry & Multi-Provider Foundation) 📋  
+> **Новая инициатива:** 🖥️ Desktop Client (Wails) - см. [Roadmap-desktop.md](Roadmap-desktop.md)  
 > **План развития:** Version 2.0.0 - 2.5.0+  
-> **Статус:** Active Development (v2.2.0 Complete! ✅ Planning v2.3.0 Multi-Provider)  
+> **Статус:** Active Development (v2.2.2 Complete! ✅ Planning v2.3.0 + Desktop Support)  
 > **Последнее обновление:** 2025-10-28  
-> **Новое:** 🎉 v2.1.0 релиз! Complete Rebranding to AIGateway. Next: Invitation-Only Registration → Model Registry & vLLM
+> **Новое:** 🎉 v2.2.2 Enhanced User Management! Next: Model Registry → Desktop Client Support
 
 ---
 
@@ -847,6 +848,126 @@ auth:
 3. **Model Fallback:** Автоматический переход на backup provider
 4. **Multi-Model:** Разные модели на разных providers (Ollama + vLLM)
 5. **Load Balancing:** Распределение нагрузки между GPU/providers
+
+---
+
+## 🖥️ Version 2.4.0 - Desktop Client Support
+
+**Фокус:** Server-side поддержка для Desktop приложения (Wails)  
+**Приоритет:** MEDIUM  
+**Оценка времени:** 12-16 часов  
+**Статус:** 📋 Запланировано (0/4 задач)  
+**Версионирование:** v2.4.1-v2.4.4  
+**Dependencies:** v2.2.0+ (API Keys system must be working)  
+**Related:** [Roadmap-desktop.md](Roadmap-desktop.md) - Desktop app development plan
+
+**Стратегия:** Подготовка server-side инфраструктуры для поддержки тонкого desktop клиента на Wails. Фокус на auto-generated API keys, device management, и WebSocket streaming.
+
+### Задачи
+
+- [ ] **DESKTOP-01** Auto-Generated API Keys System → [BACKLOG/DESKTOP-01_auto_api_keys.md](BACKLOG/DESKTOP-01_auto_api_keys.md) → **v2.4.1**
+  - Endpoint для auto-creation API keys: POST /api/auth/devices/register
+  - Device metadata в API keys (os, hostname, app_version)
+  - Device naming convention: "Desktop App - {OS} - {Date}"
+  - Automatic expiry для device keys (опционально, 90 days)
+  - Device fingerprinting для duplicate detection
+  - Last seen timestamp update на каждый request
+  - **Оценка:** 3-4 часа
+
+- [ ] **DESKTOP-02** Device Management API → [BACKLOG/DESKTOP-02_device_management.md](BACKLOG/DESKTOP-02_device_management.md) → **v2.4.2**
+  - GET /api/auth/devices - список всех устройств пользователя
+  - GET /api/auth/devices/:id - информация об устройстве
+  - DELETE /api/auth/devices/:id - revoke device key
+  - PATCH /api/auth/devices/:id/rename - переименование устройства
+  - Device activity tracking (last_ip, last_location, usage stats)
+  - Push notification на новое устройство (опционально)
+  - **Оценка:** 3-4 часа
+
+- [ ] **DESKTOP-03** WebSocket Streaming для Desktop → [BACKLOG/DESKTOP-03_websocket_streaming.md](BACKLOG/DESKTOP-03_websocket_streaming.md) → **v2.4.3**
+  - WebSocket endpoint: /ws/chat?token={api_key}
+  - Server-Sent Events (SSE) как альтернатива
+  - Streaming chat responses через WebSocket
+  - Binary protocol для эффективности
+  - Reconnection logic на server-side
+  - Ping/Pong для keep-alive
+  - **Оценка:** 4-5 часов
+
+- [ ] **DESKTOP-04** Desktop-Specific WebUI Features → [BACKLOG/DESKTOP-04_webui_devices.md](BACKLOG/DESKTOP-04_webui_devices.md) → **v2.4.4**
+  - Devices Management page в web UI
+  - Visual indicators для активных устройств (online/offline)
+  - Device details modal (OS, version, last activity)
+  - Bulk revoke для multiple devices
+  - Activity timeline per device
+  - Security alerts (новое устройство, подозрительная активность)
+  - **Оценка:** 2-3 часа
+
+### 🎯 Ключевые возможности
+
+**Authentication:**
+
+- 🔑 **One-time Password Flow** - Username/Password → JWT → API Key → Discard JWT
+- 🖥️ **Device Recognition** - Каждый desktop получает unique API key
+- 🔒 **Granular Control** - Revoke access для конкретного устройства
+- 📊 **Activity Tracking** - Last seen, IP address, usage metrics
+- 🔄 **Auto-renewal** - Опционально, продление ключей для активных devices
+
+**Streaming:**
+
+- ⚡ **WebSocket Support** - Real-time chat streaming для desktop
+- 🔄 **Fallback to SSE** - Server-Sent Events если WebSocket недоступен
+- 📡 **Binary Protocol** - Эффективная передача данных
+- 🔌 **Auto-reconnect** - Graceful handling connection drops
+
+**Management:**
+
+- 📱 **Multi-Device Support** - Пользователь может иметь 10+ devices
+- 🗑️ **Easy Revocation** - One-click device removal из web UI
+- 🔔 **Notifications** - Уведомления о новых устройствах
+- 📈 **Usage Analytics** - Статистика по устройствам
+
+### 🏗️ Технический стек
+
+**Backend:**
+
+- Existing API Keys system (расширение)
+- WebSocket library (gorilla/websocket)
+- Device fingerprinting (user-agent parsing)
+- GeoIP для location tracking (опционально)
+
+**Database:**
+
+Расширение таблицы `api_keys`:
+
+```sql
+ALTER TABLE api_keys ADD COLUMN device_info JSONB;
+ALTER TABLE api_keys ADD COLUMN last_seen_at TIMESTAMP;
+ALTER TABLE api_keys ADD COLUMN last_ip VARCHAR(45);
+ALTER TABLE api_keys ADD COLUMN auto_generated BOOLEAN DEFAULT false;
+```
+
+**WebUI:**
+
+- Devices Management page (React/Svelte)
+- Device cards с status indicators
+- Activity timeline component
+- Revoke confirmation modal
+
+### 📈 Use Cases
+
+1. **Desktop App Login:** User вводит credentials один раз → автоматически создается API key
+2. **Multi-Device:** User работает с home PC + office PC + laptop - каждое устройство имеет свой key
+3. **Security Incident:** User видит неизвестное устройство → revokes его key немедленно
+4. **Device Lost:** Laptop украден → revoke ключа из web UI блокирует access
+5. **Usage Tracking:** Admin видит что device не использовался 90 days → auto-revoke
+
+### 🔗 Desktop Client Integration
+
+После реализации v2.4.0, desktop client (см. [Roadmap-desktop.md](Roadmap-desktop.md)) сможет:
+
+- ✅ Использовать POST /api/auth/devices/register для получения API key
+- ✅ Подключаться к /ws/chat для streaming
+- ✅ Показывать список всех user devices
+- ✅ Self-revoke при logout
 
 ---
 

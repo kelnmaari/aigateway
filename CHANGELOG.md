@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.5] - 2025-10-28
+
+### Fixed
+
+- **CRITICAL: WebSocket Panic Fix** 🐛:
+  - **Issue**: Server panic "send on closed channel" when client disconnects during streaming
+  - **Root Cause**: Goroutine continues streaming after client's `Send` channel closed
+  - **Solution**: 
+    - Added panic recovery in `sendMessage()` with `defer recover()`
+    - Added 5-second timeout to detect disconnected clients
+    - Stop streaming immediately on send error (graceful goroutine exit)
+    - Ignore errors on final "done" message (client may be disconnected)
+  - **Impact**: Server now handles client disconnections gracefully without crashes
+  - **Testing**: Verified with client disconnect during active streaming
+
+### Technical
+
+- **File Modified**: `internal/websocket/chat_handler.go`
+  - `sendMessage()`:
+    - Added `defer recover()` to catch panic from closed channel
+    - Added `select` with `time.After(5s)` timeout
+    - Returns error instead of panicking
+  - `processStreamingResponse()`:
+    - Check `sendMessage()` error on every chunk
+    - Exit goroutine immediately on error (stop streaming)
+    - Log warning with context (request_id, chunks_sent, client_id)
+- **Design Patterns**:
+  - Panic recovery pattern for channel operations
+  - Timeout pattern for dead client detection
+  - Graceful goroutine shutdown on errors
+- **Documentation**: Added `WEBSOCKET_PANIC_FIX.md` with detailed analysis
+
 ## [2.4.4] - 2025-10-28
 
 ### Added

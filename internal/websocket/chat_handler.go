@@ -198,7 +198,25 @@ func (h *ChatHandler) processStreamingResponse(
 					"client_id":   client.ID,
 					"chunks_sent": chunksProcessed,
 				}).Warn("Client disconnected during streaming, stopping gracefully")
-				return // Exit goroutine - don't try to send more
+				
+				// Try to send done message before exiting (client might still be connected)
+				// Ignore errors - if this fails too, client is definitely gone
+				_ = h.sendMessage(client, &ChatDoneMessage{
+					Type:      MessageTypeChatDone,
+					RequestID: requestID,
+					Payload: struct {
+						MessageID    string `json:"message_id"`
+						TotalTokens  int    `json:"total_tokens"`
+						FinishReason string `json:"finish_reason"`
+					}{
+						MessageID:    requestID,
+						TotalTokens:  totalTokens,
+						FinishReason: "stop",
+					},
+					Timestamp: time.Now(),
+				})
+				
+				return // Exit goroutine - don't try to send more chunks
 			}
 
 			chunksProcessed++

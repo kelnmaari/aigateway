@@ -288,6 +288,16 @@ func (p *PostgreSQLDB) getMigrations() []migration {
 			Name:    "add_invitations_table",
 			SQL:     p.getAddInvitationsTableMigration(),
 		},
+		{
+			Version: 5,
+			Name:    "create_model_registry_tables",
+			SQL:     p.getCreateModelRegistryTablesMigration(),
+		},
+		{
+			Version: 6,
+			Name:    "seed_default_ollama_provider",
+			SQL:     p.getSeedDefaultOllamaProviderMigration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -855,10 +865,149 @@ func (tx *postgresqlTx) GetEffectiveModelConfig(ctx context.Context, modelName, 
 var _ storage.Tx = (*postgresqlTx)(nil)
 
 // ========================================
+// Migration Functions
+// ========================================
+
+// getCreateModelRegistryTablesMigration returns SQL for creating model registry tables (v5 migration)
+func (p *PostgreSQLDB) getCreateModelRegistryTablesMigration() string {
+	return `
+-- Model Providers Table
+-- Хранит конфигурацию для каждого model provider (Ollama, vLLM, OpenAI, etc)
+CREATE TABLE IF NOT EXISTS model_providers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT UNIQUE NOT NULL,              -- "ollama-local", "vllm-primary", "openai"
+    provider_type TEXT NOT NULL,            -- "ollama", "vllm", "openai", "anthropic", "custom"
+    base_url TEXT NOT NULL,                 -- "http://localhost:11434"
+    api_key TEXT,                           -- Encrypted (для OpenAI, Anthropic)
+    
+    -- Configuration
+    enabled BOOLEAN DEFAULT true,           -- Provider включен/выключен
+    priority INTEGER DEFAULT 100,           -- Higher = preferred (для fallback)
+    config JSONB DEFAULT '{}'::jsonb,       -- Provider-specific config
+    
+    -- Health tracking
+    health_status TEXT DEFAULT 'unknown',   -- "healthy", "unhealthy", "unknown"
+    last_health_check TIMESTAMP,
+    error_message TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    CONSTRAINT valid_provider_type CHECK (provider_type IN ('ollama', 'vllm', 'openai', 'anthropic', 'custom'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_providers_type ON model_providers(provider_type);
+CREATE INDEX IF NOT EXISTS idx_model_providers_enabled ON model_providers(enabled);
+CREATE INDEX IF NOT EXISTS idx_model_providers_priority ON model_providers(priority DESC);
+
+-- Model Registry Table
+-- Универсальный реестр всех моделей из всех providers
+CREATE TABLE IF NOT EXISTS model_registry (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Model identification
+    model_id TEXT UNIQUE NOT NULL,          -- "llama2:7b", "mistral-7b-instruct", "gpt-4"
+    model_name TEXT NOT NULL,               -- Display name
+    provider_id UUID NOT NULL,              -- FK to model_providers
+    
+    -- Capabilities (JSON array)
+    capabilities JSONB DEFAULT '[]'::jsonb, -- ["chat", "embeddings", "vision", "function-calling"]
+    parameters JSONB DEFAULT '{}'::jsonb,   -- Model-specific parameters (max_tokens, etc)
+    
+    -- Requirements
+    requires_gpu BOOLEAN DEFAULT false,
+    min_vram_gb INTEGER,
+    context_length INTEGER,
+    
+    -- Status
+    status TEXT DEFAULT 'active',           -- "active", "inactive", "loading", "error"
+    health_status TEXT DEFAULT 'unknown',   -- "healthy", "unhealthy", "unknown"
+    last_health_check TIMESTAMP,
+    
+    -- Metadata
+    description TEXT,
+    tags TEXT[],                            -- Array of tags: {"opensource", "7b", "instruct"}
+    
+    -- Performance metrics (updated periodically)
+    avg_latency_ms REAL,
+    tokens_per_second REAL,
+    total_requests BIGINT DEFAULT 0,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Constraints
+    FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE CASCADE,
+    CONSTRAINT valid_status CHECK (status IN ('active', 'inactive', 'loading', 'error')),
+    CONSTRAINT valid_health CHECK (health_status IN ('healthy', 'unhealthy', 'unknown'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_registry_provider ON model_registry(provider_id);
+CREATE INDEX IF NOT EXISTS idx_model_registry_status ON model_registry(status);
+CREATE INDEX IF NOT EXISTS idx_model_registry_health ON model_registry(health_status);
+CREATE INDEX IF NOT EXISTS idx_model_registry_model_id ON model_registry(model_id);
+CREATE INDEX IF NOT EXISTS idx_model_registry_capabilities ON model_registry USING GIN (capabilities);
+
+-- Triggers для auto-update updated_at
+CREATE OR REPLACE FUNCTION update_model_providers_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_model_providers_timestamp
+BEFORE UPDATE ON model_providers
+FOR EACH ROW
+EXECUTE FUNCTION update_model_providers_timestamp();
+
+CREATE OR REPLACE FUNCTION update_model_registry_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_model_registry_timestamp
+BEFORE UPDATE ON model_registry
+FOR EACH ROW
+EXECUTE FUNCTION update_model_registry_timestamp();
+	`
+}
+
+// getSeedDefaultOllamaProviderMigration returns SQL for seeding default Ollama provider (v6 migration)
+func (p *PostgreSQLDB) getSeedDefaultOllamaProviderMigration() string {
+	return `
+-- Seed default Ollama provider (local)
+-- Используем фиксированный ID для идемпотентности
+INSERT INTO model_providers (
+    id, name, provider_type, base_url, 
+    enabled, priority, config, 
+    health_status, created_at, updated_at
+) VALUES (
+    'ollama-local-default',
+    'ollama-local',
+    'ollama',
+    'http://localhost:11434',
+    true,
+    100,
+    '{}'::jsonb,
+    'unknown',
+    NOW(),
+    NOW()
+)
+ON CONFLICT (id) DO NOTHING;
+	`
+}
+
+// ========================================
 // Transaction Methods (Delegation)
 // ========================================
 //
 // Transaction methods are implemented in transactions.go
 // They delegate to the parent DB's methods
 // ========================================
-

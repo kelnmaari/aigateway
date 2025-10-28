@@ -501,3 +501,77 @@ func (tx *postgresqlTx) ListAllTenants(ctx context.Context) ([]*models.Tenant, e
 func (tx *postgresqlTx) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
 	return tx.db.GetUsersWithDetails(ctx, filters)
 }
+
+// ========================================
+// Model Registry (Version 2.3.0+: REGISTRY-01) - Transaction Delegation
+// ========================================
+
+// Model Providers
+func (tx *postgresqlTx) CreateModelProvider(ctx context.Context, provider *models.ModelProvider) error {
+	return tx.db.CreateModelProvider(ctx, provider)
+}
+
+func (tx *postgresqlTx) GetModelProvider(ctx context.Context, id string) (*models.ModelProvider, error) {
+	return tx.db.GetModelProvider(ctx, id)
+}
+
+func (tx *postgresqlTx) GetModelProviderByName(ctx context.Context, name string) (*models.ModelProvider, error) {
+	return tx.db.GetModelProviderByName(ctx, name)
+}
+
+func (tx *postgresqlTx) UpdateModelProvider(ctx context.Context, provider *models.ModelProvider) error {
+	return tx.db.UpdateModelProvider(ctx, provider)
+}
+
+func (tx *postgresqlTx) DeleteModelProvider(ctx context.Context, id string) error {
+	return tx.db.DeleteModelProvider(ctx, id)
+}
+
+func (tx *postgresqlTx) ListModelProviders(ctx context.Context, enabledOnly bool) ([]*models.ModelProvider, error) {
+	return tx.db.ListModelProviders(ctx, enabledOnly)
+}
+
+func (tx *postgresqlTx) UpdateModelProviderHealth(ctx context.Context, id string, health models.ModelHealthStatus, errorMsg string) error {
+	return tx.db.UpdateModelProviderHealth(ctx, id, health, errorMsg)
+}
+
+// Model Registry
+func (tx *postgresqlTx) CreateModelRegistry(ctx context.Context, model *models.ModelRegistry) error {
+	return tx.db.CreateModelRegistry(ctx, model)
+}
+
+func (tx *postgresqlTx) GetModelRegistry(ctx context.Context, id string) (*models.ModelRegistry, error) {
+	return tx.db.GetModelRegistry(ctx, id)
+}
+
+func (tx *postgresqlTx) GetModelRegistryByModelID(ctx context.Context, modelID string) (*models.ModelRegistry, error) {
+	return tx.db.GetModelRegistryByModelID(ctx, modelID)
+}
+
+func (tx *postgresqlTx) UpdateModelRegistry(ctx context.Context, model *models.ModelRegistry) error {
+	return tx.db.UpdateModelRegistry(ctx, model)
+}
+
+func (tx *postgresqlTx) DeleteModelRegistry(ctx context.Context, id string) error {
+	return tx.db.DeleteModelRegistry(ctx, id)
+}
+
+func (tx *postgresqlTx) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
+	return tx.db.ListModelRegistry(ctx, filter)
+}
+
+func (tx *postgresqlTx) UpdateModelRegistryHealth(ctx context.Context, id string, health models.ModelHealthStatus) error {
+	return tx.db.UpdateModelRegistryHealth(ctx, id, health)
+}
+
+func (tx *postgresqlTx) UpdateModelRegistryMetrics(ctx context.Context, id string, latency float64, tokensPerSec float64) error {
+	return tx.db.UpdateModelRegistryMetrics(ctx, id, latency, tokensPerSec)
+}
+
+func (tx *postgresqlTx) IncrementModelRequests(ctx context.Context, id string) error {
+	return tx.db.IncrementModelRequests(ctx, id)
+}
+
+func (tx *postgresqlTx) GetModelRegistryStats(ctx context.Context) (*models.ModelRegistryStats, error) {
+	return tx.db.GetModelRegistryStats(ctx)
+}

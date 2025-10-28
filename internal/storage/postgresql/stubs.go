@@ -433,3 +433,75 @@ func (db *PostgreSQLDB) GetQuotaWithUsage(ctx context.Context, scope models.Quot
 	return nil, nil, fmt.Errorf("GetQuotaWithUsage not implemented for PostgreSQL yet (Version 1.11.7+)")
 }
 
+// ========================================
+// Model Registry (Version 2.3.0+: REGISTRY-01) - Stubs
+// ========================================
+
+func (db *PostgreSQLDB) CreateModelProvider(ctx context.Context, provider *models.ModelProvider) error {
+	return fmt.Errorf("CreateModelProvider not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) GetModelProvider(ctx context.Context, id string) (*models.ModelProvider, error) {
+	return nil, fmt.Errorf("GetModelProvider not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) GetModelProviderByName(ctx context.Context, name string) (*models.ModelProvider, error) {
+	return nil, fmt.Errorf("GetModelProviderByName not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) UpdateModelProvider(ctx context.Context, provider *models.ModelProvider) error {
+	return fmt.Errorf("UpdateModelProvider not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) DeleteModelProvider(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteModelProvider not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) ListModelProviders(ctx context.Context, enabledOnly bool) ([]*models.ModelProvider, error) {
+	return nil, fmt.Errorf("ListModelProviders not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) UpdateModelProviderHealth(ctx context.Context, id string, health models.ModelHealthStatus, errorMsg string) error {
+	return fmt.Errorf("UpdateModelProviderHealth not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) CreateModelRegistry(ctx context.Context, model *models.ModelRegistry) error {
+	return fmt.Errorf("CreateModelRegistry not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) GetModelRegistry(ctx context.Context, id string) (*models.ModelRegistry, error) {
+	return nil, fmt.Errorf("GetModelRegistry not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) GetModelRegistryByModelID(ctx context.Context, modelID string) (*models.ModelRegistry, error) {
+	return nil, fmt.Errorf("GetModelRegistryByModelID not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) UpdateModelRegistry(ctx context.Context, model *models.ModelRegistry) error {
+	return fmt.Errorf("UpdateModelRegistry not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) DeleteModelRegistry(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteModelRegistry not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
+	return nil, fmt.Errorf("ListModelRegistry not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) UpdateModelRegistryHealth(ctx context.Context, id string, health models.ModelHealthStatus) error {
+	return fmt.Errorf("UpdateModelRegistryHealth not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) UpdateModelRegistryMetrics(ctx context.Context, id string, latency float64, tokensPerSec float64) error {
+	return fmt.Errorf("UpdateModelRegistryMetrics not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) IncrementModelRequests(ctx context.Context, id string) error {
+	return fmt.Errorf("IncrementModelRequests not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+
+func (db *PostgreSQLDB) GetModelRegistryStats(ctx context.Context) (*models.ModelRegistryStats, error) {
+	return nil, fmt.Errorf("GetModelRegistryStats not implemented for PostgreSQL yet (Version 2.3.0+)")
+}
+

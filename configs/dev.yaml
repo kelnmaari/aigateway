@@ -518,3 +518,17 @@ rag:
   security:
     encryption_key: "12345678901234567890123456789012"  # 32 bytes для AES-256 (замените в production!)
     credentials_encryption_enabled: true
+
+# Model Registry System Configuration (Version 2.3.0+: REGISTRY-01)
+model_registry:
+  enabled: true  # Включить Model Registry систему
+  
+  # Auto-Discovery Configuration
+  auto_discovery:
+    enabled: true  # Автоматическое обнаружение моделей при старте
+    interval: "30m"  # Интервал между повторными auto-discovery (0 = только при старте)
+  
+  # Provider Health Check
+  health_check:
+    enabled: true  # Периодическая проверка здоровья providers
+    interval: "5m"  # Интервал между health checks

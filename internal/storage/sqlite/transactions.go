@@ -598,7 +598,6 @@ func (tx *sqliteTx) GetInvitationWithUsers(ctx context.Context, id string) (*mod
 	return tx.db.GetInvitationWithUsers(ctx, id)
 }
 
-
 // ListAllTenants возвращает список всех tenants (delegation to db)
 func (tx *sqliteTx) ListAllTenants(ctx context.Context) ([]*models.Tenant, error) {
 	return tx.db.ListAllTenants(ctx)
@@ -607,4 +606,78 @@ func (tx *sqliteTx) ListAllTenants(ctx context.Context) ([]*models.Tenant, error
 // GetUsersWithDetails возвращает список пользователей с enriched данными (delegation to db)
 func (tx *sqliteTx) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
 	return tx.db.GetUsersWithDetails(ctx, filters)
+}
+
+// ========================================
+// Model Registry (Version 2.3.0+: REGISTRY-01) - Transaction Delegation
+// ========================================
+
+// Model Providers
+func (tx *sqliteTx) CreateModelProvider(ctx context.Context, provider *models.ModelProvider) error {
+	return tx.db.CreateModelProvider(ctx, provider)
+}
+
+func (tx *sqliteTx) GetModelProvider(ctx context.Context, id string) (*models.ModelProvider, error) {
+	return tx.db.GetModelProvider(ctx, id)
+}
+
+func (tx *sqliteTx) GetModelProviderByName(ctx context.Context, name string) (*models.ModelProvider, error) {
+	return tx.db.GetModelProviderByName(ctx, name)
+}
+
+func (tx *sqliteTx) UpdateModelProvider(ctx context.Context, provider *models.ModelProvider) error {
+	return tx.db.UpdateModelProvider(ctx, provider)
+}
+
+func (tx *sqliteTx) DeleteModelProvider(ctx context.Context, id string) error {
+	return tx.db.DeleteModelProvider(ctx, id)
+}
+
+func (tx *sqliteTx) ListModelProviders(ctx context.Context, enabledOnly bool) ([]*models.ModelProvider, error) {
+	return tx.db.ListModelProviders(ctx, enabledOnly)
+}
+
+func (tx *sqliteTx) UpdateModelProviderHealth(ctx context.Context, id string, health models.ModelHealthStatus, errorMsg string) error {
+	return tx.db.UpdateModelProviderHealth(ctx, id, health, errorMsg)
+}
+
+// Model Registry
+func (tx *sqliteTx) CreateModelRegistry(ctx context.Context, model *models.ModelRegistry) error {
+	return tx.db.CreateModelRegistry(ctx, model)
+}
+
+func (tx *sqliteTx) GetModelRegistry(ctx context.Context, id string) (*models.ModelRegistry, error) {
+	return tx.db.GetModelRegistry(ctx, id)
+}
+
+func (tx *sqliteTx) GetModelRegistryByModelID(ctx context.Context, modelID string) (*models.ModelRegistry, error) {
+	return tx.db.GetModelRegistryByModelID(ctx, modelID)
+}
+
+func (tx *sqliteTx) UpdateModelRegistry(ctx context.Context, model *models.ModelRegistry) error {
+	return tx.db.UpdateModelRegistry(ctx, model)
+}
+
+func (tx *sqliteTx) DeleteModelRegistry(ctx context.Context, id string) error {
+	return tx.db.DeleteModelRegistry(ctx, id)
+}
+
+func (tx *sqliteTx) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
+	return tx.db.ListModelRegistry(ctx, filter)
+}
+
+func (tx *sqliteTx) UpdateModelRegistryHealth(ctx context.Context, id string, health models.ModelHealthStatus) error {
+	return tx.db.UpdateModelRegistryHealth(ctx, id, health)
+}
+
+func (tx *sqliteTx) UpdateModelRegistryMetrics(ctx context.Context, id string, latency float64, tokensPerSec float64) error {
+	return tx.db.UpdateModelRegistryMetrics(ctx, id, latency, tokensPerSec)
+}
+
+func (tx *sqliteTx) IncrementModelRequests(ctx context.Context, id string) error {
+	return tx.db.IncrementModelRequests(ctx, id)
+}
+
+func (tx *sqliteTx) GetModelRegistryStats(ctx context.Context) (*models.ModelRegistryStats, error) {
+	return tx.db.GetModelRegistryStats(ctx)
 }

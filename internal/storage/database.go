@@ -468,6 +468,31 @@ type Database interface {
 	CreateRAGQueryLog(ctx context.Context, log *models.RAGQueryLog) error
 	GetRAGQueryLog(ctx context.Context, id int64) (*models.RAGQueryLog, error)
 	ListRAGQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*models.RAGQueryLog, error)
+
+	// ========================================
+	// Model Registry (Version 2.3.0+: REGISTRY-01)
+	// ========================================
+
+	// Model Providers
+	CreateModelProvider(ctx context.Context, provider *models.ModelProvider) error
+	GetModelProvider(ctx context.Context, id string) (*models.ModelProvider, error)
+	GetModelProviderByName(ctx context.Context, name string) (*models.ModelProvider, error)
+	UpdateModelProvider(ctx context.Context, provider *models.ModelProvider) error
+	DeleteModelProvider(ctx context.Context, id string) error
+	ListModelProviders(ctx context.Context, enabledOnly bool) ([]*models.ModelProvider, error)
+	UpdateModelProviderHealth(ctx context.Context, id string, health models.ModelHealthStatus, errorMsg string) error
+
+	// Model Registry
+	CreateModelRegistry(ctx context.Context, model *models.ModelRegistry) error
+	GetModelRegistry(ctx context.Context, id string) (*models.ModelRegistry, error)
+	GetModelRegistryByModelID(ctx context.Context, modelID string) (*models.ModelRegistry, error)
+	UpdateModelRegistry(ctx context.Context, model *models.ModelRegistry) error
+	DeleteModelRegistry(ctx context.Context, id string) error
+	ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error)
+	UpdateModelRegistryHealth(ctx context.Context, id string, health models.ModelHealthStatus) error
+	UpdateModelRegistryMetrics(ctx context.Context, id string, latency float64, tokensPerSec float64) error
+	IncrementModelRequests(ctx context.Context, id string) error
+	GetModelRegistryStats(ctx context.Context) (*models.ModelRegistryStats, error)
 }
 
 // AuditFilters фильтры для запроса audit events (Version 1.11.4+)

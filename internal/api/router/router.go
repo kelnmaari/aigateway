@@ -39,6 +39,7 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/storage"
 	"aigateway/internal/websocket"
+	"aigateway/internal/providers"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -98,6 +99,10 @@ type Router struct {
 	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
 	invitationHandler     *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
 	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
+	registryHandler       *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
+
+	// Provider Management (Version 2.3.0+: REGISTRY-01)
+	providerManager *providers.ProviderManager // Model providers manager
 
 	// WebSocket components
 	wsHub              *websocket.Hub
@@ -1102,6 +1107,32 @@ func (r *Router) setupAdminRoutes() {
 			pprofGroup.GET("/mutex", gin.WrapH(pprof.Handler("mutex")))
 			pprofGroup.GET("/threadcreate", gin.WrapH(pprof.Handler("threadcreate")))
 		}
+	}
+
+	// Model Registry endpoints (v2.3.0+: REGISTRY-01)
+	if r.registryHandler != nil {
+		r.logger.Info("Admin routes: Registering Model Registry endpoints")
+		
+		// Provider Management
+		admin.GET("/registry/providers", r.registryHandler.ListProviders)
+		admin.POST("/registry/providers", r.registryHandler.CreateProvider)
+		admin.GET("/registry/providers/health", r.registryHandler.HealthCheckProviders)
+		admin.GET("/registry/providers/:id", r.registryHandler.GetProvider)
+		admin.PUT("/registry/providers/:id", r.registryHandler.UpdateProvider)
+		admin.DELETE("/registry/providers/:id", r.registryHandler.DeleteProvider)
+		
+		// Model Registry Management
+		admin.GET("/registry/models", r.registryHandler.ListModels)
+		admin.POST("/registry/models", r.registryHandler.RegisterModel)
+		admin.GET("/registry/models/:id", r.registryHandler.GetModel)
+		admin.PUT("/registry/models/:id", r.registryHandler.UpdateModel)
+		admin.DELETE("/registry/models/:id", r.registryHandler.DeleteModel)
+		
+		// Model Discovery
+		admin.POST("/registry/discover", r.registryHandler.DiscoverModels)
+		
+		// Registry Stats
+		admin.GET("/registry/stats", r.registryHandler.GetStats)
 	}
 
 	r.logger.Info("Admin routes configured successfully")

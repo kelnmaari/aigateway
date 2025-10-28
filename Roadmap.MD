@@ -766,7 +766,7 @@ auth:
 **Фокус:** Universal Model Registry + vLLM Integration  
 **Приоритет:** MEDIUM  
 **Оценка времени:** 20-28 часов  
-**Статус:** 📋 Запланировано (0/4 задач)  
+**Статус:** 🚧 В разработке (1/4 задач)  
 **Версионирование:** v2.3.1-v2.3.4  
 **Dependencies:** ⚠️ Требует v2.1.0 (Rebranding complete)
 
@@ -774,14 +774,19 @@ auth:
 
 ### Задачи
 
-- [ ] **REGISTRY-01** Model Registry Core → [BACKLOG/REGISTRY-01_model_registry.md](BACKLOG/REGISTRY-01_model_registry.md) → **v2.3.1**
-  - Model metadata storage (DB schema)
-  - Model capabilities tracking (chat/embeddings/vision/function-calling)
-  - Provider abstraction layer
-  - Model registration API (POST /api/models/registry)
-  - Model discovery endpoint (GET /api/models/registry)
-  - Health check integration
-  - **Оценка:** 6-8 часов
+- [x] **REGISTRY-01** Model Registry Core → [BACKLOG/REGISTRY-01_model_registry.md](BACKLOG/REGISTRY-01_model_registry.md) → **v2.3.1** ✅
+  - ✅ Model metadata storage (DB schema: model_providers, model_registry)
+  - ✅ Model capabilities tracking (chat/embeddings/vision/function-calling)
+  - ✅ Provider abstraction layer (Provider interface, OllamaProvider, vLLMProvider stub)
+  - ✅ Model registration API (POST /api/admin/registry/models)
+  - ✅ Model discovery endpoint (GET /api/admin/registry/models)
+  - ✅ Provider management API (CRUD для providers)
+  - ✅ Auto-discovery mechanism (DiscoverModels при старте)
+  - ✅ Health check integration (HealthCheckAll providers)
+  - ✅ Configuration (model_registry в dev.yaml)
+  - ✅ Seed data (default Ollama provider)
+  - **Фактически:** 8 часов
+  - **Завершено:** 2025-10-28
 
 - [ ] **REGISTRY-02** Smart Model Router → [BACKLOG/REGISTRY-02_smart_router.md](BACKLOG/REGISTRY-02_smart_router.md) → **v2.3.2**
   - Router middleware для model requests

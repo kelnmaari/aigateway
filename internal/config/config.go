@@ -29,6 +29,7 @@ type Config struct {
 	Extractors    ExtractorsConfig    `mapstructure:"extractors"`    // Version 1.10.0+: Document extractors
 	WebFetch      WebFetchConfig           `mapstructure:"web_fetch"`     // Version 1.10.4+: Web content fetching
 	RAG           ragconfig.RAGConfig      `mapstructure:"rag"`           // Version 1.13.0+: RAG system configuration
+	ModelRegistry ModelRegistryConfig      `mapstructure:"model_registry"` // Version 2.3.0+: Model Registry system
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -787,6 +788,24 @@ type InvitationsConfig struct {
 		// Max validation requests per IP per minute
 		ValidationPerIPMinute int `mapstructure:"validation_per_ip_minute"`
 	} `mapstructure:"rate_limit"`
+}
+
+// ModelRegistryConfig конфигурация Model Registry system (Version 2.3.0+)
+type ModelRegistryConfig struct {
+	// Enabled - включить Model Registry систему
+	Enabled bool `mapstructure:"enabled"`
+	
+	// AutoDiscovery - автоматическое обнаружение моделей при старте
+	AutoDiscovery struct {
+		Enabled  bool          `mapstructure:"enabled"`
+		Interval time.Duration `mapstructure:"interval"` // Интервал между auto-discovery
+	} `mapstructure:"auto_discovery"`
+	
+	// HealthCheck - проверка здоровья providers
+	HealthCheck struct {
+		Enabled  bool          `mapstructure:"enabled"`
+		Interval time.Duration `mapstructure:"interval"` // Интервал между health checks
+	} `mapstructure:"health_check"`
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

@@ -18,6 +18,7 @@
 ### Текущая ситуация (DESKTOP-02)
 
 ✅ **Уже реализовано:**
+
 - Device cards с OS icons (🪟 Windows, 🍎 macOS, 🐧 Linux)
 - Status badges (Active, Inactive, Expired)
 - Last seen timestamp с цветовой индикацией
@@ -29,6 +30,7 @@
 - Adaptive grid layout (CSS Grid)
 
 ❌ **НЕ реализовано (DESKTOP-04):**
+
 - Device details modal с полной информацией
 - Real-time online/offline indicators через WebSocket
 - Bulk revoke для multiple devices
@@ -116,6 +118,7 @@
 ```
 
 **JavaScript:**
+
 ```javascript
 // В DeviceManager class
 openDeviceDetails(deviceId) {
@@ -177,6 +180,7 @@ markDeviceOnline(deviceId) {
 ```
 
 **CSS для online indicator:**
+
 ```css
 .online-indicator {
   display: inline-flex;
@@ -220,6 +224,7 @@ markDeviceOnline(deviceId) {
 ```
 
 **JavaScript:**
+
 ```javascript
 // В DeviceManager class
 enableBulkSelection() {
@@ -274,6 +279,7 @@ async bulkRevokeDevices() {
 ### 4. Activity Timeline per Device 📊
 
 **Backend endpoint (опционально):**
+
 ```go
 // GET /api/auth/devices/:id/activity
 // Returns last N activities for device
@@ -287,6 +293,7 @@ type DeviceActivity struct {
 ```
 
 **Frontend rendering:**
+
 ```javascript
 async loadDeviceActivity(deviceId) {
   try {
@@ -320,6 +327,7 @@ renderActivityTimeline(activities) {
 ```
 
 **CSS для timeline:**
+
 ```css
 .activity-timeline {
   margin-top: 1.5rem;
@@ -396,6 +404,7 @@ If this wasn't you, please revoke this device immediately.`,
 ```
 
 **Backend WebSocket event (в device_handler.go):**
+
 ```go
 // После успешной регистрации устройства
 func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
@@ -463,6 +472,7 @@ func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 ## 📝 Acceptance Criteria
 
 ### Must Have (для v2.4.4)
+
 - [x] Device details modal открывается при клике на card
 - [x] Modal показывает полную информацию о device
 - [x] Bulk selection checkboxes на device cards
@@ -471,6 +481,7 @@ func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 - [x] Защита от self-revoke при bulk operations
 
 ### Nice to Have (опционально)
+
 - [ ] Real-time online/offline indicators через WebSocket
 - [ ] Activity timeline в device details modal
 - [ ] Security alerts при новых устройствах
@@ -525,4 +536,3 @@ func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 
 **Дата создания:** 2025-10-28  
 **Последнее обновление:** 2025-10-28
-

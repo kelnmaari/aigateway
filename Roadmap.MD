@@ -1,12 +1,12 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 2.2.2 ✅ (Enhanced User Management)  
-> **Следующая версия:** 2.3.0 (Model Registry & Multi-Provider Foundation) 📋  
+> **Текущая версия:** 2.3.0 ✅ (Model Registry & Multi-Provider Foundation)  
+> **Следующая версия:** 2.4.0 (Desktop Client Support) 📋  
 > **Новая инициатива:** 🖥️ Desktop Client (Wails) - см. [Roadmap-desktop.md](Roadmap-desktop.md)  
 > **План развития:** Version 2.0.0 - 2.5.0+  
-> **Статус:** Active Development (v2.2.2 Complete! ✅ Planning v2.3.0 + Desktop Support)  
+> **Статус:** Active Development (v2.3.0 Complete! ✅ Next: Desktop Client Support)  
 > **Последнее обновление:** 2025-10-28  
-> **Новое:** 🎉 v2.2.2 Enhanced User Management! Next: Model Registry → Desktop Client Support
+> **Новое:** 🎉 v2.3.0 Model Registry Complete! 🗄️ Universal provider management, auto-discovery, health monitoring
 
 ---
 
@@ -766,7 +766,7 @@ auth:
 **Фокус:** Universal Model Registry + vLLM Integration  
 **Приоритет:** MEDIUM  
 **Оценка времени:** 20-28 часов  
-**Статус:** 🚧 В разработке (1/4 задач)  
+**Статус:** ✅ Завершена (3/4 задач, VLLM-01 отложена)  
 **Версионирование:** v2.3.1-v2.3.4  
 **Dependencies:** ⚠️ Требует v2.1.0 (Rebranding complete)
 
@@ -788,13 +788,17 @@ auth:
   - **Фактически:** 8 часов
   - **Завершено:** 2025-10-28
 
-- [ ] **REGISTRY-02** Smart Model Router → [BACKLOG/REGISTRY-02_smart_router.md](BACKLOG/REGISTRY-02_smart_router.md) → **v2.3.2**
-  - Router middleware для model requests
-  - Provider selection logic (Ollama/vLLM/etc)
-  - Fallback chains (если primary provider down)
-  - Load balancing между providers
-  - Request tracing с provider info
-  - **Оценка:** 5-7 часов
+- [x] **REGISTRY-02** Smart Model Router → [BACKLOG/REGISTRY-02_smart_router.md](BACKLOG/REGISTRY-02_smart_router.md) → **v2.3.2** ✅
+  - ✅ Router middleware для model requests (ModelRouterMiddleware)
+  - ✅ Provider selection logic (automatic routing by model_id)
+  - ✅ Fallback chains (automatic failover при provider down)
+  - ✅ Load balancing (latency + load-based selection)
+  - ✅ Request tracing (X-Provider-* headers + structured logs)
+  - ✅ Capabilities matching при fallback
+  - ✅ Health checks перед маршрутизацией
+  - ✅ Model-Provider caching (5min TTL)
+  - **Фактически:** 5 часов
+  - **Завершено:** 2025-10-28
 
 - [ ] **VLLM-01** vLLM Backend Integration → [BACKLOG/VLLM-01_integration.md](BACKLOG/VLLM-01_integration.md) → **v2.3.3**
   - vLLM client implementation
@@ -806,14 +810,18 @@ auth:
   - **Оценка:** 6-8 часов
   - **Documentation:** vLLM installation guide для Linux 2x GPU
 
-- [ ] **REGISTRY-03** Model Management WebUI → [BACKLOG/REGISTRY-03_webui.md](BACKLOG/REGISTRY-03_webui.md) → **v2.3.4**
-  - Model Registry dashboard
-  - Provider status cards (Ollama/vLLM/etc)
-  - Model registration form
-  - Model health monitoring
-  - Performance metrics per model
-  - Switch provider для specific model
-  - **Оценка:** 3-5 часов
+- [x] **REGISTRY-03** Model Management WebUI → [BACKLOG/REGISTRY-03_webui.md](BACKLOG/REGISTRY-03_webui.md) → **v2.3.4** ✅
+  - ✅ Model Registry dashboard (admin-registry.html)
+  - ✅ Provider status cards с real-time health indicators
+  - ✅ Model registration forms (modals для providers и models)
+  - ✅ Model health monitoring (auto-refresh каждые 30 сек)
+  - ✅ Performance metrics display (latency, throughput, total requests)
+  - ✅ Model discovery UI (кнопка + progress)
+  - ✅ Filters & Search (provider, status, health, keyword)
+  - ✅ Statistics cards (total models, active, providers, healthy)
+  - ✅ Integration с admin panel (вкладка Model Registry)
+  - **Фактически:** 3 часа
+  - **Завершено:** 2025-10-28
 
 ### 🎯 Ключевые возможности
 

@@ -6,6 +6,7 @@
 > **Target:** Cross-platform desktop app (Windows, macOS, Linux)  
 > **Vision:** Native desktop UI для AIGateway с local file system integration  
 > **Last Updated:** 2025-10-28  
+> **Project Path:** `G:\golang\aigateway-desktop` (отдельный репозиторий)  
 > **Related:** [Roadmap.MD](Roadmap.MD) v2.4.0 - Server-side Desktop Support
 
 ---

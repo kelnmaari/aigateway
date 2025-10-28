@@ -217,6 +217,14 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		}
 	}
 
+	// Setup Model Registry (Version 2.3.0+: REGISTRY-01)
+	if r.db != nil && opts.Config.ModelRegistry.Enabled {
+		if err := r.setupModelRegistry(opts.Config, opts.Logger); err != nil {
+			return nil, fmt.Errorf("failed to setup Model Registry: %w", err)
+		}
+		opts.Logger.Info("Model Registry initialized successfully")
+	}
+
 	// Инициализация handlers
 	r.setupHandlers(opts.Config, opts.Logger, ollamaClient)
 
@@ -817,6 +825,7 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html") // RBAC Management (v1.11.5)
 	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html") // Audit Log (v1.11.4)
 	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html") // RAG Management (v1.13.0)
+	r.engine.StaticFile("/admin-registry.html", "./web/admin-registry.html") // Model Registry (REGISTRY-03, v2.3.0)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
@@ -1179,6 +1188,52 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 	return nil
 }
 
+// setupModelRegistry инициализирует Model Registry систему (Version 2.3.0+: REGISTRY-01)
+func (r *Router) setupModelRegistry(cfg *config.Config, logger *logrus.Logger) error {
+	logger.Info("Setting up Model Registry")
+
+	// Создаем Provider Manager
+	r.providerManager = providers.NewProviderManager(r.db, logger)
+
+	// Загружаем providers из БД
+	ctx := context.Background()
+	if err := r.providerManager.LoadProvidersFromDB(ctx); err != nil {
+		return fmt.Errorf("failed to load providers from database: %w", err)
+	}
+
+	// Initial model discovery если включен
+	if cfg.ModelRegistry.AutoDiscovery.Enabled {
+		logger.Info("Running initial model discovery...")
+		discovered, err := r.providerManager.DiscoverModels(ctx)
+		if err != nil {
+			logger.WithError(err).Warn("Initial model discovery failed, will retry later")
+		} else {
+			logger.Infof("Initial model discovery complete: %d new models registered", discovered)
+		}
+	}
+
+	// Initial health check для всех providers
+	if cfg.ModelRegistry.HealthCheck.Enabled {
+		logger.Info("Running initial provider health check...")
+		r.providerManager.HealthCheckAll(ctx)
+		logger.Info("Initial health check complete")
+	}
+
+	// Запускаем background loops в горутинах
+	if cfg.ModelRegistry.AutoDiscovery.Enabled && cfg.ModelRegistry.AutoDiscovery.Interval > 0 {
+		go r.providerManager.RunDiscoveryLoop(ctx, cfg.ModelRegistry.AutoDiscovery.Interval)
+		logger.Infof("Auto-discovery loop started with interval: %s", cfg.ModelRegistry.AutoDiscovery.Interval)
+	}
+
+	if cfg.ModelRegistry.HealthCheck.Enabled && cfg.ModelRegistry.HealthCheck.Interval > 0 {
+		go r.providerManager.RunHealthCheckLoop(ctx, cfg.ModelRegistry.HealthCheck.Interval)
+		logger.Infof("Health check loop started with interval: %s", cfg.ModelRegistry.HealthCheck.Interval)
+	}
+
+	logger.Info("Model Registry setup completed")
+	return nil
+}
+
 // setupInvitationsRoutes настраивает Invitation System endpoints (AUTH-03, v2.2.0)
 func (r *Router) setupInvitationsRoutes() {
 	if r.invitationHandler == nil {
@@ -1363,6 +1418,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		// Invitation Handler initialization (AUTH-03, v2.2.0)
 		r.invitationHandler = handlers.NewInvitationHandler(r.db, cfg, logger)
 		logger.Info("Invitation handler initialized successfully")
+
+		// Model Registry Handler initialization (REGISTRY-03, v2.3.0)
+		if r.providerManager != nil {
+			r.registryHandler = handlers.NewRegistryHandler(r.db, r.providerManager, logger)
+			logger.Info("Model Registry handler initialized successfully")
+		}
 
 		// Quota Middleware initialization
 		r.quotaMiddleware = middleware.NewQuotaMiddleware(r.quotaService, logger)

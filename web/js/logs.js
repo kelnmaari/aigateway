@@ -355,12 +355,12 @@ class LogsViewer {
 // Global instance
 let logsViewer = null;
 
-// Initialize when Logs tab is opened
+// Initialize when Logs subtab is opened (System & Logs > Logs)
 document.addEventListener('DOMContentLoaded', () => {
-    const logsTab = document.querySelector('[data-tab="logs"]');
+    const logsSubtab = document.querySelector('[data-subtab="system-logs"]');
     
-    if (logsTab) {
-        logsTab.addEventListener('click', () => {
+    if (logsSubtab) {
+        logsSubtab.addEventListener('click', () => {
             if (!logsViewer) {
                 logsViewer = new LogsViewer();
                 logsViewer.init();

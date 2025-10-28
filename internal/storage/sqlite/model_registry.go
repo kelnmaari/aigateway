@@ -74,19 +74,21 @@ func (s *SQLiteDB) GetModelProvider(ctx context.Context, id string) (*models.Mod
 	provider := &models.ModelProvider{}
 	var configJSON string
 	var lastHealthCheck sql.NullTime
+	var apiKey sql.NullString
+	var errorMessage sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&provider.ID,
 		&provider.Name,
 		&provider.ProviderType,
 		&provider.BaseURL,
-		&provider.APIKey,
+		&apiKey,
 		&provider.Enabled,
 		&provider.Priority,
 		&configJSON,
 		&provider.HealthStatus,
 		&lastHealthCheck,
-		&provider.ErrorMessage,
+		&errorMessage,
 		&provider.CreatedAt,
 		&provider.UpdatedAt,
 	)
@@ -104,6 +106,13 @@ func (s *SQLiteDB) GetModelProvider(ctx context.Context, id string) (*models.Mod
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Handle nullable fields
+	if apiKey.Valid {
+		provider.APIKey = apiKey.String
+	}
+	if errorMessage.Valid {
+		provider.ErrorMessage = errorMessage.String
+	}
 	if lastHealthCheck.Valid {
 		provider.LastHealthCheck = &lastHealthCheck.Time
 	}
@@ -125,19 +134,21 @@ func (s *SQLiteDB) GetModelProviderByName(ctx context.Context, name string) (*mo
 	provider := &models.ModelProvider{}
 	var configJSON string
 	var lastHealthCheck sql.NullTime
+	var apiKey sql.NullString
+	var errorMessage sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, name).Scan(
 		&provider.ID,
 		&provider.Name,
 		&provider.ProviderType,
 		&provider.BaseURL,
-		&provider.APIKey,
+		&apiKey,
 		&provider.Enabled,
 		&provider.Priority,
 		&configJSON,
 		&provider.HealthStatus,
 		&lastHealthCheck,
-		&provider.ErrorMessage,
+		&errorMessage,
 		&provider.CreatedAt,
 		&provider.UpdatedAt,
 	)
@@ -155,6 +166,13 @@ func (s *SQLiteDB) GetModelProviderByName(ctx context.Context, name string) (*mo
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Handle nullable fields
+	if apiKey.Valid {
+		provider.APIKey = apiKey.String
+	}
+	if errorMessage.Valid {
+		provider.ErrorMessage = errorMessage.String
+	}
 	if lastHealthCheck.Valid {
 		provider.LastHealthCheck = &lastHealthCheck.Time
 	}
@@ -255,19 +273,21 @@ func (s *SQLiteDB) ListModelProviders(ctx context.Context, enabledOnly bool) ([]
 		provider := &models.ModelProvider{}
 		var configJSON string
 		var lastHealthCheck sql.NullTime
+		var apiKey sql.NullString
+		var errorMessage sql.NullString
 
 		err := rows.Scan(
 			&provider.ID,
 			&provider.Name,
 			&provider.ProviderType,
 			&provider.BaseURL,
-			&provider.APIKey,
+			&apiKey,
 			&provider.Enabled,
 			&provider.Priority,
 			&configJSON,
 			&provider.HealthStatus,
 			&lastHealthCheck,
-			&provider.ErrorMessage,
+			&errorMessage,
 			&provider.CreatedAt,
 			&provider.UpdatedAt,
 		)
@@ -281,6 +301,13 @@ func (s *SQLiteDB) ListModelProviders(ctx context.Context, enabledOnly bool) ([]
 			return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 		}
 
+		// Handle nullable fields
+		if apiKey.Valid {
+			provider.APIKey = apiKey.String
+		}
+		if errorMessage.Valid {
+			provider.ErrorMessage = errorMessage.String
+		}
 		if lastHealthCheck.Valid {
 			provider.LastHealthCheck = &lastHealthCheck.Time
 		}

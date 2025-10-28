@@ -5,6 +5,118 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2025-10-28
+
+### Changed
+
+- **Admin Panel UI Refactoring**: Реорганизация табов для улучшения навигации и устранения горизонтального скролла
+  - **Users & RBAC**: Объединены "Users", "Invitations" и "RBAC" в один таб с подтабами
+    - Users → управление пользователями с расширенной информацией
+    - Invitations → система приглашений (AUTH-03)
+    - RBAC → управление ролями и разрешениями
+  - **Models**: Объединены "Available Models" и "Model Registry" в один таб с подтабами
+    - Available Models → список доступных моделей Ollama
+    - Model Registry → управление провайдерами и зарегистрированными моделями (REGISTRY-03)
+  - **System & Logs**: Объединены "Performance", "Audit" и "Logs" в один таб с подтабами
+    - Performance → мониторинг CPU, RAM, GPU, MoniGo метрики
+    - Audit → события безопасности и compliance мониторинг
+    - Logs → просмотр системных логов с фильтрацией
+  - **Итого**: Сокращение с 11 до 8 основных табов, улучшенная группировка по функциональности
+
+### Fixed
+
+- **Logs Tab Loading**: Исправлена ошибка `Uncaught SyntaxError: Identifier 'logsViewer' has already been declared`
+  - Удалено дублирующее объявление переменной `logsViewer` в `admin.html`
+  - Обновлен селектор в `logs.js` с `[data-tab="logs"]` на `[data-subtab="system-logs"]`
+  - Теперь логи корректно загружаются при переключении на подтаб Logs
+
+### Technical
+
+- **Frontend (HTML/CSS/JS)**:
+  - Добавлена система подтабов (`.sub-tabs`, `.sub-tab-btn`, `.sub-tab-pane`) в `admin.html`
+  - JavaScript логика для переключения подтабов с сохранением контекста родительского таба
+  - CSS стили для визуального разделения основных табов и подтабов
+  - Функция `loadAuditPreview()` для автозагрузки audit событий при открытии подтаба
+  - Интеграция существующего `LogsViewer` класса для работы с новой структурой табов
+  - Все модальные окна и существующий функционал сохранен без изменений
+
+## [2.3.0] - 2025-10-28
+
+### Added
+
+- **Model Registry & Multi-Provider Foundation** (REGISTRY-01, REGISTRY-03): Универсальная система управления моделями от разных провайдеров
+  - **Model Registry Core**:
+    - Централизованный реестр всех доступных моделей с метаданными
+    - Поддержка множества провайдеров: Ollama, vLLM, OpenAI, Anthropic, Custom
+    - Отслеживание capabilities моделей: chat, embeddings, vision, function-calling
+    - Health monitoring для провайдеров и моделей с историей статусов
+    - Auto-discovery механизм для автоматического обнаружения новых моделей
+    - Performance метрики: latency, throughput, total requests
+  - **Model Registry WebUI** (`admin-registry.html`):
+    - Dashboard с provider status cards (active/inactive/error states)
+    - Табы "Model Providers" и "Registered Models" для раздельного управления
+    - Real-time health indicators с автообновлением каждые 30 секунд
+    - Модальные формы для создания/редактирования провайдеров и моделей
+    - Фильтрация по provider, status, health, keyword
+    - Кнопка "Discover Models" для запуска автообнаружения моделей
+    - Statistics cards: total models, active models, providers count, healthy models
+    - Integration с основной admin панелью через вкладку "Model Registry"
+  - **Database Schema**:
+    - Таблица `model_registry`: хранение метаданных моделей
+    - Таблица `model_providers`: конфигурация провайдеров с API keys
+    - Поля для capabilities, health status, performance metrics
+  - **Configuration** (`config.go`, `dev.yaml`):
+    - Секция `model_registry` для включения/отключения функционала
+    - Настройки auto-discovery и health check интервалов
+    - Provider configurations для Ollama (active), vLLM (inactive)
+
+### Technical
+
+- **Backend (Go)**:
+  - Новые модели в `internal/models/registry.go`:
+    - `ModelRegistry`: описание зарегистрированной модели
+    - `ModelProvider`: конфигурация провайдера моделей
+    - `ModelCapabilities`: битовая маска для chat/embeddings/vision/functions
+    - `ProviderType`: enum для типов провайдеров
+    - `HealthStatus`: enum для статусов здоровья
+  - Реализация `RegistryHandler` в `internal/api/handlers/registry_handler.go`:
+    - CRUD операции для провайдеров и моделей
+    - Health check endpoints для мониторинга
+    - Discovery endpoint для автоматического обнаружения моделей
+    - Stats endpoint для dashboard метрик
+  - Реализация `ProviderManager` в `internal/providers/manager.go`:
+    - Управление lifecycle провайдеров (load, health check, discovery)
+    - Background loops для периодических задач (discovery, health checks)
+    - Интеграция с Ollama и vLLM провайдерами
+  - Storage layer (`internal/storage/sqlite/model_registry.go`):
+    - CRUD методы для `model_registry` и `model_providers` таблиц
+    - Support для `NULL` значений в `api_key` и `error_message` через `sql.NullString`
+  - Миграции (v16, v17):
+    - v16: создание таблиц `model_registry` и `model_providers`
+    - v17: seed данных - Ollama провайдер и базовые модели (llama3.2, qwen2.5, etc.)
+  - Router integration (`internal/api/router/router.go`):
+    - Функция `setupModelRegistry` для инициализации провайдеров
+    - Регистрация Model Registry API endpoints в `/api/admin/registry/*`
+    - Background tasks для auto-discovery и health monitoring
+
+- **Frontend (HTML/JS/CSS)**:
+  - `web/admin-registry.html`: полноценная страница управления Model Registry
+  - `web/js/admin-registry.js`: client-side логика для CRUD операций, фильтрации, real-time updates
+  - Модальные окна для создания/редактирования провайдеров и моделей
+  - CSS стили для status badges, health indicators, provider cards
+  - Интеграция с существующей темой и dashboard стилями
+
+- **Configuration**:
+  - `configs/dev.yaml`: добавлена секция `model_registry` с настройками
+  - `internal/config/config.go`: структуры `ModelRegistryConfig`, `ProviderConfig`
+
+### Notes
+
+- vLLM провайдер настроен, но отключен (inactive) до развертывания vLLM сервера
+- Система готова к добавлению новых провайдеров через UI или конфигурацию
+- Auto-discovery работает в фоновом режиме с настраиваемым интервалом
+- Health checks обновляют статусы провайдеров и моделей автоматически
+
 ## [2.2.2] - 2025-10-28
 
 ### Added

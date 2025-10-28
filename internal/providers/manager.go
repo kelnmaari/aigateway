@@ -194,3 +194,55 @@ func (pm *ProviderManager) DiscoverModels(ctx context.Context) (int, error) {
 	return totalDiscovered, nil
 }
 
+// RunDiscoveryLoop запускает периодическое обнаружение моделей
+func (pm *ProviderManager) RunDiscoveryLoop(ctx context.Context, interval time.Duration) {
+	pm.logger.Infof("Starting model discovery loop with interval: %s", interval)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			pm.logger.Info("Model discovery loop stopped")
+			return
+		case <-ticker.C:
+			pm.logger.Debug("Running scheduled model discovery...")
+			discovered, err := pm.DiscoverModels(ctx)
+			if err != nil {
+				pm.logger.WithError(err).Warn("Scheduled model discovery failed")
+			} else {
+				pm.logger.Debugf("Scheduled model discovery complete: %d new models", discovered)
+			}
+		}
+	}
+}
+
+// RunHealthCheckLoop запускает периодическую проверку здоровья providers
+func (pm *ProviderManager) RunHealthCheckLoop(ctx context.Context, interval time.Duration) {
+	pm.logger.Infof("Starting provider health check loop with interval: %s", interval)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			pm.logger.Info("Provider health check loop stopped")
+			return
+		case <-ticker.C:
+			pm.logger.Debug("Running scheduled provider health check...")
+			healthResults := pm.HealthCheckAll(ctx)
+			unhealthyCount := 0
+			for _, health := range healthResults {
+				if health.Status == models.HealthStatusUnhealthy {
+					unhealthyCount++
+				}
+			}
+			if unhealthyCount > 0 {
+				pm.logger.Warnf("Health check complete: %d/%d providers unhealthy", unhealthyCount, len(healthResults))
+			} else {
+				pm.logger.Debugf("Health check complete: all %d providers healthy", len(healthResults))
+			}
+		}
+	}
+}
+

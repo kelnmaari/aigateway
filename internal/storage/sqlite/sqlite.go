@@ -660,6 +660,11 @@ func (s *SQLiteDB) getMigrations() []migration {
 			Name:    "add_changelog_v2_4_5",
 			SQL:     s.getAddChangelogV245Migration(),
 		},
+		{
+			Version: 71,
+			Name:    "add_changelog_v2_4_6",
+			SQL:     s.getAddChangelogV246Migration(),
+		},
 		// Добавляем новые миграции здесь по мере необходимости
 	}
 }
@@ -4509,6 +4514,29 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
   - processStreamingResponse(): Check sendMessage() error on every chunk, exit immediately on error
 - **Design Patterns**: Panic recovery, timeout pattern, graceful goroutine shutdown
 - **Documentation**: Added WEBSOCKET_PANIC_FIX.md with detailed analysis');
+	`
+}
+
+// getAddChangelogV246Migration returns SQL for adding changelog v2.4.6 (v71 migration)
+func (s *SQLiteDB) getAddChangelogV246Migration() string {
+	return `
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.4.6', '2025-10-29', '## [2.4.6] - 2025-10-29
+
+### Fixed
+
+- **CRITICAL: WebUI Modal Overlay Conflict**: On "My Devices" page, all buttons become unclickable (including top menu)
+  - **Root Cause**: CSS class name conflict between device details modal (.modal-overlay in profile-devices.html) and confirmation modals (.modal-overlay in notifications.js)
+  - **Problem**: When confirmation modal closes, it removes modal-show class but device details CSS has display: flex always visible, leaving invisible overlay blocking clicks
+  - **Solution**: Renamed device details modal class from .modal-overlay to .device-modal-overlay
+  - **Impact**: All buttons and navigation now work correctly after using confirmation modals
+  - **Files Modified**: web/profile-devices.html and web/js/profile-devices.js
+
+### Technical
+
+- **CSS Specificity Issue**: Global class names like .modal-overlay should be avoided or properly scoped
+- **Best Practice**: Use component-specific class names (e.g., .device-modal-overlay, .tenant-modal-overlay)
+- **Future**: Consider CSS modules or scoped styles to prevent conflicts');
 	`
 }
 

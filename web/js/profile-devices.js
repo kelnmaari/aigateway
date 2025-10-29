@@ -378,9 +378,9 @@ class DeviceManager {
 
         const modalHTML = this.renderDeviceDetailsHTML(device);
         
-        // Use notifications.js modal system
+        // Create device details modal (CLIENT-016 fix: use unique class name to avoid conflict with notifications.js)
         const modalContainer = document.createElement('div');
-        modalContainer.className = 'modal-overlay';
+        modalContainer.className = 'device-modal-overlay';
         modalContainer.innerHTML = modalHTML;
         document.body.appendChild(modalContainer);
 

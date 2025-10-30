@@ -1,0 +1,9 @@
+-- Rollback: Drop model_providers table
+DROP INDEX IF EXISTS idx_model_providers_type;
+DROP INDEX IF EXISTS idx_model_providers_enabled;
+DROP INDEX IF EXISTS idx_model_providers_priority;
+DROP INDEX IF EXISTS idx_model_registry_provider;
+DROP INDEX IF EXISTS idx_model_registry_status;
+DROP INDEX IF EXISTS idx_model_registry_health;
+DROP INDEX IF EXISTS idx_model_registry_model_id;
+DROP TABLE IF EXISTS model_providers;

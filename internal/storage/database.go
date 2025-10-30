@@ -39,6 +39,15 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
+// MigrationInfo contains information about a migration (REFACTOR-01)
+type MigrationInfo struct {
+	Version      int
+	Name         string
+	Applied      bool
+	HasRollback  bool
+	Irreversible bool
+}
+
 // Database представляет unified интерфейс для работы с БД
 type Database interface {
 	// ========================================
@@ -63,6 +72,12 @@ type Database interface {
 
 	// GetMigrationVersion возвращает текущую версию схемы
 	GetMigrationVersion(ctx context.Context) (int, error)
+
+	// RollbackMigrations откатывает миграции до указанной версии (REFACTOR-01)
+	RollbackMigrations(ctx context.Context, targetVersion int) error
+
+	// ListMigrations возвращает список всех миграций с их статусом (REFACTOR-01)
+	ListMigrations(ctx context.Context) ([]MigrationInfo, error)
 
 	// ========================================
 	// Transaction Support

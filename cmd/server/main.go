@@ -32,6 +32,13 @@ func main() {
 	// Парсинг флагов
 	showVersion := flag.Bool("version", false, "Show version information and exit")
 	configPath := flag.String("config", "", "Path to configuration file (default: auto-detect)")
+
+	// Migration management flags (REFACTOR-01)
+	rollbackCount := flag.Int("rollback", 0, "Rollback last N migrations")
+	rollbackTo := flag.Int("rollback-to", -1, "Rollback to specific migration version")
+	showMigrationVersion := flag.Bool("migration-version", false, "Show current migration version")
+	listMigrations := flag.Bool("migrations-list", false, "List all migrations with their status")
+
 	flag.Parse()
 
 	// Показываем версию и выходим если запрошено
@@ -88,8 +95,20 @@ func main() {
 
 		appLogger.Info("✅ Database initialized successfully")
 		fmt.Println("💾 База данных инициализирована")
+
+		// Handle migration management commands (REFACTOR-01)
+		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 {
+			handleMigrationCommands(db, appLogger, *showMigrationVersion, *listMigrations, *rollbackCount, *rollbackTo)
+			os.Exit(0)
+		}
 	} else {
 		appLogger.Info("Database not configured, skipping initialization")
+
+		// Cannot use migration commands without database
+		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 {
+			fmt.Println("❌ Migration commands require database to be configured")
+			os.Exit(1)
+		}
 	}
 
 	// Инициализация JWT Manager (Version 1.3.0+)
@@ -298,14 +317,14 @@ func main() {
 	var ragDataSourceService *ragservice.DataSourceService
 	if cfg.RAG.Enabled && db != nil {
 		appLogger.Info("Initializing RAG Data Source Service...")
-		
+
 		// Encryption key для credentials (32 bytes для AES-256)
 		encryptionKey := cfg.RAG.Security.EncryptionKey
 		if encryptionKey == "" {
 			appLogger.Warn("RAG encryption key not set, using default (NOT SECURE FOR PRODUCTION)")
 			encryptionKey = "12345678901234567890123456789012" // 32 bytes placeholder
 		}
-		
+
 		ragDataSourceService, err = ragservice.NewDataSourceService(
 			db, // DB implements RAGDataSourceRepository
 			encryptionKey,
@@ -365,15 +384,15 @@ func main() {
 		Config:               cfg,
 		Logger:               appLogger,
 		Version:              version.Version,
-		Database:             db,                    // Может быть nil для legacy mode
-		JWTManager:           jwtManager,            // Может быть nil для legacy mode
-		TracerProvider:       tracerProvider,        // Может быть nil если tracing отключен (v1.6.0+)
-		PerformanceMonitor:   perfMonitor,           // Может быть nil если performance monitoring отключен (v1.6.2+)
-		LeakDetector:         leakDetector,          // Может быть nil если leak detection отключен (v1.6.2+)
-		MonigoPort:           monigoPort,            // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
-		GPUMonitor:           gpuMonitor,            // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
-		ModelPreloader:       modelPreloader,        // Может быть nil если preloading отключен (v1.12.1+)
-		RAGDataSourceService: ragDataSourceService,  // Может быть nil если RAG отключен (v1.13.1+)
+		Database:             db,                   // Может быть nil для legacy mode
+		JWTManager:           jwtManager,           // Может быть nil для legacy mode
+		TracerProvider:       tracerProvider,       // Может быть nil если tracing отключен (v1.6.0+)
+		PerformanceMonitor:   perfMonitor,          // Может быть nil если performance monitoring отключен (v1.6.2+)
+		LeakDetector:         leakDetector,         // Может быть nil если leak detection отключен (v1.6.2+)
+		MonigoPort:           monigoPort,           // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
+		GPUMonitor:           gpuMonitor,           // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
+		ModelPreloader:       modelPreloader,       // Может быть nil если preloading отключен (v1.12.1+)
+		RAGDataSourceService: ragDataSourceService, // Может быть nil если RAG отключен (v1.13.1+)
 	})
 
 	if err != nil {
@@ -448,3 +467,105 @@ func main() {
 	fmt.Println("✅ Сервер успешно остановлен")
 }
 
+// handleMigrationCommands handles migration management CLI commands (REFACTOR-01)
+func handleMigrationCommands(db storage.Database, appLogger interface{},
+	showVersion, listMigs bool, rollbackCount, rollbackTo int) {
+
+	ctx := context.Background()
+
+	// Show current migration version
+	if showVersion {
+		version, err := db.GetMigrationVersion(ctx)
+		if err != nil {
+			fmt.Printf("❌ Error getting migration version: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("📊 Current migration version: %d\n", version)
+		return
+	}
+
+	// List all migrations with their status
+	if listMigs {
+		migrations, err := db.ListMigrations(ctx)
+		if err != nil {
+			fmt.Printf("❌ Error listing migrations: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("📋 Migrations list:")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("%-7s %-50s %-10s %-10s\n", "Version", "Name", "Status", "Rollback")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+		for _, m := range migrations {
+			status := "❌ Pending"
+			if m.Applied {
+				status = "✅ Applied"
+			}
+
+			rollback := "✅ Yes"
+			if !m.HasRollback {
+				rollback = "❌ No"
+			} else if m.Irreversible {
+				rollback = "⚠️  IRREVERSIBLE"
+			}
+
+			fmt.Printf("%-7d %-50s %-10s %-10s\n", m.Version, m.Name, status, rollback)
+		}
+
+		currentVersion, _ := db.GetMigrationVersion(ctx)
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("Current version: %d | Total migrations: %d\n", currentVersion, len(migrations))
+		return
+	}
+
+	// Rollback last N migrations
+	if rollbackCount > 0 {
+		currentVersion, err := db.GetMigrationVersion(ctx)
+		if err != nil {
+			fmt.Printf("❌ Error getting migration version: %v\n", err)
+			os.Exit(1)
+		}
+
+		targetVersion := currentVersion - rollbackCount
+		if targetVersion < 0 {
+			targetVersion = 0
+		}
+
+		fmt.Printf("🔄 Rolling back last %d migrations (from v%d to v%d)...\n",
+			rollbackCount, currentVersion, targetVersion)
+
+		if err := db.RollbackMigrations(ctx, targetVersion); err != nil {
+			fmt.Printf("❌ Rollback failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("✅ Successfully rolled back to version %d\n", targetVersion)
+		return
+	}
+
+	// Rollback to specific version
+	if rollbackTo >= 0 {
+		currentVersion, err := db.GetMigrationVersion(ctx)
+		if err != nil {
+			fmt.Printf("❌ Error getting migration version: %v\n", err)
+			os.Exit(1)
+		}
+
+		if rollbackTo >= currentVersion {
+			fmt.Printf("❌ Target version (%d) must be less than current version (%d)\n",
+				rollbackTo, currentVersion)
+			os.Exit(1)
+		}
+
+		fmt.Printf("🔄 Rolling back to version %d (from v%d)...\n", rollbackTo, currentVersion)
+
+		if err := db.RollbackMigrations(ctx, rollbackTo); err != nil {
+			fmt.Printf("❌ Rollback failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("✅ Successfully rolled back to version %d\n", rollbackTo)
+		return
+	}
+}

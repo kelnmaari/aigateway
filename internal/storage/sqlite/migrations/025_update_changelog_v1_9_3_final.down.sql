@@ -1,0 +1,3 @@
+-- IRREVERSIBLE MIGRATION
+-- Reason: Could not automatically generate rollback
+-- Manual rollback: Review the up migration and write appropriate rollback SQL

@@ -137,6 +137,20 @@ func (p *PostgreSQLDB) Ping(ctx context.Context) error {
 }
 
 // ========================================
+// Migrations (REFACTOR-01 - PostgreSQL stubs)
+// ========================================
+
+// RollbackMigrations - stub for PostgreSQL (not yet implemented)
+func (p *PostgreSQLDB) RollbackMigrations(ctx context.Context, targetVersion int) error {
+	return fmt.Errorf("migration rollback not yet implemented for PostgreSQL")
+}
+
+// ListMigrations - stub for PostgreSQL (not yet implemented)
+func (p *PostgreSQLDB) ListMigrations(ctx context.Context) ([]storage.MigrationInfo, error) {
+	return nil, fmt.Errorf("listing migrations not yet implemented for PostgreSQL")
+}
+
+// ========================================
 // Transaction Support
 // ========================================
 
@@ -830,6 +844,15 @@ func (tx *postgresqlTx) CountTotalUsers(ctx context.Context) (int, error) {
 
 func (tx *postgresqlTx) CountActiveAPIKeys(ctx context.Context) (int, error) {
 	return tx.db.CountActiveAPIKeys(ctx)
+}
+
+// Migration management methods delegation (REFACTOR-01)
+func (tx *postgresqlTx) RollbackMigrations(ctx context.Context, targetVersion int) error {
+	return tx.db.RollbackMigrations(ctx, targetVersion)
+}
+
+func (tx *postgresqlTx) ListMigrations(ctx context.Context) ([]storage.MigrationInfo, error) {
+	return tx.db.ListMigrations(ctx)
 }
 
 // Model Configurations delegation (v1.9.1+)

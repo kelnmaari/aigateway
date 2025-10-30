@@ -7,7 +7,7 @@ description: Workflow для обновления changelog при заверш�
 
 ## 🚨 КРИТИЧЕСКИ ВАЖНО: Запрещено удалять БД
 
-**НИКОГДА** не удаляй `data/proxy.db` файл. Это приведет к потере:
+**НИКОГДА** не удаляй `data/aigateway.db` файл. Это приведет к потере:
 
 - Всех пользователей и их аккаунтов
 - API ключей
@@ -21,7 +21,7 @@ description: Workflow для обновления changelog при заверш�
 
 ```bash
 # Обнови VERSION файл с новым номером
-echo "1.X.Y" > VERSION
+echo "2.X.Y" > VERSION
 ```
 
 ### 2. Обновление CHANGELOG.md
@@ -29,7 +29,7 @@ echo "1.X.Y" > VERSION
 Добавь новую версию в начало файла по формату [Keep a Changelog](https://keepachangelog.com/):
 
 ```markdown
-## [1.X.Y] - YYYY-MM-DD
+## [2.X.Y] - YYYY-MM-DD
 
 ### Added
 - **Новая фича**: Описание
@@ -48,32 +48,26 @@ echo "1.X.Y" > VERSION
 - Изменения в архитектуре
 ```
 
-### 3. Создание SQL миграции в sqlite.go
+### 3. Создание SQL миграции (v2.4.7+ with Rollback Support!)
 
-**Файл:** [internal/storage/sqlite/sqlite.go](mdc:internal/storage/sqlite/sqlite.go)
+**Файлы:** 
+- `internal/storage/sqlite/migrations/{VERSION}_add_changelog_v{X_Y_Z}.up.sql` (forward)
+- `internal/storage/sqlite/migrations/{VERSION}_add_changelog_v{X_Y_Z}.down.sql` (rollback)
 
-#### Шаг 3.1: Добавь миграцию в getMigrations()
+#### Шаг 3.1: Определи номер следующей версии миграции
 
-Найди функцию `getMigrations()` и добавь новую запись:
+Посмотри в директории `internal/storage/sqlite/migrations/`:
+- Последний файл: `071_add_changelog_v2_4_6.up.sql`
+- Следующий номер: `072`
 
-```go
-{
-    Version: 18,  // Следующий номер по порядку
-    Name:    "add_changelog_v1_X_Y",
-    SQL:     s.getAddChangelogV1XYMigration(),
-},
-```
+#### Шаг 3.2: Создай UP файл (forward migration)
 
-#### Шаг 3.2: Создай функцию миграции
+**Путь:** `internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.up.sql`
 
-В конце файла перед `// NOTE: CRUD Operations Implementation` добавь:
-
-```go
-// getAddChangelogV1XYMigration returns SQL for adding changelog vX.Y.Z (vN migration)
-func (s *SQLiteDB) getAddChangelogV1XYMigration() string {
-    return `
+**Содержимое:**
+```sql
 INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
-('1.X.Y', 'YYYY-MM-DD', '## [1.X.Y] - YYYY-MM-DD
+('2.4.7', 'YYYY-MM-DD', '## [2.4.7] - YYYY-MM-DD
 
 ### Added
 - **Feature Name**: Полное описание
@@ -86,9 +80,19 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - Технические детали
 - Новые зависимости
 - Архитектурные изменения');
-    `
-}
 ```
+
+#### Шаг 3.3: Создай DOWN файл (rollback migration)
+
+**Путь:** `internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.down.sql`
+
+**Содержимое:**
+```sql
+-- Rollback: Remove changelog entry for v2.4.7
+DELETE FROM changelogs WHERE version = '2.4.7';
+```
+
+**✅ Для changelog миграций rollback ВСЕГДА безопасен** - это просто удаление записи.
 
 **ВАЖНО:**
 
@@ -96,8 +100,17 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - Escape одинарные кавычки в тексте как `''`
 - Используй INSERT OR REPLACE для idempotency
 - Markdown форматирование должно быть корректным
+- **Файл будет автоматически загружен через embed.FS**
+- **Не нужно обновлять getMigrations()** - loader сам найдет файл по имени
 
-### 4. Проверка компиляции
+### 4. PostgreSQL миграция (опционально)
+
+Если используется PostgreSQL, создай аналогичный файл:
+```
+internal/storage/postgresql/migrations/072_add_changelog_v2_4_7.sql
+```
+
+### 5. Проверка компиляции
 
 ```bash
 go build -o bin/server.exe cmd/server/main.go
@@ -106,95 +119,114 @@ go build -o bin/server.exe cmd/server/main.go
 ## 📊 Как это работает
 
 1. **При старте сервера**: Система применяет все pending миграции автоматически
-2. **Миграция v18+**: Добавляет запись в таблицу `changelogs`
-3. **API endpoint**: `/api/system/changelogs` возвращает все версии
-4. **WebUI**: Страница "О Системе" отображает историю изменений в accordion UI
+2. **Loader с embed.FS**: Читает все .sql файлы из директории migrations/
+3. **Сортировка по версии**: Файлы применяются в порядке номеров (001, 002, ..., 072)
+4. **API endpoint**: `/api/system/changelogs` возвращает все версии
+5. **WebUI**: Страница "О Системе" отображает историю изменений в accordion UI
+
+## 📁 Структура миграций (v2.4.7+)
+
+```
+internal/storage/
+  sqlite/
+    sqlite.go              (~300 строк - connection management)
+    migrations.go          (~150 строк - loader & registry)
+    migrations/
+      001_initial_schema.sql
+      002_add_mcp_servers.sql
+      003_add_changelogs_with_data.sql
+      ...
+      071_add_changelog_v2_4_6.sql
+      072_add_changelog_v2_4_7.sql  ← твоя новая миграция
+```
+
+**Loader автоматически:**
+- Читает все .sql файлы через embed.FS
+- Извлекает номер версии из имени файла (regex: `^(\d+)_(.+)\.sql$`)
+- Сортирует по версии
+- Применяет pending миграции при старте
 
 ## 🔄 Последовательность действий при завершении задачи
 
 ```
 1. ✅ Задача полностью завершена и протестирована
-2. ✅ Обновить VERSION файл (1.X.Y)
+2. ✅ Обновить VERSION файл (2.X.Y)
 3. ✅ Добавить запись в CHANGELOG.md
-4. ✅ Создать миграцию vN в sqlite.go
+4. ✅ Создать SQL файл в migrations/ директории
 5. ✅ Проверить компиляцию (go build)
 6. ✅ Коммит всех изменений вместе
 ```
 
 ## ❌ Что НЕ делать
 
-- ❌ **НЕ удалять data/proxy.db**
-- ❌ НЕ изменять существующие миграции (v1-v17)
-- ❌ НЕ добавлять версию в миграцию v3 (changelogs initial data)
+- ❌ **НЕ удалять data/aigateway.db**
+- ❌ НЕ изменять существующие миграции (001-071)
+- ❌ НЕ добавлять миграции в sqlite.go как Go функции (устарело с v2.4.7)
 - ❌ НЕ пропускать создание миграции при завершении задачи
 - ❌ НЕ использовать sqlite3 CLI для ручного INSERT
+- ❌ НЕ обновлять getMigrations() вручную (loader сам найдет файл)
 
 ## 🎯 Пример реализации
 
-**Задача:** Добавлена OpenTelemetry интеграция в v1.6.1
+**Задача:** Добавлена новая фича в v2.4.7
 
-**VERSION:**
-
+### VERSION файл:
 ```
-1.6.1
+2.4.7
 ```
 
-**CHANGELOG.md:**
-
+### CHANGELOG.md:
 ```markdown
-## [1.6.1] - 2025-10-12
+## [2.4.7] - 2025-10-30
 
 ### Added
-- **OpenTelemetry Distributed Tracing**: Полная интеграция OpenTelemetry
-  - Поддержка Jaeger и Zipkin экспортеров
-  - Автоматическая трассировка всех HTTP запросов
-  - W3C Trace Context propagation
-  - Настраиваемый sampling rate (0.0 - 1.0)
+- **Migration System Refactoring**: Разбиение sqlite.go на отдельные SQL файлы
+  - 71 миграция в отдельных .sql файлах
+  - Использование Go 1.16+ embed.FS
+  - Автоматическая загрузка через loader
 
 ### Technical
-- Новый пакет internal/observability с TracerProvider
-- TracingMiddleware для Gin
-- Зависимости: go.opentelemetry.io/otel v1.38.0
+- Новая директория internal/storage/sqlite/migrations/
+- migrations.go с embed.FS loader
+- Regex-based version extraction
 ```
 
-**sqlite.go:**
+### SQL миграция:
 
-```go
-// В getMigrations():
-{
-    Version: 18,
-    Name:    "add_changelog_v1_6_1",
-    SQL:     s.getAddChangelogV161Migration(),
-},
+**Файл:** `internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.sql`
 
-// В конце файла:
-func (s *SQLiteDB) getAddChangelogV161Migration() string {
-    return `
+```sql
 INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
-('1.6.1', '2025-10-12', '## [1.6.1] - 2025-10-12
+('2.4.7', '2025-10-30', '## [2.4.7] - 2025-10-30
 
 ### Added
-- **OpenTelemetry Distributed Tracing**: Полная интеграция OpenTelemetry
-  - Поддержка Jaeger и Zipkin экспортеров
-  - Автоматическая трассировка всех HTTP запросов
-  - W3C Trace Context propagation
-  - Настраиваемый sampling rate (0.0 - 1.0)
+- **Migration System Refactoring**: Разбиение sqlite.go на отдельные SQL файлы
+  - 71 миграция в отдельных .sql файлах
+  - Использование Go 1.16+ embed.FS
+  - Автоматическая загрузка через loader
 
 ### Technical
-- Новый пакет internal/observability с TracerProvider
-- TracingMiddleware для Gin
-- Зависимости: go.opentelemetry.io/otel v1.38.0');
-    `
-}
+- Новая директория internal/storage/sqlite/migrations/
+- migrations.go с embed.FS loader
+- Regex-based version extraction');
 ```
 
 ## 🔍 Проверка результата
 
 После запуска сервера:
 
-1. Проверь логи: `Migration applied successfully: version=18`
-2. API: `curl http://localhost:8080/api/system/changelogs`
-3. WebUI: Открой "О Системе" - должна быть новая версия
+1. Проверь логи: 
+   ```
+   [INFO] Loaded migrations from embedded FS count=72
+   [INFO] Migration applied successfully: version=72
+   ```
+
+2. API: 
+   ```bash
+   curl http://localhost:8080/api/system/changelogs | jq '.[] | select(.version=="2.4.7")'
+   ```
+
+3. WebUI: Открой "О Системе" - должна быть новая версия 2.4.7
 
 ## 📝 Заметки
 
@@ -202,3 +234,107 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 - INSERT OR REPLACE позволяет безопасно перезапускать миграцию
 - Для клиентов и production: **НЕ нужно удалять БД**, миграция применится автоматически
 - Номер миграции должен быть уникальным и последовательным
+- **Loader автоматически найдет новые .sql файлы** через embed.FS
+- Формат имени файла критичен: `{VERSION}_descriptive_name.sql`
+
+## 🆕 Изменения в v2.4.7
+
+### До v2.4.7 (УСТАРЕЛО):
+```go
+// Добавление миграции в sqlite.go:
+func (s *SQLiteDB) getMigrations() []migration {
+    return []migration{
+        // ... existing
+        {Version: 72, Name: "add_changelog_v2_4_7", SQL: s.getAddChangelogV247Migration()},
+    }
+}
+
+func (s *SQLiteDB) getAddChangelogV247Migration() string {
+    return `INSERT OR REPLACE ...`
+}
+```
+
+### С v2.4.7 (АКТУАЛЬНО):
+```bash
+# Просто создай SQL файл:
+touch internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.sql
+
+# Loader автоматически найдет и применит при старте
+```
+
+**Преимущества новой системы:**
+- ✅ Легче добавлять (1 команда вместо редактирования 2 функций)
+- ✅ Легче ревьюить в Git (один файл вместо большого diff в sqlite.go)
+- ✅ Можно использовать SQL форматтеры/linters
+- ✅ sqlite.go уменьшен с 4560 до ~300 строк
+
+## 🚀 Quick Reference
+
+**Добавление changelog миграции (v2.4.7+):**
+```bash
+# 1. Узнать следующий номер
+ls internal/storage/sqlite/migrations/ | tail -1
+# Output: 071_add_changelog_v2_4_6.up.sql
+
+# 2. Создать UP файл (forward)
+cat > internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.up.sql << 'EOF'
+INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
+('2.4.7', '2025-10-30', '## [2.4.7] - 2025-10-30
+
+### Added
+- Feature description
+
+### Technical
+- Technical details');
+EOF
+
+# 3. Создать DOWN файл (rollback)
+cat > internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.down.sql << 'EOF'
+-- Rollback: Remove changelog entry for v2.4.7
+DELETE FROM changelogs WHERE version = '2.4.7';
+EOF
+
+# 4. Готово! Loader автоматически применит при старте
+```
+
+## 🔄 Rollback миграций (v2.4.7+)
+
+### CLI команды
+
+```bash
+# Откатить последнюю миграцию
+go run cmd/server/main.go -rollback 1
+
+# Откатить до конкретной версии (например, до v71)
+go run cmd/server/main.go -rollback-to 71
+
+# Показать текущую версию миграции
+go run cmd/server/main.go -migration-version
+
+# Показать историю миграций
+go run cmd/server/main.go -migrations-list
+```
+
+### Когда использовать rollback
+
+✅ **Безопасно откатить:**
+- Changelog миграции (просто удаление записи)
+- Создание индексов
+- Добавление nullable колонок (если данные некритичны)
+
+⚠️ **С осторожностью:**
+- Удаление колонок (потеря данных)
+- Изменение типов данных (может не сработать)
+
+❌ **Лучше использовать backup:**
+- Удаление таблиц с данными
+- Массовые UPDATE/DELETE операции
+- Data migrations без возможности восстановления
+
+### Emergency: Restore from backup
+
+Если rollback невозможен:
+```bash
+# Автоматический backup создается перед каждой миграцией
+cp data/backups/pre-migration-[timestamp]-[version].db data/aigateway.db
+```

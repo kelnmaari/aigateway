@@ -475,6 +475,70 @@
 
 ---
 
+### Version 0.4.1 - Hotfixes & Polish (3 дня) 🐛 PRIORITY 4.1
+
+**Фокус:** Критичные bug fixes после v0.4.0
+
+**Задачи:**
+
+- [ ] **CLIENT-014.1** Conversations Management (COMPLETED)
+  - ✅ Create new conversation (SaveConversation backend)
+  - ✅ Load conversation history (GetConversations)
+  - ✅ Switch between conversations (UI state management)
+  - ✅ Delete conversations (DeleteConversation)
+  - ✅ Conversation metadata (title, model, created_at, updated_at)
+  - ✅ Auto-generate titles from first message
+  - ✅ Persist conversations in config.json
+  - **Status:** Завершено 2025-10-28
+  
+- [ ] **CLIENT-014.2** UI State Persistence (COMPLETED)
+  - ✅ Save/Restore panel sizes (left, right panels)
+  - ✅ Save/Restore current chat ID
+  - ✅ Save/Restore selected model
+  - ✅ Save/Restore conversations list height
+  - ✅ Debounced saving (prevent excessive writes)
+  - ✅ Integration с Wails runtime
+  - **Status:** Завершено 2025-10-28
+  
+- [ ] **CLIENT-014.3** Open Files Persistence (COMPLETED)
+  - ✅ Track open files in EditorPanel (path, pinned, modified)
+  - ✅ Save open files to config on change
+  - ✅ Restore open files on app startup
+  - ✅ Preserve file order and pinned status
+  - ✅ `getOpenFiles()` and `restoreOpenFiles()` API
+  - **Status:** Завершено 2025-10-28
+  
+- [ ] **CLIENT-014.4** Resizable Conversations List (COMPLETED)
+  - ✅ Vertical resize handle для conversations list
+  - ✅ Save/Restore conversations height в UI state
+  - ✅ Min/Max constraints (150px - 600px)
+  - ✅ Smooth resize с throttling
+  - ✅ Cursor feedback (ns-resize)
+  - **Status:** Завершено 2025-10-28
+
+- [ ] **CLIENT-030** 🐛 Fix: Models не загружаются при первом запуске
+  - **Issue:** После свежей установки нужно перезапустить app для загрузки моделей
+  - **Root Cause:** Race condition между auth и models loading
+  - **Solution:**
+    - Добавить explicit `loadModels()` после successful auth
+    - Retry механизм для models loading (3 attempts)
+    - Loading state в UI (spinner в model dropdown)
+    - Fallback на первую available модель если `selectedModel` empty
+  - **Testing:**
+    - Удалить `~/.aigateway/config.json`
+    - Первый запуск → login → models должны загрузиться сразу
+  - **Priority:** 🔴 CRITICAL
+
+**Acceptance Criteria:**
+
+- ✅ Models loading работает с первого запуска (no restart needed)
+- ✅ UI показывает loading state при загрузке моделей
+- ✅ Graceful fallback если models не загрузились
+
+**Время:** ~3 дня
+
+---
+
 ### Version 0.5.0 - Advanced Features (3 недели) 🎯 PRIORITY 5
 
 **Фокус:** Terminal, Git, Settings
@@ -490,6 +554,7 @@
   - Detect .git folder
   - Show git status в file tree
   - Diff viewer для changes
+  - Скрывать .git каталог при просмотре проекта
   
 - [ ] **CLIENT-019** Settings UI
   - Server configuration
@@ -501,12 +566,45 @@
   - Show all user devices (GET /api/auth/devices)
   - Self-revoke button
   - Device info display
+  
+- [ ] **CLIENT-029** LSP/Linter Integration
+  - **Language Server Protocol (LSP) Client:**
+    - Go: `gopls` integration для Go files
+    - Python: `pyright` или `pylance` для Python files
+    - TypeScript/JavaScript: Built-in Monaco support (уже работает)
+    - Rust: `rust-analyzer` (опционально)
+  - **Real-time Diagnostics:**
+    - Error/Warning markers в editor gutter
+    - Problem panel (bottom) с списком issues
+    - Severity indicators (error 🔴, warning 🟡, info 🔵)
+  - **Quick Fixes:**
+    - Lightbulb 💡 для available actions
+    - Auto-import missing packages
+    - Fix typos, unused variables
+  - **Code Actions:**
+    - Refactoring suggestions
+    - Extract function/variable
+    - Organize imports
+  - **Performance:**
+    - LSP process management (spawn/kill)
+    - Debounced diagnostics (300ms delay)
+    - Background processing (не блокирует UI)
+  - **Configuration:**
+    - Enable/Disable LSP per language в Settings
+    - LSP binary path configuration
+    - Custom LSP settings (formatOnSave, etc.)
+  - **Dependencies:**
+    - Requires external LSP binaries (gopls, pyright)
+    - Auto-detect installed LSPs или prompt user to install
+  - **Note:** Это опциональная feature - editor работает без LSP
 
 **Acceptance Criteria:**
 
 - ✅ Terminal работает
 - ✅ Git status видно
 - ✅ Settings UI функционален
+- ✅ LSP diagnostics показывают errors/warnings в real-time
+- ✅ Quick fixes доступны через lightbulb menu
 
 **Время:** ~21 день
 
@@ -580,18 +678,271 @@
 
 ---
 
+### Version 0.8.0 - Agentic Mode & MCP Integration (4-5 недель) 🤖 PRIORITY 8
+
+**Фокус:** AI Agent с autonomous capabilities (как Windsurf, Cursor)
+
+**Зависимости:**
+
+- Requires server v2.5.0+ (Agent API endpoints)
+- Requires Terminal (CLIENT-017) для command execution
+- Requires Monaco Editor (CLIENT-010-012) для code modifications
+
+**Архитектура Agentic Mode:**
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  User Request → AI Agent (on server)                     │
+│                      │                                    │
+│                      ▼                                    │
+│              Task Planning & Decomposition                │
+│              (разбиение на подзадачи)                     │
+│                      │                                    │
+│                      ▼                                    │
+│         ┌────────────┴────────────┐                       │
+│         │    Tool Selection       │                       │
+│         └────────────┬────────────┘                       │
+│                      │                                    │
+│      ┌───────────────┼───────────────┐                    │
+│      ▼               ▼               ▼                    │
+│  File Ops      Terminal Cmds     MCP Tools                │
+│  (read/write)  (bash/powershell) (server catalog)        │
+│      │               │               │                    │
+│      └───────────────┼───────────────┘                    │
+│                      │                                    │
+│                      ▼                                    │
+│              Execution Results                            │
+│              (success/failure)                            │
+│                      │                                    │
+│                      ▼                                    │
+│         User Approval / Auto-approve                      │
+│         (для destructive operations)                      │
+│                      │                                    │
+│                      ▼                                    │
+│              Apply Changes + Rollback                     │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Задачи:**
+
+- [ ] **CLIENT-028** Agentic Mode Framework
+  
+  **28.1. Agent Communication Protocol:**
+  - WebSocket или SSE для agent streaming messages
+  - Message types:
+    - `agent_thinking` - показывает что agent планирует
+    - `agent_tool_use` - запрос на использование tool
+    - `agent_tool_result` - результат tool execution
+    - `agent_approval_needed` - требуется подтверждение user
+    - `agent_completed` - task завершена
+  - Structured agent responses (JSON schema)
+  
+  **28.2. Task Planning UI:**
+  - Agent thinking indicator (animated brain 🧠)
+  - Task decomposition tree view (parent → subtasks)
+  - Progress tracking (N/M tasks completed)
+  - Current task highlight
+  - Estimated time remaining (if available)
+  
+  **28.3. Tool Execution UI:**
+  - Tool cards в chat:
+
+    ```
+    ┌────────────────────────────────────┐
+    │ 🔧 File Operation                  │
+    │ Action: Write file                 │
+    │ Path: src/main.go                  │
+    │ Changes: +45 lines, -12 lines      │
+    │ [ View Diff ] [ Approve ] [ Deny ] │
+    └────────────────────────────────────┘
+    ```
+
+  - Expandable tool details (показать полный diff)
+  - Batch approval (approve all pending)
+  - Auto-approve toggle для trusted operations
+  
+  **28.4. Approval Flow:**
+  - **Require approval для:**
+    - File deletion/overwrite
+    - Terminal commands с `sudo`, `rm -rf`, etc.
+    - Network requests (curl, wget)
+    - Git operations (commit, push)
+  - **Auto-approve для:**
+    - File read operations
+    - Non-destructive commands (ls, cat, echo)
+    - MCP tool queries (если whitelisted)
+  - Approval timeout (30 seconds → auto-deny)
+  - Approval history log
+  
+  **28.5. Rollback Mechanism:**
+  - Snapshot files before modification (git-like)
+  - Undo last N operations (stack-based)
+  - "Restore Previous Version" button
+  - Diff viewer для rollback preview
+  
+  **28.6. Agent Settings:**
+  - Enable/Disable agentic mode toggle
+  - Auto-approve preferences (per tool type)
+  - Max tool use per task (limit 50)
+  - Timeout settings (per task, per tool)
+  
+- [ ] **CLIENT-031** MCP Servers Support
+  
+  **31.1. MCP Catalog Browser:**
+  - GET /api/mcp/catalog → список available MCP servers
+  - MCP card UI:
+
+    ```
+    ┌────────────────────────────────────┐
+    │ 🔌 GitHub MCP Server               │
+    │ Description: GitHub API integration│
+    │ Tools: 12 available                │
+    │ Status: ● Enabled                  │
+    │ [ Configure ] [ Disable ]          │
+    └────────────────────────────────────┘
+    ```
+
+  - Filter по categories (filesystem, web, database, etc.)
+  - Search MCP servers
+  
+  **31.2. MCP Tool Management:**
+  - Browse tools per MCP server
+  - Tool schema display (input/output parameters)
+  - Enable/Disable tools individually
+  - Tool usage statistics (how many times used)
+  
+  **31.3. MCP Tool Execution:**
+  - Agent can request MCP tool use
+  - POST /api/agent/tools/execute
+
+    ```json
+    {
+      "tool": "github.create_issue",
+      "mcp_server": "github-mcp",
+      "parameters": {
+        "repo": "user/repo",
+        "title": "Bug report",
+        "body": "Description..."
+      }
+    }
+    ```
+
+  - Tool result display в chat
+  - Error handling (tool not found, execution failed)
+  
+  **31.4. MCP Configuration:**
+  - Per-MCP server settings (API keys, base URLs)
+  - Sync MCP configs from server (централизованное управление)
+  - Local overrides для development
+  
+  **31.5. Security:**
+  - Whitelist MCP servers (only from our catalog)
+  - Rate limiting per MCP server (max 100 calls/min)
+  - Tool execution logs (audit trail)
+  - Dangerous tool warnings (delete operations, etc.)
+
+- [ ] **CLIENT-032** Tool System (File & Terminal)
+  
+  **32.1. File Operations Tools:**
+  - `file.read(path)` - read file content
+  - `file.write(path, content)` - write/overwrite file
+  - `file.create(path, content)` - create new file (fail if exists)
+  - `file.delete(path)` - delete file (requires approval)
+  - `file.list(directory)` - list files в directory
+  - `file.search(pattern, directory)` - search files by pattern
+  - All operations track changes для rollback
+  
+  **32.2. Terminal Execution Tools:**
+  - `terminal.execute(command, cwd)` - run command
+  - Command output streaming (real-time)
+  - Exit code capture
+  - Timeout handling (kill after 60s)
+  - Dangerous command detection:
+    - `rm -rf`, `sudo`, `format`, `dd`, `mkfs`
+    - Require explicit approval
+  - Shell selection (bash/powershell/zsh)
+  
+  **32.3. Tool Registry:**
+  - Central tool registry на server
+  - Tool versioning (v1, v2 APIs)
+  - Tool capability advertisement
+  - Dynamic tool loading (plugin-like)
+
+- [ ] **CLIENT-033** Agent Progress & History
+  
+  **33.1. Progress Visualization:**
+  - Agent task tree (expandable/collapsible)
+  - Real-time progress updates
+  - Time elapsed per task
+  - Success/Failure indicators (✅ ❌)
+  
+  **33.2. Agent History:**
+  - Conversation with agent actions included
+  - "Agent used 5 tools" summary
+  - Expandable tool use details
+  - Export agent session (for debugging)
+  
+  **33.3. Agent Metrics:**
+  - Total tools used per session
+  - Success rate (tasks completed / tasks attempted)
+  - Average approval time (user responsiveness)
+  - Most used tools (charts)
+
+**Acceptance Criteria:**
+
+- ✅ Agent mode активируется через toggle в Settings
+- ✅ Agent может планировать и выполнять tasks
+- ✅ File operations работают с approval flow
+- ✅ Terminal commands выполняются безопасно
+- ✅ MCP servers доступны из catalog
+- ✅ MCP tools выполняются через agent
+- ✅ Rollback mechanism работает (undo file changes)
+- ✅ UI показывает progress и требует approvals
+- ✅ Security: dangerous operations require explicit approval
+- ✅ Performance: UI не блокируется во время agent work
+
+**Время:** ~28-35 дней (4-5 недель)
+
+**Notes:**
+
+- Это **самая сложная feature** в roadmap
+- Требует тесной интеграции с server Agent API
+- Security критичен - все destructive operations require approval
+- Тестирование должно быть exhaustive (edge cases, timeouts, errors)
+
+---
+
 ### Version 1.0.0 - Production Release 🎯 MILESTONE
 
-**Total Development Time:** ~5-6 месяцев
+**Total Development Time:** ~6-8 месяцев
 
 **Requirements:**
 
-- ✅ All v0.1.0-v0.7.0 features implemented
+- ✅ All v0.1.0-v0.8.0 features implemented:
+  - ✅ Authentication & Chat (v0.1.0)
+  - ✅ File System Integration (v0.2.0)
+  - ✅ Monaco Editor (v0.3.0)
+  - ✅ WebSocket Streaming (v0.4.0)
+  - ✅ Hotfixes & Polish (v0.4.1)
+  - ✅ Terminal, Git, Settings, LSP (v0.5.0)
+  - ✅ Offline Mode & Cache (v0.6.0)
+  - ✅ Packaging & Auto-Updates (v0.7.0)
+  - ✅ Agentic Mode & MCP (v0.8.0) 🤖
 - ✅ Test coverage > 70%
-- ✅ Performance benchmarks pass
-- ✅ Security audit complete
-- ✅ Documentation complete
-- ✅ Cross-platform testing done
+- ✅ Performance benchmarks pass:
+  - App size < 50 MB
+  - Memory < 250 MB (with Agent mode)
+  - Startup < 5 seconds
+  - Chat latency < 100ms
+- ✅ Security audit complete:
+  - Agent approval flow tested
+  - Dangerous command detection verified
+  - MCP tool execution sandboxed
+- ✅ Documentation complete:
+  - User guide с Agent mode examples
+  - MCP integration guide
+  - Troubleshooting FAQ
+- ✅ Cross-platform testing done (Windows, macOS, Linux)
 
 ---
 
@@ -686,6 +1037,13 @@ aigateway-desktop/
 | Device Management | v2.4.2 | GET/DELETE /api/auth/devices |
 | WebSocket Streaming | v2.4.3 | /ws/chat |
 | Device UI | v2.4.4 | Web UI updates |
+| **Agentic Mode** | **v2.5.0+** | **/api/agent/\*** |
+| Agent Task Planning | v2.5.0+ | POST /api/agent/plan |
+| Agent Tool Execution | v2.5.0+ | POST /api/agent/tools/execute |
+| MCP Catalog | v2.5.0+ | GET /api/mcp/catalog |
+| MCP Tool Invoke | v2.5.0+ | POST /api/mcp/invoke |
+| File Operations Tool | v2.5.0+ | POST /api/agent/tools/file |
+| Terminal Tool | v2.5.0+ | POST /api/agent/tools/terminal |
 
 ### Technical Risks
 
@@ -695,6 +1053,12 @@ aigateway-desktop/
 | API Key revoked | Medium | Graceful re-login flow |
 | WebSocket failures | Low | Fallback to HTTP |
 | Cross-platform bugs | Medium | Extensive testing on all OS |
+| **Agent executes dangerous commands** | **Critical** | **Approval flow + command whitelist** |
+| **Agent infinite loop (too many tools)** | **High** | **Max tool limit (50), timeout per task** |
+| **MCP server compromised** | **High** | **Whitelist only our catalog, rate limiting** |
+| **File operations corrupt data** | **Medium** | **Rollback mechanism, git-like snapshots** |
+| **LSP binary not installed** | **Low** | **Auto-detect, prompt user to install** |
+| **Terminal command hangs** | **Medium** | **60s timeout, kill process** |
 
 ---
 
@@ -736,15 +1100,36 @@ aigateway-desktop/
 
 **Timeline:**
 
-- MVP (v0.1.0): 2 weeks
-- Beta (v0.4.0): 2-3 months  
-- Production (v1.0.0): 5-6 months
+- MVP (v0.1.0): 2 weeks ✅
+- File Integration (v0.2.0): 2 weeks ✅
+- Monaco Editor (v0.3.0): 3 weeks ✅
+- WebSocket Streaming (v0.4.0): 2 weeks ✅
+- Hotfixes (v0.4.1): 3 days ⏳ NEXT
+- Terminal & LSP (v0.5.0): 3 weeks
+- Offline Mode (v0.6.0): 2 weeks
+- Packaging (v0.7.0): 2 weeks
+- Agentic Mode (v0.8.0): 4-5 weeks 🤖
+- Production (v1.0.0): 6-8 months total
 
 **Next Steps:**
 
-1. Implement server v2.4.1 (Auto API Keys) - **PREREQUISITE**
-2. Initialize Wails project: `wails init -n aigateway-desktop`
-3. Start with CLIENT-001 (Project Setup)
-4. Weekly releases для rapid iteration
+1. ✅ ~~Implement server v2.4.1 (Auto API Keys)~~ - DONE
+2. ✅ ~~Initialize Wails project~~ - DONE
+3. ✅ ~~CLIENT-001 to CLIENT-016~~ - COMPLETED (v0.1.0 - v0.4.0)
+4. ⏳ **CLIENT-030** - Fix models loading bug (v0.4.1) - **IN PROGRESS**
+5. 🎯 **CLIENT-017** - Embedded Terminal (v0.5.0) - **NEXT MAJOR**
+6. 🤖 **CLIENT-028 to CLIENT-033** - Agentic Mode (v0.8.0) - **FUTURE**
 
-Let's build the best AI desktop client! 🚀
+**Current Status (2025-10-29):**
+
+- ✅ v0.1.0 - v0.4.0: COMPLETED
+- ⏳ v0.4.1: IN PROGRESS (models loading bug fix)
+- 📋 v0.5.0 - v0.8.0: PLANNED
+
+**Major Milestones Ahead:**
+
+1. **v0.5.0** (Terminal & LSP) - ~3 weeks
+2. **v0.8.0** (Agentic Mode 🤖) - ~4-5 weeks (BIGGEST FEATURE)
+3. **v1.0.0** (Production) - ~6-8 months total
+
+Let's build the best AI desktop client with full Agent capabilities! 🚀🤖

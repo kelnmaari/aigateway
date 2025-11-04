@@ -1,0 +1,10 @@
+-- Rollback: Drop api_usage_new table
+DROP INDEX IF EXISTS idx_api_usage_user_id;
+DROP INDEX IF EXISTS idx_api_usage_tenant_id;
+DROP INDEX IF EXISTS idx_api_usage_api_key_id;
+DROP INDEX IF EXISTS idx_api_usage_created_at;
+DROP INDEX IF EXISTS idx_api_usage_endpoint;
+DROP INDEX IF EXISTS idx_api_usage_model;
+DROP INDEX IF EXISTS idx_api_usage_user_created;
+DROP INDEX IF EXISTS idx_api_usage_tenant_created;
+DROP TABLE IF EXISTS api_usage_new;

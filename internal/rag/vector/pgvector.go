@@ -26,11 +26,16 @@ func NewPgVectorStore(config PostgreSQLConfig, logger *logrus.Logger) (*PgVector
 		logger = logrus.New()
 	}
 
-	// Build connection string
-	connStr := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		config.Host, config.Port, config.User, config.Password, config.Database, config.SSLMode,
-	)
+	// Build connection string (приоритет ConnectionString)
+	var connStr string
+	if config.ConnectionString != "" {
+		connStr = config.ConnectionString
+	} else {
+		connStr = fmt.Sprintf(
+			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			config.Host, config.Port, config.User, config.Password, config.Database, config.SSLMode,
+		)
+	}
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -94,6 +99,53 @@ func (s *PgVectorStore) initialize() error {
 		"table":      s.config.TableName,
 		"dimensions": s.config.Dimensions,
 	}).Info("Vector table initialized")
+
+	// Создаем index если требуется (Version 1.14.0+)
+	if s.config.CreateIndex {
+		indexName := fmt.Sprintf("%s_embedding_idx", s.config.TableName)
+		indexType := s.config.IndexType
+		if indexType == "" {
+			indexType = "hnsw" // Default to HNSW
+		}
+
+		// pgvector операторные классы для разных метрик
+		opsClass := "vector_cosine_ops" // default: cosine distance
+		if s.config.DistanceMetric == "l2" {
+			opsClass = "vector_l2_ops" // L2/Euclidean distance
+		} else if s.config.DistanceMetric == "inner_product" || s.config.DistanceMetric == "dot_product" {
+			opsClass = "vector_ip_ops" // Inner product
+		}
+
+		// HNSW parameters
+		m := 16 // default
+		efConstruction := 64 // default
+		if s.config.HNSWParams != nil {
+			if mVal, ok := s.config.HNSWParams["m"].(int); ok {
+				m = mVal
+			}
+			if efVal, ok := s.config.HNSWParams["ef_construction"].(int); ok {
+				efConstruction = efVal
+			}
+		}
+
+		createIndexSQL := fmt.Sprintf(`
+			CREATE INDEX IF NOT EXISTS %s ON %s 
+			USING %s (embedding %s) 
+			WITH (m = %d, ef_construction = %d)
+		`, indexName, s.config.TableName, indexType, opsClass, m, efConstruction)
+
+		_, err = s.db.Exec(createIndexSQL)
+		if err != nil {
+			return fmt.Errorf("failed to create vector index: %w", err)
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"index": indexName,
+			"type":  indexType,
+			"m":     m,
+			"ef":    efConstruction,
+		}).Info("Vector index created")
+	}
 
 	return nil
 }

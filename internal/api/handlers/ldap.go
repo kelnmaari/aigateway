@@ -228,6 +228,7 @@ func (h *LDAPHandler) provisionUser(ctx context.Context, ldapUser *ldapauth.User
 			Language: "en",
 			Timezone: "UTC",
 		},
+		Metadata: make(map[string]interface{}), // Empty map for JSONB
 	}
 
 	if err := h.db.CreateUser(ctx, newUser); err != nil {

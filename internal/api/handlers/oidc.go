@@ -361,6 +361,7 @@ func (h *OIDCHandler) provisionUser(ctx context.Context, issuer string, claims *
 			Language: "en",
 			Timezone: "UTC",
 		},
+		Metadata: make(map[string]interface{}), // Empty map for JSONB
 	}
 
 	if claims.EmailVerified {

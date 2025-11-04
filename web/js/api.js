@@ -202,6 +202,13 @@ class API {
             if (modelParams.top_p !== undefined) requestBody.top_p = modelParams.top_p;
             if (modelParams.max_tokens !== undefined) requestBody.max_tokens = modelParams.max_tokens;
             if (modelParams.options) requestBody.options = modelParams.options;
+            
+            // RAG parameters (v1.13.0+)
+            if (modelParams.rag_enabled !== undefined) requestBody.rag_enabled = modelParams.rag_enabled;
+            if (modelParams.rag_source_ids !== undefined) requestBody.rag_source_ids = modelParams.rag_source_ids;
+            if (modelParams.rag_top_k !== undefined) requestBody.rag_top_k = modelParams.rag_top_k;
+            if (modelParams.rag_min_score !== undefined) requestBody.rag_min_score = modelParams.rag_min_score;
+            if (modelParams.rag_rerank !== undefined) requestBody.rag_rerank = modelParams.rag_rerank;
         }
 
         const response = await this.request(`${this.baseURL}/v1/chat/completions`, {

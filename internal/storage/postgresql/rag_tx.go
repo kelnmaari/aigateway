@@ -75,6 +75,10 @@ func (tx *postgresqlTx) DeleteRAGChunksByDocument(ctx context.Context, documentI
 	return tx.db.DeleteRAGChunksByDocument(ctx, documentID)
 }
 
+func (tx *postgresqlTx) DeleteChunksBySource(ctx context.Context, sourceID string) error {
+	return tx.db.DeleteChunksBySource(ctx, sourceID)
+}
+
 // RAG Jobs Queue (v1.13.0+)
 
 func (tx *postgresqlTx) CreateRAGJob(ctx context.Context, job *models.RAGJob) error {
@@ -118,4 +122,3 @@ func (tx *postgresqlTx) GetRAGQueryLog(ctx context.Context, id int64) (*models.R
 func (tx *postgresqlTx) ListRAGQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*models.RAGQueryLog, error) {
 	return tx.db.ListRAGQueryLogsByUser(ctx, userID, limit, offset)
 }
-

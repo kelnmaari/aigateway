@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
 )
@@ -111,8 +111,8 @@ func (s *SQLiteDB) GetRAGDataSource(ctx context.Context, id string) (*models.RAG
 
 	// Parse nullable fields
 	if tenantID.Valid {
-		tid, _ := uuid.Parse(tenantID.String)
-		source.TenantID = &tid
+		tidStr := tenantID.String
+		source.TenantID = &tidStr
 	}
 	if lastSyncAt.Valid {
 		t, _ := time.Parse(time.RFC3339, lastSyncAt.String)
@@ -295,8 +295,8 @@ func (s *SQLiteDB) ListRAGDataSources(ctx context.Context, filter *storage.RAGDa
 
 		// Parse nullable fields
 		if tenantID.Valid {
-			tid, _ := uuid.Parse(tenantID.String)
-			source.TenantID = &tid
+			tidStr := tenantID.String
+			source.TenantID = &tidStr
 		}
 		if lastSyncAt.Valid {
 			t, _ := time.Parse(time.RFC3339, lastSyncAt.String)
@@ -766,6 +766,40 @@ func (s *SQLiteDB) DeleteRAGChunksByDocument(ctx context.Context, documentID str
 	return err
 }
 
+// DeleteChunksBySource удаляет все chunks для указанного источника
+func (s *SQLiteDB) DeleteChunksBySource(ctx context.Context, sourceID string) error {
+	// Также удаляем связанные векторы
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Удаляем векторы
+	_, err = tx.ExecContext(ctx, "DELETE FROM rag_vectors WHERE source_id = ?", sourceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete vectors: %w", err)
+	}
+
+	// Удаляем chunks
+	_, err = tx.ExecContext(ctx, "DELETE FROM rag_chunks WHERE source_id = ?", sourceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete chunks: %w", err)
+	}
+
+	// Удаляем документы
+	_, err = tx.ExecContext(ctx, "DELETE FROM rag_documents WHERE source_id = ?", sourceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete documents: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 // ========================================
 // RAG Jobs Queue
 // ========================================
@@ -1103,12 +1137,12 @@ func (s *SQLiteDB) GetRAGQueryLog(ctx context.Context, id int64) (*models.RAGQue
 	}
 
 	if userID.Valid {
-		uid, _ := uuid.Parse(userID.String)
-		log.UserID = &uid
+		uidStr := userID.String
+		log.UserID = &uidStr
 	}
 	if conversationID.Valid {
-		cid, _ := uuid.Parse(conversationID.String)
-		log.ConversationID = &cid
+		cidStr := conversationID.String
+		log.ConversationID = &cidStr
 	}
 	if chunksUsed.Valid {
 		log.ChunksUsed = int(chunksUsed.Int64)
@@ -1176,12 +1210,12 @@ func (s *SQLiteDB) ListRAGQueryLogsByUser(ctx context.Context, userID string, li
 		}
 
 		if userIDField.Valid {
-			uid, _ := uuid.Parse(userIDField.String)
-			log.UserID = &uid
+			uidStr := userIDField.String
+			log.UserID = &uidStr
 		}
 		if conversationID.Valid {
-			cid, _ := uuid.Parse(conversationID.String)
-			log.ConversationID = &cid
+			cidStr := conversationID.String
+			log.ConversationID = &cidStr
 		}
 		if chunksUsed.Valid {
 			log.ChunksUsed = int(chunksUsed.Int64)

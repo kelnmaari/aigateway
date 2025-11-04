@@ -15,6 +15,7 @@ import (
 	"aigateway/internal/imageproc"
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
+	"aigateway/internal/utils"
 	"aigateway/internal/vision"
 )
 
@@ -231,7 +232,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 		StorageBackend:   uploadResp.StorageType,
 		StoragePath:      uploadResp.Path,
 		ExtractedText:    ocrText,
-		ExtractionStatus: stringPtr("completed"),
+		ExtractionStatus: utils.Ptr("completed"),
 		Language:         ocrLanguage,
 		Metadata: &models.FileMetadata{
 			PageCount: 0, // Для изображений не применимо

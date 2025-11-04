@@ -158,6 +158,7 @@ func (p *TenantProvisioner) getOrCreateTenant(
 			ChatEnabled:      true,
 			APIAccessEnabled: true,
 		},
+		Metadata:  make(map[string]interface{}), // Empty map for JSONB
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -216,6 +217,7 @@ func (p *TenantProvisioner) addUserToTenant(
 		Role:      role,
 		JoinedAt:  now,
 		UpdatedAt: now,
+		Metadata:  make(map[string]interface{}), // Empty map for JSONB
 	}
 	
 	if err := p.db.AddTenantMember(ctx, member); err != nil {

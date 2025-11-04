@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // DocumentStatus статус обработки документа
@@ -21,8 +19,8 @@ const (
 
 // RAGDocument представляет документ в RAG системе
 type RAGDocument struct {
-	ID                      uuid.UUID      `json:"id" db:"id"`
-	SourceID                uuid.UUID      `json:"source_id" db:"source_id"`
+	ID                      string      `json:"id" db:"id"`
+	SourceID                string      `json:"source_id" db:"source_id"`
 	
 	// Файл информация
 	Filename                string         `json:"filename,omitempty" db:"filename"`
@@ -61,9 +59,14 @@ func (m *DocumentMetadata) Scan(value interface{}) error {
 		return nil
 	}
 	
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan DocumentMetadata: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan DocumentMetadata: expected []byte or string, got %T", value)
 	}
 	
 	return json.Unmarshal(bytes, m)

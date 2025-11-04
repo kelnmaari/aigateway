@@ -194,7 +194,7 @@ func (p *ModelPreloader) performHealthCheck(ctx context.Context) {
 
 	for _, modelName := range models {
 		checkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		
+
 		// Send keep-alive request
 		if err := p.loadModel(checkCtx, modelName); err != nil {
 			p.logger.WithError(err).Warnf("Health check failed for model: %s", modelName)
@@ -235,9 +235,9 @@ func (p *ModelPreloader) unloadUnused() {
 
 	for modelName, lastUsed := range p.loadedModels {
 		if now.Sub(lastUsed) > p.config.UnloadAfter {
-			p.logger.Infof("Unloading unused model: %s (last used: %s ago)", 
+			p.logger.Infof("Unloading unused model: %s (last used: %s ago)",
 				modelName, now.Sub(lastUsed))
-			
+
 			// Ollama doesn't have explicit unload API
 			// Model will be evicted by LRU when memory is needed
 			delete(p.loadedModels, modelName)
@@ -269,7 +269,7 @@ func (p *ModelPreloader) markUnloaded(modelName string) {
 func (p *ModelPreloader) MarkUsed(modelName string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if _, exists := p.loadedModels[modelName]; exists {
 		p.loadedModels[modelName] = time.Now()
 		p.logger.Debugf("Model marked as used: %s", modelName)
@@ -286,10 +286,10 @@ func (p *ModelPreloader) GetLoadedModels() []ModelStatus {
 
 	for model, lastUsed := range p.loadedModels {
 		models = append(models, ModelStatus{
-			Name:      model,
-			Loaded:    true,
-			LastUsed:  lastUsed,
-			IdleTime:  now.Sub(lastUsed),
+			Name:     model,
+			Loaded:   true,
+			LastUsed: lastUsed,
+			IdleTime: now.Sub(lastUsed),
 		})
 	}
 
@@ -317,5 +317,3 @@ type ModelStatus struct {
 	LastUsed time.Time     `json:"last_used"`
 	IdleTime time.Duration `json:"idle_time"`
 }
-
-

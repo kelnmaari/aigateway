@@ -95,22 +95,26 @@ type VectorStoreConfig struct {
 
 // PostgreSQLConfig конфигурация для pgvector
 type PostgreSQLConfig struct {
-	Host     string
-	Port     int
-	Database string
-	User     string
-	Password string
-	SSLMode  string
+	// Connection (либо ConnectionString, либо Host+Port+etc)
+	ConnectionString string // PostgreSQL connection string (приоритет)
+	Host             string
+	Port             int
+	Database         string
+	User             string
+	Password         string
+	SSLMode          string
 	
 	// Table settings
-	TableName   string // Название таблицы для vectors
-	ChunkIDColumn string // Колонка для chunk_id
-	VectorColumn  string // Колонка для vector
+	TableName      string // Название таблицы для vectors
+	ChunkIDColumn  string // Колонка для chunk_id
+	VectorColumn   string // Колонка для vector
 	MetadataColumn string // Колонка для metadata (JSONB)
 	
 	// Vector settings
 	Dimensions     int    // Размерность векторов (768, 1024, etc.)
-	DistanceMetric string // "cosine", "l2", "inner_product"
+	DistanceMetric string // Metric для similarity search (cosine, l2, inner_product)
+	IndexType      string // hnsw или ivfflat
+	CreateIndex    bool   // Создать index при инициализации
 	
 	// Index settings
 	HNSWParams map[string]interface{} // m, ef_construction, ef_search

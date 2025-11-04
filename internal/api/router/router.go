@@ -36,6 +36,7 @@ import (
 	"aigateway/internal/services/model"
 	"aigateway/internal/services/quota"
 	ragservice "aigateway/internal/services/rag"
+	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/storage"
 	"aigateway/internal/websocket"
@@ -149,6 +150,7 @@ type Router struct {
 	
 	// RAG System (Version 1.13.0+: RAG System)
 	ragDataSourceService *ragservice.DataSourceService
+	ragOrchestrator      *ragorchestrator.RAGOrchestrator
 }
 
 // NewOptions содержит опции для создания роутера
@@ -161,10 +163,11 @@ type NewOptions struct {
 	TracerProvider       *observability.TracerProvider     // Опциональный OpenTelemetry tracer (v1.6.0+)
 	PerformanceMonitor   *observability.PerformanceMonitor // Опциональный performance monitor (v1.6.2+)
 	LeakDetector         *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
-	MonigoPort           int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
-	GPUMonitor           *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
-	ModelPreloader       *model.ModelPreloader             // Опциональный model preloader (v1.12.1+)
-	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
+	MonigoPort           int                                  // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
+	GPUMonitor           *metrics.GPUMonitor                  // Опциональный GPU monitor (v1.9.3+)
+	ModelPreloader       *model.ModelPreloader                // Опциональный model preloader (v1.12.1+)
+	RAGDataSourceService *ragservice.DataSourceService        // Опциональный RAG Data Source Service (v1.13.1+)
+	RAGOrchestrator      *ragorchestrator.RAGOrchestrator // Опциональный RAG Orchestrator (v1.13.1+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -197,6 +200,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		gpuMonitor:           opts.GPUMonitor,
 		modelPreloader:       opts.ModelPreloader,
 		ragDataSourceService: opts.RAGDataSourceService,
+		ragOrchestrator:      opts.RAGOrchestrator,
 	}
 
 	// Setup tracer if provided
@@ -1328,6 +1332,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	if r.modelPreloader != nil {
 		r.chatHandler.SetModelPreloader(r.modelPreloader)
 		logger.Info("Model preloader attached to chat handler")
+	}
+
+	// Setup RAG orchestrator для chat retrieval (v1.13.1+)
+	if r.ragOrchestrator != nil {
+		r.chatHandler.SetRAGOrchestrator(r.ragOrchestrator)
+		logger.Info("RAG Orchestrator attached to chat handler")
 	}
 
 	r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)

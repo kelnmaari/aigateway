@@ -1,0 +1,18 @@
+# Патч для добавления TCP services в NGINX Ingress ConfigMap
+# Применяется через: kubectl patch configmap tcp-services -n nginx-ingress --patch-file nginx-ingress-tcp-patch.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tcp-services
+  namespace: nginx-ingress
+data:
+  # Existing service (сохраняем)
+  "9000": nginx-ingress/ingress-nginx-1762145411-defaultbackend:80
+  
+  # PostgreSQL - порт 5432 презентуется как 30432
+  "30432": rag-infrastructure/postgres-service:5432
+  
+  # Redis - порт 6379 презентуется как 30379  
+  "30379": rag-infrastructure/redis-service:6379
+

@@ -1,0 +1,90 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Prometheus Configuration for RAG Infrastructure Monitoring
+# ═══════════════════════════════════════════════════════════════════════════
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'rag-infrastructure'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - 'alertmanager:9093'
+
+# Scrape configurations
+scrape_configs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Prometheus self-monitoring
+  # ═══════════════════════════════════════════════════════════════════════════
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PostgreSQL + pgvector metrics (requires postgres_exporter)
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Uncomment if you add postgres_exporter container
+  # - job_name: 'postgresql'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgresql'
+  #         database: 'ollama_proxy'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Redis metrics (requires redis_exporter)
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Uncomment if you add redis_exporter container
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #       labels:
+  #         service: 'redis'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Qdrant metrics (built-in Prometheus endpoint)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - job_name: 'qdrant'
+    static_configs:
+      - targets: ['qdrant:6333']
+        labels:
+          service: 'qdrant'
+    metrics_path: '/metrics'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MinIO metrics (built-in Prometheus endpoint)
+  # ═══════════════════════════════════════════════════════════════════════════
+  - job_name: 'minio'
+    bearer_token: 'YOUR_MINIO_PROMETHEUS_TOKEN'  # Generate via: mc admin prometheus generate minio
+    metrics_path: '/minio/v2/metrics/cluster'
+    scheme: http
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Your Application metrics (if your server exposes /metrics endpoint)
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Uncomment and adjust when you run your RAG server
+  # - job_name: 'aigateway'
+  #   static_configs:
+  #     - targets: ['aigateway:8080']
+  #       labels:
+  #         service: 'aigateway'
+  #   metrics_path: '/metrics'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Recording Rules (для pre-computed метрик)
+# ═══════════════════════════════════════════════════════════════════════════
+# rule_files:
+#   - 'alerts/*.yml'
+#   - 'rules/*.yml'
+

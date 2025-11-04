@@ -24,6 +24,10 @@ import (
 	"aigateway/internal/observability"
 	"aigateway/internal/services/model"
 	ragservice "aigateway/internal/services/rag"
+	ragworker "aigateway/internal/rag/worker"
+	ragorchestrator "aigateway/internal/rag/orchestrator"
+	"aigateway/internal/rag/embeddings"
+	"aigateway/internal/rag/vector"
 	"aigateway/internal/storage"
 	"aigateway/internal/version"
 )
@@ -38,6 +42,7 @@ func main() {
 	rollbackTo := flag.Int("rollback-to", -1, "Rollback to specific migration version")
 	showMigrationVersion := flag.Bool("migration-version", false, "Show current migration version")
 	listMigrations := flag.Bool("migrations-list", false, "List all migrations with their status")
+	destroyDatabase := flag.Bool("destroy", false, "DESTROY database - drops ALL tables (requires confirmation)")
 
 	flag.Parse()
 
@@ -97,15 +102,15 @@ func main() {
 		fmt.Println("💾 База данных инициализирована")
 
 		// Handle migration management commands (REFACTOR-01)
-		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 {
-			handleMigrationCommands(db, appLogger, *showMigrationVersion, *listMigrations, *rollbackCount, *rollbackTo)
+		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 || *destroyDatabase {
+			handleMigrationCommands(db, appLogger, *showMigrationVersion, *listMigrations, *rollbackCount, *rollbackTo, *destroyDatabase)
 			os.Exit(0)
 		}
 	} else {
 		appLogger.Info("Database not configured, skipping initialization")
 
 		// Cannot use migration commands without database
-		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 {
+		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 || *destroyDatabase {
 			fmt.Println("❌ Migration commands require database to be configured")
 			os.Exit(1)
 		}
@@ -315,6 +320,7 @@ func main() {
 
 	// Инициализация RAG Data Source Service (Version 1.13.1+)
 	var ragDataSourceService *ragservice.DataSourceService
+	var ragOrchestrator *ragorchestrator.RAGOrchestrator
 	if cfg.RAG.Enabled && db != nil {
 		appLogger.Info("Initializing RAG Data Source Service...")
 
@@ -335,6 +341,107 @@ func main() {
 		} else {
 			appLogger.Info("✅ RAG Data Source Service initialized successfully")
 			fmt.Println("🧠 RAG System включен")
+			
+			// Создаем отдельный logger для RAG worker
+			ragLogger := logger.NewFileLogger("logs/rag-worker.log", cfg.Logging.Level)
+			ragLogger.Info("RAG Worker logger initialized")
+			
+			// Инициализация Embeddings (Version 1.14.0+)
+			var embedder embeddings.Embedder
+			var vectorStore vector.VectorStore
+			
+			if cfg.RAG.Embeddings.Provider != "" {
+				appLogger.Info("Initializing Embeddings...")
+				
+				// Конфигурация embedder
+				embedConfig := embeddings.EmbedderConfig{
+					Provider:     cfg.RAG.Embeddings.Provider,
+					BaseURL:      cfg.RAG.Embeddings.OllamaURL,
+					Model:        cfg.RAG.Embeddings.Model,
+					Dimensions:   cfg.RAG.Embeddings.Dimensions,
+					Timeout:      int(cfg.RAG.Embeddings.Timeout.Seconds()),
+					MaxBatchSize: cfg.RAG.Embeddings.BatchSize,
+					RateLimit:    10.0, // 10 req/sec
+				}
+				
+				embedder = embeddings.NewOllamaEmbedder(embedConfig, appLogger)
+				appLogger.WithFields(map[string]interface{}{
+					"provider": embedConfig.Provider,
+					"model":    embedConfig.Model,
+					"dims":     embedConfig.Dimensions,
+				}).Info("✅ Embeddings initialized")
+				fmt.Printf("🧮 Embeddings: %s (%s, %d dims)\n", embedConfig.Provider, embedConfig.Model, embedConfig.Dimensions)
+				
+				// Инициализация Vector Store (pgvector)
+				if cfg.RAG.VectorStore.Type == "pgvector" {
+					appLogger.Info("Initializing pgvector store...")
+					
+					// Извлекаем параметры подключения из connection string
+					pgConfig := vector.PostgreSQLConfig{
+						ConnectionString: cfg.RAG.VectorStore.ConnectionString,
+						TableName:        "rag_vectors",
+						Dimensions:       cfg.RAG.VectorStore.Dimensions,
+						DistanceMetric:   cfg.RAG.VectorStore.DistanceMetric,
+						CreateIndex:      true,
+						IndexType:        "hnsw", // или ivfflat
+					}
+					
+					vs, err := vector.NewPgVectorStore(pgConfig, appLogger)
+					if err != nil {
+						appLogger.WithError(err).Warn("Failed to initialize pgvector store, continuing without vector search")
+					} else {
+						vectorStore = vs
+						appLogger.WithFields(map[string]interface{}{
+							"table":  pgConfig.TableName,
+							"dims":   pgConfig.Dimensions,
+							"metric": pgConfig.DistanceMetric,
+						}).Info("✅ pgvector store initialized")
+						fmt.Printf("🔍 Vector Store: pgvector (%d dims, %s metric)\n", pgConfig.Dimensions, pgConfig.DistanceMetric)
+					}
+				}
+			} else {
+				appLogger.Warn("Embeddings not configured, RAG will work in simple mode without similarity search")
+			}
+			
+			// Инициализация RAG Orchestrator для чата (Version 1.14.0+)
+			appLogger.Info("Initializing RAG Orchestrator...")
+			ragOrchestrator = ragorchestrator.NewRAGOrchestrator(
+				db,
+				embedder,    // Embedder для генерации query embeddings
+				vectorStore, // Vector store для similarity search
+				appLogger,
+			)
+			
+			if embedder != nil && vectorStore != nil {
+				appLogger.Info("✅ RAG Orchestrator initialized (full mode with embeddings + vector search)")
+				fmt.Println("🔍 RAG Orchestrator готов (полный режим с embeddings)")
+			} else {
+				appLogger.Info("✅ RAG Orchestrator initialized (simple mode)")
+				fmt.Println("🔍 RAG Orchestrator готов (упрощенный режим)")
+			}
+			
+			// Запуск RAG Worker для обработки jobs (Version 1.14.0+)
+			appLogger.Info("Starting RAG Worker...")
+			
+			// Создаем и запускаем worker с embedder и vectorStore
+			ragWorker := ragworker.NewRAGWorker(db, embedder, vectorStore, ragLogger)
+			
+			// Запускаем в отдельной goroutine
+			go func() {
+				workerCtx := context.Background()
+				ragWorker.Start(workerCtx)
+			}()
+			
+			// Graceful shutdown для worker
+			defer ragWorker.Stop()
+			
+			if embedder != nil {
+				appLogger.Info("✅ RAG Worker started with embeddings support")
+				fmt.Println("⚙️  RAG Worker запущен (с embeddings)")
+			} else {
+				appLogger.Info("✅ RAG Worker started (simple mode)")
+				fmt.Println("⚙️  RAG Worker запущен (без embeddings)")
+			}
 		}
 	}
 
@@ -393,6 +500,7 @@ func main() {
 		GPUMonitor:           gpuMonitor,           // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
 		ModelPreloader:       modelPreloader,       // Может быть nil если preloading отключен (v1.12.1+)
 		RAGDataSourceService: ragDataSourceService, // Может быть nil если RAG отключен (v1.13.1+)
+		RAGOrchestrator:      ragOrchestrator,      // Может быть nil если RAG отключен (v1.13.1+)
 	})
 
 	if err != nil {
@@ -469,7 +577,7 @@ func main() {
 
 // handleMigrationCommands handles migration management CLI commands (REFACTOR-01)
 func handleMigrationCommands(db storage.Database, appLogger interface{},
-	showVersion, listMigs bool, rollbackCount, rollbackTo int) {
+	showVersion, listMigs bool, rollbackCount, rollbackTo int, destroy bool) {
 
 	ctx := context.Background()
 
@@ -566,6 +674,40 @@ func handleMigrationCommands(db storage.Database, appLogger interface{},
 		}
 
 		fmt.Printf("✅ Successfully rolled back to version %d\n", rollbackTo)
+		return
+	}
+
+	// Destroy database
+	if destroy {
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Println("⚠️  WARNING: DESTRUCTIVE OPERATION")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Println("This will PERMANENTLY DELETE:")
+		fmt.Println("  - All tables")
+		fmt.Println("  - All data (users, conversations, API keys, etc)")
+		fmt.Println("  - All migrations")
+		fmt.Println("")
+		fmt.Println("A backup will be created in data/backups/ before destruction")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Print("\nType 'YES' in CAPITALS to confirm destruction: ")
+
+		var confirmation string
+		fmt.Scanln(&confirmation)
+
+		if confirmation != "YES" {
+			fmt.Println("❌ Destruction cancelled")
+			os.Exit(0)
+		}
+
+		fmt.Println("\n🔥 Destroying database...")
+
+		if err := db.DestroyDatabase(ctx); err != nil {
+			fmt.Printf("❌ Destruction failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("✅ Database destroyed successfully")
+		fmt.Println("💡 To start fresh, run the server - migrations will be applied automatically")
 		return
 	}
 }

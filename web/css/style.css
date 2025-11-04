@@ -583,6 +583,19 @@ body {
     margin-bottom: 0;
 }
 
+/* Remove margins around thinking spoiler */
+.message-content .thinking-spoiler {
+    margin: 4px 0;
+}
+
+.message-content p:has(.thinking-spoiler) {
+    margin: 0;
+}
+
+.message-content .thinking-spoiler + p {
+    margin-top: 8px;
+}
+
 .message-content pre {
     background: var(--code-bg);
     border: 1px solid var(--border-color);
@@ -2290,6 +2303,65 @@ body {
     font-style: italic;
 }
 
+/* RAG Sources List with Checkboxes */
+.rag-sources-list {
+    width: 100%;
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.rag-source-loading {
+    padding: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+}
+
+.rag-source-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.rag-source-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.rag-source-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    margin-right: 10px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+.rag-source-item label {
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rag-source-type {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
 .checkbox-label {
     display: flex;
     align-items: center;
@@ -2399,5 +2471,83 @@ body {
     display: inline-block;
     margin: 2px;
     border: 1px dashed rgba(128, 128, 128, 0.3);
+}
+
+/* ===========================
+   Thinking Spoiler (for reasoning models like DeepSeek-R1)
+   =========================== */
+.thinking-spoiler {
+    margin: 4px 0;
+    background: rgba(20, 40, 80, 0.6);
+    border-left: 3px solid rgba(59, 130, 246, 0.7);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.thinking-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    user-select: none;
+    background: rgba(30, 50, 90, 0.7);
+    transition: background 0.2s;
+}
+
+.thinking-header:hover {
+    background: rgba(40, 60, 100, 0.8);
+}
+
+.thinking-icon {
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+.thinking-title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.8em;
+    color: rgba(150, 200, 255, 1);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.thinking-toggle {
+    font-size: 0.75em;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.thinking-content {
+    padding: 14px;
+    font-size: 0.9em;
+    color: rgba(236, 236, 236, 0.95);
+    line-height: 1.6;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(59, 130, 246, 0.25);
+    white-space: pre-wrap;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.thinking-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 4px;
+}
+
+.thinking-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.5);
 }
 

@@ -1,0 +1,63 @@
+# Полный патч для добавления всех TCP портов в NGINX Ingress Controller Service
+# Применяется через: kubectl patch svc ingress-nginx-1762145411-controller -n nginx-ingress --patch-file nginx-controller-service-full.yaml
+
+spec:
+  ports:
+  # Existing ports (HTTP/HTTPS)
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  
+  # PostgreSQL TCP port
+  - name: postgres-tcp
+    port: 30432
+    protocol: TCP
+    targetPort: 30432
+  
+  # Redis TCP port  
+  - name: redis-tcp
+    port: 30379
+    protocol: TCP
+    targetPort: 30379
+  
+  # pgAdmin TCP port
+  - name: pgadmin-tcp
+    port: 30050
+    protocol: TCP
+    targetPort: 30050
+  
+  # MinIO API TCP port
+  - name: minio-api-tcp
+    port: 30900
+    protocol: TCP
+    targetPort: 30900
+  
+  # MinIO Console TCP port
+  - name: minio-console-tcp
+    port: 30901
+    protocol: TCP
+    targetPort: 30901
+  
+  # Qdrant HTTP TCP port
+  - name: qdrant-http-tcp
+    port: 30633
+    protocol: TCP
+    targetPort: 30633
+  
+  # Qdrant gRPC TCP port
+  - name: qdrant-grpc-tcp
+    port: 30634
+    protocol: TCP
+    targetPort: 30634
+  
+  # Grafana TCP port
+  - name: grafana-tcp
+    port: 30300
+    protocol: TCP
+    targetPort: 30300
+

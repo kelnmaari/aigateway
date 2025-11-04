@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -234,25 +235,12 @@ func (k *APIKey) IsActive() bool {
 // HasModelAccess проверяет доступ к модели
 func (k *APIKey) HasModelAccess(model string) bool {
 	// Если доступ ко всем моделям
-	for _, allowedModel := range k.Models {
-		if allowedModel == "*" {
-			return true
-		}
-		if allowedModel == model {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(k.Models, "*") || slices.Contains(k.Models, model)
 }
 
 // HasPermission проверяет наличие разрешения
 func (k *APIKey) HasPermission(permission string) bool {
-	for _, perm := range k.Permissions {
-		if perm == "*" || perm == permission {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(k.Permissions, "*") || slices.Contains(k.Permissions, permission)
 }
 
 // VerifyKey проверяет plaintext ключ против хеша
@@ -518,26 +506,13 @@ func IsValidAPIKeyFormat(key string) bool {
 
 // HasPermission проверяет наличие разрешения у публичного ключа
 func (k *APIKeyPublic) HasPermission(permission string) bool {
-	for _, perm := range k.Permissions {
-		if perm == "*" || perm == permission {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(k.Permissions, "*") || slices.Contains(k.Permissions, permission)
 }
 
 // HasModelAccess проверяет доступ к модели у публичного ключа
 func (k *APIKeyPublic) HasModelAccess(model string) bool {
 	// Если доступ ко всем моделям
-	for _, allowedModel := range k.Models {
-		if allowedModel == "*" {
-			return true
-		}
-		if allowedModel == model {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(k.Models, "*") || slices.Contains(k.Models, model)
 }
 
 // IsExpired проверяет истек ли публичный ключ

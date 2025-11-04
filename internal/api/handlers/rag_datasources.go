@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"aigateway/internal/models"
 	"aigateway/internal/services/rag"
@@ -61,10 +60,9 @@ func (h *RAGDataSourcesHandler) CreateDataSource(c *gin.Context) {
 // GetDataSource получает источник по ID
 // GET /api/rag/sources/:id
 func (h *RAGDataSourcesHandler) GetDataSource(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source ID"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source ID is required"})
 		return
 	}
 	
@@ -132,9 +130,7 @@ func (h *RAGDataSourcesHandler) ListDataSources(c *gin.Context) {
 	
 	// Get tenant ID if filtering by tenant
 	if tenantIDStr := c.Query("tenant_id"); tenantIDStr != "" {
-		if tenantID, err := uuid.Parse(tenantIDStr); err == nil {
-			filter.TenantID = &tenantID
-		}
+		filter.TenantID = &tenantIDStr
 	}
 	
 	// List sources
@@ -156,12 +152,7 @@ func (h *RAGDataSourcesHandler) ListDataSources(c *gin.Context) {
 // UpdateDataSource обновляет источник
 // PUT /api/rag/sources/:id
 func (h *RAGDataSourcesHandler) UpdateDataSource(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source ID"})
-		return
-	}
+	id := c.Param("id")
 	
 	var req models.UpdateRAGDataSourceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -196,12 +187,7 @@ func (h *RAGDataSourcesHandler) UpdateDataSource(c *gin.Context) {
 // DeleteDataSource удаляет источник
 // DELETE /api/rag/sources/:id
 func (h *RAGDataSourcesHandler) DeleteDataSource(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source ID"})
-		return
-	}
+	id := c.Param("id")
 	
 	// Verify ownership
 	source, err := h.service.GetDataSource(c.Request.Context(), id)
@@ -247,12 +233,7 @@ func (h *RAGDataSourcesHandler) TestConnection(c *gin.Context) {
 // SyncSource запускает синхронизацию источника
 // POST /api/rag/sources/:id/sync
 func (h *RAGDataSourcesHandler) SyncSource(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source ID"})
-		return
-	}
+	id := c.Param("id")
 	
 	// Verify ownership
 	source, err := h.service.GetDataSource(c.Request.Context(), id)
@@ -267,37 +248,41 @@ func (h *RAGDataSourcesHandler) SyncSource(c *gin.Context) {
 		return
 	}
 	
-	// TODO: enqueue sync job
-	// For now, return placeholder
+	// Create sync job
+	jobID, err := h.service.StartSync(c.Request.Context(), id)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to start sync")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start sync"})
+		return
+	}
+	
+	h.logger.WithField("job_id", jobID).Info("Sync job queued successfully")
+	
 	c.JSON(http.StatusAccepted, models.SyncSourceResponse{
-		JobID:         1,
-		Message:       "Sync job queued (not yet implemented)",
+		JobID:         jobID,
+		Message:       "Sync job queued successfully. Worker will process it shortly.",
 		EstimatedTime: "5m",
 	})
 }
 
 // getUserIDFromContext извлекает user ID из gin context
-func getUserIDFromContext(c *gin.Context) (uuid.UUID, error) {
+func getUserIDFromContext(c *gin.Context) (string, error) {
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
-		return uuid.Nil, errors.New("user_id not found in context")
+		return "", errors.New("user_id not found in context")
 	}
 	
 	userIDStr, ok := userIDInterface.(string)
 	if !ok {
-		return uuid.Nil, errors.New("user_id is not a string")
+		return "", errors.New("user_id is not a string")
 	}
 	
-	// JWT middleware sets user_id with "user_" prefix, strip it if present
-	if len(userIDStr) > 5 && userIDStr[:5] == "user_" {
-		userIDStr = userIDStr[5:]
-	}
-	
-	return uuid.Parse(userIDStr)
+	// Return the full user_id as-is (includes "user_" prefix from JWT)
+	return userIDStr, nil
 }
 
 // getTenantIDFromContext извлекает tenant ID из gin context (опционально)
-func getTenantIDFromContext(c *gin.Context) *uuid.UUID {
+func getTenantIDFromContext(c *gin.Context) *string {
 	tenantIDInterface, exists := c.Get("tenant_id")
 	if !exists {
 		return nil
@@ -308,17 +293,8 @@ func getTenantIDFromContext(c *gin.Context) *uuid.UUID {
 		return nil
 	}
 	
-	// Strip "tenant_" prefix if present
-	if len(tenantIDStr) > 7 && tenantIDStr[:7] == "tenant_" {
-		tenantIDStr = tenantIDStr[7:]
-	}
-	
-	tenantID, err := uuid.Parse(tenantIDStr)
-	if err != nil {
-		return nil
-	}
-	
-	return &tenantID
+	// Return the full tenant_id as-is (includes "tenant_" prefix if present)
+	return &tenantIDStr
 }
 
 

@@ -29,12 +29,15 @@ func (p *PostgreSQLDB) CreateUser(ctx context.Context, user *models.User) error 
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataJSON []byte
+	var metadataValue interface{}
 	if user.Metadata != nil {
-		metadataJSON, err = json.Marshal(user.Metadata)
+		metadataJSON, err := json.Marshal(user.Metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
+		metadataValue = metadataJSON
+	} else {
+		metadataValue = nil  // PostgreSQL NULL
 	}
 
 	query := `
@@ -61,7 +64,7 @@ func (p *PostgreSQLDB) CreateUser(ctx context.Context, user *models.User) error 
 		user.UpdatedAt,
 		user.LastLogin,
 		preferencesJSON,
-		metadataJSON,
+		metadataValue,
 	)
 
 	if err != nil {
@@ -148,6 +151,36 @@ func (p *PostgreSQLDB) GetUserByEmail(ctx context.Context, email string) (*model
 			return nil, fmt.Errorf("user not found: %s", email)
 		}
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
+	}
+
+	return user, nil
+}
+
+// GetUserByLDAPDN получает пользователя по LDAP DN
+func (p *PostgreSQLDB) GetUserByLDAPDN(ctx context.Context, ldapDN string) (*models.User, error) {
+	if p.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	p.logger.WithField("ldap_dn", ldapDN).Debug("Getting user by LDAP DN")
+
+	query := `
+		SELECT 
+			id, username, email, full_name, password_hash,
+			status, is_admin, is_active, verified, verified_at,
+			created_at, updated_at, last_login,
+			preferences, metadata,
+			auth_provider, oidc_subject, oidc_issuer, ldap_dn
+		FROM users
+		WHERE ldap_dn = $1
+	`
+
+	user, err := p.scanUser(p.db.QueryRowContext(ctx, query, ldapDN))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found for LDAP DN=%s", ldapDN)
+		}
+		return nil, fmt.Errorf("failed to get user by LDAP DN: %w", err)
 	}
 
 	return user, nil
@@ -273,7 +306,7 @@ func (p *PostgreSQLDB) DeleteUser(ctx context.Context, id string) error {
 		UPDATE users SET
 			status = 'deleted',
 			updated_at = CURRENT_TIMESTAMP,
-			is_active = FALSE
+			is_active = 0
 		WHERE id = $1
 	`
 
@@ -465,7 +498,71 @@ func (p *PostgreSQLDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject
 }
 
 // GetUsersWithDetails возвращает список пользователей с enriched данными (roles, tenants) для админ-панели (v2.2.2+)
-// PostgreSQL implementation stub
-func (p *PostgreSQLDB) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
-	return nil, fmt.Errorf("GetUsersWithDetails not implemented yet for PostgreSQL")
+func (db *PostgreSQLDB) GetUsersWithDetails(ctx context.Context, filters models.UserFilters) ([]*models.UserWithDetails, error) {
+	if db.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	// Получаем базовый список пользователей
+	users, err := db.ListUsers(ctx, filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	// Enriched users с ролями и тенантами
+	enrichedUsers := make([]*models.UserWithDetails, 0, len(users))
+
+	for _, user := range users {
+		userDetails := &models.UserWithDetails{
+			User: *user,
+		}
+
+		// Получаем роли пользователя
+		userRoles, err := db.GetUserRoles(ctx, user.ID)
+		if err != nil {
+			db.logger.WithError(err).WithField("user_id", user.ID).Warn("Failed to get user roles")
+		} else {
+			// Конвертируем в RoleInfo
+			roleInfos := make([]models.RoleInfo, 0, len(userRoles))
+			for _, ur := range userRoles {
+				// Получаем информацию о роли
+				role, err := db.GetRole(ctx, ur.RoleID)
+				if err != nil {
+					db.logger.WithError(err).WithField("role_id", ur.RoleID).Warn("Failed to get role details")
+					continue
+				}
+
+				roleInfos = append(roleInfos, models.RoleInfo{
+					ID:       role.ID,
+					Name:     role.Name,
+					TenantID: ur.TenantID,
+				})
+			}
+			userDetails.Roles = roleInfos
+		}
+
+		// Получаем тенанты пользователя
+		tenants, err := db.ListUserTenants(ctx, user.ID)
+		if err != nil {
+			db.logger.WithError(err).WithField("user_id", user.ID).Warn("Failed to get user tenants")
+		} else {
+			// Конвертируем в TenantInfo
+			tenantInfos := make([]models.TenantInfo, 0, len(tenants))
+			for _, tenant := range tenants {
+				tenantInfos = append(tenantInfos, models.TenantInfo{
+					ID:   tenant.ID,
+					Name: tenant.Name,
+					Slug: tenant.Slug,
+					Role: string(tenant.Type), // или Role из tenant_members
+				})
+			}
+			userDetails.Tenants = tenantInfos
+		}
+
+		enrichedUsers = append(enrichedUsers, userDetails)
+	}
+
+	db.logger.WithField("count", len(enrichedUsers)).Debug("Listed users with details")
+
+	return enrichedUsers, nil
 }

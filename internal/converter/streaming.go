@@ -15,23 +15,29 @@ import (
 
 // StreamConverter обрабатывает конвертацию streaming responses
 type StreamConverter struct {
-	logger       *logrus.Logger
-	config       *config.Config
-	hadToolCalls bool // 🔧 Запоминаем что в запросе были tool_calls
+	logger        *logrus.Logger
+	config        *config.Config
+	hadToolCalls  bool // 🔧 Запоминаем что в запросе были tool_calls
+	isThinking    bool // 🧠 Отслеживаем thinking state для DeepSeek-R1 (v2.4.7+)
+	thinkingStarted bool // Флаг что <think> тег уже отправлен
 }
 
 // NewStreamConverter создает новый stream converter
 func NewStreamConverter(cfg *config.Config, logger *logrus.Logger) *StreamConverter {
 	return &StreamConverter{
-		logger:       logger,
-		config:       cfg,
-		hadToolCalls: false,
+		logger:          logger,
+		config:          cfg,
+		hadToolCalls:    false,
+		isThinking:      false,
+		thinkingStarted: false,
 	}
 }
 
 // Reset сбрасывает состояние конвертера для нового запроса
 func (s *StreamConverter) Reset() {
 	s.hadToolCalls = false
+	s.isThinking = false
+	s.thinkingStarted = false
 }
 
 // ConvertOllamaChunkToOpenAI конвертирует Ollama chunk в OpenAI streaming format
@@ -61,15 +67,32 @@ func (s *StreamConverter) ConvertOllamaChunkToOpenAI(
 
 	// Для gpt-oss моделей: thinking является частью генерации
 	// Отправляем thinking как content для отображения процесса рассуждения
+	// Оборачиваем в теги <think>...</think> для frontend spoiler (v2.4.7+)
 	if content == "" && ollamaChunk.Message.Thinking != "" {
-		content = ollamaChunk.Message.Thinking
+		// Thinking chunk
+		if !s.thinkingStarted {
+			// Первый thinking chunk - отправляем открывающий тег
+			content = "<think>" + ollamaChunk.Message.Thinking
+			s.isThinking = true
+			s.thinkingStarted = true
+			s.logger.Debug("Thinking started - opening <think> tag")
+		} else {
+			// Продолжение thinking - просто текст без тегов
+			content = ollamaChunk.Message.Thinking
+		}
 
 		s.logger.WithFields(logrus.Fields{
 			"request_id":    requestID,
 			"model":         ollamaChunk.Model,
-			"thinking_len":  len(content),
-			"thinking_text": content,
+			"thinking_len":  len(ollamaChunk.Message.Thinking),
+			"thinking_text": ollamaChunk.Message.Thinking,
+			"is_first":      !s.isThinking,
 		}).Debug("Using thinking as content for gpt-oss model")
+	} else if s.isThinking && content != "" {
+		// Переход от thinking к content - закрываем тег
+		content = "</think>\n\n" + content
+		s.isThinking = false
+		s.logger.Debug("Thinking ended - closing </think> tag")
 	}
 
 	delta := models.ChatMessage{

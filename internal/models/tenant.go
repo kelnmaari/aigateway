@@ -2,6 +2,7 @@
 package models
 
 import (
+	"slices"
 	"time"
 )
 
@@ -128,12 +129,7 @@ func (r TenantRole) Can(action TenantPermission) bool {
 		},
 	}
 
-	for _, perm := range permissions[r] {
-		if perm == action {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(permissions[r], action)
 }
 
 // TenantPermission представляет разрешение в tenant
@@ -152,4 +148,3 @@ type TenantWithMember struct {
 	*Tenant
 	MemberRole TenantRole `json:"member_role"` // Роль текущего пользователя
 }
-

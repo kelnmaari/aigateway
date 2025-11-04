@@ -1,0 +1,27 @@
+# Патч для добавления TCP портов в NGINX Ingress Controller Service
+# Применяется через: kubectl patch svc ingress-nginx-1762145411-controller -n nginx-ingress --patch-file nginx-controller-service-patch.yaml
+
+spec:
+  ports:
+  # Existing ports (HTTP/HTTPS)
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  
+  # PostgreSQL TCP port
+  - name: postgres-tcp
+    port: 30432
+    protocol: TCP
+    targetPort: 30432
+  
+  # Redis TCP port  
+  - name: redis-tcp
+    port: 30379
+    protocol: TCP
+    targetPort: 30379
+

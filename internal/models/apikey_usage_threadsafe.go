@@ -2,6 +2,7 @@
 package models
 
 import (
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -140,11 +141,7 @@ func (u *APIKeyUsageThreadSafe) GetModelUsage() map[string]int64 {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
 
-	result := make(map[string]int64, len(u.ModelUsage))
-	for k, v := range u.ModelUsage {
-		result[k] = v
-	}
-	return result
+	return maps.Clone(u.ModelUsage)
 }
 
 // GetEndpointUsage returns thread-safe copy of endpoint usage
@@ -152,11 +149,7 @@ func (u *APIKeyUsageThreadSafe) GetEndpointUsage() map[string]int64 {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
 
-	result := make(map[string]int64, len(u.EndpointUsage))
-	for k, v := range u.EndpointUsage {
-		result[k] = v
-	}
-	return result
+	return maps.Clone(u.EndpointUsage)
 }
 
 // GetDailyUsage returns thread-safe copy of daily usage
@@ -164,10 +157,5 @@ func (u *APIKeyUsageThreadSafe) GetDailyUsage() map[string]DayUsage {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
 
-	result := make(map[string]DayUsage, len(u.DailyUsage))
-	for k, v := range u.DailyUsage {
-		result[k] = v
-	}
-	return result
+	return maps.Clone(u.DailyUsage)
 }
-

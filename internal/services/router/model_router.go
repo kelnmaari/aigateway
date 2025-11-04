@@ -3,12 +3,14 @@ package router
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	"aigateway/internal/models"
 	"aigateway/internal/providers"
 	"aigateway/internal/storage"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,7 +19,7 @@ type ModelRouter struct {
 	db              storage.Database
 	providerManager *providers.ProviderManager
 	logger          *logrus.Logger
-	
+
 	// Cache для быстрого поиска provider по model_id
 	modelProviderCache map[string]string // model_id -> provider_id
 	cacheMu            sync.RWMutex
@@ -26,20 +28,20 @@ type ModelRouter struct {
 
 // RouteConfig конфигурация маршрутизации для конкретного запроса
 type RouteConfig struct {
-	ModelID         string
-	RequireHealthy  bool          // Требовать только healthy providers
-	AllowFallback   bool          // Разрешить fallback на другие providers
-	PreferredType   models.ModelProviderType // Предпочитаемый тип provider (ollama/vllm)
-	Timeout         time.Duration
+	ModelID        string
+	RequireHealthy bool                     // Требовать только healthy providers
+	AllowFallback  bool                     // Разрешить fallback на другие providers
+	PreferredType  models.ModelProviderType // Предпочитаемый тип provider (ollama/vllm)
+	Timeout        time.Duration
 }
 
 // RouteResult результат маршрутизации
 type RouteResult struct {
-	Provider        providers.Provider
-	ProviderID      string
-	Model           *models.ModelRegistry
-	IsFallback      bool
-	FallbackReason  string
+	Provider           providers.Provider
+	ProviderID         string
+	Model              *models.ModelRegistry
+	IsFallback         bool
+	FallbackReason     string
 	AttemptedProviders []string // Список попыток для отладки
 }
 
@@ -57,9 +59,9 @@ func NewModelRouter(db storage.Database, providerManager *providers.ProviderMana
 // Route выбирает оптимальный provider для обработки запроса
 func (r *ModelRouter) Route(ctx context.Context, config RouteConfig) (*RouteResult, error) {
 	r.logger.WithFields(logrus.Fields{
-		"model_id":       config.ModelID,
+		"model_id":        config.ModelID,
 		"require_healthy": config.RequireHealthy,
-		"allow_fallback": config.AllowFallback,
+		"allow_fallback":  config.AllowFallback,
 	}).Debug("Routing model request")
 
 	// 1. Поиск модели в registry
@@ -69,7 +71,7 @@ func (r *ModelRouter) Route(ctx context.Context, config RouteConfig) (*RouteResu
 	}
 
 	result := &RouteResult{
-		Model:             model,
+		Model:              model,
 		AttemptedProviders: []string{},
 	}
 
@@ -96,14 +98,14 @@ func (r *ModelRouter) Route(ctx context.Context, config RouteConfig) (*RouteResu
 			result.FallbackReason = fmt.Sprintf("primary provider unavailable: %v", err)
 			r.logger.WithFields(logrus.Fields{
 				"fallback_provider": providerID,
-				"reason":           result.FallbackReason,
+				"reason":            result.FallbackReason,
 			}).Info("Routed to fallback provider")
 			return result, nil
 		}
 	}
 
 	// 4. Не удалось найти доступный provider
-	return nil, fmt.Errorf("no available provider for model %s (attempted: %v)", 
+	return nil, fmt.Errorf("no available provider for model %s (attempted: %v)",
 		config.ModelID, result.AttemptedProviders)
 }
 
@@ -174,13 +176,7 @@ func (r *ModelRouter) findFallbackProvider(ctx context.Context, model *models.Mo
 	// Пытаемся найти модель с теми же capabilities
 	for _, candidateModel := range sortedCandidates {
 		// Пропускаем уже попробованные providers
-		alreadyAttempted := false
-		for _, attempted := range result.AttemptedProviders {
-			if attempted == candidateModel.ProviderID {
-				alreadyAttempted = true
-				break
-			}
-		}
+		alreadyAttempted := slices.Contains(result.AttemptedProviders, candidateModel.ProviderID)
 		if alreadyAttempted {
 			continue
 		}
@@ -301,4 +297,3 @@ func (r *ModelRouter) GetCachedProvider(modelID string) (string, bool) {
 	providerID, exists := r.modelProviderCache[modelID]
 	return providerID, exists
 }
-

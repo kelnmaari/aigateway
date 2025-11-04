@@ -79,6 +79,9 @@ type Database interface {
 	// ListMigrations возвращает список всех миграций с их статусом (REFACTOR-01)
 	ListMigrations(ctx context.Context) ([]MigrationInfo, error)
 
+	// DestroyDatabase полностью очищает базу данных (удаляет все таблицы)
+	DestroyDatabase(ctx context.Context) error
+
 	// ========================================
 	// Transaction Support
 	// ========================================
@@ -487,6 +490,7 @@ type Database interface {
 	ListRAGChunksByDocument(ctx context.Context, documentID string) ([]*models.RAGChunk, error)
 	ListRAGChunksBySource(ctx context.Context, sourceID string, limit, offset int) ([]*models.RAGChunk, error)
 	DeleteRAGChunksByDocument(ctx context.Context, documentID string) error
+	DeleteChunksBySource(ctx context.Context, sourceID string) error
 
 	// RAG Jobs Queue
 	CreateRAGJob(ctx context.Context, job *models.RAGJob) error

@@ -391,7 +391,34 @@ class ChatManager {
 
             for await (const chunk of stream) {
                 fullResponse += chunk;
-                contentDiv.innerHTML = marked.parse(fullResponse);
+                
+                // Extract thinking blocks
+                const { content, spoilers } = this.extractThinkingBlocks(fullResponse);
+                
+                // Parse markdown
+                contentDiv.innerHTML = marked.parse(content);
+                
+                // Insert thinking spoilers at the beginning
+                if (spoilers.length > 0) {
+                    spoilers.forEach(spoiler => {
+                        const spoilerDiv = document.createElement('div');
+                        spoilerDiv.className = 'thinking-spoiler';
+                        spoilerDiv.setAttribute('data-block-id', spoiler.id);
+                        spoilerDiv.innerHTML = `
+<div class="thinking-header" onclick="window.chatManager.toggleThinking('${spoiler.id}')">
+<span class="thinking-icon">🧠</span>
+<span class="thinking-title">Процесс размышления</span>
+<span class="thinking-toggle">▶</span>
+</div>
+<div class="thinking-content" id="${spoiler.id}" style="display: none;">${this.escapeHtml(spoiler.content)}</div>`;
+                        
+                        contentDiv.insertBefore(spoilerDiv, contentDiv.firstChild);
+                    });
+                }
+                
+                // Attach listeners for thinking spoilers
+                this.attachThinkingSpoilerListeners(contentDiv);
+                
                 this.scrollToBottom();
             }
 
@@ -438,12 +465,89 @@ class ChatManager {
         const messageDiv = this.createMessageElement(message.role);
         const contentDiv = messageDiv.querySelector('.message-content');
         
-        // Parse markdown for all messages (user + assistant)
-        contentDiv.innerHTML = marked.parse(message.content);
+        // Extract thinking blocks
+        const { content, spoilers } = this.extractThinkingBlocks(message.content);
+        
+        // Parse markdown (without thinking blocks)
+        contentDiv.innerHTML = marked.parse(content);
+        
+        // Insert thinking spoilers at the beginning
+        if (spoilers.length > 0) {
+            spoilers.forEach(spoiler => {
+                const spoilerDiv = document.createElement('div');
+                spoilerDiv.className = 'thinking-spoiler';
+                spoilerDiv.setAttribute('data-block-id', spoiler.id);
+                spoilerDiv.innerHTML = `
+<div class="thinking-header" onclick="window.chatManager.toggleThinking('${spoiler.id}')">
+<span class="thinking-icon">🧠</span>
+<span class="thinking-title">Процесс размышления</span>
+<span class="thinking-toggle">▶</span>
+</div>
+<div class="thinking-content" id="${spoiler.id}" style="display: none;">${this.escapeHtml(spoiler.content)}</div>`;
+                
+                // Insert at the beginning
+                contentDiv.insertBefore(spoilerDiv, contentDiv.firstChild);
+            });
+        }
+        
+        // Attach event listeners for thinking spoilers
+        this.attachThinkingSpoilerListeners(contentDiv);
         
         // Show attached files if any (FILE-STORAGE-01: Phase 4)
         if (message.role === 'user' && message.file_ids && message.file_ids.length > 0) {
             this.renderMessageFiles(messageDiv, message.file_ids);
+        }
+    }
+    
+    // Extract thinking blocks and remove them from content
+    extractThinkingBlocks(content) {
+        const thinkRegex = /<think>([\s\S]*?)<\/think>|<reasoning>([\s\S]*?)<\/reasoning>/gi;
+        const spoilers = [];
+        let processedContent = content;
+        let match;
+        
+        while ((match = thinkRegex.exec(content)) !== null) {
+            const thinkingContent = match[1] || match[2];
+            const blockId = `thinking-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            spoilers.push({ id: blockId, content: thinkingContent.trim() });
+            // Just remove the thinking block from content
+            processedContent = processedContent.replace(match[0], '');
+        }
+        
+        return { content: processedContent, spoilers };
+    }
+    
+    // Escape HTML for safe display
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Attach event listeners to thinking spoiler elements
+    attachThinkingSpoilerListeners(contentDiv) {
+        const spoilers = contentDiv.querySelectorAll('.thinking-spoiler');
+        spoilers.forEach(spoiler => {
+            const header = spoiler.querySelector('.thinking-header');
+            const blockId = spoiler.getAttribute('data-block-id');
+            
+            header.onclick = () => this.toggleThinking(blockId);
+        });
+    }
+    
+    // Toggle thinking spoiler visibility
+    toggleThinking(blockId) {
+        const content = document.getElementById(blockId);
+        const header = content.previousElementSibling;
+        const toggle = header.querySelector('.thinking-toggle');
+        
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
         }
     }
 
@@ -733,21 +837,35 @@ class RAGManager {
             const response = await api.getRAGSources();
             this.sources = response.sources || [];
             
-            // Populate select
+            // Populate checkboxes
             this.ragSourcesSelect.innerHTML = '';
             
             if (this.sources.length === 0) {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = 'No sources available';
-                option.disabled = true;
-                this.ragSourcesSelect.appendChild(option);
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'rag-source-loading';
+                emptyMsg.textContent = 'No sources available';
+                this.ragSourcesSelect.appendChild(emptyMsg);
             } else {
                 this.sources.forEach(source => {
-                    const option = document.createElement('option');
-                    option.value = source.id;
-                    option.textContent = `${source.name} (${source.source_type})`;
-                    this.ragSourcesSelect.appendChild(option);
+                    const item = document.createElement('div');
+                    item.className = 'rag-source-item';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `rag-source-${source.id}`;
+                    checkbox.value = source.id;
+                    checkbox.dataset.sourceId = source.id;
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `rag-source-${source.id}`;
+                    label.innerHTML = `
+                        <span>${source.name}</span>
+                        <span class="rag-source-type">${source.source_type}</span>
+                    `;
+                    
+                    item.appendChild(checkbox);
+                    item.appendChild(label);
+                    this.ragSourcesSelect.appendChild(item);
                 });
             }
         } catch (error) {
@@ -761,9 +879,9 @@ class RAGManager {
             return null;
         }
 
-        // Get selected sources
-        const selectedOptions = Array.from(this.ragSourcesSelect.selectedOptions);
-        const sourceIDs = selectedOptions.map(opt => opt.value).filter(v => v);
+        // Get checked checkboxes
+        const checkboxes = this.ragSourcesSelect.querySelectorAll('input[type="checkbox"]:checked');
+        const sourceIDs = Array.from(checkboxes).map(cb => cb.value).filter(v => v);
 
         if (sourceIDs.length === 0) {
             return null; // No sources selected

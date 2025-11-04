@@ -1,0 +1,483 @@
+version: '3.8'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RAG Infrastructure Stack
+# ═══════════════════════════════════════════════════════════════════════════
+# 
+# Компоненты для RAG (Retrieval-Augmented Generation) системы:
+#   - PostgreSQL + pgvector (vector database)
+#   - Redis (кеш и очередь)
+#   - Qdrant (альтернативный vector store)
+#   - MinIO (S3-совместимое файловое хранилище)
+#   - Grafana + Prometheus (мониторинг)
+#
+# Использование:
+#   docker-compose -f docker-compose.rag-infrastructure.yml up
+#
+# Профили:
+#   - default: PostgreSQL + pgvector + Redis
+#   - qdrant: + Qdrant vector database
+#   - minio: + MinIO S3 storage
+#   - monitoring: + Prometheus + Grafana
+#   - full: все компоненты
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PostgreSQL с pgvector расширением - основное векторное хранилище
+  # ═══════════════════════════════════════════════════════════════════════════
+  postgres-pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: rag-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      # Основные настройки
+      POSTGRES_DB: ${POSTGRES_DB:-ollama_proxy}
+      POSTGRES_USER: ${POSTGRES_USER:-proxy_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      
+      # Performance tuning для RAG workload
+      # Увеличиваем shared_buffers для кеша векторов
+      POSTGRES_SHARED_BUFFERS: "512MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "2GB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "256MB"
+      POSTGRES_WORK_MEM: "64MB"
+      
+      # WAL настройки для лучшей производительности
+      POSTGRES_WAL_BUFFERS: "16MB"
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
+      POSTGRES_MAX_WAL_SIZE: "1GB"
+      
+      # Connection pool
+      POSTGRES_MAX_CONNECTIONS: "200"
+    volumes:
+      - postgres_pgvector_data:/var/lib/postgresql/data
+      - ./docker/postgres-pgvector-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./docker/postgres-pgvector-tuning.sql:/docker-entrypoint-initdb.d/02-tuning.sql:ro
+    networks:
+      - rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-proxy_user} -d ${POSTGRES_DB:-ollama_proxy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # pgAdmin - Web UI для управления PostgreSQL
+  # ═══════════════════════════════════════════════════════════════════════════
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rag-pgadmin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - rag_network
+    depends_on:
+      postgres-pgvector:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Redis - кеширование, очередь задач, distributed rate limiting
+  # ═══════════════════════════════════════════════════════════════════════════
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --tcp-backlog 511
+      --timeout 0
+      --tcp-keepalive 300
+    volumes:
+      - redis_data:/data
+    networks:
+      - rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Qdrant - альтернативный vector database (опционально)
+  # ═══════════════════════════════════════════════════════════════════════════
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-qdrant
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    environment:
+      # Qdrant configuration
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      
+      # Storage configuration
+      QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
+      QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/snapshots
+      
+      # Performance tuning
+      QDRANT__SERVICE__MAX_REQUEST_SIZE_MB: 100
+      QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB: 20000
+      QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD_KB: 50000
+      
+      # Logging
+      QDRANT__LOG_LEVEL: INFO
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - qdrant_snapshots:/qdrant/snapshots
+    networks:
+      - rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    profiles:
+      - qdrant
+      - full
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MinIO - S3-совместимое объектное хранилище для файлов
+  # ═══════════════════════════════════════════════════════════════════════════
+  minio:
+    image: minio/minio:latest
+    container_name: rag-minio
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      
+      # Browser configuration
+      MINIO_BROWSER: "on"
+      MINIO_BROWSER_REDIRECT_URL: "http://localhost:9001"
+      
+      # Compression
+      MINIO_COMPRESS: "on"
+      MINIO_COMPRESS_EXTENSIONS: ".txt,.csv,.json,.pdf"
+      
+      # Security
+      MINIO_SERVER_URL: "http://localhost:9000"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    profiles:
+      - minio
+      - full
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MinIO Client - автоматическое создание buckets
+  # ═══════════════════════════════════════════════════════════════════════════
+  minio-setup:
+    image: minio/mc:latest
+    container_name: rag-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing minio/user-files;
+      mc mb --ignore-existing minio/rag-documents;
+      mc mb --ignore-existing minio/embeddings-cache;
+      mc policy set download minio/user-files;
+      exit 0;
+      "
+    networks:
+      - rag_network
+    profiles:
+      - minio
+      - full
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Prometheus - сбор метрик
+  # ═══════════════════════════════════════════════════════════════════════════
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rag-prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ./docker/prometheus-rag.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - rag_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    profiles:
+      - monitoring
+      - full
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Grafana - визуализация метрик
+  # ═══════════════════════════════════════════════════════════════════════════
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rag-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      # Security
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      
+      # Server
+      GF_SERVER_ROOT_URL: "http://localhost:3000"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      
+      # Database (SQLite встроенная)
+      GF_DATABASE_TYPE: sqlite3
+      GF_DATABASE_PATH: /var/lib/grafana/grafana.db
+      
+      # Plugins
+      GF_INSTALL_PLUGINS: "redis-datasource,postgres-datasource"
+      
+      # Anonymous access (для демо)
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      
+      # Logging
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: info
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana-rag:/etc/grafana/provisioning:ro
+    networks:
+      - rag_network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    profiles:
+      - monitoring
+      - full
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Volumes
+# ═══════════════════════════════════════════════════════════════════════════
+volumes:
+  postgres_pgvector_data:
+    driver: local
+    name: rag_postgres_data
+  pgadmin_data:
+    driver: local
+    name: rag_pgadmin_data
+  redis_data:
+    driver: local
+    name: rag_redis_data
+  qdrant_data:
+    driver: local
+    name: rag_qdrant_data
+  qdrant_snapshots:
+    driver: local
+    name: rag_qdrant_snapshots
+  minio_data:
+    driver: local
+    name: rag_minio_data
+  prometheus_data:
+    driver: local
+    name: rag_prometheus_data
+  grafana_data:
+    driver: local
+    name: rag_grafana_data
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Network
+# ═══════════════════════════════════════════════════════════════════════════
+networks:
+  rag_network:
+    driver: bridge
+    name: rag_network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USAGE EXAMPLES
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Базовая конфигурация (PostgreSQL + Redis):
+#   docker-compose -f docker-compose.rag-infrastructure.yml up -d
+#
+# С Qdrant:
+#   docker-compose -f docker-compose.rag-infrastructure.yml --profile qdrant up -d
+#
+# С MinIO:
+#   docker-compose -f docker-compose.rag-infrastructure.yml --profile minio up -d
+#
+# С мониторингом:
+#   docker-compose -f docker-compose.rag-infrastructure.yml --profile monitoring up -d
+#
+# Полный стек:
+#   docker-compose -f docker-compose.rag-infrastructure.yml --profile full up -d
+#
+# Остановить:
+#   docker-compose -f docker-compose.rag-infrastructure.yml down
+#
+# Очистить данные:
+#   docker-compose -f docker-compose.rag-infrastructure.yml down -v
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# ENVIRONMENT VARIABLES
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Создайте .env файл в той же директории:
+#
+# # PostgreSQL
+# POSTGRES_PORT=5432
+# POSTGRES_DB=ollama_proxy
+# POSTGRES_USER=proxy_user
+# POSTGRES_PASSWORD=secure_password_change_me
+#
+# # pgAdmin
+# PGADMIN_PORT=5050
+# PGADMIN_DEFAULT_EMAIL=admin@admin.com
+# PGADMIN_DEFAULT_PASSWORD=admin123
+#
+# # Redis
+# REDIS_PORT=6379
+#
+# # Qdrant
+# QDRANT_HTTP_PORT=6333
+# QDRANT_GRPC_PORT=6334
+#
+# # MinIO
+# MINIO_API_PORT=9000
+# MINIO_CONSOLE_PORT=9001
+# MINIO_ROOT_USER=minioadmin
+# MINIO_ROOT_PASSWORD=minioadmin123
+#
+# # Prometheus
+# PROMETHEUS_PORT=9090
+#
+# # Grafana
+# GRAFANA_PORT=3000
+# GRAFANA_ADMIN_USER=admin
+# GRAFANA_ADMIN_PASSWORD=admin123
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# CONNECTION STRINGS
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# PostgreSQL (из вашего приложения):
+#   postgres://proxy_user:secure_password_change_me@localhost:5432/ollama_proxy?sslmode=disable
+#
+# Redis:
+#   redis://localhost:6379/0
+#
+# Qdrant:
+#   http://localhost:6333
+#
+# MinIO S3:
+#   Endpoint: http://localhost:9000
+#   Access Key: minioadmin
+#   Secret Key: minioadmin123
+#
+# ═══════════════════════════════════════════════════════════════════════════
+

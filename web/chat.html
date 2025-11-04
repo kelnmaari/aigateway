@@ -311,7 +311,7 @@
                     <div id="rag-controls" class="rag-controls" style="display: none;">
                         <!-- Source Selector -->
                         <div class="param-control">
-                            <label for="rag-sources">
+                            <label>
                                 Data Sources
                                 <span class="param-info" title="Select RAG data sources to use">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -320,10 +320,10 @@
                                     </svg>
                                 </span>
                             </label>
-                            <select id="rag-sources" class="param-select" multiple size="3">
-                                <option value="">Loading sources...</option>
-                            </select>
-                            <small class="param-help">Hold Ctrl/Cmd to select multiple</small>
+                            <div id="rag-sources" class="rag-sources-list">
+                                <div class="rag-source-loading">Loading sources...</div>
+                            </div>
+                            <small class="param-help">Select one or more sources</small>
                         </div>
                         
                         <!-- TopK -->

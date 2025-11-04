@@ -18,9 +18,15 @@ type RAGConfig struct {
 
 // VectorStoreConfig конфигурация vector storage
 type VectorStoreConfig struct {
-	Backend      string            `mapstructure:"backend"` // "pgvector" или "qdrant"
-	PGVector     PGVectorConfig    `mapstructure:"pgvector"`
-	Qdrant       QdrantConfig      `mapstructure:"qdrant"`
+	Type              string         `mapstructure:"type"`               // "pgvector" или "qdrant"
+	ConnectionString  string         `mapstructure:"connection_string"`  // PostgreSQL connection string
+	Dimensions        int            `mapstructure:"dimensions"`         // Vector dimensions
+	DistanceMetric    string         `mapstructure:"distance_metric"`    // "cosine", "l2", "dot_product"
+	HNSWEFConstruction int           `mapstructure:"hnsw_ef_construction"` // HNSW parameter
+	HNSWM             int            `mapstructure:"hnsw_m"`             // HNSW parameter
+	Backend           string         `mapstructure:"backend"`            // Deprecated: use Type
+	PGVector          PGVectorConfig `mapstructure:"pgvector"`           // Deprecated
+	Qdrant            QdrantConfig   `mapstructure:"qdrant"`             // Deprecated
 }
 
 // PGVectorConfig конфигурация pgvector
@@ -42,7 +48,8 @@ type QdrantConfig struct {
 
 // EmbeddingsConfig конфигурация embeddings
 type EmbeddingsConfig struct {
-	Provider        string        `mapstructure:"provider"`         // "ollama"
+	Provider        string        `mapstructure:"provider"`         // "ollama", "openai"
+	OllamaURL       string        `mapstructure:"ollama_url"`       // Ollama API URL
 	Model           string        `mapstructure:"model"`            // "nomic-embed-text" или "bge-m3"
 	Dimensions      int           `mapstructure:"dimensions"`       // 768 или 1024
 	BatchSize       int           `mapstructure:"batch_size"`       // 32

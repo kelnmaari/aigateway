@@ -1,0 +1,12 @@
+-- Rollback: Drop files table
+DROP INDEX IF EXISTS idx_files_user_id;
+DROP INDEX IF EXISTS idx_files_tenant_id;
+DROP INDEX IF EXISTS idx_files_mime_type;
+DROP INDEX IF EXISTS idx_files_extraction_status;
+DROP INDEX IF EXISTS idx_files_checksum;
+DROP INDEX IF EXISTS idx_files_created_at;
+DROP INDEX IF EXISTS idx_files_storage_backend;
+DROP INDEX IF EXISTS idx_file_logs_file_id;
+DROP INDEX IF EXISTS idx_file_logs_user_id;
+DROP INDEX IF EXISTS idx_file_logs_created_at;
+DROP TABLE IF EXISTS files;

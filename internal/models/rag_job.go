@@ -64,9 +64,14 @@ func (p *JobPayload) Scan(value interface{}) error {
 		return nil
 	}
 	
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan JobPayload: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan JobPayload: expected []byte or string, got %T", value)
 	}
 	
 	return json.Unmarshal(bytes, p)
@@ -90,9 +95,14 @@ func (r *JobResult) Scan(value interface{}) error {
 		return nil
 	}
 	
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan JobResult: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan JobResult: expected []byte or string, got %T", value)
 	}
 	
 	return json.Unmarshal(bytes, r)

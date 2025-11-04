@@ -11,7 +11,6 @@ import (
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
 
-	"github.com/google/uuid"
 )
 
 // Verify that SQLiteDB implements RAGDataSourceRepository
@@ -45,9 +44,9 @@ func (s *SQLiteDB) CreateDataSource(ctx context.Context, source *models.RAGDataS
 	`
 
 	_, err = s.db.ExecContext(ctx, query,
-		source.ID.String(),
-		source.UserID.String(),
-		nullableUUID(source.TenantID),
+		source.ID,
+		source.UserID,
+		nullableString(source.TenantID),
 		source.Name,
 		source.Description,
 		source.SourceType,
@@ -72,7 +71,7 @@ func (s *SQLiteDB) CreateDataSource(ctx context.Context, source *models.RAGDataS
 }
 
 // GetDataSourceByID получает источник по ID
-func (s *SQLiteDB) GetDataSourceByID(ctx context.Context, id uuid.UUID) (*models.RAGDataSource, error) {
+func (s *SQLiteDB) GetDataSourceByID(ctx context.Context, id string) (*models.RAGDataSource, error) {
 	query := `
 		SELECT 
 			id, user_id, tenant_id, name, description, source_type,
@@ -93,7 +92,7 @@ func (s *SQLiteDB) GetDataSourceByID(ctx context.Context, id uuid.UUID) (*models
 	var tagsJSON, configJSON, indexingConfigJSON string
 	var isSharedInt int
 
-	err := s.db.QueryRowContext(ctx, query, id.String()).Scan(
+	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&source.ID,
 		&source.UserID,
 		&tenantID,
@@ -126,8 +125,8 @@ func (s *SQLiteDB) GetDataSourceByID(ctx context.Context, id uuid.UUID) (*models
 
 	// Parse nullable fields
 	if tenantID.Valid {
-		tid, _ := uuid.Parse(tenantID.String)
-		source.TenantID = &tid
+		tidStr := tenantID.String
+		source.TenantID = &tidStr
 	}
 	if lastSyncAt.Valid {
 		source.LastSyncAt = &lastSyncAt.Time
@@ -171,12 +170,12 @@ func (s *SQLiteDB) ListDataSources(ctx context.Context, filter storage.DataSourc
 
 	if filter.UserID != nil {
 		whereClauses = append(whereClauses, "user_id = ?")
-		args = append(args, filter.UserID.String())
+		args = append(args, filter.UserID)
 	}
 
 	if filter.TenantID != nil {
 		whereClauses = append(whereClauses, "tenant_id = ?")
-		args = append(args, filter.TenantID.String())
+		args = append(args, filter.TenantID)
 	}
 
 	if filter.SourceType != nil {
@@ -266,8 +265,8 @@ func (s *SQLiteDB) ListDataSources(ctx context.Context, filter storage.DataSourc
 
 		// Parse nullable fields
 		if tenantID.Valid {
-			tid, _ := uuid.Parse(tenantID.String)
-			source.TenantID = &tid
+			tidStr := tenantID.String
+			source.TenantID = &tidStr
 		}
 		if lastSyncAt.Valid {
 			source.LastSyncAt = &lastSyncAt.Time
@@ -336,52 +335,45 @@ func (s *SQLiteDB) UpdateDataSource(ctx context.Context, source *models.RAGDataS
 		string(tagsJSON),
 		boolToInt(source.IsShared),
 		source.UpdatedAt,
-		source.ID.String(),
+		source.ID,
 	)
 
 	return err
 }
 
 // DeleteDataSource удаляет источник
-func (s *SQLiteDB) DeleteDataSource(ctx context.Context, id uuid.UUID) error {
+func (s *SQLiteDB) DeleteDataSource(ctx context.Context, id string) error {
 	query := "DELETE FROM rag_data_sources WHERE id = ?"
-	_, err := s.db.ExecContext(ctx, query, id.String())
+	_, err := s.db.ExecContext(ctx, query, id)
 	return err
 }
 
 // UpdateSourceStatus обновляет статус источника
-func (s *SQLiteDB) UpdateSourceStatus(ctx context.Context, id uuid.UUID, status models.SourceStatus, errorMsg string) error {
+func (s *SQLiteDB) UpdateSourceStatus(ctx context.Context, id string, status models.SourceStatus, errorMsg string) error {
 	query := "UPDATE rag_data_sources SET status = ?, last_error = ?, updated_at = ? WHERE id = ?"
-	_, err := s.db.ExecContext(ctx, query, string(status), errorMsg, sql.NullTime{}, id.String())
+	_, err := s.db.ExecContext(ctx, query, string(status), errorMsg, sql.NullTime{}, id)
 	return err
 }
 
 // UpdateSyncInfo обновляет информацию о синхронизации
-func (s *SQLiteDB) UpdateSyncInfo(ctx context.Context, id uuid.UUID, status models.SyncStatus, chunkCount int) error {
+func (s *SQLiteDB) UpdateSyncInfo(ctx context.Context, id string, status models.SyncStatus, chunkCount int) error {
 	query := `
 		UPDATE rag_data_sources 
 		SET last_sync_at = ?, last_sync_status = ?, last_chunk_count = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := s.db.ExecContext(ctx, query, sql.NullTime{}, string(status), chunkCount, sql.NullTime{}, id.String())
+	_, err := s.db.ExecContext(ctx, query, sql.NullTime{}, string(status), chunkCount, sql.NullTime{}, id)
 	return err
 }
 
 // UpdateStatistics обновляет статистику источника
-func (s *SQLiteDB) UpdateStatistics(ctx context.Context, id uuid.UUID, totalChunks int, totalTokens int64) error {
+func (s *SQLiteDB) UpdateStatistics(ctx context.Context, id string, totalChunks int, totalTokens int64) error {
 	query := "UPDATE rag_data_sources SET total_chunks = ?, total_tokens = ?, updated_at = ? WHERE id = ?"
-	_, err := s.db.ExecContext(ctx, query, totalChunks, totalTokens, sql.NullTime{}, id.String())
+	_, err := s.db.ExecContext(ctx, query, totalChunks, totalTokens, sql.NullTime{}, id)
 	return err
 }
 
 // Helper functions
-func nullableUUID(id *uuid.UUID) interface{} {
-	if id == nil {
-		return nil
-	}
-	return id.String()
-}
-
 func nullableString(s *string) interface{} {
 	if s == nil {
 		return nil

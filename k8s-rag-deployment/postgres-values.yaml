@@ -1,0 +1,82 @@
+# Global settings
+global:
+  security:
+    allowInsecureImages: true  # Разрешаем pgvector/pgvector образ
+
+auth:
+  username: proxy_user
+  password: secure_password_change_me
+  database: ollama_proxy
+
+# Используем образ PostgreSQL с pgvector
+image:
+  registry: docker.io
+  repository: pgvector/pgvector
+  tag: "pg16"
+
+primary:
+  # Инициализация базы данных с pgvector
+  initdb:
+    scripts:
+      01-init.sql: |
+        -- Enable pgvector extension
+        CREATE EXTENSION IF NOT EXISTS vector;
+        
+        -- Grant permissions
+        GRANT ALL PRIVILEGES ON DATABASE ollama_proxy TO proxy_user;
+        
+        -- Создание таблиц для RAG
+        CREATE TABLE IF NOT EXISTS document_embeddings (
+          id SERIAL PRIMARY KEY,
+          document_id VARCHAR(255) NOT NULL,
+          chunk_index INTEGER NOT NULL,
+          embedding vector(1536),
+          content TEXT,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(document_id, chunk_index)
+        );
+        
+        -- Индекс для быстрого поиска по векторам
+        CREATE INDEX IF NOT EXISTS document_embeddings_vector_idx 
+          ON document_embeddings 
+          USING ivfflat (embedding vector_cosine_ops)
+          WITH (lists = 100);
+        
+        -- Индекс для быстрого поиска по document_id
+        CREATE INDEX IF NOT EXISTS document_embeddings_document_id_idx 
+          ON document_embeddings(document_id);
+        
+      02-tuning.sql: |
+        -- Performance tuning для RAG workload
+        ALTER SYSTEM SET shared_buffers = '512MB';
+        ALTER SYSTEM SET effective_cache_size = '2GB';
+        ALTER SYSTEM SET maintenance_work_mem = '256MB';
+        ALTER SYSTEM SET work_mem = '64MB';
+        ALTER SYSTEM SET wal_buffers = '16MB';
+        ALTER SYSTEM SET max_connections = '200';
+
+  # Ресурсы
+  resources:
+    limits:
+      memory: 4Gi
+      cpu: 2000m
+    requests:
+      memory: 2Gi
+      cpu: 1000m
+
+  # Persistence
+  persistence:
+    enabled: true
+    size: 20Gi
+
+  # Service type - ClusterIP для использования через NGINX-Ingress TCP
+  service:
+    type: ClusterIP
+    ports:
+      postgresql: 5432
+
+# Metrics для Prometheus (отключены из-за проблем с образом exporter)
+metrics:
+  enabled: false
+

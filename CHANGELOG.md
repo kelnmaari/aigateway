@@ -5,6 +5,253 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.9] - Unreleased
+
+### Planned
+
+- **Go 1.18-1.25 Modernization** 🚀:
+  - **Generic Pointer Helpers**:
+    - New `internal/utils/ptr.go` with `Ptr[T]()` and `Value[T]()` functions
+    - Replace 200+ lines of duplicated `stringPtr`, `intPtr`, `float64Ptr` helpers
+    - Type-safe pointer operations across entire codebase
+  - **Standard Library Integration**:
+    - `slices` package (Go 1.21+): Replace manual loops with `slices.Contains`, `slices.DeleteFunc`, `slices.Index`
+    - `maps` package (Go 1.21+): Safe operations with `maps.Clone`, `maps.Copy` for configs and metadata
+    - Estimated code reduction: ~150 lines
+  - **Generic API Response Wrapper**:
+    - Type-safe `APIResponse[T any]` for all API handlers
+    - Consistent error handling across endpoints
+    - Better type inference and IDE support
+  - **Custom Iterators** (Go 1.23):
+    - Database pagination with `range over func`
+    - RAG chunk processing iterator
+    - Cleaner, more idiomatic pagination code
+  - **Generic Type Aliases** (Go 1.24):
+    - `ConfigMap[T]` for typed configuration maps
+    - `Metadata[T]` for model and RAG metadata
+    - Improved type safety and code clarity
+  - **Generic Vector Operations**:
+    - `Vector[T ~float32 | ~float64]` for RAG embeddings
+    - Type-safe similarity calculations
+    - Support for both float32 and float64 precision
+  - **Go 1.25 New Features**:
+    - `sync.WaitGroup.Go()` - convenient goroutine spawning pattern
+    - `runtime/trace.FlightRecorder` - lightweight execution tracing for rare events
+    - `hash.Cloner` interface - implement for all custom hash implementations
+    - `net/http.CrossOriginProtection` - CSRF protection middleware
+    - `testing.T.Attr()` - test attributes for better observability
+    - Container-aware `GOMAXPROCS` - automatic CPU limit detection in Kubernetes
+    - Experimental GreenTea GC (`GOEXPERIMENT=greenteagc`) - 10-40% GC overhead reduction
+    - `go vet` analyzers: `waitgroup` (misplaced Add calls), `hostport` (IPv6 compatibility)
+
+### Technical
+
+- **Estimated Impact**:
+  - Code reduction: ~500 lines
+  - Type safety improvement: High
+  - Performance: Minimal overhead (generics are zero-cost at runtime)
+  - Readability: Very High improvement
+- **Compatibility**: Go 1.21+ required for full feature set
+- **Migration**: Incremental rollout, backward compatible
+
+## [2.4.8] - 2025-11-04
+
+### Added
+
+- **Embeddings & Vector Search** 🧮:
+  - Ollama embeddings integration (`mxbai-embed-large`, `nomic-embed-text`)
+  - pgvector store for similarity search with HNSW index
+  - Automatic index creation with configurable parameters (m=16, ef_construction=64)
+  - Connection string support for direct PostgreSQL connection
+  - Configurable dimensions (768, 1024) and distance metrics (cosine, l2, inner_product)
+  - **RAG Worker embeddings generation**:
+    - Batch embeddings for all RAG data sources (API, DB, Web)
+    - Automatic vector storage in pgvector after chunk creation
+    - Graceful fallback to simple mode if embedder not configured
+    - `generateAndStoreEmbeddings()` method for efficient processing
+  - Full vs Simple mode: seamless operation with or without embeddings
+  - RAG Orchestrator integrates embedder and vector store for enhanced search
+
+- **RAG Worker Full Implementation** 🤖:
+  - Complete API Sync implementation (`internal/rag/worker/api_sync.go`)
+    - REST API data synchronization (GET/POST methods)
+    - JSON and plain text response parsing
+    - Configurable `data_path` extraction (e.g., "data.items")
+    - Custom `text_fields` selection for chunking
+    - Batch processing for array responses
+  - Complete Database Sync implementation (`internal/rag/worker/db_sync.go`)
+    - PostgreSQL and MySQL database connectivity
+    - SQL query execution with full row scanning
+    - Dynamic connection string building from config + encrypted credentials
+    - Automatic document and chunk creation from query results
+  - Complete Web Scraping implementation (`internal/rag/worker/web_scrape.go`)
+    - HTML page scraping with User-Agent spoofing
+    - Text extraction from HTML (script/style tag removal)
+    - HTML entities decoding (&nbsp;, &lt;, &mdash;, etc.)
+    - Whitespace cleanup and normalization
+    - Multiple URLs batch processing
+    - Partial success handling (some URLs may fail)
+  - **Chunking Strategies**:
+    - **Fixed**: Fixed-size chunks with configurable overlap
+    - **Sentence**: Smart sentence-based chunking (punctuation detection)
+    - **Paragraph**: Paragraph-based chunking (double newline split)
+  - Token counting: Approximate `tokens = len(text) / 4`
+  - RAG Worker logging to separate file: `logs/rag-worker.log`
+
+- **UI Improvements** 🎨:
+  - **RAG Data Sources Checkboxes**:
+    - Replaced confusing multi-select dropdown with intuitive checkboxes
+    - Each source shows name and type badge (api/database/web)
+    - Hover effects and visual feedback
+    - No more "Hold Ctrl/Cmd" requirement
+    - Scrollable list for many sources (max-height: 150px)
+  - **Thinking Spoiler for Reasoning Models**:
+    - Compact single-line spoiler with expand/collapse toggle (DeepSeek-R1, o1-preview)
+    - Dark theme styling (blue accent, #1a1a2e background)
+    - `<think>` and `<reasoning>` tag support in streaming chunks
+    - Frontend extraction and rendering without breaking markdown
+
+### Changed
+
+- **RAG Job Processing** 🔧:
+  - Job queue polling interval: 5 seconds
+  - Max retry attempts: 3
+  - Job locking: 5 minutes timeout
+  - Status flow: `pending` → `processing` → `completed`/`failed`
+  - Automatic expired job unlocking
+
+- **RAG Data Source Configuration**:
+  - **API Sources**: `url`, `method`, `headers`, `data_path`, `text_fields`
+  - **Database Sources**: `connection_string`, `query`, `database_type`
+  - **Web Sources**: `url` or `urls` (array)
+  - **Indexing Config**: `chunk_strategy`, `max_chunk_size` (default: 500), `chunk_overlap` (default: 50)
+
+### Fixed
+
+- **RAG Data Source Update Config Loss** 🔧:
+  - Fixed critical bug where editing RAG source would lose advanced config fields
+  - **Problem**: Frontend rebuilt `config` and `indexing_config` from scratch, losing:
+    - API sources: `data_path`, `text_fields`, custom `headers`
+    - Database sources: `connection_string`, custom `database_type`
+    - All sources: `chunk_strategy` in indexing_config
+  - **Solution**: 
+    - `buildConfig()` now starts with existing config when editing: `{ ...this.currentSource.config }`
+    - `indexing_config` preserves existing fields: `{ ...existingIndexingConfig, chunk_size, chunk_overlap }`
+    - Only form-visible fields are updated, everything else remains intact
+  - **Impact**: Config changes now properly persist between edits
+  - File modified: `web/js/rag-sources.js`
+
+- **RAG Sync Deduplication** 🔄:
+  - Implemented `DeleteChunksBySource` to prevent data duplication on repeated syncs
+  - Each sync now deletes old chunks/vectors/documents before creating new ones
+  - Atomic transaction: vectors → chunks → documents cleanup
+  - Applied to all sync types: API, Database, Web Scraping
+  - Prevents "chunks growing infinitely" issue
+  - Implementation:
+    - `internal/storage/database.go`: Added interface method
+    - `internal/storage/postgresql/rag.go`: PostgreSQL implementation with transaction
+    - `internal/storage/sqlite/rag.go`: SQLite implementation with transaction
+    - `internal/rag/worker/api_sync.go`: Delete before sync
+    - `internal/rag/worker/db_sync.go`: Delete before sync
+    - `internal/rag/worker/web_scrape.go`: Delete before sync
+
+- **RAG Chunk ID Collisions** 🔧:
+  - Changed chunk ID generation from `timestamp+random` to **UUID v4**
+  - Fixes `duplicate key value violates unique constraint "rag_chunks_pkey"` error
+  - Prevents collisions during high-speed chunk creation (100+ chunks/sec)
+  - Applies to API sync, DB sync, and web scraping workers
+- **Duplicate Method Declarations**:
+  - Removed duplicate `generateDocumentID`, `generateChunkID`, `randInt` from `db_sync.go`
+  - Centralized ID generation in `api_sync.go`
+- **Compilation Errors**:
+  - Fixed method redeclaration conflicts
+  - Removed duplicate `DocumentProcessor` implementation (kept `pipeline.go` version)
+
+### Technical
+
+- **File Structure**:
+  ```
+  internal/rag/worker/
+    ├── worker.go           # Main worker loop and job dispatching
+    ├── api_sync.go         # API synchronization logic
+    ├── db_sync.go          # Database query synchronization
+    └── web_scrape.go       # Web scraping logic
+  
+  internal/rag/processor/
+    ├── pipeline.go         # Document processing pipeline (existing)
+    └── worker.go           # Worker pool for batch processing
+  ```
+
+- **Documentation**:
+  - New comprehensive guide: `docs/RAG_WORKER_GUIDE.md`
+  - API endpoints documentation
+  - Troubleshooting guide
+  - Configuration examples for all source types
+
+## [2.4.7] - 2025-11-03
+
+### Added
+
+- **PostgreSQL Full Support** 🐘:
+  - Complete PostgreSQL database backend implementation
+  - All 12 CRUD modules ported from SQLite (8,000+ lines of code)
+  - 142 migration files (71 up + 71 down) with rollback support
+  - Automatic placeholder conversion (? → $1, $2, $3...)
+  - Production-ready with full feature parity to SQLite
+
+### Changed
+
+- **Migration System Refactoring** 🔧:
+  - Split monolithic `sqlite.go` (4,560 lines) into separate SQL files
+  - Reduced `sqlite.go` to ~300 lines (connection management only)
+  - New structure: `internal/storage/{sqlite,postgresql}/migrations/`
+  - File naming: `001_initial_schema.up.sql` + `001_initial_schema.down.sql`
+  - Automatic loader via Go 1.16+ `embed.FS`
+
+### Fixed
+
+- **PostgreSQL Migration Syntax** 🔧:
+  - Converted 47 changelog migrations from SQLite `INSERT OR REPLACE` to PostgreSQL `INSERT ... ON CONFLICT`
+  - Fixed SQL syntax errors in `001_initial_schema.up.sql` (comments, DEFAULT values)
+  - Fixed cross-platform path handling (`path.Join` for `embed.FS`, `filepath.Join` for OS filesystem)
+  - Fixed `build.ps1` PowerShell script (emoji parser errors, VCS status handling)
+  - All PostgreSQL CRUD operations now compile successfully
+  - Converted all SQLite-specific syntax to PostgreSQL:
+    - `DATETIME` → `TIMESTAMP`
+    - `INTEGER PRIMARY KEY AUTOINCREMENT` → `BIGSERIAL PRIMARY KEY`
+    - `randomblob()` → `gen_random_bytes()` (requires `pgcrypto` extension)
+    - SQLite triggers → PL/pgSQL trigger functions
+  - Added required PostgreSQL extensions: `pgcrypto` (for UUID generation), `vector` (for RAG/embeddings)
+
+### Technical
+
+- **Migration Loader**:
+  - Regex-based version extraction from filenames
+  - Automatic sorting by version number
+  - Embedded FS for zero-config deployment
+  - Rollback support with `.down.sql` files
+
+- **PostgreSQL Specifics**:
+  - JSONB for all JSON fields (better performance)
+  - Native UUID support via `gen_random_uuid()`
+  - Proper boolean types (vs INTEGER in SQLite)
+  - Timestamp with timezone support
+  - Full-text search capabilities (future)
+
+- **Code Quality**:
+  - 100% method coverage across all CRUD operations
+  - Type-safe placeholder conversion
+  - Consistent error handling patterns
+  - Thread-safe transaction support
+
+### Files Modified
+
+- `VERSION`: 2.4.6 → 2.4.7
+- `internal/storage/postgresql/`: 12 CRUD files created
+- `internal/storage/postgresql/migrations/`: 142 SQL files
+- `internal/storage/sqlite/migrations/`: 142 SQL files
+- `Roadmap.MD`: REFACTOR-01 marked as completed
+
 ## [2.4.6] - 2025-10-29
 
 ### Fixed

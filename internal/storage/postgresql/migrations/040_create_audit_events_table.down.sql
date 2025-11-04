@@ -1,0 +1,9 @@
+-- Rollback: Drop audit_events table
+DROP INDEX IF EXISTS idx_audit_events_timestamp;
+DROP INDEX IF EXISTS idx_audit_events_actor_id;
+DROP INDEX IF EXISTS idx_audit_events_event_type;
+DROP INDEX IF EXISTS idx_audit_events_severity;
+DROP INDEX IF EXISTS idx_audit_events_resource;
+DROP INDEX IF EXISTS idx_audit_events_target_id;
+DROP INDEX IF EXISTS idx_audit_events_status;
+DROP TABLE IF EXISTS audit_events;

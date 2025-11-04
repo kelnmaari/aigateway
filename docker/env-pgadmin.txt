@@ -1,0 +1,11 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Добавьте эти переменные в ваш .env файл для pgAdmin
+# ═══════════════════════════════════════════════════════════════════════════
+
+# pgAdmin Web UI (PostgreSQL management)
+PGADMIN_PORT=5050
+PGADMIN_DEFAULT_EMAIL=admin@admin.com
+PGADMIN_DEFAULT_PASSWORD=admin123
+
+# ⚠️ КРИТИЧНО: Измените email и пароль в production!
+

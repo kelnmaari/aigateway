@@ -5,7 +5,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"aigateway/internal/models"
 )
 
@@ -15,7 +14,7 @@ type RAGDataSourceRepository interface {
 	CreateDataSource(ctx context.Context, source *models.RAGDataSource) error
 	
 	// Get получает источник по ID
-	GetDataSourceByID(ctx context.Context, id uuid.UUID) (*models.RAGDataSource, error)
+	GetDataSourceByID(ctx context.Context, id string) (*models.RAGDataSource, error)
 	
 	// List возвращает список источников с фильтрацией
 	ListDataSources(ctx context.Context, filter DataSourceFilter) ([]models.RAGDataSource, int, error)
@@ -24,22 +23,22 @@ type RAGDataSourceRepository interface {
 	UpdateDataSource(ctx context.Context, source *models.RAGDataSource) error
 	
 	// Delete удаляет источник
-	DeleteDataSource(ctx context.Context, id uuid.UUID) error
+	DeleteDataSource(ctx context.Context, id string) error
 	
 	// UpdateStatus обновляет статус источника
-	UpdateSourceStatus(ctx context.Context, id uuid.UUID, status models.SourceStatus, err string) error
+	UpdateSourceStatus(ctx context.Context, id string, status models.SourceStatus, err string) error
 	
 	// UpdateSyncInfo обновляет информацию о синхронизации
-	UpdateSyncInfo(ctx context.Context, id uuid.UUID, status models.SyncStatus, chunkCount int) error
+	UpdateSyncInfo(ctx context.Context, id string, status models.SyncStatus, chunkCount int) error
 	
 	// UpdateStatistics обновляет статистику источника
-	UpdateStatistics(ctx context.Context, id uuid.UUID, totalChunks int, totalTokens int64) error
+	UpdateStatistics(ctx context.Context, id string, totalChunks int, totalTokens int64) error
 }
 
 // DataSourceFilter фильтр для списка источников
 type DataSourceFilter struct {
-	UserID     *uuid.UUID
-	TenantID   *uuid.UUID
+	UserID     *string
+	TenantID   *string
 	SourceType *models.SourceType
 	Status     *models.SourceStatus
 	Tags       []string
@@ -53,19 +52,19 @@ type RAGDocumentRepository interface {
 	CreateDocument(ctx context.Context, doc *models.RAGDocument) error
 	
 	// Get получает документ по ID
-	GetDocumentByID(ctx context.Context, id uuid.UUID) (*models.RAGDocument, error)
+	GetDocumentByID(ctx context.Context, id string) (*models.RAGDocument, error)
 	
 	// ListBySource возвращает список документов источника
-	ListDocumentsBySource(ctx context.Context, sourceID uuid.UUID, limit, offset int) ([]models.RAGDocument, int, error)
+	ListDocumentsBySource(ctx context.Context, sourceID string, limit, offset int) ([]models.RAGDocument, int, error)
 	
 	// Update обновляет документ
 	UpdateDocument(ctx context.Context, doc *models.RAGDocument) error
 	
 	// UpdateStatus обновляет статус обработки
-	UpdateDocumentStatus(ctx context.Context, id uuid.UUID, status models.DocumentStatus, err string) error
+	UpdateDocumentStatus(ctx context.Context, id string, status models.DocumentStatus, err string) error
 	
 	// Delete удаляет документ
-	DeleteDocument(ctx context.Context, id uuid.UUID) error
+	DeleteDocument(ctx context.Context, id string) error
 }
 
 // RAGChunkRepository интерфейс для работы с RAG chunks
@@ -74,16 +73,16 @@ type RAGChunkRepository interface {
 	CreateChunksBatch(ctx context.Context, chunks []models.RAGChunk) error
 	
 	// GetByDocument возвращает чанки документа
-	GetChunksByDocument(ctx context.Context, documentID uuid.UUID) ([]models.RAGChunk, error)
+	GetChunksByDocument(ctx context.Context, documentID string) ([]models.RAGChunk, error)
 	
 	// GetBySource возвращает чанки источника
-	GetChunksBySource(ctx context.Context, sourceID uuid.UUID, limit, offset int) ([]models.RAGChunk, int, error)
+	GetChunksBySource(ctx context.Context, sourceID string, limit, offset int) ([]models.RAGChunk, int, error)
 	
 	// DeleteByDocument удаляет чанки документа
-	DeleteChunksByDocument(ctx context.Context, documentID uuid.UUID) error
+	DeleteChunksByDocument(ctx context.Context, documentID string) error
 	
 	// DeleteBySource удаляет чанки источника
-	DeleteChunksBySource(ctx context.Context, sourceID uuid.UUID) error
+	DeleteChunksBySource(ctx context.Context, sourceID string) error
 }
 
 // RAGJobRepository интерфейс для работы с RAG jobs queue
@@ -122,10 +121,10 @@ type RAGQueryLogRepository interface {
 	CreateQueryLog(ctx context.Context, log *models.RAGQueryLog) error
 	
 	// GetByUser возвращает логи пользователя
-	GetQueryLogsByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.RAGQueryLog, int, error)
+	GetQueryLogsByUser(ctx context.Context, userID string, limit, offset int) ([]models.RAGQueryLog, int, error)
 	
 	// GetStats возвращает статистику по логам
-	GetQueryStats(ctx context.Context, userID *uuid.UUID, from, to *time.Time) (*models.RAGQueryStats, error)
+	GetQueryStats(ctx context.Context, userID *string, from, to *time.Time) (*models.RAGQueryStats, error)
 }
 
 

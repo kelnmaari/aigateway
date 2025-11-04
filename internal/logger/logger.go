@@ -253,3 +253,45 @@ func setupErrorLogHook(cfg config.LoggingConfig, formatter logrus.Formatter) *Er
 	)
 }
 
+// NewFileLogger создает отдельный logger для вывода в конкретный файл
+func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
+	logger := logrus.New()
+	
+	// Настройка уровня логирования
+	level, err := logrus.ParseLevel(levelStr)
+	if err != nil {
+		logger.Warn("Invalid log level, using info")
+		level = logrus.InfoLevel
+	}
+	logger.SetLevel(level)
+	
+	// Форматирование логов
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05",
+	})
+	
+	// Создаем директорию если не существует
+	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			logger.WithError(err).Error("Failed to create log directory")
+			logger.SetOutput(os.Stdout)
+			return logger
+		}
+	}
+	
+	// Настройка ротации логов
+	fileWriter := &lumberjack.Logger{
+		Filename:   filePath,
+		MaxSize:    100, // MB
+		MaxBackups: 5,
+		MaxAge:     30, // days
+		Compress:   true,
+	}
+	
+	// Multi-writer: file + stdout
+	multiWriter := io.MultiWriter(fileWriter, os.Stdout)
+	logger.SetOutput(multiWriter)
+	
+	return logger
+}

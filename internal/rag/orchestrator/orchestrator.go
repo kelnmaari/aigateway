@@ -10,6 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"aigateway/internal/models"
 	"aigateway/internal/rag/embeddings"
 	"aigateway/internal/rag/vector"
 	"aigateway/internal/storage"
@@ -102,6 +103,12 @@ func (o *RAGOrchestrator) Query(ctx context.Context, req RAGRequest) (*RAGRespon
 		"top_k":      req.TopK,
 		"source_ids": req.SourceIDs,
 	}).Info("Processing RAG query")
+
+	// ⚠️ Fallback: If embedder or vectorStore not configured, use simple query without vector search
+	if o.embedder == nil || o.vectorStore == nil {
+		o.logger.Warn("Embedder or VectorStore not configured, using simple query without similarity search")
+		return o.simpleQuery(ctx, req, startTime)
+	}
 
 	// 1. Generate query embedding
 	queryEmbedding, err := o.embedder.Embed(ctx, embeddings.EmbeddingRequest{
@@ -353,4 +360,79 @@ func (o *RAGOrchestrator) logQuery(
 	// }
 }
 
+// simpleQuery выполняет простой поиск chunks БЕЗ embeddings (fallback)
+func (o *RAGOrchestrator) simpleQuery(ctx context.Context, req RAGRequest, startTime time.Time) (*RAGResponse, error) {
+	// Получаем все chunks из указанных sources
+	var allChunks []*models.RAGChunk
+	
+	for _, sourceID := range req.SourceIDs {
+		chunks, err := o.db.ListRAGChunksBySource(ctx, sourceID, req.TopK, 0)
+		if err != nil {
+			o.logger.WithError(err).WithField("source_id", sourceID).Warn("Failed to get chunks from source")
+			continue
+		}
+		allChunks = append(allChunks, chunks...)
+	}
+
+	o.logger.WithField("total_chunks", len(allChunks)).Info("Retrieved chunks from sources (simple query)")
+
+	// Если chunks не найдены
+	if len(allChunks) == 0 {
+		return &RAGResponse{
+			Context:       "",
+			SourceChunks:  []RetrievedChunk{},
+			TotalChunks:   0,
+			SearchTime:    time.Since(startTime),
+			ContextTokens: 0,
+			Metadata: map[string]interface{}{
+				"method": "simple_query_no_embeddings",
+			},
+		}, nil
+	}
+
+	// Ограничиваем до TopK
+	if len(allChunks) > req.TopK {
+		allChunks = allChunks[:req.TopK]
+	}
+
+	// Собираем context
+	var contextParts []string
+	retrievedChunks := make([]RetrievedChunk, 0, len(allChunks))
+	totalTokens := 0
+
+	for i, chunk := range allChunks {
+		retrievedChunks = append(retrievedChunks, RetrievedChunk{
+			ChunkID:    chunk.ID,
+			SourceID:   chunk.SourceID,
+			DocumentID: chunk.DocumentID,
+			Text:       chunk.ChunkText,
+			Score:      1.0, // Фиктивный score (нет similarity search)
+			Metadata:   chunk.Metadata,
+		})
+
+		contextParts = append(contextParts, fmt.Sprintf("[Chunk %d]\n%s", i+1, chunk.ChunkText))
+		totalTokens += chunk.ChunkTokens
+	}
+
+	context := strings.Join(contextParts, "\n\n---\n\n")
+	searchTime := time.Since(startTime)
+
+	o.logger.WithFields(logrus.Fields{
+		"chunks_used":    len(retrievedChunks),
+		"context_tokens": totalTokens,
+		"search_time_ms": searchTime.Milliseconds(),
+	}).Info("Simple RAG query completed")
+
+	return &RAGResponse{
+		Context:       context,
+		SourceChunks:  retrievedChunks,
+		TotalChunks:   len(retrievedChunks),
+		SearchTime:    searchTime,
+		ContextTokens: totalTokens,
+		Metadata: map[string]interface{}{
+			"method": "simple_query_no_embeddings",
+			"note":   "This is a simplified RAG without vector search. For production use, implement embeddings.",
+		},
+	}, nil
+}
 

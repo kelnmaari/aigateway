@@ -1,0 +1,149 @@
+---
+# ConfigMap для Qdrant конфигурации
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qdrant-config
+  namespace: rag-infrastructure
+data:
+  config.yaml: |
+    service:
+      http_port: 6333
+      grpc_port: 6334
+    
+    storage:
+      storage_path: /qdrant/storage
+      snapshots_path: /qdrant/snapshots
+      optimizers:
+        indexing_threshold_kb: 20000
+        memmap_threshold_kb: 50000
+    
+    log_level: INFO
+
+---
+# Service для Qdrant
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: rag-infrastructure
+  labels:
+    app: qdrant
+spec:
+  ports:
+  - port: 6333
+    name: http
+    targetPort: 6333
+  - port: 6334
+    name: grpc
+    targetPort: 6334
+  clusterIP: None  # Headless service
+  selector:
+    app: qdrant
+
+---
+# Service для доступа к Qdrant
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-service
+  namespace: rag-infrastructure
+  labels:
+    app: qdrant
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6333
+    targetPort: 6333
+    protocol: TCP
+    name: http
+  - port: 6334
+    targetPort: 6334
+    protocol: TCP
+    name: grpc
+  selector:
+    app: qdrant
+
+---
+# StatefulSet для Qdrant
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qdrant
+  namespace: rag-infrastructure
+spec:
+  serviceName: qdrant
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+      - name: qdrant
+        image: qdrant/qdrant:latest
+        ports:
+        - containerPort: 6333
+          name: http
+        - containerPort: 6334
+          name: grpc
+        env:
+        - name: QDRANT__SERVICE__HTTP_PORT
+          value: "6333"
+        - name: QDRANT__SERVICE__GRPC_PORT
+          value: "6334"
+        - name: QDRANT__STORAGE__STORAGE_PATH
+          value: "/qdrant/storage"
+        - name: QDRANT__STORAGE__SNAPSHOTS_PATH
+          value: "/qdrant/snapshots"
+        - name: QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB
+          value: "20000"
+        - name: QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD_KB
+          value: "50000"
+        - name: QDRANT__LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: qdrant-storage
+          mountPath: /qdrant/storage
+        - name: qdrant-snapshots
+          mountPath: /qdrant/snapshots
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: 2000m
+          requests:
+            memory: 1Gi
+            cpu: 500m
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 6333
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 6333
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+  volumeClaimTemplates:
+  - metadata:
+      name: qdrant-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 20Gi
+  - metadata:
+      name: qdrant-snapshots
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+

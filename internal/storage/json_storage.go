@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -451,15 +452,8 @@ func (s *JSONStorage) ImportAPIKeys(ctx context.Context, apiKeys []models.APIKey
 	defer s.mutex.Unlock()
 
 	// Backup текущего состояния
-	backup := make(map[string]*models.APIKey)
-	hashBackup := make(map[string]string)
-
-	for k, v := range s.cache {
-		backup[k] = v
-	}
-	for k, v := range s.hashIndex {
-		hashBackup[k] = v
-	}
+	backup := maps.Clone(s.cache)
+	hashBackup := maps.Clone(s.hashIndex)
 
 	// Добавляем новые ключи
 	conflicts := 0
@@ -719,4 +713,3 @@ func (s *JSONStorage) applySorting(keys []models.APIKey, sortBy, sortOrder strin
 		return less
 	})
 }
-

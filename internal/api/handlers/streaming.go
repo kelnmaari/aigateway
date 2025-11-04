@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -397,12 +398,7 @@ func (h *StreamingChatHandler) isLargeModel(modelName string) bool {
 	}
 
 	modelLower := strings.ToLower(modelName)
-	for _, pattern := range largeModelPatterns {
-		if strings.Contains(modelLower, pattern) {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(largeModelPatterns, func(pattern string) bool {
+		return strings.Contains(modelLower, pattern)
+	})
 }
-

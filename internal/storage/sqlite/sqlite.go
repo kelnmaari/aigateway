@@ -240,6 +240,10 @@ func (tx *sqliteTx) ListMigrations(ctx context.Context) ([]storage.MigrationInfo
 	return tx.db.ListMigrations(ctx)
 }
 
+func (tx *sqliteTx) DestroyDatabase(ctx context.Context) error {
+	return tx.db.DestroyDatabase(ctx)
+}
+
 // ========================================
 // Migrations
 // ========================================

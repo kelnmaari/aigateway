@@ -75,6 +75,10 @@ func (tx *sqliteTx) DeleteRAGChunksByDocument(ctx context.Context, documentID st
 	return tx.db.DeleteRAGChunksByDocument(ctx, documentID)
 }
 
+func (tx *sqliteTx) DeleteChunksBySource(ctx context.Context, sourceID string) error {
+	return tx.db.DeleteChunksBySource(ctx, sourceID)
+}
+
 // RAG Jobs Queue (v1.13.0+)
 
 func (tx *sqliteTx) CreateRAGJob(ctx context.Context, job *models.RAGJob) error {

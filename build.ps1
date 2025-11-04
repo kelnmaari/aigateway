@@ -20,8 +20,12 @@ if ([string]::IsNullOrEmpty($Version)) {
 
 $BuildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd_HH:mm:ss")
 try {
-    $GitCommit = (git rev-parse --short HEAD 2>$null)
-    if (-not $GitCommit) { $GitCommit = "unknown" }
+    $ErrorActionPreference = "SilentlyContinue"
+    $GitCommit = (git rev-parse --short HEAD 2>&1 | Out-String).Trim()
+    $ErrorActionPreference = "Continue"
+    if ([string]::IsNullOrWhiteSpace($GitCommit) -or $LASTEXITCODE -ne 0) { 
+        $GitCommit = "unknown" 
+    }
 } catch {
     $GitCommit = "unknown"
 }
@@ -66,7 +70,7 @@ function Build-Platform {
     $env:GOOS = $OS
     $env:GOARCH = $Arch
     $env:CGO_ENABLED = "0"  # Disable CGO for cross-compilation
-    
+    $env:GOEXPERIMENT = "greenteagc"
     # Build flags with version information
     $ldflags = "-w -s"
     $ldflags += " -X 'aigateway/internal/version.Version=$Version'"
@@ -81,6 +85,7 @@ function Build-Platform {
     
     # Build
     go build `
+        -buildvcs=false `
         -ldflags="$ldflags" `
         -tags $tags `
         -trimpath `
@@ -92,12 +97,12 @@ function Build-Platform {
         $sizeKB = [math]::Round($size / 1KB, 2)
         $sizeMB = [math]::Round($size / 1MB, 2)
         if ($sizeMB -gt 1) {
-            Write-Info "✓ Built: $output ($sizeMB MB)"
+            Write-Info "Built successfully: $output ($sizeMB MB)"
         } else {
-            Write-Info "✓ Built: $output ($sizeKB KB)"
+            Write-Info "Built successfully: $output ($sizeKB KB)"
         }
     } else {
-        Write-ErrorMsg "✗ Failed to build $OS/$Arch"
+        Write-ErrorMsg "Failed to build $OS/$Arch"
         exit 1
     }
 }
@@ -106,7 +111,7 @@ function Build-Platform {
 function Build-All {
     Write-Info "Starting build process..."
     Write-Info "Version: $Version"
-    Write-Info "Build Time: $BuildTime"
+    Write-Info "Build Date: $BuildDate"
     Write-Info "Git Commit: $GitCommit"
     Write-Host ""
     
@@ -171,7 +176,7 @@ function Invoke-Package {
         $archivePath = Join-Path $OutputDir $archiveName
         
         Compress-Archive -Path $pkgDir -DestinationPath $archivePath -Force
-        Write-Info "✓ Created: $archivePath"
+        Write-Info "Archive created: $archivePath"
         
         # Cleanup temp dir
         Remove-Item -Path $pkgDir -Recurse -Force

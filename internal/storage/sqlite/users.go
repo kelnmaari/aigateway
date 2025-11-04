@@ -29,12 +29,15 @@ func (s *SQLiteDB) CreateUser(ctx context.Context, user *models.User) error {
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataJSON []byte
+	var metadataValue interface{}
 	if user.Metadata != nil {
-		metadataJSON, err = json.Marshal(user.Metadata)
+		metadataJSON, err := json.Marshal(user.Metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
+		metadataValue = metadataJSON
+	} else {
+		metadataValue = nil  // SQLite NULL
 	}
 
 	query := `
@@ -62,7 +65,7 @@ func (s *SQLiteDB) CreateUser(ctx context.Context, user *models.User) error {
 		user.UpdatedAt,
 		user.LastLogin,
 		preferencesJSON,
-		metadataJSON,
+		metadataValue,
 		user.AuthProvider,
 		user.OIDCSubject,
 		user.OIDCIssuer,

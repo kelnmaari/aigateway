@@ -238,6 +238,10 @@ func (tx *postgresqlTx) ListMigrations(ctx context.Context) ([]storage.Migration
 	return tx.db.ListMigrations(ctx)
 }
 
+func (tx *postgresqlTx) DestroyDatabase(ctx context.Context) error {
+	return tx.db.DestroyDatabase(ctx)
+}
+
 // Ensure postgresqlTx implements storage.Tx interface
 var _ storage.Tx = (*postgresqlTx)(nil)
 

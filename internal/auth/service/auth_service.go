@@ -176,6 +176,13 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Regis
 		Status:      models.TenantStatusActive,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
+		Settings: models.TenantSettings{
+			MaxAPIKeys:       100,
+			MaxConversations: 1000,
+			ChatEnabled:      true,
+			APIAccessEnabled: true,
+		},
+		Metadata: make(map[string]interface{}), // Empty map for JSONB
 	}
 
 	if err := tx.CreateTenant(ctx, tenant); err != nil {
@@ -189,6 +196,7 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Regis
 		Role:      models.TenantRoleOwner,
 		JoinedAt:  time.Now(),
 		UpdatedAt: time.Now(),
+		Metadata:  make(map[string]interface{}), // Empty map for JSONB
 	}
 
 	if err := tx.AddTenantMember(ctx, member); err != nil {

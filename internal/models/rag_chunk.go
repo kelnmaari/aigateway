@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // RAGChunk представляет chunk текста в RAG системе
 type RAGChunk struct {
-	ID          uuid.UUID     `json:"id" db:"id"`
-	DocumentID  uuid.UUID     `json:"document_id" db:"document_id"`
-	SourceID    uuid.UUID     `json:"source_id" db:"source_id"`
+	ID          string     `json:"id" db:"id"`
+	DocumentID  string     `json:"document_id" db:"document_id"`
+	SourceID    string     `json:"source_id" db:"source_id"`
 	
 	// Chunk контент
 	ChunkText   string        `json:"chunk_text" db:"chunk_text"`
@@ -43,9 +41,14 @@ func (m *ChunkMetadata) Scan(value interface{}) error {
 		return nil
 	}
 	
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan ChunkMetadata: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan ChunkMetadata: expected []byte or string, got %T", value)
 	}
 	
 	return json.Unmarshal(bytes, m)
@@ -61,7 +64,7 @@ func (m ChunkMetadata) Value() (driver.Value, error) {
 
 // CreateChunksRequest запрос на создание chunks из документа
 type CreateChunksRequest struct {
-	DocumentID uuid.UUID `json:"document_id" binding:"required"`
+	DocumentID string `json:"document_id" binding:"required"`
 	Chunks     []struct {
 		ChunkText   string                 `json:"chunk_text" binding:"required"`
 		ChunkIndex  int                    `json:"chunk_index" binding:"required"`

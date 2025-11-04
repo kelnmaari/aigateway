@@ -1,0 +1,9 @@
+-- Rollback: Drop web_fetches table
+DROP INDEX IF EXISTS idx_web_fetches_url_hash;
+DROP INDEX IF EXISTS idx_web_fetches_user;
+DROP INDEX IF EXISTS idx_web_fetches_tenant;
+DROP INDEX IF EXISTS idx_web_fetches_domain;
+DROP INDEX IF EXISTS idx_web_fetches_expires;
+DROP INDEX IF EXISTS idx_web_fetches_created;
+DROP INDEX IF EXISTS idx_rate_limits_domain;
+DROP TABLE IF EXISTS web_fetches;

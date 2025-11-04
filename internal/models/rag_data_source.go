@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // SourceType определяет тип источника данных
@@ -41,9 +39,9 @@ const (
 
 // RAGDataSource представляет источник данных для RAG
 type RAGDataSource struct {
-	ID          uuid.UUID    `json:"id" db:"id"`
-	UserID      uuid.UUID    `json:"user_id" db:"user_id"`
-	TenantID    *uuid.UUID   `json:"tenant_id,omitempty" db:"tenant_id"`
+	ID          string    `json:"id" db:"id"`
+	UserID      string    `json:"user_id" db:"user_id"`
+	TenantID    *string   `json:"tenant_id,omitempty" db:"tenant_id"`
 	
 	// Основная информация
 	Name        string       `json:"name" db:"name"`
@@ -89,9 +87,14 @@ func (c *SourceConfig) Scan(value interface{}) error {
 		return nil
 	}
 	
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan SourceConfig: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan SourceConfig: expected []byte or string, got %T", value)
 	}
 	
 	return json.Unmarshal(bytes, c)
@@ -121,9 +124,14 @@ func (ic *IndexingConfig) Scan(value interface{}) error {
 		return nil
 	}
 	
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan IndexingConfig: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan IndexingConfig: expected []byte or string, got %T", value)
 	}
 	
 	return json.Unmarshal(bytes, ic)
@@ -185,8 +193,8 @@ type TestConnectionResponse struct {
 
 // SyncSourceRequest запрос на синхронизацию источника
 type SyncSourceRequest struct {
-	SourceID uuid.UUID `json:"source_id" binding:"required"`
-	Force    bool      `json:"force,omitempty"` // force даже если недавно синхронизировали
+	SourceID string `json:"source_id" binding:"required"`
+	Force    bool   `json:"force,omitempty"` // force даже если недавно синхронизировали
 }
 
 // SyncSourceResponse результат запуска синхронизации

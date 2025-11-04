@@ -15,6 +15,7 @@ import (
 	"aigateway/internal/filestorage"
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
+	"aigateway/internal/utils"
 )
 
 // FileHandler обрабатывает HTTP запросы для работы с файлами (v1.10.0+)
@@ -186,7 +187,7 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		WordCount:        wordCount,
 		Language:         language,
 		Metadata: &models.FileMetadata{
-			PageCount: intValue(pageCount),
+			PageCount: utils.Value(pageCount, 0),
 		},
 	})
 	if err != nil {
@@ -202,8 +203,8 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		FileID:    dbFile.ID,
 		UserID:    &userID,
 		Action:    "upload",
-		IPAddress: stringPtr(c.ClientIP()),
-		UserAgent: stringPtr(c.Request.UserAgent()),
+		IPAddress: utils.Ptr(c.ClientIP()),
+		UserAgent: utils.Ptr(c.Request.UserAgent()),
 	})
 
 	// WS-01 v1.10.2: Уведомляем о завершении загрузки и обработки
@@ -216,10 +217,10 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		// Если файл обрабатывался, отправляем результат
 		if extract && extractionStatus == "completed" {
 			processingResult := map[string]interface{}{
-				"extracted_text_length": len(stringValue(extractedText)),
-				"word_count":            intValue(wordCount),
-				"language":              stringValue(language),
-				"page_count":            intValue(pageCount),
+				"extracted_text_length": len(utils.Value(extractedText, "")),
+				"word_count":            utils.Value(wordCount, 0),
+				"language":              utils.Value(language, ""),
+				"page_count":            utils.Value(pageCount, 0),
 			}
 			if err := h.wsBroadcaster.BroadcastFileProcessingComplete(dbFile.ID, processingResult); err != nil {
 				h.logger.WithError(err).Debug("Failed to broadcast processing complete")
@@ -309,8 +310,8 @@ func (h *FileHandler) DownloadFile(c *gin.Context) {
 		FileID:    fileID,
 		UserID:    &userID,
 		Action:    "download",
-		IPAddress: stringPtr(c.ClientIP()),
-		UserAgent: stringPtr(c.Request.UserAgent()),
+		IPAddress: utils.Ptr(c.ClientIP()),
+		UserAgent: utils.Ptr(c.Request.UserAgent()),
 	})
 
 	// Устанавливаем заголовки для скачивания
@@ -450,8 +451,8 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		FileID:    fileID,
 		UserID:    &userID,
 		Action:    "delete",
-		IPAddress: stringPtr(c.ClientIP()),
-		UserAgent: stringPtr(c.Request.UserAgent()),
+		IPAddress: utils.Ptr(c.ClientIP()),
+		UserAgent: utils.Ptr(c.Request.UserAgent()),
 	})
 
 	h.logger.WithFields(logrus.Fields{
@@ -491,24 +492,6 @@ func (h *FileHandler) SearchFiles(c *gin.Context) {
 }
 
 // Helper functions
-
-func stringPtr(s string) *string {
-	return &s
-}
-
-func intValue(i *int) int {
-	if i == nil {
-		return 0
-	}
-	return *i
-}
-
-func stringValue(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
 
 // detectMimeType определяет MIME-тип по расширению файла
 // detectProcessingType определяет тип обработки файла (WS-01 v1.10.2)
@@ -574,4 +557,3 @@ func detectMimeType(filename, browserMimeType string) string {
 	// Fallback на текст/plain для неизвестных файлов
 	return "application/octet-stream"
 }
-

@@ -272,15 +272,21 @@ class RAGSourcesManager {
             return;
         }
 
+        // При редактировании сохраняем существующие поля indexing_config
+        const existingIndexingConfig = this.editMode && this.currentSource && this.currentSource.indexing_config
+            ? { ...this.currentSource.indexing_config }
+            : {};
+
         const data = {
             name: document.getElementById('source-name').value,
             description: document.getElementById('source-description').value,
             source_type: sourceType,
             config: this.buildConfig(sourceType),
             indexing_config: {
+                ...existingIndexingConfig,
                 chunk_size: parseInt(document.getElementById('chunk-size').value),
                 chunk_overlap: parseInt(document.getElementById('chunk-overlap').value),
-                splitter_type: 'semantic'
+                splitter_type: existingIndexingConfig.splitter_type || 'semantic'
             },
             is_shared: document.getElementById('source-shared').checked
         };
@@ -309,19 +315,38 @@ class RAGSourcesManager {
     }
 
     buildConfig(sourceType) {
-        const config = {};
+        // При редактировании начинаем с существующего config для сохранения дополнительных полей
+        const config = this.editMode && this.currentSource && this.currentSource.config 
+            ? { ...this.currentSource.config } 
+            : {};
 
         if (sourceType === 'api') {
             config.url = document.getElementById('api-url').value;
             config.method = document.getElementById('api-method').value;
             config.auth_type = document.getElementById('api-auth-type').value;
-            config.response_field = 'data'; // default
+            if (!config.response_field) {
+                config.response_field = 'data'; // default only for new sources
+            }
+            // Сохраняем дополнительные поля: data_path, text_fields, headers и т.д.
         } else if (sourceType === 'database') {
-            config.host = document.getElementById('db-host').value;
-            config.port = parseInt(document.getElementById('db-port').value);
-            config.database = document.getElementById('db-name').value;
-            config.username = document.getElementById('db-username').value;
+            // Build connection string template (password will be injected server-side from credentials)
+            const host = document.getElementById('db-host').value;
+            const port = parseInt(document.getElementById('db-port').value) || 5432;
+            const database = document.getElementById('db-name').value;
+            const username = document.getElementById('db-username').value;
+            
+            // Store connection string template and individual fields
+            config.host = host;
+            config.port = port;
+            config.database = database;
+            config.username = username;
             config.query = document.getElementById('db-query').value;
+            if (!config.database_type) {
+                config.database_type = 'postgres'; // Default to PostgreSQL only for new sources
+            }
+            
+            // NOTE: Password is sent separately via credentials (encrypted server-side)
+            // Server will construct full connection_string: postgres://username:password@host:port/database?sslmode=disable
         } else if (sourceType === 'web') {
             config.url = document.getElementById('web-url').value;
             config.max_depth = parseInt(document.getElementById('web-depth').value);

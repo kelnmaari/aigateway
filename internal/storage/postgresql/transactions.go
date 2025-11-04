@@ -506,8 +506,6 @@ func (tx *postgresqlTx) GetInvitationWithUsers(ctx context.Context, id string) (
 	return tx.db.GetInvitationWithUsers(ctx, id)
 }
 
-
-
 // ListAllTenants возвращает список всех tenants (delegation to db)
 func (tx *postgresqlTx) ListAllTenants(ctx context.Context) ([]*models.Tenant, error) {
 	return tx.db.ListAllTenants(ctx)

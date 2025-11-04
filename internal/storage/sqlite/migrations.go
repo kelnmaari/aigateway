@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path" // For embed.FS paths (always forward slashes)
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -63,7 +64,8 @@ func (s *SQLiteDB) getMigrations() []migration {
 		name := matches[2]
 		direction := matches[3] // "up" or "down"
 
-		content, err := migrationsFS.ReadFile(filepath.Join("migrations", filename))
+		// Use path.Join (not filepath.Join) for embed.FS - always forward slashes
+		content, err := migrationsFS.ReadFile(path.Join("migrations", filename))
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
 				"file":  filename,
@@ -267,4 +269,78 @@ func (s *SQLiteDB) ListMigrations(ctx context.Context) ([]storage.MigrationInfo,
 	}
 
 	return result, nil
+}
+
+// DestroyDatabase полностью удаляет все таблицы из базы данных
+func (s *SQLiteDB) DestroyDatabase(ctx context.Context) error {
+	s.logger.Warn("⚠️  DESTROYING DATABASE - ALL DATA WILL BE LOST")
+
+	// Create backup before destruction
+	timestamp := time.Now().Format("20060102-150405")
+	backupPath := fmt.Sprintf("data/backups/pre-destroy-%s.db", timestamp)
+	
+	if err := s.createBackup(backupPath); err != nil {
+		s.logger.WithError(err).Warn("Failed to create backup before destruction")
+	} else {
+		s.logger.WithField("backup_path", backupPath).Info("✅ Backup created successfully")
+	}
+
+	// Get all tables (excluding sqlite_* system tables)
+	query := `
+		SELECT name FROM sqlite_master 
+		WHERE type='table' AND name NOT LIKE 'sqlite_%'
+		ORDER BY name
+	`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to list tables: %w", err)
+	}
+	defer rows.Close()
+
+	var tables []string
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			return fmt.Errorf("failed to scan table name: %w", err)
+		}
+		tables = append(tables, tableName)
+	}
+
+	if len(tables) == 0 {
+		s.logger.Info("No tables to drop - database is already empty")
+		return nil
+	}
+
+	s.logger.WithField("table_count", len(tables)).Info("Found tables to drop")
+
+	// Disable foreign key constraints temporarily
+	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+		return fmt.Errorf("failed to disable foreign keys: %w", err)
+	}
+
+	// Drop all tables
+	for _, table := range tables {
+		s.logger.WithField("table", table).Debug("Dropping table")
+		
+		dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s", table)
+		if _, err := s.db.ExecContext(ctx, dropSQL); err != nil {
+			s.logger.WithError(err).Errorf("Failed to drop table: %s", table)
+			return fmt.Errorf("failed to drop table %s: %w", table, err)
+		}
+	}
+
+	// Re-enable foreign key constraints
+	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+		s.logger.WithError(err).Warn("Failed to re-enable foreign keys")
+	}
+
+	// Vacuum to reclaim space
+	s.logger.Info("Running VACUUM to reclaim space")
+	if _, err := s.db.ExecContext(ctx, "VACUUM"); err != nil {
+		s.logger.WithError(err).Warn("Failed to vacuum database")
+	}
+
+	s.logger.Info("✅ Database destroyed successfully - all tables dropped")
+	return nil
 }

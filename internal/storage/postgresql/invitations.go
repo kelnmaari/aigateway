@@ -15,7 +15,7 @@ import (
 // ========================================
 
 // CreateInvitation создает новое приглашение
-func (p *PostgreSQLDB) CreateInvitation(ctx context.Context, invitation *models.Invitation) error {
+func (db *PostgreSQLDB) CreateInvitation(ctx context.Context, invitation *models.Invitation) error {
 	// Generate IDs if not provided
 	if invitation.ID == "" {
 		invitation.ID = uuid.New().String()
@@ -37,7 +37,7 @@ func (p *PostgreSQLDB) CreateInvitation(ctx context.Context, invitation *models.
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
-	_, err := p.db.ExecContext(ctx, query,
+	_, err := db.db.ExecContext(ctx, query,
 		invitation.ID,
 		invitation.Token,
 		invitation.CreatedByUserID,
@@ -52,12 +52,12 @@ func (p *PostgreSQLDB) CreateInvitation(ctx context.Context, invitation *models.
 		return fmt.Errorf("failed to create invitation: %w", err)
 	}
 
-	p.logger.WithField("invitation_id", invitation.ID).Info("Invitation created")
+	db.logger.WithField("invitation_id", invitation.ID).Info("Invitation created")
 	return nil
 }
 
 // GetInvitation получает приглашение по ID
-func (p *PostgreSQLDB) GetInvitation(ctx context.Context, id string) (*models.Invitation, error) {
+func (db *PostgreSQLDB) GetInvitation(ctx context.Context, id string) (*models.Invitation, error) {
 	query := `
 		SELECT id, token, created_by_user_id, created_at,
 			   email, expires_at, max_uses, current_uses,
@@ -68,7 +68,7 @@ func (p *PostgreSQLDB) GetInvitation(ctx context.Context, id string) (*models.In
 	`
 
 	invitation := &models.Invitation{}
-	err := p.db.QueryRowContext(ctx, query, id).Scan(
+	err := db.db.QueryRowContext(ctx, query, id).Scan(
 		&invitation.ID,
 		&invitation.Token,
 		&invitation.CreatedByUserID,
@@ -95,7 +95,7 @@ func (p *PostgreSQLDB) GetInvitation(ctx context.Context, id string) (*models.In
 }
 
 // GetInvitationWithUsers получает приглашение с информацией о пользователях (AUTH-03)
-func (p *PostgreSQLDB) GetInvitationWithUsers(ctx context.Context, id string) (*models.InvitationWithUsers, error) {
+func (db *PostgreSQLDB) GetInvitationWithUsers(ctx context.Context, id string) (*models.InvitationWithUsers, error) {
 	query := `
 		SELECT 
 			i.id, i.token, i.created_by_user_id, i.created_at,
@@ -116,14 +116,14 @@ func (p *PostgreSQLDB) GetInvitationWithUsers(ctx context.Context, id string) (*
 	`
 
 	inv := &models.InvitationWithUsers{}
-	
+
 	var (
-		creatorID, creatorUsername, creatorEmail, creatorDisplayName             sql.NullString
-		usedByID, usedByUsername, usedByEmail, usedByDisplayName                 sql.NullString
-		revokedByID, revokedByUsername, revokedByEmail, revokedByDisplayName     sql.NullString
+		creatorID, creatorUsername, creatorEmail, creatorDisplayName         sql.NullString
+		usedByID, usedByUsername, usedByEmail, usedByDisplayName             sql.NullString
+		revokedByID, revokedByUsername, revokedByEmail, revokedByDisplayName sql.NullString
 	)
 
-	err := p.db.QueryRowContext(ctx, query, id).Scan(
+	err := db.db.QueryRowContext(ctx, query, id).Scan(
 		// Invitation fields
 		&inv.ID,
 		&inv.Token,
@@ -194,7 +194,7 @@ func (p *PostgreSQLDB) GetInvitationWithUsers(ctx context.Context, id string) (*
 }
 
 // GetInvitationByToken получает приглашение по токену
-func (p *PostgreSQLDB) GetInvitationByToken(ctx context.Context, token string) (*models.Invitation, error) {
+func (db *PostgreSQLDB) GetInvitationByToken(ctx context.Context, token string) (*models.Invitation, error) {
 	query := `
 		SELECT id, token, created_by_user_id, created_at,
 			   email, expires_at, max_uses, current_uses,
@@ -205,7 +205,7 @@ func (p *PostgreSQLDB) GetInvitationByToken(ctx context.Context, token string) (
 	`
 
 	invitation := &models.Invitation{}
-	err := p.db.QueryRowContext(ctx, query, token).Scan(
+	err := db.db.QueryRowContext(ctx, query, token).Scan(
 		&invitation.ID,
 		&invitation.Token,
 		&invitation.CreatedByUserID,
@@ -232,7 +232,7 @@ func (p *PostgreSQLDB) GetInvitationByToken(ctx context.Context, token string) (
 }
 
 // ListInvitations возвращает список приглашений с фильтрацией
-func (p *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.InvitationListFilter) ([]*models.Invitation, error) {
+func (db *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.InvitationListFilter) ([]*models.Invitation, error) {
 	query := `
 		SELECT id, token, created_by_user_id, created_at,
 			   email, expires_at, max_uses, current_uses,
@@ -243,19 +243,19 @@ func (p *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.Invita
 	`
 
 	args := []interface{}{}
-	argNum := 1
+	paramIndex := 1 // PostgreSQL uses $1, $2, $3...
 
 	// Apply filters
 	if filter.CreatedByUserID != nil {
-		query += fmt.Sprintf(" AND created_by_user_id = $%d", argNum)
+		query += fmt.Sprintf(" AND created_by_user_id = $%d", paramIndex)
 		args = append(args, *filter.CreatedByUserID)
-		argNum++
+		paramIndex++
 	}
 
 	if filter.Email != nil {
-		query += fmt.Sprintf(" AND email = $%d", argNum)
+		query += fmt.Sprintf(" AND email = $%d", paramIndex)
 		args = append(args, *filter.Email)
-		argNum++
+		paramIndex++
 	}
 
 	if filter.Status != nil {
@@ -263,16 +263,15 @@ func (p *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.Invita
 		switch *filter.Status {
 		case models.InvitationStatusActive:
 			query += " AND revoked_at IS NULL AND current_uses < max_uses"
-			query += fmt.Sprintf(" AND (expires_at IS NULL OR expires_at > $%d)", argNum)
+			query += fmt.Sprintf(" AND (expires_at IS NULL OR expires_at > $%d)", paramIndex)
 			args = append(args, time.Now())
-			argNum++
+			paramIndex++
 		case models.InvitationStatusUsed:
 			query += " AND current_uses >= max_uses"
 		case models.InvitationStatusExpired:
-			query += fmt.Sprintf(" AND expires_at IS NOT NULL AND expires_at <= $%d", argNum)
-			query += " AND revoked_at IS NULL"
+			query += fmt.Sprintf(" AND expires_at IS NOT NULL AND expires_at <= $%d", paramIndex)
 			args = append(args, time.Now())
-			argNum++
+			paramIndex++
 		case models.InvitationStatusRevoked:
 			query += " AND revoked_at IS NOT NULL"
 		}
@@ -283,17 +282,17 @@ func (p *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.Invita
 
 	// Pagination
 	if filter.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT $%d", argNum)
+		query += fmt.Sprintf(" LIMIT $%d", paramIndex)
 		args = append(args, filter.Limit)
-		argNum++
+		paramIndex++
 	}
 	if filter.Offset > 0 {
-		query += fmt.Sprintf(" OFFSET $%d", argNum)
+		query += fmt.Sprintf(" OFFSET $%d", paramIndex)
 		args = append(args, filter.Offset)
-		argNum++
+		paramIndex++
 	}
 
-	rows, err := p.db.QueryContext(ctx, query, args...)
+	rows, err := db.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list invitations: %w", err)
 	}
@@ -327,11 +326,11 @@ func (p *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.Invita
 }
 
 // UseInvitation увеличивает счетчик использований приглашения
-func (p *PostgreSQLDB) UseInvitation(ctx context.Context, token string, userID string) error {
+func (db *PostgreSQLDB) UseInvitation(ctx context.Context, token string, userID string) error {
 	now := time.Now()
 
 	// First check if invitation is valid
-	inv, err := p.GetInvitationByToken(ctx, token)
+	inv, err := db.GetInvitationByToken(ctx, token)
 	if err != nil {
 		return err
 	}
@@ -352,7 +351,7 @@ func (p *PostgreSQLDB) UseInvitation(ctx context.Context, token string, userID s
 		  AND (expires_at IS NULL OR expires_at > $4)
 	`
 
-	result, err := p.db.ExecContext(ctx, query, now, userID, token, now)
+	result, err := db.db.ExecContext(ctx, query, now, userID, token, now)
 	if err != nil {
 		return fmt.Errorf("failed to use invitation: %w", err)
 	}
@@ -366,12 +365,12 @@ func (p *PostgreSQLDB) UseInvitation(ctx context.Context, token string, userID s
 		return fmt.Errorf("invitation cannot be used (may be already used, revoked, or expired)")
 	}
 
-	p.logger.WithField("invitation_token", token).WithField("user_id", userID).Info("Invitation used")
+	db.logger.WithField("invitation_token", token).WithField("user_id", userID).Info("Invitation used")
 	return nil
 }
 
 // RevokeInvitation отзывает приглашение
-func (p *PostgreSQLDB) RevokeInvitation(ctx context.Context, id string, revokedByUserID string, reason string) error {
+func (db *PostgreSQLDB) RevokeInvitation(ctx context.Context, id string, revokedByUserID string, reason string) error {
 	now := time.Now()
 
 	query := `
@@ -383,7 +382,7 @@ func (p *PostgreSQLDB) RevokeInvitation(ctx context.Context, id string, revokedB
 		  AND revoked_at IS NULL
 	`
 
-	result, err := p.db.ExecContext(ctx, query, now, revokedByUserID, reason, id)
+	result, err := db.db.ExecContext(ctx, query, now, revokedByUserID, reason, id)
 	if err != nil {
 		return fmt.Errorf("failed to revoke invitation: %w", err)
 	}
@@ -397,16 +396,16 @@ func (p *PostgreSQLDB) RevokeInvitation(ctx context.Context, id string, revokedB
 		return fmt.Errorf("invitation not found or already revoked: %s", id)
 	}
 
-	p.logger.WithField("invitation_id", id).WithField("revoked_by", revokedByUserID).Info("Invitation revoked")
+	db.logger.WithField("invitation_id", id).WithField("revoked_by", revokedByUserID).Info("Invitation revoked")
 	return nil
 }
 
 // GetInvitationStats возвращает статистику по приглашениям
-func (p *PostgreSQLDB) GetInvitationStats(ctx context.Context) (*models.InvitationStats, error) {
+func (db *PostgreSQLDB) GetInvitationStats(ctx context.Context) (*models.InvitationStats, error) {
 	stats := &models.InvitationStats{}
 
 	// Total created
-	err := p.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM invitations").Scan(&stats.TotalCreated)
+	err := db.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM invitations").Scan(&stats.TotalCreated)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total created: %w", err)
 	}
@@ -419,13 +418,13 @@ func (p *PostgreSQLDB) GetInvitationStats(ctx context.Context) (*models.Invitati
 		  AND current_uses < max_uses
 		  AND (expires_at IS NULL OR expires_at > $1)
 	`
-	err = p.db.QueryRowContext(ctx, query, time.Now()).Scan(&stats.Active)
+	err = db.db.QueryRowContext(ctx, query, time.Now()).Scan(&stats.Active)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active count: %w", err)
 	}
 
 	// Used (fully used)
-	err = p.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM invitations WHERE current_uses >= max_uses").Scan(&stats.Used)
+	err = db.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM invitations WHERE current_uses >= max_uses").Scan(&stats.Used)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get used count: %w", err)
 	}
@@ -438,17 +437,16 @@ func (p *PostgreSQLDB) GetInvitationStats(ctx context.Context) (*models.Invitati
 		  AND expires_at <= $1
 		  AND revoked_at IS NULL
 	`
-	err = p.db.QueryRowContext(ctx, query, time.Now()).Scan(&stats.Expired)
+	err = db.db.QueryRowContext(ctx, query, time.Now()).Scan(&stats.Expired)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get expired count: %w", err)
 	}
 
 	// Revoked
-	err = p.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM invitations WHERE revoked_at IS NOT NULL").Scan(&stats.Revoked)
+	err = db.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM invitations WHERE revoked_at IS NOT NULL").Scan(&stats.Revoked)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get revoked count: %w", err)
 	}
 
 	return stats, nil
 }
-

@@ -29,12 +29,15 @@ func (s *SQLiteDB) CreateTenant(ctx context.Context, tenant *models.Tenant) erro
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataJSON []byte
+	var metadataValue interface{}
 	if tenant.Metadata != nil {
-		metadataJSON, err = json.Marshal(tenant.Metadata)
+		metadataJSON, err := json.Marshal(tenant.Metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
+		metadataValue = metadataJSON
+	} else {
+		metadataValue = nil  // SQLite NULL
 	}
 
 	query := `
@@ -57,7 +60,7 @@ func (s *SQLiteDB) CreateTenant(ctx context.Context, tenant *models.Tenant) erro
 		tenant.CreatedAt,
 		tenant.UpdatedAt,
 		settingsJSON,
-		metadataJSON,
+		metadataValue,
 	)
 
 	if err != nil {
@@ -313,13 +316,15 @@ func (s *SQLiteDB) AddTenantMember(ctx context.Context, member *models.TenantMem
 	}).Debug("Adding tenant member")
 
 	// Serialize metadata to JSON if present
-	var metadataJSON []byte
-	var err error
+	var metadataValue interface{}
 	if member.Metadata != nil {
-		metadataJSON, err = json.Marshal(member.Metadata)
+		metadataJSON, err := json.Marshal(member.Metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
+		metadataValue = metadataJSON
+	} else {
+		metadataValue = nil  // SQLite NULL
 	}
 
 	query := `
@@ -330,7 +335,7 @@ func (s *SQLiteDB) AddTenantMember(ctx context.Context, member *models.TenantMem
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err = s.db.ExecContext(ctx, query,
+	_, err := s.db.ExecContext(ctx, query,
 		member.TenantID,
 		member.UserID,
 		member.Role,
@@ -338,7 +343,7 @@ func (s *SQLiteDB) AddTenantMember(ctx context.Context, member *models.TenantMem
 		member.UpdatedAt,
 		member.LeftAt,
 		member.InvitedBy,
-		metadataJSON,
+		metadataValue,
 	)
 
 	if err != nil {

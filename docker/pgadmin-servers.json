@@ -1,0 +1,16 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "RAG PostgreSQL (pgvector)",
+      "Group": "RAG Infrastructure",
+      "Host": "postgres-pgvector",
+      "Port": 5432,
+      "MaintenanceDB": "ollama_proxy",
+      "Username": "proxy_user",
+      "SSLMode": "prefer",
+      "PassFile": "/tmp/pgpassfile",
+      "Comment": "PostgreSQL + pgvector for RAG system"
+    }
+  }
+}
+

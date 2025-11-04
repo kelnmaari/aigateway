@@ -1,0 +1,14 @@
+-- Rollback: Drop rag_data_sources table
+DROP INDEX IF EXISTS idx_rag_sources_user;
+DROP INDEX IF EXISTS idx_rag_sources_tenant;
+DROP INDEX IF EXISTS idx_rag_sources_type;
+DROP INDEX IF EXISTS idx_rag_sources_status;
+DROP INDEX IF EXISTS idx_rag_docs_source;
+DROP INDEX IF EXISTS idx_rag_docs_status;
+DROP INDEX IF EXISTS idx_rag_chunks_document;
+DROP INDEX IF EXISTS idx_rag_chunks_source;
+DROP INDEX IF EXISTS idx_rag_jobs_status;
+DROP INDEX IF EXISTS idx_rag_jobs_type;
+DROP INDEX IF EXISTS idx_rag_query_logs_user;
+DROP INDEX IF EXISTS idx_rag_query_logs_created;
+DROP TABLE IF EXISTS rag_data_sources;

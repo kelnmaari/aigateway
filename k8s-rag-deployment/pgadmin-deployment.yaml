@@ -1,0 +1,133 @@
+---
+# ConfigMap с серверами для pgAdmin
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-servers
+  namespace: rag-infrastructure
+data:
+  servers.json: |
+    {
+      "Servers": {
+        "1": {
+          "Name": "RAG PostgreSQL",
+          "Group": "Servers",
+          "Host": "postgres-service",
+          "Port": 5432,
+          "MaintenanceDB": "ollama_proxy",
+          "Username": "proxy_user",
+          "SSLMode": "prefer",
+          "PassFile": "/pgpass"
+        }
+      }
+    }
+  
+  pgpass: |
+    postgres-service:5432:ollama_proxy:proxy_user:secure_password_change_me
+
+---
+# Deployment для pgAdmin
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin
+  namespace: rag-infrastructure
+  labels:
+    app: pgadmin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgadmin
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+    spec:
+      containers:
+      - name: pgadmin
+        image: dpage/pgadmin4:latest
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: PGADMIN_DEFAULT_EMAIL
+          value: "admin@admin.com"
+        - name: PGADMIN_DEFAULT_PASSWORD
+          value: "admin123"
+        - name: PGADMIN_CONFIG_SERVER_MODE
+          value: "False"
+        - name: PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED
+          value: "False"
+        volumeMounts:
+        - name: pgadmin-data
+          mountPath: /var/lib/pgadmin
+        - name: pgadmin-servers
+          mountPath: /pgadmin4/servers.json
+          subPath: servers.json
+        - name: pgadmin-servers
+          mountPath: /pgpass
+          subPath: pgpass
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 500m
+          requests:
+            memory: 256Mi
+            cpu: 100m
+        livenessProbe:
+          httpGet:
+            path: /misc/ping
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /misc/ping
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: pgadmin-data
+        persistentVolumeClaim:
+          claimName: pgadmin-data
+      - name: pgadmin-servers
+        configMap:
+          name: pgadmin-servers
+          defaultMode: 0600
+
+---
+# PVC для pgAdmin
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgadmin-data
+  namespace: rag-infrastructure
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# Service для pgAdmin
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin
+  namespace: rag-infrastructure
+  labels:
+    app: pgadmin
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: pgadmin
+

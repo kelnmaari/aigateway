@@ -1,15 +1,15 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 2.4.6 ✅ | **В работе:** v2.4.7 (REFACTOR-01 🔄)  
+> **Текущая версия:** 2.4.7 ✅ | **В работе:** v2.5.0 (Agentic AI 🔄)  
 > **Следующие версии:**  
 >
-> - 🤖 **v2.5.0** - Agentic AI & MCP Integration (HIGH Priority)  
+> - 🤖 **v2.5.0** - Agentic AI & MCP Integration (HIGH Priority) 🔄
 > - 🎨 **v2.6.0** - HTMX Migration & TUI Removal (MEDIUM Priority) **← BIG Release!**  
 > - 🔴 **v2.7.0** - Redis Integration & Sessions (MEDIUM Priority)  
 > **План развития:** Version 2.0.0 - 2.7.0+  
-> **Статус:** Active Development (9 versions ✅ Complete! 1 🔄 In Progress | Next: REFACTOR-01 → Agentic AI + HTMX + Redis)  
-> **Последнее обновление:** 2025-10-30  
-> **Новое:** 🔧 **Migration System Refactoring в v2.4.7!** Разбиваем sqlite.go (4560+ строк) на отдельные SQL файлы с embed.FS. После этого - 🗑️ **TUI Removal** в v2.6.0 (HTMX migration + полное удаление TUI). Codebase станет значительно чище!
+> **Статус:** Active Development (10 versions ✅ Complete! | Next: Agentic AI → HTMX + Redis)  
+> **Последнее обновление:** 2025-11-03  
+> **Новое:** 🎉 **v2.4.7 завершена!** PostgreSQL полностью реализован с 142 миграциями (71 up/down), все CRUD методы портированы. Codebase значительно улучшен (sqlite.go уменьшен с 4560 до ~300 строк). Следующий этап - 🤖 **Agentic AI & MCP Integration** в v2.5.0!
 
 ---
 

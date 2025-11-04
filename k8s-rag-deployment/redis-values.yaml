@@ -1,0 +1,50 @@
+# Архитектура: standalone (для простоты)
+architecture: standalone
+
+auth:
+  enabled: false  # Для совместимости с docker-compose
+
+# Master конфигурация
+master:
+  persistence:
+    enabled: true
+    size: 8Gi
+  
+  resources:
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+    requests:
+      memory: 512Mi
+      cpu: 250m
+  
+  # Redis конфигурация
+  configuration: |-
+    # Persistence
+    appendonly yes
+    appendfsync everysec
+    save 900 1
+    save 300 10
+    save 60 10000
+    
+    # Memory management
+    maxmemory 2gb
+    maxmemory-policy allkeys-lru
+    
+    # Network
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+  
+  # Service type - ClusterIP для использования через NGINX-Ingress TCP
+  service:
+    type: ClusterIP
+    ports:
+      redis: 6379
+
+# Metrics для Prometheus
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Пока отключим
+

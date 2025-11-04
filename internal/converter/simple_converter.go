@@ -12,6 +12,7 @@ import (
 	"aigateway/internal/config"
 	"aigateway/internal/models"
 	"aigateway/internal/optimizer"
+	"aigateway/internal/utils"
 )
 
 // SimpleConverter обеспечивает прямую конвертацию без маппинга моделей
@@ -129,23 +130,23 @@ func (c *SimpleConverter) ConvertChatRequest(req *models.ChatCompletionRequest) 
 
 			// num_ctx - context window size
 			if numCtx, ok := req.Options["num_ctx"].(float64); ok {
-				options.NumCtx = intPtr(int(numCtx))
+				options.NumCtx = utils.Ptr(int(numCtx))
 				c.logger.WithField("num_ctx", int(numCtx)).Debug("Applied num_ctx from options")
 			} else if numCtx, ok := req.Options["num_ctx"].(int); ok {
-				options.NumCtx = intPtr(numCtx)
+				options.NumCtx = utils.Ptr(numCtx)
 				c.logger.WithField("num_ctx", numCtx).Debug("Applied num_ctx from options")
 			}
 
 			// top_k
 			if topK, ok := req.Options["top_k"].(float64); ok {
-				options.TopK = intPtr(int(topK))
+				options.TopK = utils.Ptr(int(topK))
 			} else if topK, ok := req.Options["top_k"].(int); ok {
-				options.TopK = intPtr(topK)
+				options.TopK = utils.Ptr(topK)
 			}
 
 			// repeat_penalty
 			if repeatPenalty, ok := req.Options["repeat_penalty"].(float64); ok {
-				options.RepeatPenalty = float64Ptr(repeatPenalty)
+				options.RepeatPenalty = utils.Ptr(repeatPenalty)
 			}
 		}
 	}
@@ -647,15 +648,7 @@ The tools are available and ready to use - call the most appropriate one immedia
 // Helper Functions (v1.9.1+)
 // ========================================
 
-// intPtr returns a pointer to an int
-func intPtr(v int) *int {
-	return &v
-}
-
-// float64Ptr returns a pointer to a float64
-func float64Ptr(v float64) *float64 {
-	return &v
-}
+// intPtr and float64Ptr replaced with utils.Ptr[T] (Go 1.25 generics)
 
 // injectAdditionalSystemMessage добавляет дополнительное системное сообщение к messages
 func (c *SimpleConverter) injectAdditionalSystemMessage(messages []models.ChatMessage) []models.ChatMessage {
@@ -701,4 +694,3 @@ func (c *SimpleConverter) injectAdditionalSystemMessage(messages []models.ChatMe
 
 	return messages
 }
-

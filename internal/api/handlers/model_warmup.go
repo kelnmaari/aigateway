@@ -11,6 +11,7 @@ import (
 
 	"aigateway/internal/client/ollama"
 	"aigateway/internal/config"
+	"aigateway/internal/utils"
 )
 
 // ModelWarmer обеспечивает предварительный прогрев моделей
@@ -44,7 +45,7 @@ func (w *ModelWarmer) WarmupModel(ctx context.Context, modelName string) error {
 		},
 		Stream: false, // Не stream для warmup
 		Options: &ollama.ChatOptions{
-			NumPredict: intPtr(1), // Генерируем только 1 токен
+			NumPredict: utils.Ptr(1), // Генерируем только 1 токен
 		},
 	}
 
@@ -152,7 +153,5 @@ func GetModelSize(modelName string) string {
 }
 
 // intPtr helper function
-func intPtr(i int) *int {
-	return &i
-}
+// intPtr replaced with utils.Ptr[int]
 

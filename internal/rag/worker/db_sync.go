@@ -258,8 +258,5 @@ func (w *RAGWorker) handleSyncError(ctx context.Context, source *models.RAGDataS
 
 // generateDocumentID, generateChunkID, randInt находятся в api_sync.go
 
-// timePtr возвращает указатель на time.Time
-func timePtr(t time.Time) *time.Time {
-	return &t
-}
+// timePtr replaced with utils.Ptr[time.Time]
 

@@ -12,6 +12,7 @@ import (
 
 	"aigateway/internal/models"
 	"aigateway/internal/services/ratelimit"
+	"aigateway/internal/utils"
 )
 
 // AdvancedRateLimitMiddleware middleware для advanced rate limiting с RFC 6585 headers
@@ -27,8 +28,8 @@ func AdvancedRateLimitMiddleware(limiter *ratelimit.AdvancedRateLimiter, logger 
 
 		// Convert to strings with nil-safety
 		userIDStr := stringValue(userID)
-		tenantIDPtr := stringPtr(tenantID)
-		apiKeyIDPtr := stringPtr(apiKeyID)
+		tenantIDPtr := utils.PtrOrNil(stringValue(tenantID))
+		apiKeyIDPtr := utils.PtrOrNil(stringValue(apiKeyID))
 
 		if userIDStr == "" {
 			// No user context, skip rate limiting (legacy API keys?)
@@ -143,14 +144,8 @@ func stringValue(val interface{}) string {
 	return ""
 }
 
-// stringPtr безопасное создание *string из interface{}
-func stringPtr(val interface{}) *string {
-	str := stringValue(val)
-	if str == "" {
-		return nil
-	}
-	return &str
-}
+// stringPtr replaced with utils.PtrOrNil[T] (Go 1.25 generics)
+// utils.PtrOrNil returns pointer to value, or nil if value is zero-value
 
 // formatRateLimitMessage форматирует сообщение об ошибке rate limit
 func formatRateLimitMessage(result *models.RateLimitResult) string {

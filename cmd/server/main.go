@@ -19,6 +19,7 @@ import (
 	"aigateway/internal/client/ollama"
 	"aigateway/internal/config"
 	"aigateway/internal/dbfactory"
+	"aigateway/internal/debug"
 	"aigateway/internal/logger"
 	"aigateway/internal/metrics"
 	"aigateway/internal/observability"
@@ -74,6 +75,32 @@ func main() {
 		WithField("git_commit", version.GitCommit).
 		WithField("build_date", version.BuildDate).
 		Info("Starting Ollama-OpenAI Proxy Server")
+
+	// FlightRecorder для production debugging (v2.4.9+) - Go 1.25 feature
+	// Автоматически сохраняет trace последних 30 секунд при panic
+	flightRecorder := debug.NewFlightRecorderManager(debug.FlightRecorderConfig{
+		Enabled:         true,
+		MinAge:          30 * time.Second,
+		MaxBytes:        10 * 1024 * 1024, // 10MB
+		OutputDir:       "traces",
+		AutoSaveOnPanic: true,
+	}, appLogger)
+
+	if err := flightRecorder.Start(); err != nil {
+		appLogger.WithError(err).Warn("Failed to start FlightRecorder, continuing without it")
+	} else {
+		defer flightRecorder.Stop()
+		appLogger.Info("FlightRecorder started (Go 1.25) - production debugging enabled")
+	}
+
+	// Panic recovery с FlightRecorder trace saving
+	defer func() {
+		if r := recover(); r != nil {
+			flightRecorder.SaveTraceOnPanic(context.Background(), r)
+			appLogger.WithField("panic", r).Fatal("Application panicked - trace saved to traces/")
+			panic(r) // Re-panic после сохранения trace
+		}
+	}()
 
 	// Prometheus метрики (если включено)
 	// Metrics are already registered globally via promauto in prometheus.go

@@ -49,6 +49,10 @@ func setupSecurityTestManager(t *testing.T) (*apikey.Manager, context.Context) {
 
 // TestSecurity_TimingAttackResistance проверяет устойчивость к timing attacks
 func TestSecurity_TimingAttackResistance(t *testing.T) {
+	t.Attr("category", "security")
+	t.Attr("type", "integration")
+	t.Attr("go_version", "1.25+")
+	
 	t.Run("bcrypt constant time comparison", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -138,6 +142,10 @@ func TestSecurity_TimingAttackResistance(t *testing.T) {
 
 // TestSecurity_BruteForceProtection проверяет защиту от brute force атак
 func TestSecurity_BruteForceProtection(t *testing.T) {
+	t.Attr("category", "security")
+	t.Attr("type", "integration")
+	t.Attr("go_version", "1.25+")
+	
 	t.Run("multiple failed attempts", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -206,6 +214,10 @@ func TestSecurity_BruteForceProtection(t *testing.T) {
 
 // TestSecurity_TokenManipulation проверяет устойчивость к манипуляциям с токенами
 func TestSecurity_TokenManipulation(t *testing.T) {
+	t.Attr("category", "security")
+	t.Attr("type", "unit")
+	t.Attr("go_version", "1.25+")
+	
 	t.Run("modified token structure", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -301,6 +313,10 @@ func TestSecurity_TokenManipulation(t *testing.T) {
 
 // TestSecurity_InvalidKeyFormats проверяет обработку различных невалидных форматов
 func TestSecurity_InvalidKeyFormats(t *testing.T) {
+	t.Attr("category", "security")
+	t.Attr("type", "unit")
+	t.Attr("go_version", "1.25+")
+	
 	manager, ctx := setupSecurityTestManager(t)
 
 	testCases := []struct {
@@ -349,6 +365,10 @@ func TestSecurity_InvalidKeyFormats(t *testing.T) {
 
 // TestSecurity_ConcurrentAccessSafety проверяет безопасность при concurrent доступе
 func TestSecurity_ConcurrentAccessSafety(t *testing.T) {
+	t.Attr("category", "security")
+	t.Attr("type", "integration")
+	t.Attr("go_version", "1.25+")
+	
 	t.Run("concurrent key creation", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -434,6 +454,10 @@ func TestSecurity_ConcurrentAccessSafety(t *testing.T) {
 
 // TestSecurity_MemoryLeaks проверяет на утечки памяти
 func TestSecurity_MemoryLeaks(t *testing.T) {
+	t.Attr("category", "security")
+	t.Attr("type", "performance")
+	t.Attr("go_version", "1.25+")
+	
 	if testing.Short() {
 		t.Skip("Skipping memory leak test in short mode")
 	}

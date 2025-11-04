@@ -10,6 +10,7 @@ import (
 
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
+	"aigateway/internal/utils"
 )
 
 // Mock Database
@@ -105,7 +106,7 @@ func TestDataSourceService_CreateDataSource(t *testing.T) {
 
 	req := CreateDataSourceRequest{
 		UserID:      "user1",
-		TenantID:    stringPtr("tenant1"),
+		TenantID:    utils.Ptr("tenant1"),
 		Name:        "Test Source",
 		Description: "Test description",
 		SourceType:  "api",
@@ -115,7 +116,7 @@ func TestDataSourceService_CreateDataSource(t *testing.T) {
 		Credentials: map[string]string{
 			"api_key": "secret-key-123",
 		},
-		SyncFrequency: stringPtr("1h"),
+		SyncFrequency: utils.Ptr("1h"),
 		Tags:          []string{"test", "api"},
 	}
 
@@ -217,9 +218,9 @@ func TestDataSourceService_UpdateDataSource(t *testing.T) {
 
 	// Update the source
 	updateReq := UpdateDataSourceRequest{
-		Name:        stringPtr("Updated Name"),
-		Description: stringPtr("Updated description"),
-		Status:      stringPtr("inactive"),
+		Name:        utils.Ptr("Updated Name"),
+		Description: utils.Ptr("Updated description"),
+		Status:      utils.Ptr("inactive"),
 	}
 
 	updated, err := service.UpdateDataSource(ctx, created.ID, updateReq)
@@ -249,7 +250,7 @@ func TestDataSourceService_UpdateDataSource_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	updateReq := UpdateDataSourceRequest{
-		Name: stringPtr("New Name"),
+		Name: utils.Ptr("New Name"),
 	}
 
 	_, err := service.UpdateDataSource(ctx, "non-existent-id", updateReq)
@@ -310,7 +311,7 @@ func TestDataSourceService_ListDataSources(t *testing.T) {
 
 	// List sources
 	listReq := ListDataSourcesRequest{
-		UserID: stringPtr("user1"),
+		UserID: utils.Ptr("user1"),
 		Limit:  10,
 		Offset: 0,
 	}
@@ -463,9 +464,6 @@ func BenchmarkDataSourceService_EncryptDecrypt(b *testing.B) {
 	}
 }
 
-// Helper function
-func stringPtr(s string) *string {
-	return &s
-}
+// stringPtr replaced with utils.Ptr[T] (Go 1.25 generics)
 
 

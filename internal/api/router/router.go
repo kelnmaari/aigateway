@@ -383,6 +383,18 @@ func (r *Router) setupMiddleware() {
 	// CORS middleware
 	r.engine.Use(middleware.CORS(r.config))
 
+	// CSRF Protection middleware (v2.4.9+) - Go 1.25 CrossOriginProtection
+	// Защищает от Cross-Site Request Forgery атак
+	if r.config.Server.CORS.Enabled {
+		csrfConfig := middleware.CrossOriginProtectionConfig{
+			Enabled:             true,
+			TrustedOrigins:      r.config.Server.CORS.AllowedOrigins,
+			RequireOriginHeader: false, // Не требуем Origin для non-browser clients (API)
+		}
+		r.engine.Use(middleware.CrossOriginProtection(csrfConfig, r.logger))
+		r.logger.WithField("trusted_origins", csrfConfig.TrustedOrigins).Info("CSRF protection middleware enabled (Go 1.25)")
+	}
+
 	// API Key middleware применяется только к защищенным группам
 }
 

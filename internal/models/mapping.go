@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"aigateway/internal/utils"
 )
 
 // ModelMapping представляет маппинг между именами моделей OpenAI и Ollama
@@ -246,8 +248,8 @@ var DefaultModelMappings = []ModelMapping{
 		OllamaName: "qwen2.5-coder:7b",
 		Aliases:    []string{"gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k"},
 		Config: ModelMappingConfig{
-			MaxTokens:         intPtr(4096),
-			DefaultTemp:       float64Ptr(0.7),
+			MaxTokens:         utils.Ptr(4096),
+			DefaultTemp:       utils.Ptr(0.7),
 			SupportsFunctions: false,
 			SupportsVision:    false,
 			SupportsTools:     false,
@@ -258,8 +260,8 @@ var DefaultModelMappings = []ModelMapping{
 		OllamaName: "qwen3-coder:30b",
 		Aliases:    []string{"gpt-4-0613", "gpt-4-32k"},
 		Config: ModelMappingConfig{
-			MaxTokens:         intPtr(8192),
-			DefaultTemp:       float64Ptr(0.7),
+			MaxTokens:         utils.Ptr(8192),
+			DefaultTemp:       utils.Ptr(0.7),
 			SupportsFunctions: false,
 			SupportsVision:    false,
 			SupportsTools:     false,
@@ -270,8 +272,8 @@ var DefaultModelMappings = []ModelMapping{
 		OllamaName: "gpt-oss-c32k:latest",
 		Aliases:    []string{"gpt-4-turbo-preview", "gpt-4-0125-preview"},
 		Config: ModelMappingConfig{
-			MaxTokens:         intPtr(128000),
-			DefaultTemp:       float64Ptr(0.7),
+			MaxTokens:         utils.Ptr(128000),
+			DefaultTemp:       utils.Ptr(0.7),
 			SupportsFunctions: true,
 			SupportsVision:    false,
 			SupportsTools:     true,
@@ -279,16 +281,5 @@ var DefaultModelMappings = []ModelMapping{
 	},
 }
 
-// Вспомогательные функции для указателей
-func intPtr(i int) *int {
-	return &i
-}
-
-func float64Ptr(f float64) *float64 {
-	return &f
-}
-
-func stringPtr(s string) *string {
-	return &s
-}
+// Вспомогательные функции для указателей replaced with utils.Ptr[T] (Go 1.25 generics)
 

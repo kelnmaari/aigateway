@@ -40,7 +40,7 @@ func NewDataSourceService(db storage.Database, encryptionKey string, logger *log
 }
 
 // CreateDataSource создает новый источник данных
-func (s *DataSourceService) CreateDataSource(ctx context.Context, req *models.CreateRAGDataSourceRequest, userID uuid.UUID, tenantID *uuid.UUID) (*models.RAGDataSource, error) {
+func (s *DataSourceService) CreateDataSource(ctx context.Context, req *models.CreateRAGDataSourceRequest, userID string, tenantID *string) (*models.RAGDataSource, error) {
 	// Encrypt credentials if provided
 	var credentialsEncrypted string
 	if len(req.Credentials) > 0 {
@@ -53,7 +53,7 @@ func (s *DataSourceService) CreateDataSource(ctx context.Context, req *models.Cr
 	
 	// Create data source
 	source := &models.RAGDataSource{
-		ID:                   uuid.New(),
+		ID:                   uuid.New().String(),
 		UserID:               userID,
 		TenantID:             tenantID,
 		Name:                 req.Name,
@@ -85,8 +85,8 @@ func (s *DataSourceService) CreateDataSource(ctx context.Context, req *models.Cr
 }
 
 // GetDataSource получает источник по ID
-func (s *DataSourceService) GetDataSource(ctx context.Context, id uuid.UUID) (*models.RAGDataSource, error) {
-	return s.db.GetRAGDataSource(ctx, id.String())
+func (s *DataSourceService) GetDataSource(ctx context.Context, id string) (*models.RAGDataSource, error) {
+	return s.db.GetRAGDataSource(ctx, id)
 }
 
 // ListDataSources возвращает список источников с фильтрацией
@@ -98,12 +98,10 @@ func (s *DataSourceService) ListDataSources(ctx context.Context, filter storage.
 	}
 	
 	if filter.UserID != nil {
-		userIDStr := filter.UserID.String()
-		ragFilter.UserID = &userIDStr
+		ragFilter.UserID = filter.UserID
 	}
 	if filter.TenantID != nil {
-		tenantIDStr := filter.TenantID.String()
-		ragFilter.TenantID = &tenantIDStr
+		ragFilter.TenantID = filter.TenantID
 	}
 	if filter.SourceType != nil {
 		sourceTypeStr := string(*filter.SourceType)
@@ -130,9 +128,9 @@ func (s *DataSourceService) ListDataSources(ctx context.Context, filter storage.
 }
 
 // UpdateDataSource обновляет источник
-func (s *DataSourceService) UpdateDataSource(ctx context.Context, id uuid.UUID, req *models.UpdateRAGDataSourceRequest) (*models.RAGDataSource, error) {
+func (s *DataSourceService) UpdateDataSource(ctx context.Context, id string, req *models.UpdateRAGDataSourceRequest) (*models.RAGDataSource, error) {
 	// Get existing source
-	source, err := s.db.GetRAGDataSource(ctx, id.String())
+	source, err := s.db.GetRAGDataSource(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data source: %w", err)
 	}
@@ -184,8 +182,8 @@ func (s *DataSourceService) UpdateDataSource(ctx context.Context, id uuid.UUID, 
 }
 
 // DeleteDataSource удаляет источник
-func (s *DataSourceService) DeleteDataSource(ctx context.Context, id uuid.UUID) error {
-	if err := s.db.DeleteRAGDataSource(ctx, id.String()); err != nil {
+func (s *DataSourceService) DeleteDataSource(ctx context.Context, id string) error {
+	if err := s.db.DeleteRAGDataSource(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete data source: %w", err)
 	}
 	
@@ -196,10 +194,61 @@ func (s *DataSourceService) DeleteDataSource(ctx context.Context, id uuid.UUID) 
 	return nil
 }
 
+// StartSync создает RAG job для синхронизации источника
+func (s *DataSourceService) StartSync(ctx context.Context, sourceID string) (int64, error) {
+	// Get source to determine job type
+	source, err := s.db.GetRAGDataSource(ctx, sourceID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get data source: %w", err)
+	}
+	
+	// Determine job type based on source type
+	var jobType models.JobType
+	switch source.SourceType {
+	case models.SourceTypeAPI:
+		jobType = models.JobTypeAPISync
+	case models.SourceTypeDatabase:
+		jobType = models.JobTypeDBQuery
+	case models.SourceTypeWeb:
+		jobType = models.JobTypeWebScrape
+	case models.SourceTypeFile:
+		jobType = models.JobTypeAPISync // File sources use generic sync
+	default:
+		jobType = models.JobTypeAPISync // fallback
+	}
+	
+	// Create job
+	job := &models.RAGJob{
+		JobType: jobType,
+		Status:  models.JobStatusPending,
+		Payload: models.JobPayload{
+			"source_id":   sourceID,
+			"source_type": string(source.SourceType),
+			"source_name": source.Name,
+		},
+		Priority:    5,  // normal priority
+		Attempts:    0,
+		MaxAttempts: 3,
+		CreatedAt:   time.Now(),
+	}
+	
+	if err := s.db.CreateRAGJob(ctx, job); err != nil {
+		return 0, fmt.Errorf("failed to create sync job: %w", err)
+	}
+	
+	s.logger.WithFields(logrus.Fields{
+		"job_id":    job.ID,
+		"source_id": sourceID,
+		"job_type":  jobType,
+	}).Info("Sync job created successfully")
+	
+	return job.ID, nil
+}
+
 // UpdateSourceStatus обновляет статус источника
-func (s *DataSourceService) UpdateSourceStatus(ctx context.Context, id uuid.UUID, status models.SourceStatus, errorMsg string) error {
+func (s *DataSourceService) UpdateSourceStatus(ctx context.Context, id string, status models.SourceStatus, errorMsg string) error {
 	// Получаем источник и обновляем его статус
-	source, err := s.db.GetRAGDataSource(ctx, id.String())
+	source, err := s.db.GetRAGDataSource(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -212,9 +261,9 @@ func (s *DataSourceService) UpdateSourceStatus(ctx context.Context, id uuid.UUID
 }
 
 // UpdateSyncInfo обновляет информацию о синхронизации
-func (s *DataSourceService) UpdateSyncInfo(ctx context.Context, id uuid.UUID, status models.SyncStatus, chunkCount int) error {
+func (s *DataSourceService) UpdateSyncInfo(ctx context.Context, id string, status models.SyncStatus, chunkCount int) error {
 	// Получаем источник и обновляем информацию о синхронизации
-	source, err := s.db.GetRAGDataSource(ctx, id.String())
+	source, err := s.db.GetRAGDataSource(ctx, id)
 	if err != nil {
 		return err
 	}

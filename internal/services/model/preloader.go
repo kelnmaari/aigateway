@@ -98,10 +98,8 @@ func (p *ModelPreloader) preloadModels(ctx context.Context) error {
 	errCh := make(chan error, len(p.config.Models))
 
 	for _, modelName := range p.config.Models {
-		wg.Add(1)
-		go func(model string) {
-			defer wg.Done()
-
+		model := modelName // Capture for closure
+		wg.Go(func() {
 			p.logger.Infof("Preloading model: %s", model)
 			start := time.Now()
 
@@ -113,7 +111,7 @@ func (p *ModelPreloader) preloadModels(ctx context.Context) error {
 
 			p.markLoaded(model)
 			p.logger.WithField("duration", time.Since(start)).Infof("Model preloaded: %s", model)
-		}(modelName)
+		})
 	}
 
 	wg.Wait()

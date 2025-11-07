@@ -62,14 +62,14 @@ analyze_full_mr:
   artifacts:
     paths:
       - ai-review-mr-*-full.md
-      - ai-review-mr-*-part*.md
+      - ai-review-mr-*-file-*.md
     expire_in: 30 days
     when: always
   rules:
     - if: '$CI_MERGE_REQUEST_IID'  # Только для MR
       when: manual  # Запускается вручную
   allow_failure: true
-  timeout: 40m  # Увеличено для deepseek-coder:33b + вдвое больше чанков (10KB chunks)
+  timeout: 40m  # Увеличено для deepseek-coder:33b + file-based анализ (каждый файл отдельно)
   
 # ============================================================================
 # SETUP INSTRUCTIONS:

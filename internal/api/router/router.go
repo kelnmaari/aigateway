@@ -162,9 +162,9 @@ type Router struct {
 
 	// HTMX UI Handlers (Version 2.6.0+: HTMX-01)
 	templateRenderer     *templates.Renderer
-	registryUIHandler    *handlers.RegistryUIHandler
-	apiKeysUIHandler     *handlers.APIKeysUIHandler
-	tenantsUIHandler     *handlers.TenantsUIHandler
+	registryUIHandler    *handlersUI.RegistryUIHandler
+	apiKeysUIHandler     *handlersUI.APIKeysUIHandler
+	tenantsUIHandler     *handlersUI.TenantsUIHandler
 	monitorUIHandler     *handlersUI.MonitorUIHandler // Monitor UI (GPU, Audit, Usage) - HTMX-02
 }
 
@@ -1747,7 +1747,8 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	if r.db != nil {
 		// Initialize template renderer
 		var err error
-		r.templateRenderer, err = templates.NewRenderer(logger)
+		devMode := false // TODO: Add config.DevMode option for hot reload in development
+		r.templateRenderer, err = templates.NewRenderer(devMode)
 		if err != nil {
 			logger.WithError(err).Error("Failed to initialize template renderer")
 		} else {

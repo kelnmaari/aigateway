@@ -37,8 +37,8 @@ func (h *APIKeysUIHandler) GetAPIKeysList(c *gin.Context) {
 		return
 	}
 
-	// Get all keys for user
-	keys, err := h.db.ListAPIKeys(c.Request.Context(), userID)
+	// Get all personal keys for user
+	keys, err := h.db.ListPersonalAPIKeys(c.Request.Context(), userID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list API keys")
 		c.HTML(http.StatusInternalServerError, "", gin.H{
@@ -65,7 +65,7 @@ func (h *APIKeysUIHandler) GetAPIKeysList(c *gin.Context) {
 func (h *APIKeysUIHandler) GetAPIKeysForTenant(c *gin.Context) {
 	tenantID := c.Param("id")
 
-	keys, err := h.db.ListAPIKeysByTenant(c.Request.Context(), tenantID)
+	keys, err := h.db.ListTenantAPIKeys(c.Request.Context(), tenantID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list tenant API keys")
 		c.HTML(http.StatusInternalServerError, "", gin.H{

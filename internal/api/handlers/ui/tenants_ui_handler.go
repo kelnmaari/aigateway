@@ -37,8 +37,8 @@ func (h *TenantsUIHandler) GetTenantsGrid(c *gin.Context) {
 		return
 	}
 
-	// Get tenants for user (or all if admin)
-	tenants, err := h.db.ListTenants(c.Request.Context())
+	// Get tenants for user
+	tenants, err := h.db.ListUserTenants(c.Request.Context(), userID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list tenants")
 		c.HTML(http.StatusInternalServerError, "", gin.H{

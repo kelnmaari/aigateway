@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"aigateway/internal/api/handlers"
+	handlersUI "aigateway/internal/api/handlers/ui"
 	"aigateway/internal/api/middleware"
 	"aigateway/internal/auth/apikey"
 	"aigateway/internal/auth/jwt"
@@ -42,6 +43,7 @@ import (
 	ragservice "aigateway/internal/services/rag"
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/storage"
+	"aigateway/internal/web/templates"
 	"aigateway/internal/websocket"
 
 	"go.opentelemetry.io/otel/trace"
@@ -157,6 +159,12 @@ type Router struct {
 	// Agent Service (Version 2.5.0+: AGENT-01)
 	agentService    *agent.Service
 	ragOrchestrator *ragorchestrator.RAGOrchestrator
+
+	// HTMX UI Handlers (Version 2.6.0+: HTMX-01)
+	templateRenderer     *templates.Renderer
+	registryUIHandler    *handlers.RegistryUIHandler
+	apiKeysUIHandler     *handlers.APIKeysUIHandler
+	tenantsUIHandler     *handlers.TenantsUIHandler
 }
 
 // NewOptions содержит опции для создания роутера
@@ -426,6 +434,7 @@ func (r *Router) setupRoutes() {
 	r.setupMCPRoutes()         // MCP Servers Catalog (v1.4.5)
 	r.setupGPURoutes()         // GPU Monitoring (v1.9.3)
 	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
+	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
 }
 
 // setupHealthRoutes настраивает эндпоинты проверки здоровья
@@ -550,6 +559,53 @@ func (r *Router) setupFileRoutes() {
 		api.DELETE("/:id", r.fileHandler.DeleteFile)
 		api.POST("/search", r.fileHandler.SearchFiles)
 	}
+}
+
+// setupUIRoutes настраивает HTMX UI routes (v2.6.0+: HTMX-01)
+func (r *Router) setupUIRoutes() {
+	if r.registryUIHandler == nil || r.apiKeysUIHandler == nil || r.tenantsUIHandler == nil {
+		r.logger.Info("HTMX UI disabled - handlers not initialized")
+		return
+	}
+
+	// UI routes требуют JWT аутентификации
+	ui := r.engine.Group("/api/ui")
+	if r.jwtManager != nil {
+		ui.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+	{
+		// Model Registry UI
+		registry := ui.Group("/registry")
+		{
+			registry.GET("/models", r.registryUIHandler.GetModelsTable)
+			registry.GET("/models/search", r.registryUIHandler.SearchModels)
+			registry.GET("/models/new-form", r.registryUIHandler.GetNewModelForm)
+			registry.GET("/models/:id/edit", r.registryUIHandler.GetEditModelForm)
+			registry.GET("/providers/new-form", r.registryUIHandler.GetNewProviderForm)
+		}
+
+		// API Keys UI
+		apikeys := ui.Group("/api-keys")
+		{
+			apikeys.GET("/personal", r.apiKeysUIHandler.GetAPIKeysList)
+			apikeys.GET("/tenant/:id", r.apiKeysUIHandler.GetAPIKeysForTenant)
+			apikeys.GET("/create-form", r.apiKeysUIHandler.GetCreateAPIKeyForm)
+			apikeys.GET("/:id", r.apiKeysUIHandler.GetAPIKeyCard)
+			apikeys.GET("/:id/edit", r.apiKeysUIHandler.GetEditAPIKeyForm)
+		}
+
+		// Tenants UI
+		tenants := ui.Group("/tenants")
+		{
+			tenants.GET("", r.tenantsUIHandler.GetTenantsGrid)
+			tenants.GET("/create-form", r.tenantsUIHandler.GetCreateTenantForm)
+			tenants.GET("/:id", r.tenantsUIHandler.GetTenantDetails)
+			tenants.GET("/:id/edit", r.tenantsUIHandler.GetEditTenantForm)
+			tenants.GET("/:id/members", r.tenantsUIHandler.GetTenantMembers)
+		}
+	}
+
+	r.logger.Info("✅ HTMX UI routes registered successfully")
 }
 
 // setupRAGRoutes настраивает RAG System routes (v1.13.1+)
@@ -1675,6 +1731,22 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	r.metricsBroadcaster.Start()
 
 	logger.Info("WebSocket Hub, Chat Handler and Metrics Storage initialized")
+
+	// HTMX UI Handlers initialization (Version 2.6.0+: HTMX-01)
+	if r.db != nil {
+		// Initialize template renderer
+		var err error
+		r.templateRenderer, err = templates.NewRenderer(logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize template renderer")
+		} else {
+			// Initialize UI handlers
+			r.registryUIHandler = handlersUI.NewRegistryUIHandler(r.db, r.templateRenderer, logger)
+			r.apiKeysUIHandler = handlersUI.NewAPIKeysUIHandler(r.db, r.templateRenderer, logger)
+			r.tenantsUIHandler = handlersUI.NewTenantsUIHandler(r.db, r.templateRenderer, logger)
+			logger.Info("✅ HTMX UI handlers initialized successfully")
+		}
+	}
 }
 
 // setupFileStorage инициализирует file storage и extractors (v1.10.0)

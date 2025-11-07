@@ -155,6 +155,7 @@ if [ "$FILES_COUNT" -gt 1 ]; then
     if [ -n "$ERROR_MSG" ]; then
       echo "   ⚠️ Ошибка анализа: $ERROR_MSG"
       FILE_RESPONSE="[Ошибка анализа $FILE_PATH: $ERROR_MSG]"
+      FILE_RESPONSE_SIZE=0
     else
       FILE_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "[Пустой ответ]"')
       

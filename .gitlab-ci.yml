@@ -18,10 +18,10 @@ variables:
   #   ⚠️ gpt-oss-tuned:latest - НЕСТАБИЛЬНЫЙ, может возвращать пустые ответы!
   
   # Модель для быстрого review последнего коммита (автоматический)
-  COMMIT_REVIEW_MODEL: "gpt-oss-tuned:latest"
+  COMMIT_REVIEW_MODEL: "deepseek-coder:33b"
   
   # Модель для полного детального review MR (мануальный)
-  FULL_MR_REVIEW_MODEL: "gpt-oss-tuned:latest"
+  FULL_MR_REVIEW_MODEL: "deepseek-coder:33b"
 
 # Общие настройки для review jobs (YAML anchor)
 .review_base:

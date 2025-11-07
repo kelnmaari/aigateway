@@ -3,7 +3,6 @@
 
 stages:
   - analyze
-  - build
 
 variables:
   # Настройки прокси (используйте GitLab CI/CD Variables)
@@ -415,28 +414,7 @@ Diff Stats:
       when: manual  # Запускается вручную
   allow_failure: true
   timeout: 20m  # Больше времени для полного анализа
-
-# ============================================================================
-# Go Build (опционально)
-# ============================================================================
-build:
-  stage: build
-  image: golang:1.25.3-alpine
-  before_script:
-    - apk add --no-cache git make
-  script:
-    - echo "🔨 Building Go project..."
-    - make build
-  artifacts:
-    paths:
-      - bin/
-    expire_in: 1 day
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'  # Только для main ветки
-    - if: '$CI_MERGE_REQUEST_IID'  # И для MR
-  allow_failure: false
-  timeout: 15m
-
+  
 # ============================================================================
 # SETUP INSTRUCTIONS:
 # ============================================================================

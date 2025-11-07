@@ -1756,7 +1756,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			r.registryUIHandler = handlersUI.NewRegistryUIHandler(r.db, r.templateRenderer, logger)
 			r.apiKeysUIHandler = handlersUI.NewAPIKeysUIHandler(r.db, r.templateRenderer, logger)
 			r.tenantsUIHandler = handlersUI.NewTenantsUIHandler(r.db, r.templateRenderer, logger)
-			r.monitorUIHandler = handlersUI.NewMonitorUIHandler(logger, r.gpuMonitor) // HTMX-02: Monitor UI
+			r.monitorUIHandler = handlersUI.NewMonitorUIHandler(logger, r.gpuMonitor, r.db) // HTMX-02: Monitor UI
 			logger.Info("✅ HTMX UI handlers initialized successfully")
 		}
 	}

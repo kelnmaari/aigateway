@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
 	"aigateway/internal/metrics"
+	"aigateway/internal/storage"
 )
 
 // MonitorUIHandler handles monitoring UI endpoints
@@ -22,7 +24,7 @@ type MonitorUIHandler struct {
 }
 
 // NewMonitorUIHandler creates a new monitor UI handler
-func NewMonitorUIHandler(logger *logrus.Logger, gpuMonitor *metrics.GPUMonitor) *MonitorUIHandler {
+func NewMonitorUIHandler(logger *logrus.Logger, gpuMonitor *metrics.GPUMonitor, db storage.Database) *MonitorUIHandler {
 	// Load templates
 	tmpl, err := template.ParseGlob("internal/web/templates/partials/monitor/*.html")
 	if err != nil {
@@ -32,6 +34,7 @@ func NewMonitorUIHandler(logger *logrus.Logger, gpuMonitor *metrics.GPUMonitor) 
 	return &MonitorUIHandler{
 		logger:     logger,
 		gpuMonitor: gpuMonitor,
+		db:         db,
 		templates:  tmpl,
 	}
 }
@@ -155,40 +158,201 @@ func (h *MonitorUIHandler) renderInlineGPUMetrics(c *gin.Context, metricsData *m
 // RenderAuditLogRows renders audit log table rows for HTMX polling
 // GET /ui/monitor/audit-logs
 func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
-	// TODO: Implement with actual audit log data from database
-	// For now, return placeholder
-	c.Header("Content-Type", "text/html")
-	c.String(http.StatusOK, `
+	ctx := c.Request.Context()
+	
+	// Parse query parameters
+	filters := storage.AuditFilters{
+		Limit:  20, // Limit for live updates
+		Offset: 0,
+	}
+	
+	// Optional filters from query params
+	if severity := c.Query("severity"); severity != "" {
+		filters.Severity = severity
+	}
+	if eventType := c.Query("event_type"); eventType != "" {
+		filters.EventType = eventType
+	}
+	
+	// Get recent audit events
+	events, _, err := h.db.GetAuditEvents(ctx, filters)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get audit events for UI")
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `
 <tr>
-	<td colspan="8" class="table-empty">
-		<div class="loading"></div> Loading audit events...
+	<td colspan="8" class="table-empty error">
+		Failed to load audit events
 	</td>
 </tr>`)
+		return
+	}
+	
+	// Check if no events
+	if len(events) == 0 {
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `
+<tr>
+	<td colspan="8" class="table-empty">
+		No audit events found
+	</td>
+</tr>`)
+		return
+	}
+	
+	// Render rows
+	c.Header("Content-Type", "text/html")
+	html := ""
+	for _, event := range events {
+		severityClass := "severity-info"
+		switch event.Severity {
+		case "critical":
+			severityClass = "severity-critical"
+		case "warning":
+			severityClass = "severity-warning"
+		}
+		
+		statusClass := "status-success"
+		if event.Status == "failure" {
+			statusClass = "status-failure"
+		}
+		
+		html += fmt.Sprintf(`
+<tr class="audit-row">
+	<td>%s</td>
+	<td><span class="%s">%s</span></td>
+	<td>%s</td>
+	<td class="truncate" title="%s">%s</td>
+	<td>%s</td>
+	<td class="truncate" title="%s">%s</td>
+	<td><span class="%s">%s</span></td>
+	<td class="truncate">%s</td>
+</tr>`,
+			event.Timestamp.Format("15:04:05"),
+			severityClass, event.Severity,
+			event.EventType,
+			event.ActorID, truncateString(event.ActorID, 20),
+			event.Action,
+			event.Resource, truncateString(event.Resource, 30),
+			statusClass, event.Status,
+			event.IPAddress,
+		)
+	}
+	
+	c.String(http.StatusOK, html)
+}
+
+// truncateString truncates string to max length with ellipsis
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 // RenderUsageStats renders usage statistics cards for HTMX polling
 // GET /ui/monitor/usage-stats
 func (h *MonitorUIHandler) RenderUsageStats(c *gin.Context) {
-	// TODO: Implement with actual usage stats from database
-	// For now, return placeholder
-	c.Header("Content-Type", "text/html")
+	ctx := c.Request.Context()
+	
+	// Get user ID from context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `<div class="alert alert-error">Unauthorized</div>`)
+		return
+	}
+	userIDStr := userID.(string)
+	
+	// Get period from query (default: 24h)
+	period := 24 * time.Hour
+	if periodParam := c.Query("period"); periodParam != "" {
+		switch periodParam {
+		case "1h":
+			period = 1 * time.Hour
+		case "24h":
+			period = 24 * time.Hour
+		case "7d":
+			period = 7 * 24 * time.Hour
+		}
+	}
+	
+	// Get usage stats for user
+	stats, err := h.db.GetUserUsageStats(ctx, userIDStr, period)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get usage stats for UI")
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `<div class="alert alert-error">Failed to load usage statistics</div>`)
+		return
+	}
+	
+	// Format numbers
+	totalRequests := int64(0)
+	totalTokens := int64(0)
+	avgResponseTime := 0.0
+	
+	if stats != nil {
+		totalRequests = stats.TotalRequests
+		totalTokens = stats.TotalTokens
+		avgResponseTime = stats.AvgDurationMS
+	}
+	
 	now := time.Now()
+	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
-<div class="stat-card">
-	<div class="stat-icon" style="background: rgba(16, 163, 127, 0.1);">
-		<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)">
-			<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-width="2"/>
-		</svg>
+<div class="stats-grid">
+	<div class="stat-card">
+		<div class="stat-icon" style="background: rgba(16, 163, 127, 0.1);">
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)">
+				<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-width="2"/>
+			</svg>
+		</div>
+		<div class="stat-content">
+			<div class="stat-label">Total Requests</div>
+			<div class="stat-value">%s</div>
+		</div>
 	</div>
-	<div class="stat-content">
-		<div class="stat-label">Total Requests</div>
-		<div class="stat-value">1,234</div>
-		<div class="stat-trend trend-up">+12%% from last period</div>
+	
+	<div class="stat-card">
+		<div class="stat-icon" style="background: rgba(168, 85, 247, 0.1);">
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a855f7">
+				<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-width="2"/>
+			</svg>
+		</div>
+		<div class="stat-content">
+			<div class="stat-label">Tokens Used</div>
+			<div class="stat-value">%s</div>
+		</div>
 	</div>
-	<div class="stat-footer">
+	
+	<div class="stat-card">
+		<div class="stat-icon" style="background: rgba(59, 130, 246, 0.1);">
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6">
+				<circle cx="12" cy="12" r="10" stroke-width="2"/>
+				<path d="M12 6v6l4 2" stroke-width="2"/>
+			</svg>
+		</div>
+		<div class="stat-content">
+			<div class="stat-label">Avg Response</div>
+			<div class="stat-value">%.0fms</div>
+		</div>
+	</div>
+	
+	<div class="stat-footer-all">
 		<small class="text-muted">Updated: %s</small>
 	</div>
 </div>
-`, now.Format("15:04:05")))
+`, formatNumber(int(totalRequests)), formatNumber(int(totalTokens)), avgResponseTime, now.Format("15:04:05")))
+}
+
+// formatNumber formats number with thousands separator
+func formatNumber(n int) string {
+	if n < 1000 {
+		return strconv.Itoa(n)
+	}
+	if n < 1000000 {
+		return fmt.Sprintf("%.1fK", float64(n)/1000)
+	}
+	return fmt.Sprintf("%.1fM", float64(n)/1000000)
 }
 

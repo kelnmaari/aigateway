@@ -1,0 +1,236 @@
+{{/* Hugging Face Models List - HTMX Component */}}
+<div class="models-grid">
+    {{if eq .Count 0}}
+    <div class="alert alert-info">
+        <p>No models found. Try adjusting your search filters.</p>
+    </div>
+    {{else}}
+    {{range .Models}}
+    <div class="model-card" data-model-id="{{.ID}}">
+        <div class="model-header">
+            <h3>{{.ID}}</h3>
+            <div class="model-badges">
+                {{if .HasGGUF}}
+                <span class="badge badge-success">GGUF</span>
+                {{end}}
+                {{if .ParameterSize}}
+                <span class="badge badge-info">{{.ParameterSize}}</span>
+                {{end}}
+                {{if .PipelineTag}}
+                <span class="badge badge-secondary">{{.PipelineTag}}</span>
+                {{end}}
+            </div>
+        </div>
+        
+        <div class="model-stats">
+            <div class="stat">
+                <span class="stat-icon">⬇️</span>
+                <span class="stat-value">{{.Downloads}}</span>
+                <span class="stat-label">downloads</span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">❤️</span>
+                <span class="stat-value">{{.Likes}}</span>
+                <span class="stat-label">likes</span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">📦</span>
+                <span class="stat-value">{{len .GGUFFiles}}</span>
+                <span class="stat-label">GGUF files</span>
+            </div>
+        </div>
+        
+        <div class="model-tags">
+            {{range .Tags}}
+            <span class="tag">{{.}}</span>
+            {{end}}
+        </div>
+        
+        <div class="model-actions">
+            <button 
+                class="btn btn-sm btn-primary"
+                hx-get="/api/ui/huggingface/models/{{.ID}}"
+                hx-target="#model-details-modal-content"
+                hx-swap="innerHTML"
+                onclick="showHFModal('model-details-modal')"
+            >
+                View Details
+            </button>
+            
+            {{if .HasGGUF}}
+            <button 
+                class="btn btn-sm btn-success"
+                hx-get="/api/ui/huggingface/gguf-files/{{.ID}}"
+                hx-target="#download-modal-content"
+                hx-swap="innerHTML"
+                onclick="showHFModal('download-modal')"
+            >
+                Download
+            </button>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+    {{end}}
+</div>
+
+<style>
+.models-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.model-card {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.2s;
+}
+
+.model-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.model-header h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    color: var(--text-primary, #333);
+    word-break: break-word;
+}
+
+.model-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.badge-secondary {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.model-stats {
+    display: flex;
+    justify-content: space-between;
+    margin: 1rem 0;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.stat-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary, #333);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #666);
+    text-transform: uppercase;
+}
+
+.model-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    min-height: 2rem;
+}
+
+.tag {
+    padding: 0.25rem 0.5rem;
+    background: var(--tag-bg, #f5f5f5);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #666);
+}
+
+.model-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.875rem;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+</style>
+

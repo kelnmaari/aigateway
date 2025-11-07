@@ -30,6 +30,7 @@ import (
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
+	"aigateway/internal/huggingface"
 	"aigateway/internal/metrics"
 	"aigateway/internal/models"
 	"aigateway/internal/observability"
@@ -165,10 +166,14 @@ type Router struct {
 	registryUIHandler  *handlersUI.RegistryUIHandler
 	apiKeysUIHandler   *handlersUI.APIKeysUIHandler
 	tenantsUIHandler   *handlersUI.TenantsUIHandler
-	monitorUIHandler   *handlersUI.MonitorUIHandler   // Monitor UI (GPU, Audit, Usage) - HTMX-02
-	usersUIHandler     *handlersUI.UsersUIHandler     // Users UI (HTMX-03)
-	rbacUIHandler      *handlersUI.RBACUIHandler      // RBAC UI (HTMX-03)
-	dashboardUIHandler *handlersUI.DashboardUIHandler // Dashboard UI (HTMX-03)
+	monitorUIHandler   *handlersUI.MonitorUIHandler      // Monitor UI (GPU, Audit, Usage) - HTMX-02
+	usersUIHandler     *handlersUI.UsersUIHandler        // Users UI (HTMX-03)
+	rbacUIHandler      *handlersUI.RBACUIHandler         // RBAC UI (HTMX-03)
+	dashboardUIHandler *handlersUI.DashboardUIHandler    // Dashboard UI (HTMX-03)
+	
+	// Hugging Face Integration (Version 3.0.0+: HF-01)
+	hfClient           *huggingface.Client
+	hfUIHandler        *handlersUI.HuggingFaceUIHandler  // Hugging Face Model Browser
 }
 
 // NewOptions содержит опции для создания роутера
@@ -1806,6 +1811,14 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			r.dashboardUIHandler = handlersUI.NewDashboardUIHandler(r.db, logger)             // HTMX-03: Dashboard UI
 			logger.Info("✅ HTMX UI handlers initialized successfully")
 		}
+	}
+	
+	// Hugging Face Integration (Version 3.0.0+: HF-01)
+	hfAPIToken := cfg.HuggingFace.APIToken // Add to config
+	r.hfClient = huggingface.NewClient(hfAPIToken, logger)
+	if r.templateRenderer != nil {
+		r.hfUIHandler = handlersUI.NewHuggingFaceUIHandler(r.hfClient, r.templateRenderer, logger)
+		logger.Info("✅ Hugging Face browser initialized")
 	}
 }
 

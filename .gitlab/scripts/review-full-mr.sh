@@ -130,15 +130,25 @@ if [ "$FILES_COUNT" -gt 1 ]; then
           {"role": "user", "content": $user}
         ],
         "temperature": 0.1,
-        "max_tokens": 3000,
+        "max_tokens": 10000,
         "stream": false
       }')
+    
+    # DEBUG: Выводим запрос
+    echo "   🔍 DEBUG REQUEST:"
+    echo "$REQUEST_JSON" | jq -C '.' | head -50
+    echo ""
     
     # Отправляем запрос
     RESPONSE=$(curl -s -X POST "$PROXY_URL" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $PROXY_API_KEY" \
       -d "$REQUEST_JSON")
+    
+    # DEBUG: Выводим ответ
+    echo "   🔍 DEBUG RESPONSE:"
+    echo "$RESPONSE" | jq -C '.'
+    echo ""
     
     # Проверяем ошибки
     ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
@@ -373,7 +383,7 @@ Full MR diff для анализа:\n\n$DIFF_TEXT" \
         {"role": "user", "content": $user}
       ],
       "temperature": 0.1,
-      "max_tokens": 4000,
+      "max_tokens": 10000,
       "stream": false
     }')
   

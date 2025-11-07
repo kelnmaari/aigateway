@@ -133,23 +133,17 @@ analyze_latest_commit:
       
       echo "📄 Report file created: $REPORT_FILE"
       
-      # Загружаем файл в GitLab
-      echo "📤 Uploading report file to GitLab..."
-      UPLOAD_RESULT=$(curl -s --request POST \
-        --header "PRIVATE-TOKEN: $API_TOKEN" \
-        --form "file=@$REPORT_FILE" \
-        "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/uploads")
+      # Формируем ссылку на артефакт (файл сохранится автоматически через artifacts:)
+      echo "🔗 Generating artifact link..."
+      ARTIFACT_FILE_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/file/$REPORT_FILE"
+      ARTIFACT_RAW_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/raw/$REPORT_FILE?inline=false"
       
-      UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESULT" | jq -r '.markdown // empty')
-      UPLOAD_URL=$(echo "$UPLOAD_RESULT" | jq -r '.url // empty')
+      echo "✅ Artifact will be available at:"
+      echo "   📄 View: $ARTIFACT_FILE_URL"
+      echo "   💾 Download: $ARTIFACT_RAW_URL"
       
-      if [ -n "$UPLOAD_URL" ]; then
-        echo "✅ File uploaded: $UPLOAD_URL"
-        FULL_REPORT_LINK="[📄 Полный отчет]($CI_SERVER_URL/$CI_PROJECT_PATH$UPLOAD_URL)"
-      else
-        echo "⚠️ Failed to upload file"
-        FULL_REPORT_LINK=""
-      fi
+      # Ссылки для комментария
+      FULL_REPORT_LINK="[📄 Просмотр]($ARTIFACT_FILE_URL) | [💾 Скачать]($ARTIFACT_RAW_URL)"
       
       # Проверяем длину ответа (GitLab лимит ~64KB на комментарий)
       RESPONSE_LENGTH=$(echo "$AI_RESPONSE" | wc -c)
@@ -494,23 +488,17 @@ analyze_full_mr:
       
       echo "📄 Report file created: $REPORT_FILE"
       
-      # Загружаем файл в GitLab
-      echo "📤 Uploading full MR report to GitLab..."
-      UPLOAD_RESULT=$(curl -s --request POST \
-        --header "PRIVATE-TOKEN: $API_TOKEN" \
-        --form "file=@$REPORT_FILE" \
-        "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/uploads")
+      # Формируем ссылку на артефакт (файл сохранится автоматически через artifacts:)
+      echo "🔗 Generating artifact link..."
+      ARTIFACT_FILE_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/file/$REPORT_FILE"
+      ARTIFACT_RAW_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/raw/$REPORT_FILE?inline=false"
       
-      UPLOAD_URL=$(echo "$UPLOAD_RESULT" | jq -r '.url // empty')
+      echo "✅ Artifact will be available at:"
+      echo "   📄 View: $ARTIFACT_FILE_URL"
+      echo "   💾 Download: $ARTIFACT_RAW_URL"
       
-      if [ -n "$UPLOAD_URL" ]; then
-        echo "✅ File uploaded: $UPLOAD_URL"
-        # GitLab API уже возвращает путь типа /uploads/..., добавляем только server URL
-        FULL_REPORT_LINK="[📄 Полный отчет MR]($CI_SERVER_URL$UPLOAD_URL)"
-      else
-        echo "⚠️ Failed to upload file"
-        FULL_REPORT_LINK=""
-      fi
+      # Ссылки для комментария
+      FULL_REPORT_LINK="[📄 Просмотр]($ARTIFACT_FILE_URL) | [💾 Скачать]($ARTIFACT_RAW_URL)"
       
       # Формируем комментарий (ограничиваем длину для читаемости)
       RESPONSE_LENGTH=$(echo "$AI_RESPONSE" | wc -c)

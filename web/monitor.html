@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitor - AIGateway</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/monitor.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>🖥️ System Monitor</h1>
+                    <p class="page-description">Real-time GPU and system performance monitoring</p>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span class="live-indicator">
+                        <span class="live-dot"></span>
+                        Live (updates every 5s)
+                    </span>
+                    <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+                </div>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                
+                <!-- GPU Metrics Section -->
+                <section class="monitor-section">
+                    <div class="section-header">
+                        <h2>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                <rect x="4" y="4" width="16" height="16" rx="2" ry="2" stroke-width="2"/>
+                                <rect x="9" y="9" width="6" height="6" stroke-width="2"/>
+                                <line x1="9" y1="1" x2="9" y2="4" stroke-width="2"/>
+                                <line x1="15" y1="1" x2="15" y2="4" stroke-width="2"/>
+                                <line x1="9" y1="20" x2="9" y2="23" stroke-width="2"/>
+                                <line x1="15" y1="20" x2="15" y2="23" stroke-width="2"/>
+                                <line x1="20" y1="9" x2="23" y2="9" stroke-width="2"/>
+                                <line x1="20" y1="14" x2="23" y2="14" stroke-width="2"/>
+                                <line x1="1" y1="9" x2="4" y2="9" stroke-width="2"/>
+                                <line x1="1" y1="14" x2="4" y2="14" stroke-width="2"/>
+                            </svg>
+                            GPU Metrics
+                        </h2>
+                        <span class="refresh-timer" id="gpu-refresh-timer">Next update in 5s</span>
+                    </div>
+                    
+                    <!-- HTMX Polling Container -->
+                    <div 
+                        id="gpu-metrics-container"
+                        hx-get="/ui/monitor/gpu-metrics"
+                        hx-trigger="load, every 5s"
+                        hx-swap="innerHTML"
+                        hx-indicator="#gpu-loading">
+                        <div class="loading-container">
+                            <div class="loading"></div>
+                            <p>Loading GPU metrics...</p>
+                        </div>
+                    </div>
+                    <div id="gpu-loading" class="htmx-indicator loading-overlay">
+                        <div class="loading"></div>
+                    </div>
+                </section>
+
+                <!-- System Resources Section -->
+                <section class="monitor-section">
+                    <div class="section-header">
+                        <h2>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                                <line x1="12" y1="6" x2="12" y2="12" stroke-width="2"/>
+                                <line x1="12" y1="12" x2="15.5" y2="15.5" stroke-width="2"/>
+                            </svg>
+                            System Resources
+                        </h2>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <!-- CPU Usage -->
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"/>
+                                    <rect x="9" y="9" width="6" height="6" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">CPU Usage</div>
+                                <div class="stat-value" id="stat-cpu">-</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Memory Usage -->
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a855f7">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Memory Usage</div>
+                                <div class="stat-value" id="stat-memory">-</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Connections -->
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(16, 163, 127, 0.1);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-width="2"/>
+                                    <circle cx="9" cy="7" r="4" stroke-width="2"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Active Requests</div>
+                                <div class="stat-value" id="stat-active-requests">-</div>
+                            </div>
+                        </div>
+
+                        <!-- Uptime -->
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e">
+                                    <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                                    <polyline points="12 6 12 12 16 14" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Server Uptime</div>
+                                <div class="stat-value" id="stat-uptime">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Request Rate Section -->
+                <section class="monitor-section">
+                    <div class="section-header">
+                        <h2>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="vertical-align: middle; margin-right: 8px;">
+                                <line x1="12" y1="20" x2="12" y2="10" stroke-width="2"/>
+                                <line x1="18" y1="20" x2="18" y2="4" stroke-width="2"/>
+                                <line x1="6" y1="20" x2="6" y2="16" stroke-width="2"/>
+                            </svg>
+                            Request Rate (Last 60s)
+                        </h2>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-label">Requests/sec</div>
+                                <div class="stat-value" id="stat-rps">-</div>
+                                <div class="stat-trend trend-up" id="rps-trend">-</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-label">Avg Response Time</div>
+                                <div class="stat-value" id="stat-response-time">-</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-label">Success Rate</div>
+                                <div class="stat-value" id="stat-success-rate">-</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-label">Error Rate</div>
+                                <div class="stat-value" id="stat-error-rate">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <!-- Auth Guard MUST be loaded FIRST to protect the page -->
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/monitor.js"></script>
+</body>
+</html>
+

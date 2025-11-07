@@ -2,6 +2,7 @@ package templates
 
 import (
 	"embed"
+	"errors"
 	"html/template"
 	"io"
 	"path/filepath"
@@ -91,7 +92,7 @@ func (r *Renderer) RenderPage(w io.Writer, contentTemplate string, data interfac
 	// Clone base template and add content
 	baseTmpl, exists := r.templates["base"]
 	if !exists {
-		return template.ErrNoFiles
+		return errors.New("base template not found")
 	}
 
 	tmpl, err := baseTmpl.Clone()

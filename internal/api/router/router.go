@@ -165,6 +165,7 @@ type Router struct {
 	registryUIHandler    *handlers.RegistryUIHandler
 	apiKeysUIHandler     *handlers.APIKeysUIHandler
 	tenantsUIHandler     *handlers.TenantsUIHandler
+	monitorUIHandler     *handlersUI.MonitorUIHandler // Monitor UI (GPU, Audit, Usage) - HTMX-02
 }
 
 // NewOptions содержит опции для создания роутера
@@ -602,6 +603,16 @@ func (r *Router) setupUIRoutes() {
 			tenants.GET("/:id", r.tenantsUIHandler.GetTenantDetails)
 			tenants.GET("/:id/edit", r.tenantsUIHandler.GetEditTenantForm)
 			tenants.GET("/:id/members", r.tenantsUIHandler.GetTenantMembers)
+		}
+
+		// Monitor UI (HTMX-02: Live Updates & Real-time Features)
+		if r.monitorUIHandler != nil {
+			monitor := ui.Group("/monitor")
+			{
+				monitor.GET("/gpu-metrics", r.monitorUIHandler.RenderGPUMetrics)
+				monitor.GET("/audit-logs", r.monitorUIHandler.RenderAuditLogRows)
+				monitor.GET("/usage-stats", r.monitorUIHandler.RenderUsageStats)
+			}
 		}
 	}
 
@@ -1744,6 +1755,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			r.registryUIHandler = handlersUI.NewRegistryUIHandler(r.db, r.templateRenderer, logger)
 			r.apiKeysUIHandler = handlersUI.NewAPIKeysUIHandler(r.db, r.templateRenderer, logger)
 			r.tenantsUIHandler = handlersUI.NewTenantsUIHandler(r.db, r.templateRenderer, logger)
+			r.monitorUIHandler = handlersUI.NewMonitorUIHandler(logger, r.gpuMonitor) // HTMX-02: Monitor UI
 			logger.Info("✅ HTMX UI handlers initialized successfully")
 		}
 	}

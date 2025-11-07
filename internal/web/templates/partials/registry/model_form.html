@@ -36,7 +36,9 @@
         <select id="provider_id" name="provider_id" required>
             <option value="">Select provider...</option>
             {{range .Providers}}
-            <option value="{{.}}" {{if and $.Model (eq $.Model.ProviderID .)}}}selected{{end}}>{{.}}</option>
+            <option value="{{.ID}}" {{if and $.Model (eq $.Model.ProviderID .ID)}}selected{{end}}>
+                {{.Name}} ({{.ProviderType}})
+            </option>
             {{end}}
         </select>
         <small>Provider that hosts this model</small>

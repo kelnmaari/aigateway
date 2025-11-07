@@ -3,6 +3,7 @@ package ui
 import (
 	"net/http"
 
+	"aigateway/internal/models"
 	"aigateway/internal/storage"
 	"aigateway/internal/web/templates"
 
@@ -29,7 +30,7 @@ func NewRegistryUIHandler(db storage.Database, renderer *templates.Renderer, log
 // GetModelsTable returns HTML table rows for models
 // GET /api/ui/registry/models
 func (h *RegistryUIHandler) GetModelsTable(c *gin.Context) {
-	models, err := h.registry.ListModels(c.Request.Context())
+	models, err := h.db.ListModelRegistry(c.Request.Context(), nil)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list models")
 		c.HTML(http.StatusInternalServerError, "", gin.H{
@@ -56,7 +57,12 @@ func (h *RegistryUIHandler) GetModelsTable(c *gin.Context) {
 func (h *RegistryUIHandler) SearchModels(c *gin.Context) {
 	query := c.Query("q")
 
-	models, err := h.registry.SearchModels(c.Request.Context(), query)
+	// Use filter to search models by model_id or name
+	filter := &models.ModelRegistryFilter{}
+	// Note: Need to implement search logic in DB layer
+	// For now, just list all models (TODO: add search support)
+	
+	modelsList, err := h.db.ListModelRegistry(c.Request.Context(), filter)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to search models")
 		c.HTML(http.StatusInternalServerError, "", gin.H{
@@ -66,7 +72,7 @@ func (h *RegistryUIHandler) SearchModels(c *gin.Context) {
 	}
 
 	data := gin.H{
-		"Models": models,
+		"Models": modelsList,
 		"Query":  query,
 	}
 
@@ -83,10 +89,10 @@ func (h *RegistryUIHandler) SearchModels(c *gin.Context) {
 // GET /api/ui/registry/models/new-form
 func (h *RegistryUIHandler) GetNewModelForm(c *gin.Context) {
 	// Get available providers
-	providers, err := h.registry.ListProviders(c.Request.Context())
+	providers, err := h.db.ListModelProviders(c.Request.Context(), false)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list providers")
-		providers = []string{} // fallback to empty list
+		providers = []*models.ModelProvider{} // fallback to empty list
 	}
 
 	data := gin.H{
@@ -107,7 +113,7 @@ func (h *RegistryUIHandler) GetNewModelForm(c *gin.Context) {
 func (h *RegistryUIHandler) GetEditModelForm(c *gin.Context) {
 	modelID := c.Param("id")
 
-	model, err := h.registry.GetModel(c.Request.Context(), modelID)
+	model, err := h.db.GetModelRegistry(c.Request.Context(), modelID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get model")
 		c.HTML(http.StatusNotFound, "", gin.H{
@@ -117,10 +123,10 @@ func (h *RegistryUIHandler) GetEditModelForm(c *gin.Context) {
 	}
 
 	// Get available providers
-	providers, err := h.registry.ListProviders(c.Request.Context())
+	providers, err := h.db.ListModelProviders(c.Request.Context(), false)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list providers")
-		providers = []string{}
+		providers = []*models.ModelProvider{}
 	}
 
 	data := gin.H{

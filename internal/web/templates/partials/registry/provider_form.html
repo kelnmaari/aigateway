@@ -1,0 +1,80 @@
+<div class="modal-header">
+    <h3>Add New Provider</h3>
+    <button class="btn-close" onclick="closeModal()">✕</button>
+</div>
+
+<form hx-post="/api/admin/registry/providers"
+      hx-target="#providers-list"
+      hx-swap="beforeend"
+      hx-on::after-request="closeModal(); showToast('Provider created successfully', 'success')">
+    
+    <div class="form-group">
+        <label for="name">Provider Name *</label>
+        <input type="text" 
+               id="name" 
+               name="name" 
+               placeholder="e.g., My Ollama Server"
+               required>
+        <small>Human-readable name for this provider</small>
+    </div>
+
+    <div class="form-group">
+        <label for="provider_type">Provider Type *</label>
+        <select id="provider_type" name="provider_type" required>
+            <option value="">Select type...</option>
+            <option value="ollama">Ollama</option>
+            <option value="vllm">vLLM</option>
+            <option value="openai">OpenAI Compatible</option>
+        </select>
+        <small>Type of model provider</small>
+    </div>
+
+    <div class="form-group">
+        <label for="base_url">Base URL *</label>
+        <input type="url" 
+               id="base_url" 
+               name="base_url" 
+               placeholder="e.g., http://localhost:11434"
+               required>
+        <small>Provider API endpoint</small>
+    </div>
+
+    <div class="form-group">
+        <label for="api_key">API Key</label>
+        <input type="password" 
+               id="api_key" 
+               name="api_key" 
+               placeholder="Optional API key">
+        <small>Leave empty if provider doesn't require authentication</small>
+    </div>
+
+    <div class="form-group">
+        <label for="priority">Priority</label>
+        <input type="number" 
+               id="priority" 
+               name="priority" 
+               min="1"
+               max="1000"
+               value="100"
+               placeholder="100">
+        <small>Higher priority = used first (1-1000, default: 100)</small>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="enabled" value="true" checked>
+            Enable provider
+        </label>
+        <small>Uncheck to create disabled provider</small>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">
+            ➕ Create Provider
+        </button>
+    </div>
+</form>
+

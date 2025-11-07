@@ -79,7 +79,7 @@ analyze_latest_commit:
             {"role": "user", "content": $user}
           ],
           "temperature": 0.3,
-          "max_tokens": 1500,
+          "max_tokens": 5000,
           "stream": false
         }')
       
@@ -315,27 +315,27 @@ analyze_full_mr:
         echo "Debug Response:"
         echo "$RESPONSE" | jq '.'
         
-        # Создаем fallback отчет
-        AI_RESPONSE="## ⚠️ AI Review Failed
+        # Создаем fallback отчет (используем переменные для безопасности)
+        AI_RESPONSE="## AI Review Failed
 
-Модель \`$REVIEW_MODEL\` вернула пустой ответ.
+Модель $REVIEW_MODEL вернула пустой ответ.
 
-**Debug Info:**
+Debug Info:
 - Prompt tokens: $PROMPT_TOKENS
 - Completion tokens: $COMPLETION_TOKENS  
 - Model: $REVIEW_MODEL
 
-**Рекомендации:**
+Рекомендации:
 1. Попробуйте другую модель в переменной REVIEW_MODEL:
-   - \`qwen2.5-coder:7b\` (рекомендуется для Go)
-   - \`deepseek-coder:6.7b\` (быстрая альтернатива)
-   - \`codellama:7b\` (универсальная)
+   - qwen2.5-coder:7b (рекомендуется для Go)
+   - deepseek-coder:6.7b (быстрая альтернатива)
+   - codellama:7b (универсальная)
 
-2. Проверьте что модель загружена: \`ollama list\`
+2. Проверьте что модель загружена: ollama list
 
 3. Проверьте логи Ollama на сервере прокси
 
-**Diff Stats:**
+Diff Stats:
 - Size: $(echo "$DIFF_TEXT" | wc -c) bytes
 - Files changed: $(echo "$DIFF_RAW" | jq -r '.changes | length // 0')
 "

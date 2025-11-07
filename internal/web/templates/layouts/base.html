@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - AIGateway</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/themes.css">
+    <script src="/js/htmx.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        {{template "content" .}}
+    </div>
+    
+    <!-- Toast notifications container -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <!-- Modal container for HTMX -->
+    <div id="modal-container" class="modal-overlay" style="display: none;">
+        <div id="modal-content" class="modal-content"></div>
+    </div>
+    
+    <script>
+        // Helper functions for HTMX
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            // Close modal on successful form submission
+            if (evt.detail.successful && evt.detail.target.id === 'modal-content') {
+                closeModal();
+            }
+        });
+        
+        function closeModal() {
+            document.getElementById('modal-container').style.display = 'none';
+            document.getElementById('modal-content').innerHTML = '';
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            document.getElementById('toast-container').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+

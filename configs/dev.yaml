@@ -224,7 +224,7 @@ models:
     
     # Модели для preload (добавь нужные модели)
     models:
-      - "deepseek-r1:1.5b"
+      - "llama3.2:3b"
       # - "qwen2.5:latest"
       # - "mxbai-embed-large:latest"
     
@@ -536,3 +536,74 @@ model_registry:
   health_check:
     enabled: true  # Периодическая проверка здоровья providers
     interval: "5m"  # Интервал между health checks
+
+# ================================================================================
+# Agentic AI Configuration (Version 2.5.0+: AGENT-01)
+# ================================================================================
+agent:
+  enabled: true  # Включить Agent систему
+  
+  # Planning Model Configuration
+  # ⚠️ ВАЖНО: Модель должна поддерживать structured JSON output для planning
+  plan_model: "llama3.2:3b"  # Модель для task planning и reasoning
+  
+  # Recommended Models (в порядке приоритета):
+  # 1. qwen2.5:7b     - ✅ Лучшая для JSON generation и reasoning (РЕКОМЕНДУЕТСЯ)
+  # 2. llama3.2:3b    - ✅ Хороший баланс скорость/качество
+  # 3. mistral:7b     - ✅ Стабильная для structured output
+  # 4. deepseek-r1:1.5b - ⚠️ Может давать некорректный JSON (не рекомендуется)
+  
+  # Reasoning Configuration
+  reasoning:
+    max_iterations: 10  # Максимальное количество ReAct loop iterations
+    temperature: 0.3  # Низкая temperature для deterministic reasoning
+    top_p: 0.9
+    num_predict: 512  # Ограничение длины response для faster iterations
+    timeout: "120s"  # Таймаут на одну reasoning operation
+  
+  # Tool Configuration
+  tools:
+    enabled: true
+    base_dir: "."  # Базовая директория для file operations (security boundary)
+    
+    # File Tools
+    file:
+      read_enabled: true
+      write_enabled: true
+      delete_enabled: true
+      list_enabled: true
+      max_file_size: "10MB"
+    
+    # Terminal Tools
+    terminal:
+      enabled: false  # ⚠️ ОПАСНО: включать только в trusted environments
+      allowed_commands: []  # Whitelist команд (empty = all allowed if enabled)
+    
+    # MCP Tools (Model Context Protocol)
+    mcp:
+      enabled: true
+      discovery_interval: "5m"  # Интервал поиска новых MCP servers
+  
+  # Safety & Approval Configuration
+  safety:
+    approval_required: true  # Требовать одобрение для dangerous operations
+    dangerous_operations:
+      - "file.delete"
+      - "file.write"
+      - "terminal.execute"
+    
+    # Auto-approve for safe operations
+    auto_approve_safe: true
+    safe_operations:
+      - "file.read"
+      - "file.list"
+  
+  # Loop Detection
+  loop_detection:
+    enabled: true
+    max_identical_actions: 2  # Trigger completion после N одинаковых действий
+  
+  # Event Streaming
+  streaming:
+    enabled: true  # WebSocket streaming для real-time updates
+    buffer_size: 100  # Размер буфера для events

@@ -30,17 +30,19 @@ import (
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
 	"aigateway/internal/metrics"
+	"aigateway/internal/models"
 	"aigateway/internal/observability"
+	"aigateway/internal/providers"
+	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/request"
+	"aigateway/internal/services/agent"
 	"aigateway/internal/services/audit"
 	"aigateway/internal/services/model"
 	"aigateway/internal/services/quota"
 	ragservice "aigateway/internal/services/rag"
-	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/storage"
 	"aigateway/internal/websocket"
-	"aigateway/internal/providers"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -67,41 +69,42 @@ type Router struct {
 	bootstrapService *authService.BootstrapService // Bootstrap service для первичной настройки
 
 	// Handlers
-	healthHandler         *handlers.HealthHandler
-	systemHandler         *handlers.SystemHandler       // System endpoints (bootstrap, init-status)
-	authHandler           *handlers.AuthHandler         // Auth endpoints (login, register, etc)
-	deviceHandler         *handlers.DeviceHandler       // Device management (Version 2.4.0+)
-	userHandler           *handlers.UserHandler         // User management
-	tenantHandler         *handlers.TenantHandler       // Tenant management
+	healthHandler             *handlers.HealthHandler
+	systemHandler             *handlers.SystemHandler             // System endpoints (bootstrap, init-status)
+	authHandler               *handlers.AuthHandler               // Auth endpoints (login, register, etc)
+	deviceHandler             *handlers.DeviceHandler             // Device management (Version 2.4.0+)
+	userHandler               *handlers.UserHandler               // User management
+	tenantHandler             *handlers.TenantHandler             // Tenant management
 	conversationHandler       *handlers.ConversationHandler       // Conversation management (Version 1.3.0)
 	conversationExportHandler *handlers.ConversationExportHandler // Conversation export/import (Version 1.12.3+)
 	adminUserHandler          *handlers.AdminUserHandler          // Admin User Management (Version 1.3.0)
 	usageHandler              *handlers.UsageHandler              // Usage Statistics (Version 1.3.0)
-	modelsHandler         *handlers.ModelsHandler
-	modelPreloadHandler   *handlers.ModelPreloadHandler // Model Preload Management (Version 1.12.1+)
-	chatHandler           *handlers.ChatHandler
-	embeddingsHandler     *handlers.EmbeddingsHandler
-	completionsHandler    *handlers.CompletionsHandler
-	adminHandler          *handlers.AdminHandler
-	adminFilesHandler     *handlers.AdminFilesHandler     // Admin files management (v1.10.0)
-	statsHandler          *handlers.StatsHandler          // Handler для TUI статистики
-	configHandler         *handlers.ConfigHandler         // Handler для конфигурации
-	logsHandler           *handlers.LogsHandler           // Handler для логов
-	metricsHistoryHandler *handlers.MetricsHistoryHandler // Handler для historical metrics
-	requestsHandler       *handlers.RequestsHandler       // Handler для request monitoring (TUI-04)
-	mcpHandler            *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
-	changelogHandler      *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
-	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
-	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
-	fileHandler           *handlers.FileHandler           // Handler для file operations (v1.10.0)
-	oidcHandler           *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
-	ldapHandler           *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
-	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
-	rbacHandler           *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
-	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
-	invitationHandler     *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
-	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
-	registryHandler       *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
+	modelsHandler             *handlers.ModelsHandler
+	modelPreloadHandler       *handlers.ModelPreloadHandler // Model Preload Management (Version 1.12.1+)
+	chatHandler               *handlers.ChatHandler
+	embeddingsHandler         *handlers.EmbeddingsHandler
+	completionsHandler        *handlers.CompletionsHandler
+	adminHandler              *handlers.AdminHandler
+	adminFilesHandler         *handlers.AdminFilesHandler     // Admin files management (v1.10.0)
+	statsHandler              *handlers.StatsHandler          // Handler для TUI статистики
+	configHandler             *handlers.ConfigHandler         // Handler для конфигурации
+	logsHandler               *handlers.LogsHandler           // Handler для логов
+	metricsHistoryHandler     *handlers.MetricsHistoryHandler // Handler для historical metrics
+	requestsHandler           *handlers.RequestsHandler       // Handler для request monitoring (TUI-04)
+	mcpHandler                *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
+	changelogHandler          *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
+	backupHandler             *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
+	performanceHandler        *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
+	fileHandler               *handlers.FileHandler           // Handler для file operations (v1.10.0)
+	oidcHandler               *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
+	ldapHandler               *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
+	auditHandler              *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
+	rbacHandler               *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
+	quotaHandler              *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
+	invitationHandler         *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
+	ragDataSourcesHandler     *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
+	registryHandler           *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
+	agentHandler              *handlers.AgentHandler          // Handler для Agent API (AGENT-01, v2.5.0)
 
 	// Provider Management (Version 2.3.0+: REGISTRY-01)
 	providerManager *providers.ProviderManager // Model providers manager
@@ -147,10 +150,13 @@ type Router struct {
 
 	// Model Preloading (Version 1.12.1+: Model Preloading & Warming)
 	modelPreloader *model.ModelPreloader
-	
+
 	// RAG System (Version 1.13.0+: RAG System)
 	ragDataSourceService *ragservice.DataSourceService
-	ragOrchestrator      *ragorchestrator.RAGOrchestrator
+
+	// Agent Service (Version 2.5.0+: AGENT-01)
+	agentService    *agent.Service
+	ragOrchestrator *ragorchestrator.RAGOrchestrator
 }
 
 // NewOptions содержит опции для создания роутера
@@ -163,11 +169,11 @@ type NewOptions struct {
 	TracerProvider       *observability.TracerProvider     // Опциональный OpenTelemetry tracer (v1.6.0+)
 	PerformanceMonitor   *observability.PerformanceMonitor // Опциональный performance monitor (v1.6.2+)
 	LeakDetector         *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
-	MonigoPort           int                                  // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
-	GPUMonitor           *metrics.GPUMonitor                  // Опциональный GPU monitor (v1.9.3+)
-	ModelPreloader       *model.ModelPreloader                // Опциональный model preloader (v1.12.1+)
-	RAGDataSourceService *ragservice.DataSourceService        // Опциональный RAG Data Source Service (v1.13.1+)
-	RAGOrchestrator      *ragorchestrator.RAGOrchestrator // Опциональный RAG Orchestrator (v1.13.1+)
+	MonigoPort           int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
+	GPUMonitor           *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
+	ModelPreloader       *model.ModelPreloader             // Опциональный model preloader (v1.12.1+)
+	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
+	RAGOrchestrator      *ragorchestrator.RAGOrchestrator  // Опциональный RAG Orchestrator (v1.13.1+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -331,9 +337,9 @@ func (r *Router) setupMiddleware() {
 	store := cookie.NewStore(sessionSecret)
 	store.Options(sessions.Options{
 		Path:     "/",
-		MaxAge:   3600,    // 1 hour
-		HttpOnly: true,    // Protect against XSS
-		Secure:   false,   // Set to true in production with HTTPS
+		MaxAge:   3600,  // 1 hour
+		HttpOnly: true,  // Protect against XSS
+		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
 	})
 	r.engine.Use(sessions.Sessions("ollama_session", store))
@@ -416,10 +422,10 @@ func (r *Router) setupRoutes() {
 	r.setupWebUIRoutes()          // WebUI static files (Version 1.3.0+)
 	r.setupOpenAIRoutes()
 	r.setupAdminRoutes()
-	r.setupInvitationsRoutes()    // Invitation System (AUTH-03, v2.2.0)
-	r.setupMCPRoutes()  // MCP Servers Catalog (v1.4.5)
-	r.setupGPURoutes()  // GPU Monitoring (v1.9.3)
-	r.setupFileRoutes() // File Storage & Processing (v1.10.0)
+	r.setupInvitationsRoutes() // Invitation System (AUTH-03, v2.2.0)
+	r.setupMCPRoutes()         // MCP Servers Catalog (v1.4.5)
+	r.setupGPURoutes()         // GPU Monitoring (v1.9.3)
+	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
 }
 
 // setupHealthRoutes настраивает эндпоинты проверки здоровья
@@ -571,7 +577,7 @@ func (r *Router) setupRAGRoutes() {
 			sources.POST("/:id/sync", r.ragDataSourcesHandler.SyncSource)
 		}
 	}
-	
+
 	r.logger.Info("RAG System routes configured successfully")
 }
 
@@ -801,12 +807,12 @@ func (r *Router) setupConversationsRoutes() {
 		// Messages sub-routes
 		conversations.POST("/:id/messages", r.conversationHandler.CreateMessage) // Добавить сообщение
 		conversations.GET("/:id/messages", r.conversationHandler.ListMessages)   // Получить сообщения
-		
+
 		// Export/Import endpoints (Version 1.12.3+, v2.0.0 UI)
 		if r.conversationExportHandler != nil {
-			conversations.GET("/:id/export", r.conversationExportHandler.ExportConversation)           // Export conversation
-			conversations.POST("/import", r.conversationExportHandler.ImportConversation)              // Import conversation
-			conversations.POST("/bulk-export", r.conversationExportHandler.BulkExportConversations)  // Bulk export
+			conversations.GET("/:id/export", r.conversationExportHandler.ExportConversation)        // Export conversation
+			conversations.POST("/import", r.conversationExportHandler.ImportConversation)           // Import conversation
+			conversations.POST("/bulk-export", r.conversationExportHandler.BulkExportConversations) // Bulk export
 		}
 	}
 
@@ -855,17 +861,17 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/profile-devices.html", "./web/profile-devices.html") // Device Management (DESKTOP-02, v2.4.2)
 	r.engine.StaticFile("/tenants.html", "./web/tenants.html")
 	r.engine.StaticFile("/api-keys.html", "./web/api-keys.html")
-	r.engine.StaticFile("/files.html", "./web/files.html") // Files Management (v1.10.0)
+	r.engine.StaticFile("/files.html", "./web/files.html")             // Files Management (v1.10.0)
 	r.engine.StaticFile("/rag-sources.html", "./web/rag-sources.html") // RAG Data Sources (v1.13.0)
 	r.engine.StaticFile("/usage.html", "./web/usage.html")
-	r.engine.StaticFile("/mcp.html", "./web/mcp.html")     // MCP Catalog (v1.4.5)
-	r.engine.StaticFile("/about.html", "./web/about.html") // About System (v1.4.11)
-	r.engine.StaticFile("/admin.html", "./web/admin.html") // Admin Panel (Version 1.3.0)
+	r.engine.StaticFile("/mcp.html", "./web/mcp.html")                             // MCP Catalog (v1.4.5)
+	r.engine.StaticFile("/about.html", "./web/about.html")                         // About System (v1.4.11)
+	r.engine.StaticFile("/admin.html", "./web/admin.html")                         // Admin Panel (Version 1.3.0)
 	r.engine.StaticFile("/admin-invitations.html", "./web/admin-invitations.html") // Invitations Management (AUTH-03, v2.2.0)
-	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html") // RBAC Management (v1.11.5)
-	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html") // Audit Log (v1.11.4)
-	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html") // RAG Management (v1.13.0)
-	r.engine.StaticFile("/admin-registry.html", "./web/admin-registry.html") // Model Registry (REGISTRY-03, v2.3.0)
+	r.engine.StaticFile("/admin-rbac.html", "./web/admin-rbac.html")               // RBAC Management (v1.11.5)
+	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html")             // Audit Log (v1.11.4)
+	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html")                 // RAG Management (v1.13.0)
+	r.engine.StaticFile("/admin-registry.html", "./web/admin-registry.html")       // Model Registry (REGISTRY-03, v2.3.0)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
@@ -960,6 +966,22 @@ func (r *Router) setupOpenAIRoutes() {
 // setupAdminRoutes настраивает административные API эндпоинты
 func (r *Router) setupAdminRoutes() {
 	r.logger.Info("Setting up admin routes")
+
+	// Agent API (AGENT-01, v2.5.0+) - hybrid auth (API Key or JWT Session)
+	r.logger.Info("Setting up Agent API routes (hybrid auth)")
+
+	// Agent routes use the same hybrid auth as chat (API Key or JWT Session)
+	agent := r.engine.Group("/api/agent")
+	agent.Use(middleware.HybridAuth(r.jwtManager, r.config, r.db, r.logger))
+	{
+		agent.POST("/plan", r.agentHandler.CreateSession)
+		agent.GET("/sessions/:id", r.agentHandler.GetSession)
+		agent.POST("/sessions/:id/cancel", r.agentHandler.CancelSession)
+		// TODO: Iteration 3 - agent.POST("/approvals/:id", r.agentHandler.RespondToApproval)
+		// TODO: Iteration 2 - agent.POST("/sessions/:id/execute/:step", r.agentHandler.ExecuteStep)
+	}
+	r.logger.Info("Agent API routes configured successfully")
+
 	admin := r.engine.Group("/api/admin")
 
 	// Admin routes require JWT authentication + admin role check (Version 1.3.0+)
@@ -1161,7 +1183,7 @@ func (r *Router) setupAdminRoutes() {
 	// Model Registry endpoints (v2.3.0+: REGISTRY-01)
 	if r.registryHandler != nil {
 		r.logger.Info("Admin routes: Registering Model Registry endpoints")
-		
+
 		// Provider Management
 		admin.GET("/registry/providers", r.registryHandler.ListProviders)
 		admin.POST("/registry/providers", r.registryHandler.CreateProvider)
@@ -1169,17 +1191,18 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/registry/providers/:id", r.registryHandler.GetProvider)
 		admin.PUT("/registry/providers/:id", r.registryHandler.UpdateProvider)
 		admin.DELETE("/registry/providers/:id", r.registryHandler.DeleteProvider)
-		
+
 		// Model Registry Management
 		admin.GET("/registry/models", r.registryHandler.ListModels)
 		admin.POST("/registry/models", r.registryHandler.RegisterModel)
 		admin.GET("/registry/models/:id", r.registryHandler.GetModel)
 		admin.PUT("/registry/models/:id", r.registryHandler.UpdateModel)
+
 		admin.DELETE("/registry/models/:id", r.registryHandler.DeleteModel)
-		
+
 		// Model Discovery
 		admin.POST("/registry/discover", r.registryHandler.DiscoverModels)
-		
+
 		// Registry Stats
 		admin.GET("/registry/stats", r.registryHandler.GetStats)
 	}
@@ -1306,11 +1329,11 @@ func (r *Router) setupInvitationsRoutes() {
 	}
 
 	{
-		adminInvitations.POST("", r.invitationHandler.CreateInvitation)            // Create invitation
-		adminInvitations.GET("", r.invitationHandler.ListInvitations)              // List invitations
-		adminInvitations.GET("/stats", r.invitationHandler.GetInvitationStats)     // Get statistics
-		adminInvitations.GET("/:id", r.invitationHandler.GetInvitationDetails)     // Get invitation details with user info
-		adminInvitations.DELETE("/:id", r.invitationHandler.RevokeInvitation)      // Revoke invitation
+		adminInvitations.POST("", r.invitationHandler.CreateInvitation)        // Create invitation
+		adminInvitations.GET("", r.invitationHandler.ListInvitations)          // List invitations
+		adminInvitations.GET("/stats", r.invitationHandler.GetInvitationStats) // Get statistics
+		adminInvitations.GET("/:id", r.invitationHandler.GetInvitationDetails) // Get invitation details with user info
+		adminInvitations.DELETE("/:id", r.invitationHandler.RevokeInvitation)  // Revoke invitation
 	}
 
 	r.logger.Info("Invitation routes configured successfully")
@@ -1327,7 +1350,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	if r.modelPreloader != nil {
 		r.modelPreloadHandler = handlers.NewModelPreloadHandler(logger, r.modelPreloader)
 	}
-	
+
 	// RAG Data Sources handler (v1.13.1+)
 	if r.ragDataSourceService != nil {
 		r.ragDataSourcesHandler = handlers.NewRAGDataSourcesHandler(r.ragDataSourceService, logger)
@@ -1392,10 +1415,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// OIDC/Keycloak SSO handler (Version 1.11.1+: Enterprise Suite)
 	if cfg.Auth.OIDC.Enabled && r.db != nil && r.jwtManager != nil {
 		logger.Info("Initializing OIDC provider...")
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		oidcProvider, err := oidcauth.NewOIDCProvider(ctx, &cfg.Auth.OIDC, logger)
 		if err != nil {
 			logger.WithError(err).Error("Failed to initialize OIDC provider")
@@ -1414,7 +1437,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// LDAP/Active Directory handler (Version 1.11.3+: Enterprise Suite)
 	if cfg.Auth.LDAP.Enabled && r.db != nil && r.jwtManager != nil {
 		logger.Info("Initializing LDAP client...")
-		
+
 		ldapClient, err := ldapauth.NewClient(&cfg.Auth.LDAP, logger)
 		if err != nil {
 			logger.WithError(err).Error("Failed to initialize LDAP client")
@@ -1472,6 +1495,43 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			logger.Info("Model Registry handler initialized successfully")
 		}
 
+		// Agent Service initialization (AGENT-01, v2.5.0)
+		agentCfg := agent.DefaultConfig()
+		r.agentService = agent.NewService(r.db, logger, agentCfg)
+
+		// Setup WebSocket event callback for agent real-time updates (AGENT-05, v2.5.0+)
+		r.agentService.SetEventCallback(func(event *models.AgentEvent) {
+			// Broadcast agent events через WebSocket
+			if r.eventBroadcaster != nil {
+				// Map AgentEvent to WebSocket event type
+				wsEventType := mapAgentEventToWebSocketType(event.Type)
+				if wsEventType != "" {
+					// Добавляем session_id в data
+					eventData := event.Data
+					if eventData == nil {
+						eventData = make(map[string]interface{})
+					}
+					eventData["session_id"] = event.SessionID
+
+					// Broadcast
+					err := r.eventBroadcaster.BroadcastAgentEvent(wsEventType, eventData)
+					if err != nil {
+						logger.WithError(err).WithField("event_type", event.Type).Warn("Failed to broadcast agent event")
+					}
+				}
+			}
+
+			// Также логируем для debug
+			logger.WithFields(logrus.Fields{
+				"type":       event.Type,
+				"session_id": event.SessionID,
+			}).Debug("Agent event emitted")
+		})
+
+		// Agent Handler initialization
+		r.agentHandler = handlers.NewAgentHandler(r.agentService, logger)
+		logger.Info("Agent Service and handler initialized successfully (v2.5.0)")
+
 		// Quota Middleware initialization
 		r.quotaMiddleware = middleware.NewQuotaMiddleware(r.quotaService, logger)
 		logger.Info("Quota middleware initialized successfully")
@@ -1485,8 +1545,8 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 
 		// Audit Retention Policy initialization
 		r.auditRetentionPolicy = audit.NewRetentionPolicy(r.db, logger).
-			WithRetentionPeriod(90 * 24 * time.Hour).  // 90 days retention
-			WithCleanupInterval(24 * time.Hour)         // Daily cleanup
+			WithRetentionPeriod(90 * 24 * time.Hour). // 90 days retention
+			WithCleanupInterval(24 * time.Hour)       // Daily cleanup
 		r.auditRetentionPolicy.Start()
 		logger.Info("Audit retention policy started (90 days retention, daily cleanup)")
 	} else {
@@ -1592,6 +1652,15 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// Настраиваем WebSocket handler (DESKTOP-03)
 	r.wsHandler.SetDatabase(r.db)
 	r.wsHandler.SetChatHandler(r.wsChatHandler)
+
+	// Enable agent support for WebSocket chat (v2.5.1+: Conversational Agent)
+	if r.agentService != nil && r.db != nil {
+		toolRegistry := r.agentService.GetToolRegistry()
+		if toolRegistry != nil {
+			r.wsChatHandler.SetAgentSupport(r.db, toolRegistry)
+			logger.Info("Agent support enabled for WebSocket chat handler")
+		}
+	}
 
 	// Event Broadcaster
 	r.eventBroadcaster = websocket.NewEventBroadcaster(r.wsHub)
@@ -1720,3 +1789,41 @@ func (r *Router) setupMCPRoutes() {
 	r.logger.Info("MCP routes configured successfully")
 }
 
+// ========================================
+// Helper Functions
+// ========================================
+
+// mapAgentEventToWebSocketType maps AgentEventType to websocket.EventType (AGENT-05, v2.5.0+)
+func mapAgentEventToWebSocketType(agentEventType models.AgentEventType) websocket.EventType {
+	switch agentEventType {
+	case models.AgentEventSessionCreated:
+		return websocket.EventTypeAgentSessionCreated
+	case models.AgentEventPlanningStarted:
+		return websocket.EventTypeAgentPlanningStarted
+	case models.AgentEventPlanningCompleted:
+		return websocket.EventTypeAgentPlanningCompleted
+	case models.AgentEventExecutionStarted:
+		return websocket.EventTypeAgentExecutionStarted
+	case models.AgentEventStepStarted:
+		return websocket.EventTypeAgentStepStarted
+	case models.AgentEventStepCompleted:
+		return websocket.EventTypeAgentStepCompleted
+	case models.AgentEventStepFailed:
+		return websocket.EventTypeAgentStepFailed
+	case models.AgentEventApprovalNeeded:
+		return websocket.EventTypeAgentApprovalNeeded
+	case models.AgentEventApprovalResponded:
+		return websocket.EventTypeAgentApprovalResponded
+	case models.AgentEventSessionCompleted:
+		return websocket.EventTypeAgentSessionCompleted
+	case models.AgentEventSessionFailed:
+		return websocket.EventTypeAgentSessionFailed
+	case models.AgentEventSessionCancelled:
+		return websocket.EventTypeAgentSessionCancelled
+	case models.AgentEventProgressUpdate:
+		return websocket.EventTypeAgentProgressUpdate
+	default:
+		// Unknown event type - не транслируем
+		return ""
+	}
+}

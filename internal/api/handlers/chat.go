@@ -160,6 +160,13 @@ func (h *ChatHandler) Completion(c *gin.Context) {
 		h.logger.Info("Successfully enriched message with RAG context")
 	}
 
+	// Agent Mode (v2.5.1+): Use conversational agent with ReAct loop
+	if req.AgentMode {
+		h.logger.WithField("model", req.Model).Info("Handling agent mode chat completion")
+		h.handleAgentChatCompletion(c, &req)
+		return
+	}
+
 	// Проверка поддержки streaming
 	if req.Stream {
 		h.logger.WithField("model", req.Model).Info("Handling streaming chat completion")

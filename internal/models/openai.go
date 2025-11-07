@@ -35,6 +35,13 @@ type ChatCompletionRequest struct {
 	RAGTopK     int      `json:"rag_top_k,omitempty"`    // Количество chunks для retrieval
 	RAGMinScore float64  `json:"rag_min_score,omitempty"` // Минимальный similarity score
 	RAGRerank   bool     `json:"rag_rerank,omitempty"`   // Применять reranking
+
+	// Conversational Agent (v2.5.1+)
+	AgentMode            bool   `json:"agent_mode,omitempty"`             // Включить режим conversational agent
+	AgentMaxIter         int    `json:"agent_max_iter,omitempty"`         // Максимальное количество ReAct итераций
+	AgentModel           string `json:"agent_model,omitempty"`            // Модель для reasoning (по умолчанию из config)
+	AgentWorkingDirectory string `json:"agent_working_directory,omitempty"` // Рабочая директория для file operations
+	ConversationID       string `json:"conversation_id,omitempty"`        // ID conversation для context continuity
 }
 
 // ChatMessage представляет сообщение в чате
@@ -89,6 +96,9 @@ type ChatCompletionResponse struct {
 	SystemFingerprint string                 `json:"system_fingerprint,omitempty"`
 	Choices           []ChatCompletionChoice `json:"choices"`
 	Usage             Usage                  `json:"usage"`
+
+	// Agent mode (v2.5.1+): Full agent conversation trace
+	AgentMessages []map[string]interface{} `json:"agent_messages,omitempty"`
 }
 
 // ChatCompletionChoice представляет выбор в ответе

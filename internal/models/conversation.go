@@ -25,6 +25,10 @@ type Conversation struct {
 	IsArchived bool               `json:"is_archived" db:"is_archived"` // Архивирован ли
 	IsPinned   bool               `json:"is_pinned" db:"is_pinned"`     // Закреплен ли
 
+	// Agent Mode (v2.5.1+: Conversational Agent)
+	AgentMode    bool          `json:"agent_mode" db:"agent_mode"`                       // Включен ли режим агента
+	AgentContext *AgentContext `json:"agent_context,omitempty" db:"agent_context"`       // Контекст агента (JSON)
+
 	// Временные метки
 	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
@@ -88,6 +92,12 @@ const (
 	MessageRoleAssistant MessageRole = "assistant" // AI ассистент
 	MessageRoleSystem    MessageRole = "system"    // Системное сообщение
 	MessageRoleTool      MessageRole = "tool"      // Ответ от инструмента
+
+	// Agent roles (v2.5.1+: Conversational Agent)
+	MessageRoleAgentThinking    MessageRole = "agent_thinking"    // Рассуждения агента (collapsible)
+	MessageRoleAgentAction      MessageRole = "agent_action"      // Действие агента (tool execution)
+	MessageRoleAgentObservation MessageRole = "agent_observation" // Наблюдение агента (result analysis)
+	MessageRoleAgentApproval    MessageRole = "agent_approval"    // Запрос одобрения (dangerous operations)
 )
 
 // NOTE: ToolCall и FunctionCall определены в openai.go

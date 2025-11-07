@@ -12,6 +12,9 @@ import (
 	"aigateway/internal/config"
 	"aigateway/internal/converter"
 	"aigateway/internal/models"
+	"aigateway/internal/services/agent"
+	"aigateway/internal/services/agent/tools"
+	"aigateway/internal/storage"
 )
 
 // Message types для chat streaming (DESKTOP-03)
@@ -77,6 +80,14 @@ type ChatHandler struct {
 	converter       *converter.SimpleConverter
 	streamConverter *converter.StreamConverter
 	hub             *Hub
+	
+	// Agent support (v2.5.1+: Conversational Agent)
+	db               storage.Database  // For conversation context persistence
+	toolRegistry     *tools.Registry
+	conversationalAgent *agent.ConversationalAgent
+	
+	// Tool RPC (v2.5.4+: Client-side tool execution)
+	toolRPCClients map[string]*agent.ToolRPCClient // clientID → RPC client
 }
 
 // NewChatHandler создает новый chat handler для WebSocket
@@ -88,7 +99,37 @@ func NewChatHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient Olla
 		converter:       converter.NewSimpleConverter(cfg, logger),
 		streamConverter: converter.NewStreamConverter(cfg, logger),
 		hub:             hub,
+		toolRPCClients:  make(map[string]*agent.ToolRPCClient), // v2.5.4+
 	}
+}
+
+// SetAgentSupport enables agent functionality for WebSocket chat (v2.5.1+)
+func (h *ChatHandler) SetAgentSupport(db storage.Database, toolRegistry *tools.Registry) {
+	h.db = db
+	h.toolRegistry = toolRegistry
+	
+	// Get agent config from main config (v2.5.1+)
+	planModel := h.config.Agent.PlanModel
+	if planModel == "" {
+		planModel = "llama3.2:3b" // Safe default if config not set
+	}
+	
+	maxIterations := h.config.Agent.Reasoning.MaxIterations
+	if maxIterations == 0 {
+		maxIterations = 10 // Default
+	}
+	
+	// Initialize conversational agent with config (v2.5.1+)
+	h.conversationalAgent = agent.NewConversationalAgent(h.logger, toolRegistry, agent.ConversationalAgentConfig{
+		OllamaURL:     h.config.Ollama.URL,
+		Model:         planModel, // From config.agent.plan_model
+		MaxIterations: maxIterations, // From config.agent.reasoning.max_iterations
+	})
+	
+	h.logger.WithFields(logrus.Fields{
+		"plan_model":     planModel,
+		"max_iterations": maxIterations,
+	}).Info("Agent support enabled for WebSocket chat")
 }
 
 // HandleChatRequest обрабатывает chat request от WebSocket клиента
@@ -104,6 +145,7 @@ func (h *ChatHandler) HandleChatRequest(client *Client, message []byte) {
 		"user_id":    client.UserInfo["user_id"],
 		"request_id": req.RequestID,
 		"model":      req.Payload.Model,
+		"agent_mode": req.Payload.AgentMode, // v2.5.1+
 	}).Info("Processing WebSocket chat request")
 
 	// Process request asynchronously
@@ -114,6 +156,13 @@ func (h *ChatHandler) HandleChatRequest(client *Client, message []byte) {
 func (h *ChatHandler) processChatRequest(client *Client, req *ChatRequestMessage) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
+
+	// Agent mode (v2.5.1+: Conversational Agent)
+	if req.Payload.AgentMode {
+		h.logger.WithField("request_id", req.RequestID).Info("Using agent mode for WebSocket chat")
+		h.processAgentRequest(ctx, client, req)
+		return
+	}
 
 	// Reset stream converter state
 	h.streamConverter.Reset()
@@ -240,6 +289,209 @@ func (h *ChatHandler) processStreamingResponse(
 	}
 }
 
+// processAgentRequest handles agent mode request via WebSocket (v2.5.1+)
+func (h *ChatHandler) processAgentRequest(ctx context.Context, client *Client, req *ChatRequestMessage) {
+	if h.conversationalAgent == nil {
+		h.sendError(client, req.RequestID, "Agent mode not initialized", "agent_not_available")
+		return
+	}
+
+	// Extract task from last message
+	if len(req.Payload.Messages) == 0 {
+		h.sendError(client, req.RequestID, "No messages provided for agent mode", "invalid_request")
+		return
+	}
+	
+	lastMessage := req.Payload.Messages[len(req.Payload.Messages)-1]
+	task := ""
+	switch content := lastMessage.Content.(type) {
+	case string:
+		task = content
+	default:
+		h.sendError(client, req.RequestID, "Invalid message content type", "invalid_request")
+		return
+	}
+
+	// Get or create agent context
+	var agentContext *models.AgentContext
+	if req.Payload.ConversationID != "" && h.db != nil {
+		conv, err := h.db.GetConversation(ctx, req.Payload.ConversationID)
+		if err == nil && conv != nil {
+			agentContext = conv.AgentContext
+		}
+	}
+	if agentContext == nil {
+		agentContext = models.NewAgentContext(task)
+	}
+
+	// Determine working directory for file operations (v2.5.1+)
+	workingDir := req.Payload.AgentWorkingDirectory
+	if workingDir == "" {
+		workingDir = "." // Default to current directory
+	}
+	
+	h.logger.WithFields(logrus.Fields{
+		"request_id":    req.RequestID,
+		"working_dir":   workingDir,
+	}).Info("Agent working directory set")
+	
+	// Create tool registry with custom working directory
+	customToolRegistry := tools.NewRegistry(h.logger)
+	if err := tools.RegisterFileTools(customToolRegistry, workingDir); err != nil {
+		h.logger.WithError(err).Warn("Failed to register file tools with custom working dir")
+		h.sendError(client, req.RequestID, fmt.Sprintf("Failed to initialize file tools: %v", err), "tool_init_error")
+		return
+	}
+	if err := tools.RegisterTerminalTool(customToolRegistry, workingDir); err != nil {
+		h.logger.WithError(err).Warn("Failed to register terminal tool with custom working dir")
+	}
+	
+	// Create conversational agent with custom tool registry
+	agentMaxIter := req.Payload.AgentMaxIter
+	if agentMaxIter == 0 {
+		agentMaxIter = h.config.Agent.Reasoning.MaxIterations
+		if agentMaxIter == 0 {
+			agentMaxIter = 10 // Default
+		}
+	}
+	
+	agentModel := req.Payload.AgentModel
+	if agentModel == "" {
+		agentModel = h.config.Agent.PlanModel
+		if agentModel == "" {
+			agentModel = "llama3.2:3b" // Safe default
+		}
+	}
+	
+	customAgent := agent.NewConversationalAgent(h.logger, customToolRegistry, agent.ConversationalAgentConfig{
+		OllamaURL:     h.config.Ollama.URL,
+		Model:         agentModel,
+		MaxIterations: agentMaxIter,
+	})
+	
+	// v2.5.4+: Setup Tool RPC Client for client-side tool execution
+	rpcClient := h.getOrCreateToolRPCClient(client)
+	customAgent.SetRPCClient(rpcClient)
+	
+	h.logger.WithFields(logrus.Fields{
+		"client_id":   client.ID,
+		"agent_mode":  "rpc_tools",
+	}).Info("ToolRPCClient configured for agent - tools will execute on desktop client")
+
+	// Setup streaming callbacks for custom agent
+	customAgent.SetStreamingCallbacks(
+		// onThought
+		func(thought *models.AgentThought) {
+			h.sendMessage(client, &ChatChunkMessage{
+				Type:      MessageTypeChatChunk,
+				RequestID: req.RequestID,
+				Payload: struct {
+					Content string `json:"content"`
+					Role    string `json:"role"`
+					Done    bool   `json:"done"`
+				}{
+					Content: thought.Thought,
+					Role:    string(models.MessageRoleAgentThinking),
+					Done:    false,
+				},
+				Timestamp: time.Now(),
+			})
+		},
+		// onAction
+		func(action *models.AgentActionRecord) {
+			// Show action description (NO result here - result will be shown in onObservation)
+			actionDesc := fmt.Sprintf("🔧 **Tool**: `%s`\n📝 **Action**: %s\n⏱️ **Duration**: %dms\n✅ **Status**: %s",
+				action.Tool,
+				action.Action,
+				action.Duration,
+				map[bool]string{true: "Success", false: "Failed"}[action.Success])
+			
+			if !action.Success && action.Error != "" {
+				actionDesc += fmt.Sprintf("\n❌ **Error**: %s", action.Error)
+			}
+			
+			h.sendMessage(client, &ChatChunkMessage{
+				Type:      MessageTypeChatChunk,
+				RequestID: req.RequestID,
+				Payload: struct {
+					Content string `json:"content"`
+					Role    string `json:"role"`
+					Done    bool   `json:"done"`
+				}{
+					Content: actionDesc,
+					Role:    string(models.MessageRoleAgentAction),
+					Done:    false,
+				},
+				Timestamp: time.Now(),
+			})
+			
+			// Result is NOT shown here - it will be formatted and shown in onObservation callback
+		},
+		// onObservation
+		func(observation string) {
+			h.sendMessage(client, &ChatChunkMessage{
+				Type:      MessageTypeChatChunk,
+				RequestID: req.RequestID,
+				Payload: struct {
+					Content string `json:"content"`
+					Role    string `json:"role"`
+					Done    bool   `json:"done"`
+				}{
+					Content: observation,
+					Role:    string(models.MessageRoleAgentObservation),
+					Done:    false,
+				},
+				Timestamp: time.Now(),
+			})
+		},
+		// onComplete
+		func(success bool, result string) {
+			// Send final assistant message
+			h.sendMessage(client, &ChatChunkMessage{
+				Type:      MessageTypeChatChunk,
+				RequestID: req.RequestID,
+				Payload: struct {
+					Content string `json:"content"`
+					Role    string `json:"role"`
+					Done    bool   `json:"done"`
+				}{
+					Content: result,
+					Role:    "assistant",
+					Done:    true,
+				},
+				Timestamp: time.Now(),
+			})
+			
+			// Send done message
+			finishReason := "stop"
+			if !success {
+				finishReason = "error"
+			}
+			h.sendMessage(client, &ChatDoneMessage{
+				Type:      MessageTypeChatDone,
+				RequestID: req.RequestID,
+				Payload: struct {
+					MessageID    string `json:"message_id"`
+					TotalTokens  int    `json:"total_tokens"`
+					FinishReason string `json:"finish_reason"`
+				}{
+					MessageID:    req.RequestID,
+					TotalTokens:  0, // Not tracked in agent mode
+					FinishReason: finishReason,
+				},
+				Timestamp: time.Now(),
+			})
+		},
+	)
+
+	// Start agent task with custom agent (uses custom working directory)
+	_, _, err := customAgent.ProcessTask(ctx, task, agentContext)
+	if err != nil {
+		h.logger.WithError(err).WithField("request_id", req.RequestID).Error("Agent task failed")
+		// onComplete already called with error
+	}
+}
+
 // sendMessage отправляет JSON message через WebSocket
 // Gracefully handles closed channels (CLIENT-016 fix)
 func (h *ChatHandler) sendMessage(client *Client, msg interface{}) error {
@@ -305,6 +557,71 @@ func (h *ChatHandler) sendDone(client *Client, requestID string, totalTokens int
 
 	if err := h.sendMessage(client, &doneMsg); err != nil {
 		h.logger.WithError(err).Error("Failed to send done message to WebSocket client")
+	}
+}
+
+// getOrCreateToolRPCClient получает или создает ToolRPCClient для клиента (v2.5.4+)
+func (h *ChatHandler) getOrCreateToolRPCClient(client *Client) *agent.ToolRPCClient {
+	// Check if client already has RPC client
+	if rpcClient, exists := h.toolRPCClients[client.ID]; exists {
+		return rpcClient
+	}
+	
+	// Create new RPC client with send function
+	sendFunc := func(messageType string, payload interface{}) error {
+		// Send message to WebSocket client
+		message := map[string]interface{}{
+			"type":    messageType,
+			"payload": payload,
+		}
+		
+		if err := h.sendMessage(client, message); err != nil {
+			h.logger.WithError(err).WithFields(logrus.Fields{
+				"client_id":    client.ID,
+				"message_type": messageType,
+			}).Error("Failed to send tool RPC message to client")
+			return err
+		}
+		
+		return nil
+	}
+	
+	rpcClient := agent.NewToolRPCClient(h.logger, sendFunc)
+	h.toolRPCClients[client.ID] = rpcClient
+	
+	h.logger.WithField("client_id", client.ID).Info("Created new ToolRPCClient for WebSocket client")
+	
+	return rpcClient
+}
+
+// HandleToolExecutionResponse handles tool_execution_response message from client (v2.5.4+)
+func (h *ChatHandler) HandleToolExecutionResponse(client *Client, message []byte) {
+	h.logger.WithField("client_id", client.ID).Debug("Received tool execution response")
+	
+	// Get RPC client for this WebSocket client
+	rpcClient, exists := h.toolRPCClients[client.ID]
+	if !exists {
+		h.logger.WithField("client_id", client.ID).Warn("Received tool response for unknown client, no RPC client found")
+		return
+	}
+	
+	// Forward response to RPC client
+	if err := rpcClient.HandleResponse(message); err != nil {
+		h.logger.WithError(err).WithField("client_id", client.ID).Error("Failed to handle tool execution response")
+	}
+}
+
+// CleanupToolRPCClient removes ToolRPCClient when client disconnects (v2.5.4+)
+func (h *ChatHandler) CleanupToolRPCClient(clientID string) {
+	if rpcClient, exists := h.toolRPCClients[clientID]; exists {
+		// Cancel all pending requests for this client
+		h.logger.WithField("client_id", clientID).Info("Cleaning up ToolRPCClient")
+		
+		// Remove from map
+		delete(h.toolRPCClients, clientID)
+		
+		// Note: RPC client will be garbage collected, pending requests will timeout
+		_ = rpcClient // Prevent unused warning
 	}
 }
 

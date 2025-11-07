@@ -1,223 +1,223 @@
-# AI Review через Ollama-OpenAI Proxy
-# Документация: https://github.com/Nikita-Filonov/ai-review
+# AI Code Review через Ollama-OpenAI Proxy
+# Адаптировано для Go проекта aigateway-desktop
 
 stages:
-  - review
+  - analyze
+  - build
+
+variables:
+  # Настройки прокси (используйте GitLab CI/CD Variables)
+  PROXY_URL: "http://176.53.180.178:8085/v1/chat/completions"
+  # PROXY_API_KEY должен быть настроен в Settings → CI/CD → Variables
+  
+  # Модель для code review
+  # Рекомендуемые модели:
+  #   🏆 qwen2.5-coder:7b - лучший для Go кода
+  #   ⭐ deepseek-coder:6.7b - хороший для анализа
+  #   ✅ codellama:7b - универсальный
+  REVIEW_MODEL: "qwen2.5-coder:7b"
 
 # ============================================================================
-# Hidden job: Generate AI Review Config (reusable)
+# AI Code Review для Merge Requests
 # ============================================================================
-.generate-config:
+analyze_merge_request:
+  stage: analyze
+  image: alpine:latest
   before_script:
-    # Generate .ai-review.yaml from environment variables
-    - bash scripts/generate-ai-review-config.sh
+    - apk add --no-cache curl jq bash git
+  script:
+    - echo "🤖 AI Code Review with Ollama-OpenAI Proxy..."
+    - |
+      # Получаем изменения MR
+      echo "📥 Fetching MR changes..."
+      # Пробуем CI_JOB_TOKEN сначала, fallback на GITLAB_API_TOKEN
+      API_TOKEN="${GITLAB_API_TOKEN:-$CI_JOB_TOKEN}"
+      DIFF_RAW=$(curl -s --header "PRIVATE-TOKEN: $API_TOKEN" \
+        "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/changes")
+      
+      if [ -z "$DIFF_RAW" ] || [ "$DIFF_RAW" = "null" ]; then
+        echo "❌ Ошибка: Не удалось получить diff"
+        exit 1
+      fi
+      
+      # Извлекаем diff текст (до 8000 символов для контекста)
+      DIFF_TEXT=$(echo "$DIFF_RAW" | jq -r '.changes[] | 
+        "File: \(.new_path // .old_path)\n" + 
+        "Status: \(.new_file // false | if . then "new" else "modified" end)\n" +
+        (.diff // "No diff") + "\n---\n"' | head -c 8000)
+      
+      if [ -z "$DIFF_TEXT" ]; then
+        echo "⚠️ Diff пустой, пропускаем review"
+        exit 0
+      fi
+      
+      echo "📊 Diff size: $(echo "$DIFF_TEXT" | wc -c) bytes"
+      
+      # Создаем OpenAI-совместимый запрос
+      echo "🧠 Отправка в AI модель ($REVIEW_MODEL)..."
+      
+      SYSTEM_PROMPT="Ты опытный Go разработчик, проводящий code review.
 
-# ============================================================================
-# Полный AI Review (inline + summary)
-# ============================================================================
-ai-review:full:
-  extends: .generate-config
-  stage: review
-  image: nikitafilonov/ai-review:latest
-  when: manual
+Проанализируй изменения в коде и дай КОНКРЕТНЫЕ замечания:
+- Укажи файл и примерные строки для каждого замечания
+- Фокусируйся на: безопасность, производительность, читаемость, Go best practices
+- Игнорируй мелочи (форматирование, если код правильный)
+- Если изменения хорошие - скажи об этом кратко
+
+Формат ответа: Markdown с разделами:
+## ✅ Положительное
+## ⚠️ Замечания
+## 💡 Рекомендации (если есть)
+
+Отвечай на русском языке, кратко и по делу."
+
+      REQUEST_JSON=$(jq -n \
+        --arg model "$REVIEW_MODEL" \
+        --arg system "$SYSTEM_PROMPT" \
+        --arg user "Проанализируй следующий diff:\n\n$DIFF_TEXT" \
+        '{
+          "model": $model,
+          "messages": [
+            {"role": "system", "content": $system},
+            {"role": "user", "content": $user}
+          ],
+          "temperature": 0.3,
+          "max_tokens": 2000,
+          "stream": false
+        }')
+      
+      # Отправляем в прокси
+      RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $PROXY_API_KEY" \
+        -d "$REQUEST_JSON")
+      
+      # Проверяем ошибки
+      ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+      if [ -n "$ERROR_MSG" ]; then
+        echo "❌ Ошибка от proxy: $ERROR_MSG"
+        exit 1
+      fi
+      
+      # Извлекаем ответ AI
+      AI_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+      
+      if [ -z "$AI_RESPONSE" ]; then
+        echo "❌ Ошибка: пустой ответ от AI"
+        echo "Response: $RESPONSE"
+        exit 1
+      fi
+      
+      echo "✅ AI analysis completed"
+      echo "Response preview:"
+      echo "$AI_RESPONSE" | head -n 10
+      
+      # Формируем комментарий для MR
+      MR_COMMENT="🤖 **AI Code Review** (Model: \`$REVIEW_MODEL\`)
+
+---
+
+$AI_RESPONSE
+
+---
+*Powered by Ollama-OpenAI Proxy | Review ID: $CI_PIPELINE_ID*"
+
+      # Экранируем для JSON
+      COMMENT_BODY=$(jq -n --arg body "$MR_COMMENT" '{body: $body}')
+      
+      # Добавляем комментарий к MR
+      echo "💬 Adding comment to MR..."
+      COMMENT_RESULT=$(curl -s --request POST \
+        --header "PRIVATE-TOKEN: $API_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "$COMMENT_BODY" \
+        "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes")
+      
+      COMMENT_ID=$(echo "$COMMENT_RESULT" | jq -r '.id // empty')
+      if [ -n "$COMMENT_ID" ]; then
+        echo "✅ Comment added successfully (ID: $COMMENT_ID)"
+      else
+        echo "⚠️ Failed to add comment"
+        echo "$COMMENT_RESULT" | jq '.'
+      fi
+
   rules:
-    - if: '$CI_MERGE_REQUEST_IID'
-  script:
-    - ai-review run
-  variables:
-    # =========================================================================
-    # LLM Configuration (Ollama через ваш Proxy)
-    # =========================================================================
-    LLM__PROVIDER: "OPENAI"  # Proxy совместим с OpenAI API
-    
-    # НАСТРОЙТЕ: URL вашего Ollama-OpenAI Proxy
-    # Примеры:
-    #   - http://proxy.example.com:8080/v1
-    #   - https://ollama-proxy.internal/v1
-    #   - http://10.0.0.5:8080/v1
-    LLM__HTTP_CLIENT__API_URL: "http://176.53.180.178:8085/v1"
-    
-    # НАСТРОЙТЕ: API ключ для вашего proxy
-    # Создайте переменную в GitLab: Settings → CI/CD → Variables
-    LLM__HTTP_CLIENT__API_TOKEN: "$OLLAMA_PROXY_API_KEY"
-    
-    # НАСТРОЙТЕ: Модель из Ollama
-    # 
-    # ⚠️ ВАЖНО: AI-review требует модели с хорошей JSON поддержкой!
-    # 
-    # Рекомендуемые модели (проверены с AI-review):
-    #   🏆 qwen2.5-coder:7b       - ЛУЧШИЙ для inline review (чистый JSON)
-    #   ✅ deepseek-coder:33b     - Отличный JSON, но медленный
-    #   ✅ qwen2.5-coder:14b      - Отличный JSON, медленный
-    #   ⚠️ deepseek-coder:6.7b    - Возвращает ТЕКСТ вместо JSON (только для summary!)
-    #   ⚠️ llama3.2:latest        - Иногда оборачивает JSON в markdown
-    #   ❌ НЕ используйте:        - devstral, mistral (markdown wrapper)
-    # 
-    # ВАЖНО для inline review:
-    #   - qwen2.5-coder:7b - стабильный JSON output
-    #   - deepseek-coder:6.7b - НЕ работает (возвращает текст, а не JSON)
-    # 
-    # См. docs/BUGFIX_AI_REVIEW_COMPATIBILITY.md для деталей
-    LLM__META__MODEL: "qwen2.5-coder:7b"
-    
-    # Параметры генерации
-    LLM__META__MAX_TOKENS: "15000"
-    LLM__META__TEMPERATURE: "0.3"
-    
-    # Таймауты (увеличены для локальных моделей)
-    LLM__HTTP_CLIENT__TIMEOUT: "300"  # 5 минут на запрос
-    
-    # =========================================================================
-    # GitLab VCS Configuration
-    # =========================================================================
-    VCS__PROVIDER: "GITLAB"
-    VCS__PIPELINE__PROJECT_ID: "$CI_PROJECT_ID"
-    VCS__PIPELINE__MERGE_REQUEST_ID: "$CI_MERGE_REQUEST_IID"
-    VCS__HTTP_CLIENT__API_URL: "$CI_SERVER_URL"
-    # ВАЖНО: CI_JOB_TOKEN имеет ограниченные права!
-    # Используйте Project/Personal Access Token с scope 'api'
-    VCS__HTTP_CLIENT__API_TOKEN: "$GITLAB_API_TOKEN"
-    VCS__HTTP_CLIENT__TIMEOUT: "120"
-    
-    # =========================================================================
-    # AI Review Policy (Generated Config)
-    # =========================================================================
-    # Эти переменные используются в scripts/generate-ai-review-config.sh
-    AI_REVIEW_MAX_FILES: "10"        # Максимум файлов в одном review
-    AI_REVIEW_MAX_FILE_SIZE: "150000" # 150 KB максимальный размер файла
-    AI_REVIEW_MAX_COMMENTS: "30"     # Максимум inline комментариев
-    # AI_REVIEW_MAX_TOKENS и AI_REVIEW_TEMPERATURE берутся из LLM__META__*
-    
+    - if: '$CI_MERGE_REQUEST_IID'  # Только для MR
   allow_failure: true
-  timeout: 30m  # Увеличенный таймаут для больших MR
+  timeout: 10m
 
 # ============================================================================
-# Только Inline Review (построчные комментарии)
+# Go Build (опционально)
 # ============================================================================
-ai-review:inline:
-  extends: ai-review:full
+build:
+  stage: build
+  image: golang:1.25.3-alpine
+  before_script:
+    - apk add --no-cache git make
   script:
-    - ai-review run-inline
-  timeout: 30m
+    - echo "🔨 Building Go project..."
+    - make build
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'  # Только для main ветки
+    - if: '$CI_MERGE_REQUEST_IID'  # И для MR
+  allow_failure: false
+  timeout: 15m
 
 # ============================================================================
-# Только Summary Review (общий комментарий)
-# ============================================================================
-ai-review:summary:
-  extends: ai-review:full
-  script:
-    - ai-review run-summary
-  timeout: 30m
-
-# ============================================================================
-# Context Review (анализ архитектуры и контекста)
-# ============================================================================
-ai-review:context:
-  extends: ai-review:full
-  script:
-    - ai-review run-context
-  timeout: 30m
-
-# ============================================================================
-# Reply Review (ответ на существующие комментарии)
-# ============================================================================
-ai-review:inline-reply:
-  extends: ai-review:full
-  script:
-    - ai-review run-inline-reply
-  timeout: 30m
-
-ai-review:summary-reply:
-  extends: ai-review:full
-  script:
-    - ai-review run-summary-reply
-  timeout: 30m
-
-# ============================================================================
-# NOTES:
+# SETUP INSTRUCTIONS:
 # ============================================================================
 # 
-# 1. ОБЯЗАТЕЛЬНО создайте GitLab CI/CD переменные:
+# 1. Создайте GitLab CI/CD переменные:
 #
-#    a) OLLAMA_PROXY_API_KEY (для LLM):
+#    a) PROXY_API_KEY (Required):
 #       Settings → CI/CD → Variables → Add Variable
-#       Key: OLLAMA_PROXY_API_KEY
-#       Value: ваш API ключ из proxy (создается в WebUI)
-#       Flags: [✓] Mask variable
+#       Key: PROXY_API_KEY
+#       Value: ваш API ключ из Ollama-OpenAI Proxy
+#       Flags: [✓] Mask variable, [✓] Protect variable
 #
-#    b) GITLAB_API_TOKEN (для GitLab API):
-#       Сначала создайте Access Token:
-#       - Project Access Token (рекомендуется):
+#    b) GITLAB_API_TOKEN (Optional):
+#       По умолчанию используется CI_JOB_TOKEN (автоматический).
+#       
+#       Если CI_JOB_TOKEN не работает (GitLab < 15 или ограниченные права):
+#       Создайте Project Access Token:
 #         Settings → Access Tokens → Add new token
 #         Name: ai-review-token
-#         Role: Developer (минимум)
-#         Scopes: [✓] api, [✓] read_api, [✓] write_repository
-#       
-#       - ИЛИ Personal Access Token:
-#         User Settings → Access Tokens
-#         Name: ai-review-pat
-#         Scopes: [✓] api, [✓] read_api, [✓] write_repository
+#         Role: Developer
+#         Scopes: [✓] api, [✓] read_api
 #       
 #       Затем добавьте в CI/CD Variables:
 #       Key: GITLAB_API_TOKEN
 #       Value: (скопированный токен)
 #       Flags: [✓] Mask variable, [✓] Protect variable
+#       
+#       Для включения расширенных прав CI_JOB_TOKEN (GitLab 15+):
+#       Settings → CI/CD → Token Access → 
+#         [✓] Limit access to this project
 #
-# 2. Динамическая конфигурация:
-#    
-#    .ai-review.yaml генерируется автоматически через:
-#      scripts/generate-ai-review-config.sh
-#    
-#    Переменные для настройки (опционально):
-#      - AI_REVIEW_MAX_FILES        - Максимум файлов (default: 10)
-#      - AI_REVIEW_MAX_FILE_SIZE    - Размер файла (default: 150000)
-#      - AI_REVIEW_MAX_COMMENTS     - Максимум комментариев (default: 30)
-#    
-#    Пример: Разные настройки для разных размеров MR:
-#    
-#    ai-review:small-mr:
-#      extends: ai-review:full
-#      rules:
-#        - if: '$CI_MERGE_REQUEST_DIFF_SIZE < 500'  # < 500 строк
-#      variables:
-#        AI_REVIEW_MAX_FILES: "15"
-#        LLM__META__MODEL: "deepseek-coder:6.7b"
-#        AI_REVIEW_MAX_COMMENTS: "50"
-#    
-#    ai-review:large-mr:
-#      extends: ai-review:full
-#      rules:
-#        - if: '$CI_MERGE_REQUEST_DIFF_SIZE >= 500'  # >= 500 строк
-#      variables:
-#        AI_REVIEW_MAX_FILES: "5"
-#        LLM__META__MODEL: "qwen2.5-coder:7b"
-#        AI_REVIEW_MAX_COMMENTS: "20"
-#      script:
-#        - ai-review run-summary  # Только summary для больших MR
+# 2. Проверьте доступность прокси:
+#    - Proxy URL должен быть доступен из GitLab Runner
+#    - Если на localhost - использовать внешний IP
+#    - Проверьте firewall правила
 #
-# 3. Проверьте доступность proxy из GitLab Runner:
-#    - Если proxy на localhost - не будет работать (runner в контейнере)
-#    - Используйте внешний IP или DNS имя
-#    - Убедитесь что firewall разрешает доступ
+# 3. Настройка модели (опционально):
+#    Измените переменную REVIEW_MODEL на нужную:
+#      - qwen2.5-coder:7b (default, лучший для Go)
+#      - deepseek-coder:6.7b (быстрый)
+#      - codellama:7b (универсальный)
 #
-# 4. Доступные модели Ollama можно посмотреть:
-#    curl http://YOUR_PROXY_HOST:8080/v1/models \
+# 4. Доступные модели можно проверить:
+#    curl http://YOUR_PROXY:8085/v1/models \
 #      -H "Authorization: Bearer $API_KEY"
 #
-# 5. Для быстрого тестирования используйте маленькие модели:
-#    - qwen2.5-coder:1.5b (быстрая, хорошая для кода)
-#    - llama3.2:3b (универсальная)
-#
-# 6. Для production используйте большие модели:
-#    - deepseek-coder:33b (лучшая для кода, но медленная для 15+ файлов)
-#    - qwen2.5-coder:7b (хороший баланс)
-#
-# 7. Jobs запускаются вручную (when: manual)
-#    Запуск: MR → Pipelines → ▶️ Play на нужном job
-#
-# 8. Скрипт генерации конфигурации:
-#    scripts/generate-ai-review-config.sh создает .ai-review.yaml
-#    автоматически перед каждым review job (.generate-config:before_script)
+# 5. Workflow:
+#    1. Создаете MR в GitLab
+#    2. Pipeline автоматически запускает analyze_merge_request
+#    3. AI анализирует изменения
+#    4. Комментарий с review появляется в MR
 #
 # ============================================================================
 

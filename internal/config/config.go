@@ -30,6 +30,7 @@ type Config struct {
 	WebFetch      WebFetchConfig           `mapstructure:"web_fetch"`     // Version 1.10.4+: Web content fetching
 	RAG           ragconfig.RAGConfig      `mapstructure:"rag"`           // Version 1.13.0+: RAG system configuration
 	ModelRegistry ModelRegistryConfig      `mapstructure:"model_registry"` // Version 2.3.0+: Model Registry system
+	Agent         AgentConfig              `mapstructure:"agent"`         // Version 2.5.0+: Agentic AI configuration
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -806,6 +807,71 @@ type ModelRegistryConfig struct {
 		Enabled  bool          `mapstructure:"enabled"`
 		Interval time.Duration `mapstructure:"interval"` // Интервал между health checks
 	} `mapstructure:"health_check"`
+}
+
+// AgentConfig конфигурация Agentic AI system (Version 2.5.0+: AGENT-01)
+type AgentConfig struct {
+	// Enabled - включить Agent систему
+	Enabled bool `mapstructure:"enabled"`
+	
+	// PlanModel - модель для task planning и reasoning (ВАЖНО: должна поддерживать JSON)
+	PlanModel string `mapstructure:"plan_model"`
+	
+	// Reasoning - настройки reasoning процесса
+	Reasoning struct {
+		MaxIterations int     `mapstructure:"max_iterations"` // Максимальное количество ReAct iterations
+		Temperature   float64 `mapstructure:"temperature"`    // Temperature для reasoning (0.0-1.0)
+		TopP          float64 `mapstructure:"top_p"`          // Top-p sampling
+		NumPredict    int     `mapstructure:"num_predict"`    // Ограничение длины response
+		Timeout       time.Duration `mapstructure:"timeout"`  // Таймаут на одну reasoning operation
+	} `mapstructure:"reasoning"`
+	
+	// Tools - настройки tool system
+	Tools struct {
+		Enabled bool   `mapstructure:"enabled"`
+		BaseDir string `mapstructure:"base_dir"` // Базовая директория для file operations
+		
+		// File tools
+		File struct {
+			ReadEnabled   bool   `mapstructure:"read_enabled"`
+			WriteEnabled  bool   `mapstructure:"write_enabled"`
+			DeleteEnabled bool   `mapstructure:"delete_enabled"`
+			ListEnabled   bool   `mapstructure:"list_enabled"`
+			MaxFileSize   string `mapstructure:"max_file_size"` // e.g., "10MB"
+		} `mapstructure:"file"`
+		
+		// Terminal tools
+		Terminal struct {
+			Enabled         bool     `mapstructure:"enabled"`
+			AllowedCommands []string `mapstructure:"allowed_commands"` // Whitelist команд
+		} `mapstructure:"terminal"`
+		
+		// MCP tools
+		MCP struct {
+			Enabled           bool          `mapstructure:"enabled"`
+			DiscoveryInterval time.Duration `mapstructure:"discovery_interval"`
+		} `mapstructure:"mcp"`
+	} `mapstructure:"tools"`
+	
+	// Safety - настройки безопасности
+	Safety struct {
+		ApprovalRequired    bool     `mapstructure:"approval_required"`
+		DangerousOperations []string `mapstructure:"dangerous_operations"`
+		AutoApproveSafe     bool     `mapstructure:"auto_approve_safe"`
+		SafeOperations      []string `mapstructure:"safe_operations"`
+	} `mapstructure:"safety"`
+	
+	// LoopDetection - обнаружение зацикливания
+	LoopDetection struct {
+		Enabled             bool `mapstructure:"enabled"`
+		MaxIdenticalActions int  `mapstructure:"max_identical_actions"`
+	} `mapstructure:"loop_detection"`
+	
+	// Streaming - WebSocket streaming
+	Streaming struct {
+		Enabled    bool `mapstructure:"enabled"`
+		BufferSize int  `mapstructure:"buffer_size"`
+	} `mapstructure:"streaming"`
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

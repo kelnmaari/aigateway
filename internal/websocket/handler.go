@@ -86,6 +86,10 @@ type Handler struct {
 // ChatHandlerInterface интерфейс для обработки chat requests
 type ChatHandlerInterface interface {
 	HandleChatRequest(client *Client, message []byte)
+	
+	// v2.5.4+: Tool RPC methods
+	HandleToolExecutionResponse(client *Client, message []byte)
+	CleanupToolRPCClient(clientID string)
 }
 
 // NewHandler создает новый WebSocket handler
@@ -270,6 +274,11 @@ func stringValue(s *string) string {
 // readPump читает сообщения от клиента
 func (h *Handler) readPump(client *Client) {
 	defer func() {
+		// v2.5.4+: Cleanup Tool RPC Client before unregister
+		if h.chatHandler != nil {
+			h.chatHandler.CleanupToolRPCClient(client.ID)
+		}
+		
 		h.hub.unregister <- client
 		client.Conn.Close()
 	}()
@@ -369,6 +378,14 @@ func (h *Handler) handleClientMessage(client *Client, message []byte) {
 	case MessageTypePing:
 		// Respond with pong
 		h.sendPong(client)
+	
+	case models.WSMessageTypeToolExecutionResponse:
+		// Handle tool execution response (v2.5.4+: RPC Tools)
+		if h.chatHandler != nil {
+			h.chatHandler.HandleToolExecutionResponse(client, message)
+		} else {
+			h.logger.Warn("Chat handler not configured, ignoring tool_execution_response")
+		}
 
 	default:
 		h.logger.WithField("type", baseMsg.Type).Warn("Unknown WebSocket message type")

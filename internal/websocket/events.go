@@ -51,6 +51,21 @@ const (
 	// Notification events (WS-01 v1.10.2)
 	EventTypeNotification EventType = "notification" // General system notification
 
+	// Agent events (AGENT-05, v2.5.0+)
+	EventTypeAgentSessionCreated      EventType = "agent_session_created"       // Session created
+	EventTypeAgentPlanningStarted     EventType = "agent_planning_started"      // Planning started
+	EventTypeAgentPlanningCompleted   EventType = "agent_planning_completed"    // Plan ready
+	EventTypeAgentExecutionStarted    EventType = "agent_execution_started"     // Execution started
+	EventTypeAgentStepStarted         EventType = "agent_step_started"          // Step started
+	EventTypeAgentStepCompleted       EventType = "agent_step_completed"        // Step completed
+	EventTypeAgentStepFailed          EventType = "agent_step_failed"           // Step failed
+	EventTypeAgentApprovalNeeded      EventType = "agent_approval_needed"       // Approval required
+	EventTypeAgentApprovalResponded   EventType = "agent_approval_responded"    // Approval decision
+	EventTypeAgentSessionCompleted    EventType = "agent_session_completed"     // Session completed
+	EventTypeAgentSessionFailed       EventType = "agent_session_failed"        // Session failed
+	EventTypeAgentSessionCancelled    EventType = "agent_session_cancelled"     // Session cancelled
+	EventTypeAgentProgressUpdate      EventType = "agent_progress_update"       // Progress update
+
 	// System events
 	EventTypeHeartbeat EventType = "heartbeat"
 	EventTypeError     EventType = "error"
@@ -335,5 +350,92 @@ func (eb *EventBroadcaster) BroadcastNotification(level NotificationLevel, title
 
 	event := NewEvent(EventTypeNotification, data)
 	return eb.BroadcastEvent(event)
+}
+
+// ========================================
+// Agent Events (AGENT-05, v2.5.0+)
+// ========================================
+
+// BroadcastAgentEvent отправляет событие от Agent системы
+func (eb *EventBroadcaster) BroadcastAgentEvent(eventType EventType, data map[string]interface{}) error {
+	event := NewEvent(eventType, data)
+	return eb.BroadcastEvent(event)
+}
+
+// BroadcastAgentSessionCreated уведомляет о создании Agent session
+func (eb *EventBroadcaster) BroadcastAgentSessionCreated(sessionID, task string) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentSessionCreated, map[string]interface{}{
+		"session_id": sessionID,
+		"task":       task,
+	})
+}
+
+// BroadcastAgentPlanningStarted уведомляет о начале планирования
+func (eb *EventBroadcaster) BroadcastAgentPlanningStarted(sessionID string) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentPlanningStarted, map[string]interface{}{
+		"session_id": sessionID,
+	})
+}
+
+// BroadcastAgentPlanningCompleted уведомляет о завершении планирования
+func (eb *EventBroadcaster) BroadcastAgentPlanningCompleted(sessionID string, totalSteps int) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentPlanningCompleted, map[string]interface{}{
+		"session_id":  sessionID,
+		"total_steps": totalSteps,
+	})
+}
+
+// BroadcastAgentExecutionStarted уведомляет о начале выполнения
+func (eb *EventBroadcaster) BroadcastAgentExecutionStarted(sessionID string) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentExecutionStarted, map[string]interface{}{
+		"session_id": sessionID,
+	})
+}
+
+// BroadcastAgentStepStarted уведомляет о начале step
+func (eb *EventBroadcaster) BroadcastAgentStepStarted(sessionID string, stepNumber int, description string) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentStepStarted, map[string]interface{}{
+		"session_id":  sessionID,
+		"step_number": stepNumber,
+		"description": description,
+	})
+}
+
+// BroadcastAgentStepCompleted уведомляет о завершении step
+func (eb *EventBroadcaster) BroadcastAgentStepCompleted(sessionID string, stepNumber int, result map[string]interface{}) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentStepCompleted, map[string]interface{}{
+		"session_id":  sessionID,
+		"step_number": stepNumber,
+		"result":      result,
+	})
+}
+
+// BroadcastAgentStepFailed уведомляет об ошибке step
+func (eb *EventBroadcaster) BroadcastAgentStepFailed(sessionID string, stepNumber int, errorMsg string) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentStepFailed, map[string]interface{}{
+		"session_id":  sessionID,
+		"step_number": stepNumber,
+		"error":       errorMsg,
+	})
+}
+
+// BroadcastAgentApprovalNeeded уведомляет о необходимости approval
+func (eb *EventBroadcaster) BroadcastAgentApprovalNeeded(approvalID, sessionID string, stepNumber int, reason string) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentApprovalNeeded, map[string]interface{}{
+		"approval_id": approvalID,
+		"session_id":  sessionID,
+		"step_number": stepNumber,
+		"reason":      reason,
+	})
+}
+
+// BroadcastAgentProgressUpdate уведомляет об изменении прогресса
+func (eb *EventBroadcaster) BroadcastAgentProgressUpdate(sessionID string, currentStep, totalSteps int, percent int) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentProgressUpdate, map[string]interface{}{
+		"session_id":   sessionID,
+		"current_step": currentStep,
+		"total_steps":  totalSteps,
+		"percent":      percent,
+	})
 }
 

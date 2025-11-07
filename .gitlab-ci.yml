@@ -280,8 +280,8 @@ analyze_full_mr:
             {"role": "system", "content": $system},
             {"role": "user", "content": $user}
           ],
-          "temperature": 0.2,
-          "max_tokens": 3000,
+          "temperature": 0.3,
+          "max_tokens": 50000,
           "stream": false
         }')
       
@@ -301,10 +301,45 @@ analyze_full_mr:
       # Извлекаем ответ AI
       AI_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
       
-      if [ -z "$AI_RESPONSE" ]; then
-        echo "❌ Ошибка: пустой ответ от AI"
-        echo "Response: $RESPONSE"
-        exit 1
+      # Debug: показываем usage stats
+      PROMPT_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.prompt_tokens // 0')
+      COMPLETION_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.completion_tokens // 0')
+      echo "📊 Tokens: prompt=$PROMPT_TOKENS, completion=$COMPLETION_TOKENS"
+      
+      # Проверка на пустой ответ (баг некоторых моделей)
+      if [ -z "$AI_RESPONSE" ] || [ "$AI_RESPONSE" = "null" ]; then
+        echo "❌ Ошибка: Модель вернула пустой content"
+        echo "⚠️  Это может быть баг модели $REVIEW_MODEL"
+        echo "💡 Рекомендация: Попробуйте другую модель (qwen2.5-coder:7b, deepseek-coder:6.7b)"
+        echo ""
+        echo "Debug Response:"
+        echo "$RESPONSE" | jq '.'
+        
+        # Создаем fallback отчет
+        AI_RESPONSE="## ⚠️ AI Review Failed
+
+Модель \`$REVIEW_MODEL\` вернула пустой ответ.
+
+**Debug Info:**
+- Prompt tokens: $PROMPT_TOKENS
+- Completion tokens: $COMPLETION_TOKENS  
+- Model: $REVIEW_MODEL
+
+**Рекомендации:**
+1. Попробуйте другую модель в переменной REVIEW_MODEL:
+   - \`qwen2.5-coder:7b\` (рекомендуется для Go)
+   - \`deepseek-coder:6.7b\` (быстрая альтернатива)
+   - \`codellama:7b\` (универсальная)
+
+2. Проверьте что модель загружена: \`ollama list\`
+
+3. Проверьте логи Ollama на сервере прокси
+
+**Diff Stats:**
+- Size: $(echo "$DIFF_TEXT" | wc -c) bytes
+- Files changed: $(echo "$DIFF_RAW" | jq -r '.changes | length // 0')
+"
+        echo "⚠️ Создаем fallback report..."
       fi
       
       echo "✅ AI analysis completed"

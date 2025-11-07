@@ -9,12 +9,18 @@ variables:
   PROXY_URL: "http://176.53.180.178:8085/v1/chat/completions"
   # PROXY_API_KEY должен быть настроен в Settings → CI/CD → Variables
   
-  # Модель для code review
+  # Модели для code review (можно настроить разные для разных задач)
   # Рекомендуемые модели:
-  #   🏆 qwen2.5-coder:7b - лучший для Go кода
-  #   ⭐ deepseek-coder:6.7b - хороший для анализа
+  #   🏆 qwen2.5-coder:7b - лучший для Go кода, детальный анализ
+  #   ⭐ deepseek-coder:6.7b - быстрый, хороший для коммитов
   #   ✅ codellama:7b - универсальный
-  REVIEW_MODEL: "gpt-oss-tuned:latest"
+  #   ⚠️ gpt-oss-tuned:latest - НЕСТАБИЛЬНЫЙ, может возвращать пустые ответы!
+  
+  # Модель для быстрого review последнего коммита (автоматический)
+  COMMIT_REVIEW_MODEL: "deepseek-coder:6.7b"
+  
+  # Модель для полного детального review MR (мануальный)
+  FULL_MR_REVIEW_MODEL: "qwen2.5-coder:7b"
 
 # Общие настройки для review jobs (YAML anchor)
 .review_base:
@@ -63,12 +69,12 @@ analyze_latest_commit:
       echo "📊 Diff size: $(echo "$DIFF_TEXT" | wc -c) bytes"
       
       # Создаем OpenAI-совместимый запрос
-      echo "🧠 Отправка в AI модель ($REVIEW_MODEL)..."
+      echo "🧠 Отправка в AI модель ($COMMIT_REVIEW_MODEL)..."
       
       SYSTEM_PROMPT="Ты опытный Go разработчик проводящий code review. Проанализируй изменения и дай ТОП-5 замечаний. Укажи файл и строки для каждого замечания. Фокусируйся на безопасность производительность читаемость Go best practices. Игнорируй мелочи. КРАТКИЙ ответ максимум 3000 символов. Формат ответа Markdown с разделами Положительное Замечания Рекомендации. Отвечай на русском языке кратко."
       
       REQUEST_JSON=$(jq -n \
-        --arg model "$REVIEW_MODEL" \
+        --arg model "$COMMIT_REVIEW_MODEL" \
         --arg system "$SYSTEM_PROMPT" \
         --arg user "Проанализируй следующий diff:\n\n$DIFF_TEXT" \
         '{
@@ -116,7 +122,7 @@ analyze_latest_commit:
       {
         printf "# 🤖 AI Code Review Report (Latest Commit)\n\n"
         printf "**Pipeline ID:** %s\n" "$CI_PIPELINE_ID"
-        printf "**Model:** %s\n" "$REVIEW_MODEL"
+        printf "**Model:** %s\n" "$COMMIT_REVIEW_MODEL"
         printf "**Date:** %s\n" "$REPORT_DATE"
         printf "**Commit:** %s\n\n" "$CI_COMMIT_SHORT_SHA"
         printf -- "---\n\n"
@@ -167,7 +173,7 @@ analyze_latest_commit:
           CHUNK_TEXT=$(dd if="$TEMP_FILE" bs=1 skip=$CHUNK_START count=$MAX_CHUNK_SIZE 2>/dev/null || true)
           
           COMMENT_BODY=$(jq -n \
-            --arg model "$REVIEW_MODEL" \
+            --arg model "$COMMIT_REVIEW_MODEL" \
             --arg response "$CHUNK_TEXT" \
             --arg pipeline "$CI_PIPELINE_ID" \
             --arg part "$CHUNK_NUM" \
@@ -191,7 +197,7 @@ analyze_latest_commit:
       else
         # Ответ влезает в один комментарий
         COMMENT_BODY=$(jq -n \
-          --arg model "$REVIEW_MODEL" \
+          --arg model "$COMMIT_REVIEW_MODEL" \
           --arg response "$AI_RESPONSE" \
           --arg pipeline "$CI_PIPELINE_ID" \
           --arg report "$FULL_REPORT_LINK" \
@@ -279,13 +285,13 @@ analyze_full_mr:
           CHUNK_START=$(( ($CHUNK_NUM - 1) * $CHUNK_SIZE ))
           CHUNK_TEXT=$(dd if="$TEMP_DIFF" bs=1 skip=$CHUNK_START count=$CHUNK_SIZE 2>/dev/null || true)
           
-          echo "🧠 Анализ части $CHUNK_NUM/$CHUNKS_COUNT (Model: $REVIEW_MODEL)..."
+          echo "🧠 Анализ части $CHUNK_NUM/$CHUNKS_COUNT (Model: $FULL_MR_REVIEW_MODEL)..."
           
           # Промпт для части
           SYSTEM_PROMPT="Ты опытный Go разработчик. Проанализируй ЧАСТЬ $CHUNK_NUM из $CHUNKS_COUNT diff файлов MR. Дай краткие замечания по этой части. Укажи файлы и проблемы. Формат: список замечаний. Отвечай кратко на русском."
           
           REQUEST_JSON=$(jq -n \
-            --arg model "$REVIEW_MODEL" \
+            --arg model "$FULL_MR_REVIEW_MODEL" \
             --arg system "$SYSTEM_PROMPT" \
             --arg user "Проанализируй часть $CHUNK_NUM/$CHUNKS_COUNT diff:\n\n$CHUNK_TEXT" \
             '{
@@ -295,7 +301,7 @@ analyze_full_mr:
                 {"role": "user", "content": $user}
               ],
               "temperature": 0.3,
-              "max_tokens": 2000,
+              "max_tokens": 3000,
               "stream": false
             }')
           
@@ -312,6 +318,18 @@ analyze_full_mr:
             CHUNK_RESPONSE="[Часть $CHUNK_NUM: Ошибка анализа - $ERROR_MSG]"
           else
             CHUNK_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "[Пустой ответ]"')
+            
+            # Проверяем что ответ не пустой
+            CHUNK_SIZE_BYTES=$(echo "$CHUNK_RESPONSE" | wc -c)
+            if [ "$CHUNK_SIZE_BYTES" -lt 50 ]; then
+              echo "⚠️ ВНИМАНИЕ: Часть $CHUNK_NUM вернула очень короткий ответ ($CHUNK_SIZE_BYTES bytes)"
+              echo "⚠️ Модель $FULL_MR_REVIEW_MODEL возможно не подходит для chunked анализа"
+              echo "⚠️ Рекомендация: попробуйте qwen2.5-coder:7b или deepseek-coder:6.7b"
+              # Добавляем debug info в ответ
+              CHUNK_RESPONSE="$CHUNK_RESPONSE\n\n_⚠️ Warning: Модель вернула короткий ответ. Возможно модель $FULL_MR_REVIEW_MODEL не справляется с chunked анализом._"
+            else
+              echo "✅ Часть $CHUNK_NUM: получено $CHUNK_SIZE_BYTES bytes"
+            fi
           fi
           
           # Добавляем к итоговому результату
@@ -364,12 +382,12 @@ analyze_full_mr:
         
       else
         # Маленький diff - отправляем целиком
-        echo "🧠 Отправка в AI модель ($REVIEW_MODEL) для детального анализа..."
+        echo "🧠 Отправка в AI модель ($FULL_MR_REVIEW_MODEL) для детального анализа..."
         
         SYSTEM_PROMPT="Ты опытный Go разработчик проводящий ПОЛНЫЙ code review всего MR. Проанализируй ВСЕ изменения детально и дай исчерпывающий отчет. Укажи файлы и строки для каждого замечания. Фокусируйся на архитектуру безопасность производительность читаемость Go best practices тестирование. Формат ответа Markdown с разделами Архитектура Безопасность Производительность Замечания Рекомендации. Отвечай на русском языке подробно."
         
         REQUEST_JSON=$(jq -n \
-          --arg model "$REVIEW_MODEL" \
+          --arg model "$FULL_MR_REVIEW_MODEL" \
           --arg system "$SYSTEM_PROMPT" \
           --arg user "Проанализируй следующий полный diff MR:\n\n$DIFF_TEXT" \
           '{
@@ -464,7 +482,7 @@ analyze_full_mr:
       {
         printf "# 🔍 AI Code Review Report (Full MR)\n\n"
         printf "**Pipeline ID:** %s\n" "$CI_PIPELINE_ID"
-        printf "**Model:** %s\n" "$REVIEW_MODEL"
+        printf "**Model:** %s\n" "$FULL_MR_REVIEW_MODEL"
         printf "**Date:** %s\n" "$REPORT_DATE"
         printf "**MR:** !%s\n\n" "$CI_MERGE_REQUEST_IID"
         printf -- "---\n\n"
@@ -504,7 +522,7 @@ analyze_full_mr:
       fi
       
       COMMENT_BODY=$(jq -n \
-        --arg model "$REVIEW_MODEL" \
+        --arg model "$FULL_MR_REVIEW_MODEL" \
         --arg response "$COMMENT_RESPONSE" \
         --arg pipeline "$CI_PIPELINE_ID" \
         --arg report "$FULL_REPORT_LINK" \

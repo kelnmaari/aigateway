@@ -314,39 +314,18 @@ analyze_full_mr:
         echo "Debug Response:"
         echo "$RESPONSE" | jq '.'
         
-        # Создаем fallback отчет
-        AI_RESPONSE=$(cat << 'FALLBACK_EOF'
-## AI Review Failed
-
-Модель вернула пустой ответ.
-
-Debug Info
-- Prompt tokens used
-- Completion tokens used
-- Model name
-
-Рекомендации
-1. Попробуйте другую модель в переменной REVIEW_MODEL
-   - qwen2.5-coder:7b (рекомендуется для Go)
-   - deepseek-coder:6.7b (быстрая альтернатива)
-   - codellama:7b (универсальная)
-
-2. Проверьте что модель загружена с помощью ollama list
-
-3. Проверьте логи Ollama на сервере прокси
-
-Diff Stats
-- Size bytes
-- Files changed count
-FALLBACK_EOF
-)
-        # Добавляем переменные
-        AI_RESPONSE="${AI_RESPONSE/Модель вернула/Модель $REVIEW_MODEL вернула}"
-        AI_RESPONSE="${AI_RESPONSE/Prompt tokens used/Prompt tokens: $PROMPT_TOKENS}"
-        AI_RESPONSE="${AI_RESPONSE/Completion tokens used/Completion tokens: $COMPLETION_TOKENS}"
-        AI_RESPONSE="${AI_RESPONSE/Model name/Model: $REVIEW_MODEL}"
-        AI_RESPONSE="${AI_RESPONSE/Size bytes/Size: $(echo "$DIFF_TEXT" | wc -c) bytes}"
-        AI_RESPONSE="${AI_RESPONSE/Files changed count/Files changed: $(echo "$DIFF_RAW" | jq -r '.changes | length // 0')}"
+        # Создаем fallback отчет (простой текст без спецсимволов)
+        AI_RESPONSE="AI Review Failed - Model returned empty content"
+        AI_RESPONSE="$AI_RESPONSE\n\nModel used - $REVIEW_MODEL"
+        AI_RESPONSE="$AI_RESPONSE\nPrompt tokens - $PROMPT_TOKENS"
+        AI_RESPONSE="$AI_RESPONSE\nCompletion tokens - $COMPLETION_TOKENS"
+        AI_RESPONSE="$AI_RESPONSE\n\nRecommendations:"
+        AI_RESPONSE="$AI_RESPONSE\n- Try qwen2.5-coder:7b model (recommended for Go)"
+        AI_RESPONSE="$AI_RESPONSE\n- Try deepseek-coder:6.7b model (fast alternative)"
+        AI_RESPONSE="$AI_RESPONSE\n- Try codellama:7b model (universal)"
+        AI_RESPONSE="$AI_RESPONSE\n\nCheck if model is loaded with: ollama list"
+        AI_RESPONSE="$AI_RESPONSE\n\nDiff size - $(echo "$DIFF_TEXT" | wc -c) bytes"
+        AI_RESPONSE="$AI_RESPONSE\nFiles changed - $(echo "$DIFF_RAW" | jq -r '.changes | length // 0')"
         echo "⚠️ Создаем fallback report..."
       fi
       

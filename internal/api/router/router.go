@@ -161,11 +161,14 @@ type Router struct {
 	ragOrchestrator *ragorchestrator.RAGOrchestrator
 
 	// HTMX UI Handlers (Version 2.6.0+: HTMX-01)
-	templateRenderer  *templates.Renderer
-	registryUIHandler *handlersUI.RegistryUIHandler
-	apiKeysUIHandler  *handlersUI.APIKeysUIHandler
-	tenantsUIHandler  *handlersUI.TenantsUIHandler
-	monitorUIHandler  *handlersUI.MonitorUIHandler // Monitor UI (GPU, Audit, Usage) - HTMX-02
+	templateRenderer   *templates.Renderer
+	registryUIHandler  *handlersUI.RegistryUIHandler
+	apiKeysUIHandler   *handlersUI.APIKeysUIHandler
+	tenantsUIHandler   *handlersUI.TenantsUIHandler
+	monitorUIHandler   *handlersUI.MonitorUIHandler   // Monitor UI (GPU, Audit, Usage) - HTMX-02
+	usersUIHandler     *handlersUI.UsersUIHandler     // Users UI (HTMX-03)
+	rbacUIHandler      *handlersUI.RBACUIHandler      // RBAC UI (HTMX-03)
+	dashboardUIHandler *handlersUI.DashboardUIHandler // Dashboard UI (HTMX-03)
 }
 
 // NewOptions содержит опции для создания роутера
@@ -612,6 +615,47 @@ func (r *Router) setupUIRoutes() {
 				monitor.GET("/gpu-metrics", r.monitorUIHandler.RenderGPUMetrics)
 				monitor.GET("/audit-logs", r.monitorUIHandler.RenderAuditLogRows)
 				monitor.GET("/usage-stats", r.monitorUIHandler.RenderUsageStats)
+			}
+		}
+
+		// Users UI (HTMX-03: Advanced Forms & Search)
+		if r.usersUIHandler != nil {
+			users := ui.Group("/users")
+			{
+				users.GET("", r.usersUIHandler.GetUsersList)
+				users.GET("/create-form", r.usersUIHandler.GetCreateUserForm)
+				users.GET("/:id/edit", r.usersUIHandler.GetEditUserForm)
+				users.GET("/:id/roles", r.usersUIHandler.GetUserRolesForm)
+			}
+		}
+
+		// RBAC UI (HTMX-03: Advanced Forms & Search)
+		if r.rbacUIHandler != nil {
+			rbac := ui.Group("/rbac")
+			{
+				// Roles
+				rbac.GET("/roles", r.rbacUIHandler.GetRolesList)
+				rbac.GET("/roles/create-form", r.rbacUIHandler.GetCreateRoleForm)
+				rbac.GET("/roles/:id/edit", r.rbacUIHandler.GetEditRoleForm)
+				rbac.GET("/roles/:id/permissions", r.rbacUIHandler.GetRolePermissionsForm)
+
+				// Permissions
+				rbac.GET("/permissions", r.rbacUIHandler.GetPermissionsList)
+			}
+		}
+
+		// Dashboard UI (HTMX-03: Advanced Forms & Search)
+		if r.dashboardUIHandler != nil {
+			dashboard := ui.Group("/dashboard")
+			{
+				// Stat cards
+				dashboard.GET("/stats/users", r.dashboardUIHandler.GetUsersStatCard)
+				dashboard.GET("/stats/api-keys", r.dashboardUIHandler.GetAPIKeysStatCard)
+				dashboard.GET("/stats/models", r.dashboardUIHandler.GetModelsStatCard)
+				dashboard.GET("/stats/requests", r.dashboardUIHandler.GetRequestsStatCard)
+
+				// System health
+				dashboard.GET("/system-health", r.dashboardUIHandler.GetSystemHealthTable)
 			}
 		}
 	}
@@ -1756,7 +1800,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			r.registryUIHandler = handlersUI.NewRegistryUIHandler(r.db, r.templateRenderer, logger)
 			r.apiKeysUIHandler = handlersUI.NewAPIKeysUIHandler(r.db, r.templateRenderer, logger)
 			r.tenantsUIHandler = handlersUI.NewTenantsUIHandler(r.db, r.templateRenderer, logger)
-			r.monitorUIHandler = handlersUI.NewMonitorUIHandler(logger, r.gpuMonitor, r.db) // HTMX-02: Monitor UI
+			r.monitorUIHandler = handlersUI.NewMonitorUIHandler(logger, r.gpuMonitor, r.db)   // HTMX-02: Monitor UI
+			r.usersUIHandler = handlersUI.NewUsersUIHandler(r.db, r.templateRenderer, logger) // HTMX-03: Users UI
+			r.rbacUIHandler = handlersUI.NewRBACUIHandler(r.db, r.templateRenderer, logger)   // HTMX-03: RBAC UI
+			r.dashboardUIHandler = handlersUI.NewDashboardUIHandler(r.db, logger)             // HTMX-03: Dashboard UI
 			logger.Info("✅ HTMX UI handlers initialized successfully")
 		}
 	}

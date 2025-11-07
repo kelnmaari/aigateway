@@ -39,7 +39,7 @@
 
         <!-- Tab Content -->
         <div class="tab-content">
-            <!-- Dashboard Tab -->
+            <!-- Dashboard Tab (HTMX-03: Parallel Loading) -->
             <div id="dashboard-tab" class="tab-pane active">
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -50,7 +50,12 @@
                             <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke-width="2"/>
                         </svg>
                         <div>
-                            <div class="stat-value" id="stat-total-users">-</div>
+                            <div id="stat-total-users"
+                                 hx-get="/api/ui/dashboard/stats/users"
+                                 hx-trigger="load"
+                                 hx-swap="innerHTML">
+                                <div class="stat-value">-</div>
+                            </div>
                             <div class="stat-label">Total Users</div>
                         </div>
                     </div>
@@ -60,7 +65,12 @@
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-width="2"/>
                         </svg>
                         <div>
-                            <div class="stat-value" id="stat-total-keys">-</div>
+                            <div id="stat-total-keys"
+                                 hx-get="/api/ui/dashboard/stats/api-keys"
+                                 hx-trigger="load"
+                                 hx-swap="innerHTML">
+                                <div class="stat-value">-</div>
+                            </div>
                             <div class="stat-label">API Keys</div>
                         </div>
                     </div>
@@ -70,7 +80,12 @@
                             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" stroke-width="2"/>
                         </svg>
                         <div>
-                            <div class="stat-value" id="stat-total-models">-</div>
+                            <div id="stat-total-models"
+                                 hx-get="/api/ui/dashboard/stats/models"
+                                 hx-trigger="load"
+                                 hx-swap="innerHTML">
+                                <div class="stat-value">-</div>
+                            </div>
                             <div class="stat-label">Models</div>
                         </div>
                     </div>
@@ -79,7 +94,12 @@
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-width="2"/>
                         </svg>
                         <div>
-                            <div class="stat-value" id="stat-total-requests">-</div>
+                            <div id="stat-total-requests"
+                                 hx-get="/api/ui/dashboard/stats/requests"
+                                 hx-trigger="load"
+                                 hx-swap="innerHTML">
+                                <div class="stat-value">-</div>
+                            </div>
                             <div class="stat-label">API Requests (30d)</div>
                         </div>
                     </div>
@@ -89,7 +109,10 @@
                     <h2>📊 System Health</h2>
                     <div class="data-table-container">
                         <table class="data-table">
-                            <tbody id="system-health-table">
+                            <tbody id="system-health-table"
+                                   hx-get="/api/ui/dashboard/system-health"
+                                   hx-trigger="load"
+                                   hx-swap="innerHTML">
                                 <tr><td colspan="2" class="table-empty">Loading...</td></tr>
                             </tbody>
                         </table>
@@ -106,38 +129,45 @@
                     <button class="sub-tab-btn" data-subtab="user-rbac">RBAC</button>
                 </div>
 
-                <!-- Users List Sub-tab -->
-                <div id="user-list-subtab" class="sub-tab-pane active">
-                    <div class="section-header">
-                        <h2>👥 User Management</h2>
-                        <button class="btn btn-primary" id="create-user-btn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M12 5v14M5 12h14" stroke-width="2"/>
-                            </svg>
-                            Create User
-                        </button>
-                    </div>
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Email</th>
-                                    <th>Auth Provider</th>
-                                    <th>RBAC Roles</th>
-                                    <th>Tenants</th>
-                                    <th>Admin</th>
-                                    <th>Status</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table">
-                                <tr><td colspan="9" class="table-empty">Loading users...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Users List Sub-tab -->
+            <div id="user-list-subtab" class="sub-tab-pane active">
+                <div class="section-header">
+                    <h2>👥 User Management</h2>
+                    <button class="btn btn-primary"
+                            hx-get="/api/ui/users/create-form"
+                            hx-target="#modal-content"
+                            hx-swap="innerHTML"
+                            onclick="showModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M12 5v14M5 12h14" stroke-width="2"/>
+                        </svg>
+                        Create User
+                    </button>
                 </div>
+                <div class="data-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Auth Provider</th>
+                                <th>RBAC Roles</th>
+                                <th>Tenants</th>
+                                <th>Admin</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table"
+                               hx-get="/api/ui/users"
+                               hx-trigger="load, userUpdated from:body"
+                               hx-swap="innerHTML">
+                            <tr><td colspan="9" class="table-empty">Loading users...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
                 <!-- Invitations Sub-tab (AUTH-03, v2.2.0) -->
                 <div id="user-invitations-subtab" class="sub-tab-pane">
@@ -230,58 +260,76 @@
                 </div>
                 </div>
 
-                <!-- RBAC Sub-tab (v1.11.5) -->
+                <!-- RBAC Sub-tab (HTMX-03) -->
                 <div id="user-rbac-subtab" class="sub-tab-pane">
-                <div class="section">
-                    <div class="section-header">
-                        <h2>🛡️ RBAC Management</h2>
-                        <a href="/admin-rbac.html" class="btn btn-primary" target="_blank">
-                            <i class="fas fa-external-link-alt"></i> Open RBAC Manager
-                        </a>
+                    <!-- RBAC Nested Sub-tabs -->
+                    <div class="sub-tabs" style="margin-top: 0;">
+                        <button class="sub-tab-btn active" data-subtab="rbac-roles">Roles</button>
+                        <button class="sub-tab-btn" data-subtab="rbac-permissions">Permissions</button>
                     </div>
-                    
-                    <div class="info-card">
-                        <div class="info-card-icon">🛡️</div>
-                        <div class="info-card-content">
-                            <h3>Role-Based Access Control</h3>
-                            <p>
-                                Advanced permission management система для fine-grained access control.
-                                Управляй ролями, правами доступа и назначением пользователей.
-                            </p>
+
+                    <!-- Roles Sub-tab -->
+                    <div id="rbac-roles-subtab" class="sub-tab-pane active">
+                        <div class="section-header">
+                            <h2>🛡️ Roles Management</h2>
+                            <button class="btn btn-primary"
+                                    hx-get="/api/ui/rbac/roles/create-form"
+                                    hx-target="#modal-content"
+                                    hx-swap="innerHTML"
+                                    onclick="showModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M12 5v14M5 12h14" stroke-width="2"/>
+                                </svg>
+                                Create Role
+                            </button>
+                        </div>
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Role</th>
+                                        <th>Scope</th>
+                                        <th>Permissions</th>
+                                        <th>Users</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="roles-table"
+                                       hx-get="/api/ui/rbac/roles"
+                                       hx-trigger="load, roleUpdated from:body"
+                                       hx-swap="innerHTML">
+                                    <tr><td colspan="6" class="table-empty">Loading roles...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px;">
-                        <div class="stat-card">
-                            <h3>System Roles</h3>
-                            <div class="value" id="rbac-roles-count">-</div>
-                            <small style="color: var(--text-secondary);">Active Roles</small>
+                    <!-- Permissions Sub-tab -->
+                    <div id="rbac-permissions-subtab" class="sub-tab-pane">
+                        <div class="section-header">
+                            <h2>🔑 Permissions Directory</h2>
+                            <p class="text-muted">All available permissions in the system</p>
                         </div>
-                        <div class="stat-card">
-                            <h3>Permissions</h3>
-                            <div class="value" id="rbac-permissions-count">-</div>
-                            <small style="color: var(--text-secondary);">Total Permissions</small>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Assigned Users</h3>
-                            <div class="value" id="rbac-users-count">-</div>
-                            <small style="color: var(--text-secondary);">Users with Roles</small>
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Permission</th>
+                                        <th>Resource</th>
+                                        <th>Action</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="permissions-table"
+                                       hx-get="/api/ui/rbac/permissions"
+                                       hx-trigger="load"
+                                       hx-swap="innerHTML">
+                                    <tr><td colspan="4" class="table-empty">Loading permissions...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-
-                    <h3 style="margin: 2rem 0 1rem 0;">Quick Actions</h3>
-                    <div class="stats-grid">
-                        <button class="btn btn-primary" onclick="window.open('/admin-rbac.html#roles', '_blank')">
-                            👥 Manage Roles
-                        </button>
-                        <button class="btn btn-primary" onclick="window.open('/admin-rbac.html#user-roles', '_blank')">
-                            👨‍💼 User Roles
-                        </button>
-                        <button class="btn btn-primary" onclick="window.open('/admin-rbac.html#permissions', '_blank')">
-                            🔑 View Permissions
-                        </button>
-                    </div>
-                </div>
                 </div>
             </div>
 
@@ -1271,6 +1319,225 @@
         .sub-tab-pane.active {
             display: block;
         }
+
+        /* Modal styles (HTMX-03) */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-dialog {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-close:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* Form styles (HTMX-03) */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .form-group label.required::after {
+            content: " *";
+            color: var(--danger-color);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .form-control:disabled,
+        .form-control[readonly] {
+            background: var(--bg-hover);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .form-text {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .form-description {
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .checkbox-label:hover {
+            background: var(--bg-hover);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* Badge styles (HTMX-03) */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        .badge-admin {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .badge-provider {
+            background: rgba(147, 51, 234, 0.1);
+            color: #a855f7;
+        }
+
+        .badge-active {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--success-color);
+        }
+
+        .badge-inactive {
+            background: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .badge-suspended {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+        }
+
+        /* User row styles */
+        .user-row {
+            transition: background 0.2s;
+        }
+
+        .user-row:hover {
+            background: var(--bg-hover);
+        }
+
+        .user-info strong {
+            display: block;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
     </style>
 
     <script>
@@ -1293,7 +1560,48 @@
                 });
             });
         });
+
+        // Modal functions (HTMX-03: User Management)
+        function showModal() {
+            document.getElementById('htmx-modal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('htmx-modal').style.display = 'none';
+            document.body.style.overflow = '';
+            // Clear modal content
+            document.getElementById('modal-content').innerHTML = '';
+        }
+
+        // Close modal on ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('htmx-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'htmx-modal') closeModal();
+        });
+
+        // HTMX event: Trigger userUpdated event after successful form submission
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            // If swap was successful and target is users-table, trigger refresh
+            if (event.detail.target.id === 'users-table') {
+                // Optionally show notification
+                console.log('Users table updated');
+            }
+        });
     </script>
+
+    <!-- Modal for HTMX forms (HTMX-03) -->
+    <div id="htmx-modal" class="modal">
+        <div class="modal-dialog">
+            <div id="modal-content">
+                <!-- Dynamic content loaded via HTMX -->
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 

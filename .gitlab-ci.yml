@@ -261,39 +261,111 @@ analyze_full_mr:
         exit 0
       fi
       
-      echo "📊 Diff size: $(echo "$DIFF_TEXT" | wc -c) bytes"
+      DIFF_SIZE=$(echo "$DIFF_TEXT" | wc -c)
+      echo "📊 Diff size: $DIFF_SIZE bytes"
       
-      # Создаем OpenAI-совместимый запрос для ПОЛНОГО анализа
-      echo "🧠 Отправка в AI модель ($REVIEW_MODEL) для детального анализа..."
+      # Chunking: разбиваем большой diff на части
+      CHUNK_SIZE=20000  # ~20KB per chunk (примерно 5000 токенов)
       
-      # Более детальный промпт для полного MR
-      SYSTEM_PROMPT="Ты опытный Go разработчик проводящий ПОЛНЫЙ code review всего MR. Проанализируй ВСЕ изменения детально и дай исчерпывающий отчет. Укажи файлы и строки для каждого замечания. Фокусируйся на архитектуру безопасность производительность читаемость Go best practices тестирование. Формат ответа Markdown с разделами Архитектура Безопасность Производительность Замечания Рекомендации. Отвечай на русском языке подробно."
-      
-      REQUEST_JSON=$(jq -n \
-        --arg model "$REVIEW_MODEL" \
-        --arg system "$SYSTEM_PROMPT" \
-        --arg user "Проанализируй следующий полный diff MR:\n\n$DIFF_TEXT" \
-        '{
-          "model": $model,
-          "messages": [
-            {"role": "system", "content": $system},
-            {"role": "user", "content": $user}
-          ],
-          "temperature": 0.3,
-          "max_tokens": 4000,
-          "stream": false
-        }')
-      
-      # Отправляем в прокси
-      RESPONSE=$(curl -s -X POST "$PROXY_URL" \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer $PROXY_API_KEY" \
-        -d "$REQUEST_JSON")
-      
-      # Проверяем ошибки
-      ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
-      if [ -n "$ERROR_MSG" ]; then
-        echo "❌ Ошибка от proxy: $ERROR_MSG"
+      if [ "$DIFF_SIZE" -gt "$CHUNK_SIZE" ]; then
+        echo "📦 Diff слишком большой, разбиваем на части (chunk size: $CHUNK_SIZE bytes)"
+        
+        # Сохраняем diff во временный файл
+        TEMP_DIFF=$(mktemp)
+        echo "$DIFF_TEXT" > "$TEMP_DIFF"
+        
+        # Подсчитываем количество частей
+        CHUNKS_COUNT=$(( ($DIFF_SIZE + $CHUNK_SIZE - 1) / $CHUNK_SIZE ))
+        echo "📊 Создано частей: $CHUNKS_COUNT"
+        
+        # Собираем ответы от всех частей
+        ALL_RESPONSES=""
+        
+        for CHUNK_NUM in $(seq 1 $CHUNKS_COUNT); do
+          CHUNK_START=$(( ($CHUNK_NUM - 1) * $CHUNK_SIZE ))
+          CHUNK_TEXT=$(dd if="$TEMP_DIFF" bs=1 skip=$CHUNK_START count=$CHUNK_SIZE 2>/dev/null || true)
+          
+          echo "🧠 Анализ части $CHUNK_NUM/$CHUNKS_COUNT (Model: $REVIEW_MODEL)..."
+          
+          # Промпт для части
+          SYSTEM_PROMPT="Ты опытный Go разработчик. Проанализируй ЧАСТЬ $CHUNK_NUM из $CHUNKS_COUNT diff файлов MR. Дай краткие замечания по этой части. Укажи файлы и проблемы. Формат: список замечаний. Отвечай кратко на русском."
+          
+          REQUEST_JSON=$(jq -n \
+            --arg model "$REVIEW_MODEL" \
+            --arg system "$SYSTEM_PROMPT" \
+            --arg user "Проанализируй часть $CHUNK_NUM/$CHUNKS_COUNT diff:\n\n$CHUNK_TEXT" \
+            '{
+              "model": $model,
+              "messages": [
+                {"role": "system", "content": $system},
+                {"role": "user", "content": $user}
+              ],
+              "temperature": 0.3,
+              "max_tokens": 2000,
+              "stream": false
+            }')
+          
+          # Отправляем запрос
+          RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $PROXY_API_KEY" \
+            -d "$REQUEST_JSON")
+          
+          # Проверяем ошибки
+          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+          if [ -n "$ERROR_MSG" ]; then
+            echo "⚠️ Ошибка в части $CHUNK_NUM: $ERROR_MSG"
+            CHUNK_RESPONSE="[Часть $CHUNK_NUM: Ошибка анализа - $ERROR_MSG]"
+          else
+            CHUNK_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "[Пустой ответ]"')
+          fi
+          
+          # Добавляем к итоговому результату
+          ALL_RESPONSES="$ALL_RESPONSES\n\n## Часть $CHUNK_NUM/$CHUNKS_COUNT\n\n$CHUNK_RESPONSE"
+          
+          # Небольшая задержка между запросами
+          sleep 2
+        done
+        
+        # Удаляем временный файл
+        rm -f "$TEMP_DIFF"
+        
+        # Итоговый ответ - объединение всех частей
+        AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n$ALL_RESPONSES"
+        PROMPT_TOKENS=$(($CHUNKS_COUNT * 5000))  # Примерная оценка
+        COMPLETION_TOKENS=$(($CHUNKS_COUNT * 2000))
+        
+      else
+        # Маленький diff - отправляем целиком
+        echo "🧠 Отправка в AI модель ($REVIEW_MODEL) для детального анализа..."
+        
+        SYSTEM_PROMPT="Ты опытный Go разработчик проводящий ПОЛНЫЙ code review всего MR. Проанализируй ВСЕ изменения детально и дай исчерпывающий отчет. Укажи файлы и строки для каждого замечания. Фокусируйся на архитектуру безопасность производительность читаемость Go best practices тестирование. Формат ответа Markdown с разделами Архитектура Безопасность Производительность Замечания Рекомендации. Отвечай на русском языке подробно."
+        
+        REQUEST_JSON=$(jq -n \
+          --arg model "$REVIEW_MODEL" \
+          --arg system "$SYSTEM_PROMPT" \
+          --arg user "Проанализируй следующий полный diff MR:\n\n$DIFF_TEXT" \
+          '{
+            "model": $model,
+            "messages": [
+              {"role": "system", "content": $system},
+              {"role": "user", "content": $user}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 4000,
+            "stream": false
+          }')
+        
+        # Отправляем в прокси
+        RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $PROXY_API_KEY" \
+          -d "$REQUEST_JSON")
+        
+        # Проверяем ошибки (для не-chunked)
+        ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+        if [ -n "$ERROR_MSG" ]; then
+          echo "❌ Ошибка от proxy: $ERROR_MSG"
         
         # Создаем fallback для timeout/connection errors (не фейлим job)
         if echo "$ERROR_MSG" | grep -qi "timeout\|deadline\|exceeded\|connection\|refused"; then
@@ -327,7 +399,8 @@ analyze_full_mr:
         PROMPT_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.prompt_tokens // 0')
         COMPLETION_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.completion_tokens // 0')
         echo "📊 Tokens: prompt=$PROMPT_TOKENS, completion=$COMPLETION_TOKENS"
-      fi
+        fi
+      fi  # Конец chunking if
       
       # Проверка на пустой ответ (баг некоторых моделей)
       if [ -z "$AI_RESPONSE" ] || [ "$AI_RESPONSE" = "null" ]; then

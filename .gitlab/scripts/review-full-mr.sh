@@ -49,59 +49,80 @@ DIFF_SIZE=$(echo "$DIFF_TEXT" | wc -c)
 echo "📊 Diff size: $DIFF_SIZE bytes"
 
 # ============================================================================
-# 2. Chunking: разбиваем большой diff на части
+# 2. File-based splitting: разбиваем diff по файлам (не по chunks!)
 # ============================================================================
-CHUNK_SIZE=10000  # ~10KB per chunk (примерно 2500 токенов) - уменьшено в 2 раза для детального анализа
-WAS_CHUNKED=false  # Флаг для определения chunked vs non-chunked
+# Извлекаем список измененных файлов из MR
+FILES_COUNT=$(echo "$DIFF_RAW" | jq -r '.changes | length')
 
-if [ "$DIFF_SIZE" -gt "$CHUNK_SIZE" ]; then
-  WAS_CHUNKED=true
-  echo "📦 Diff слишком большой, разбиваем на части (chunk size: $CHUNK_SIZE bytes)"
+if [ "$FILES_COUNT" -eq 0 ]; then
+  echo "⚠️ Нет измененных файлов в MR"
+  exit 0
+fi
+
+echo "📦 Обнаружено файлов в MR: $FILES_COUNT"
+echo "🔍 Будем анализировать каждый файл отдельно"
+
+# Флаг для определения file-based vs single-file review
+WAS_SPLIT_BY_FILES=false
+
+if [ "$FILES_COUNT" -gt 1 ]; then
+  WAS_SPLIT_BY_FILES=true
+  echo "📊 Разбиваем на $FILES_COUNT файлов для детального анализа"
   
-  # Сохраняем diff во временный файл
-  TEMP_DIFF=$(mktemp)
-  echo "$DIFF_TEXT" > "$TEMP_DIFF"
-  
-  # Подсчитываем количество частей
-  CHUNKS_COUNT=$(( ($DIFF_SIZE + $CHUNK_SIZE - 1) / $CHUNK_SIZE ))
-  echo "📊 Создано частей: $CHUNKS_COUNT"
-  
-  # Собираем ответы от всех частей
+  # Собираем ответы от всех файлов
   ALL_RESPONSES=""
   
-  for CHUNK_NUM in $(seq 1 $CHUNKS_COUNT); do
-    CHUNK_START=$(( ($CHUNK_NUM - 1) * $CHUNK_SIZE ))
-    CHUNK_TEXT=$(dd if="$TEMP_DIFF" bs=1 skip=$CHUNK_START count=$CHUNK_SIZE 2>/dev/null || true)
+  # Итерируемся по каждому файлу
+  FILE_NUM=0
+  while read -r FILE_DATA; do
+    FILE_NUM=$((FILE_NUM + 1))
     
-    echo "🧠 Анализ части $CHUNK_NUM/$CHUNKS_COUNT (Model: $FULL_MR_REVIEW_MODEL)..."
+    FILE_PATH=$(echo "$FILE_DATA" | jq -r '.new_path // .old_path')
+    FILE_DIFF=$(echo "$FILE_DATA" | jq -r '.diff // ""')
+    FILE_STATUS=$(echo "$FILE_DATA" | jq -r 'if .new_file then "new" elif .deleted_file then "deleted" elif .renamed_file then "renamed" else "modified" end')
     
-    # Промпт для части
+    # Пропускаем файлы без diff (например, бинарные или переименованные без изменений)
+    if [ -z "$FILE_DIFF" ] || [ "$FILE_DIFF" = "null" ]; then
+      echo "⏭️  Пропуск $FILE_PATH (нет diff)"
+      continue
+    fi
+    
+    FILE_DIFF_SIZE=$(echo "$FILE_DIFF" | wc -c)
+    echo ""
+    echo "📄 [$FILE_NUM/$FILES_COUNT] Анализ файла: $FILE_PATH"
+    echo "   Status: $FILE_STATUS | Size: $FILE_DIFF_SIZE bytes"
+    
+    # Промпт для файла
     SYSTEM_PROMPT="Ты опытный Go разработчик проводящий CODE REVIEW ИЗМЕНЕНИЙ.
 
-⚠️ КРИТИЧНО - CODE REVIEW ЧАСТИ $CHUNK_NUM/$CHUNKS_COUNT:
-- Это CODE REVIEW изменений в diff (что добавлено/удалено/изменено)
+⚠️ КРИТИЧНО - CODE REVIEW ФАЙЛА $FILE_PATH:
+- Это CODE REVIEW изменений в конкретном файле (что добавлено/удалено/изменено)
 - НЕ описывай что делает код общими словами
 - НЕ объясняй функциональность или алгоритмы
-- ТОЛЬКО анализ изменений: файл:строка → проблема → fix
-- Анализируй ТОЛЬКО предоставленный diff
+- ТОЛЬКО анализ изменений: строка → проблема → fix
+- Анализируй ТОЛЬКО предоставленный diff этого файла
 
-Задача: Найди проблемы в ИЗМЕНЕНИЯХ этой части. Укажи конкретные файлы и строки.
+Задача: Найди проблемы в ИЗМЕНЕНИЯХ файла $FILE_PATH. Укажи конкретные строки.
 
 Формат:
-## Часть $CHUNK_NUM/$CHUNKS_COUNT
+## Файл: $FILE_PATH
 
 ### Проблемы
-- файл:строка - проблема → рекомендация
+- строка X - проблема → рекомендация
 
 ### Хорошо
-- файл:строка - что сделано правильно
+- строка Y - что сделано правильно
 
-Отвечай кратко на русском."
+Отвечай кратко на русском. Если проблем нет - напиши \"Нет критичных замечаний\"."
     
     REQUEST_JSON=$(jq -n \
       --arg model "$FULL_MR_REVIEW_MODEL" \
       --arg system "$SYSTEM_PROMPT" \
-      --arg user "CODE REVIEW часть $CHUNK_NUM/$CHUNKS_COUNT. Найди проблемы в изменениях:\n\n$CHUNK_TEXT" \
+      --arg filepath "$FILE_PATH" \
+      --arg status "$FILE_STATUS" \
+      --arg user "CODE REVIEW файла: $FILE_PATH (status: $FILE_STATUS)
+
+Найди проблемы в изменениях этого файла:\n\n$FILE_DIFF" \
       '{
         "model": $model,
         "messages": [
@@ -122,150 +143,152 @@ if [ "$DIFF_SIZE" -gt "$CHUNK_SIZE" ]; then
     # Проверяем ошибки
     ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
     if [ -n "$ERROR_MSG" ]; then
-      echo "⚠️ Ошибка в части $CHUNK_NUM: $ERROR_MSG"
-      CHUNK_RESPONSE="[Часть $CHUNK_NUM: Ошибка анализа - $ERROR_MSG]"
+      echo "   ⚠️ Ошибка анализа: $ERROR_MSG"
+      FILE_RESPONSE="[Ошибка анализа $FILE_PATH: $ERROR_MSG]"
     else
-      CHUNK_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "[Пустой ответ]"')
+      FILE_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "[Пустой ответ]"')
       
       # Проверяем что ответ не пустой
-      CHUNK_SIZE_BYTES=$(echo "$CHUNK_RESPONSE" | wc -c)
-      if [ "$CHUNK_SIZE_BYTES" -lt 50 ]; then
-        echo "⚠️ ВНИМАНИЕ: Часть $CHUNK_NUM вернула очень короткий ответ ($CHUNK_SIZE_BYTES bytes)"
-        echo "⚠️ Модель $FULL_MR_REVIEW_MODEL возможно не подходит для chunked анализа"
-        echo "⚠️ Рекомендация: попробуйте qwen2.5-coder:7b или deepseek-coder:6.7b"
-        CHUNK_RESPONSE="$CHUNK_RESPONSE\n\n_⚠️ Warning: Модель вернула короткий ответ. Возможно модель $FULL_MR_REVIEW_MODEL не справляется с chunked анализом._"
+      FILE_RESPONSE_SIZE=$(echo "$FILE_RESPONSE" | wc -c)
+      if [ "$FILE_RESPONSE_SIZE" -lt 50 ]; then
+        echo "   ⚠️ Короткий ответ ($FILE_RESPONSE_SIZE bytes)"
+        FILE_RESPONSE="$FILE_RESPONSE\n\n_⚠️ Warning: Модель вернула короткий ответ для $FILE_PATH._"
       else
-        echo "✅ Часть $CHUNK_NUM: получено $CHUNK_SIZE_BYTES bytes"
+        echo "   ✅ Получено $FILE_RESPONSE_SIZE bytes"
       fi
     fi
     
     # ============================================================================
-    # 2.1. Создаем отдельный MD файл для этой части
+    # 2.1. Создаем отдельный MD файл для этого файла
     # ============================================================================
-    PART_REPORT_FILE="ai-review-mr-${CI_MERGE_REQUEST_IID}-part${CHUNK_NUM}.md"
-    PART_RESPONSE_SIZE=$(echo "$CHUNK_RESPONSE" | wc -c)
-    PART_REPORT_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+    # Безопасное имя файла (замена / на -)
+    SAFE_FILE_NAME=$(echo "$FILE_PATH" | sed 's/\//-/g' | sed 's/\./-/g')
+    FILE_REPORT_FILE="ai-review-mr-${CI_MERGE_REQUEST_IID}-file-${SAFE_FILE_NAME}.md"
+    FILE_REPORT_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
     
     {
-      printf "# 🔍 AI Code Review Report (MR !%s - Часть %s/%s)\n\n" "$CI_MERGE_REQUEST_IID" "$CHUNK_NUM" "$CHUNKS_COUNT"
+      printf "# 🔍 AI Code Review Report (MR !%s - %s)\n\n" "$CI_MERGE_REQUEST_IID" "$FILE_PATH"
       printf "**Pipeline ID:** %s\n" "$CI_PIPELINE_ID"
       printf "**Model:** %s\n" "$FULL_MR_REVIEW_MODEL"
-      printf "**Date:** %s\n" "$PART_REPORT_DATE"
-      printf "**Часть:** %s из %s\n\n" "$CHUNK_NUM" "$CHUNKS_COUNT"
+      printf "**Date:** %s\n" "$FILE_REPORT_DATE"
+      printf "**File:** %s\n" "$FILE_PATH"
+      printf "**Status:** %s\n" "$FILE_STATUS"
+      printf "**File Number:** %s из %s\n\n" "$FILE_NUM" "$FILES_COUNT"
       printf -- "---\n\n"
       printf "## 📊 Analysis Summary\n\n"
-      printf "**Chunk:** %s/%s\n" "$CHUNK_NUM" "$CHUNKS_COUNT"
-      printf "**Chunk Size:** %s bytes\n" "$CHUNK_SIZE"
-      printf "**Response Length:** %s characters\n" "$PART_RESPONSE_SIZE"
-      printf "**Analysis Type:** Full MR (Chunked)\n\n"
+      printf "**File Path:** \`%s\`\n" "$FILE_PATH"
+      printf "**File Status:** %s\n" "$FILE_STATUS"
+      printf "**Diff Size:** %s bytes\n" "$FILE_DIFF_SIZE"
+      printf "**Response Length:** %s characters\n" "$FILE_RESPONSE_SIZE"
+      printf "**Analysis Type:** Full MR (Per-File)\n\n"
       printf -- "---\n\n"
-      printf "## 🔍 AI Review (Часть %s)\n\n" "$CHUNK_NUM"
-      printf "%s\n\n" "$CHUNK_RESPONSE"
+      printf "## 🔍 AI Review\n\n"
+      printf "%s\n\n" "$FILE_RESPONSE"
       printf -- "---\n\n"
       printf "*Generated by Ollama-OpenAI Proxy CI/CD Pipeline*\n"
-    } > "$PART_REPORT_FILE"
+    } > "$FILE_REPORT_FILE"
     
-    echo "📄 Создан файл части: $PART_REPORT_FILE"
+    echo "   📄 Создан файл: $FILE_REPORT_FILE"
     
     # ============================================================================
-    # 2.2. Отправляем комментарий для этой части в GitLab
+    # 2.2. Отправляем комментарий для этого файла в GitLab
     # ============================================================================
-    PART_ARTIFACT_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/file/$PART_REPORT_FILE"
-    PART_ARTIFACT_RAW="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/raw/$PART_REPORT_FILE?inline=false"
+    FILE_ARTIFACT_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/file/$FILE_REPORT_FILE"
+    FILE_ARTIFACT_RAW="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/raw/$FILE_REPORT_FILE?inline=false"
     
-    # Ограничиваем длину комментария (макс 2000 символов для части)
-    if [ "$PART_RESPONSE_SIZE" -gt 2000 ]; then
-      echo "📝 Ответ части $CHUNK_NUM слишком длинный ($PART_RESPONSE_SIZE chars), обрезаем для комментария"
-      COMMENT_CHUNK_RESPONSE=$(echo "$CHUNK_RESPONSE" | head -c 2000)
-      COMMENT_CHUNK_RESPONSE="$COMMENT_CHUNK_RESPONSE\n\n...\n\n_Полный отчет части $CHUNK_NUM см. в файле ниже._"
+    # Ограничиваем длину комментария (макс 2000 символов)
+    if [ "$FILE_RESPONSE_SIZE" -gt 2000 ]; then
+      echo "   📝 Ответ слишком длинный ($FILE_RESPONSE_SIZE chars), обрезаем для комментария"
+      COMMENT_FILE_RESPONSE=$(echo "$FILE_RESPONSE" | head -c 2000)
+      COMMENT_FILE_RESPONSE="$COMMENT_FILE_RESPONSE\n\n...\n\n_Полный отчет см. в файле ниже._"
     else
-      COMMENT_CHUNK_RESPONSE="$CHUNK_RESPONSE"
+      COMMENT_FILE_RESPONSE="$FILE_RESPONSE"
     fi
     
-    PART_COMMENT_BODY=$(jq -n \
+    FILE_COMMENT_BODY=$(jq -n \
       --arg model "$FULL_MR_REVIEW_MODEL" \
-      --arg response "$COMMENT_CHUNK_RESPONSE" \
+      --arg response "$COMMENT_FILE_RESPONSE" \
       --arg pipeline "$CI_PIPELINE_ID" \
-      --arg part "$CHUNK_NUM" \
-      --arg total "$CHUNKS_COUNT" \
-      --arg report_view "$PART_ARTIFACT_URL" \
-      --arg report_download "$PART_ARTIFACT_RAW" \
+      --arg filepath "$FILE_PATH" \
+      --arg filenum "$FILE_NUM" \
+      --arg total "$FILES_COUNT" \
+      --arg status "$FILE_STATUS" \
+      --arg report_view "$FILE_ARTIFACT_URL" \
+      --arg report_download "$FILE_ARTIFACT_RAW" \
       --arg mr "$CI_MERGE_REQUEST_IID" \
-      '{body: ("🔍 **Full MR Analysis - Часть " + $part + "/" + $total + "** (Model: " + $model + ")\n\n**MR:** !" + $mr + "\n\n---\n\n" + $response + "\n\n---\n\n📄 [Просмотр полного отчета части](" + $report_view + ") | 💾 [Скачать](" + $report_download + ")\n\n*Pipeline ID: " + $pipeline + "*")}')
+      '{body: ("📄 **File Review [" + $filenum + "/" + $total + "]: `" + $filepath + "`** (Status: " + $status + ")\n\n**Model:** " + $model + "\n\n---\n\n" + $response + "\n\n---\n\n📄 [Просмотр полного отчета](" + $report_view + ") | 💾 [Скачать](" + $report_download + ")\n\n*Pipeline ID: " + $pipeline + "*")}')
     
-    echo "💬 Отправка комментария для части $CHUNK_NUM в GitLab..."
+    echo "   💬 Отправка комментария в GitLab..."
     curl -s --request POST \
       --header "PRIVATE-TOKEN: $API_TOKEN" \
       --header "Content-Type: application/json" \
-      --data "$PART_COMMENT_BODY" \
+      --data "$FILE_COMMENT_BODY" \
       "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes" > /dev/null
     
-    echo "✅ Комментарий для части $CHUNK_NUM отправлен"
+    echo "   ✅ Комментарий отправлен"
     
     # Добавляем к итоговому результату
-    ALL_RESPONSES="$ALL_RESPONSES\n\n## Часть $CHUNK_NUM/$CHUNKS_COUNT\n\n$CHUNK_RESPONSE"
+    ALL_RESPONSES="$ALL_RESPONSES\n\n## Файл: $FILE_PATH\n\n$FILE_RESPONSE"
     
-    # Небольшая задержка между запросами (увеличена для deepseek-coder:33b)
+    # Небольшая задержка между запросами
     sleep 3
-  done
+  done < <(echo "$DIFF_RAW" | jq -c '.changes[]')
   
-  # Удаляем временный файл
-  rm -f "$TEMP_DIFF"
-  
-  echo "📦 Формируем итоговый отчет из всех частей..."
+  echo ""
+  echo "📦 Формируем итоговый отчет из всех файлов..."
   
   # Проверяем размер всех ответов
   ALL_RESPONSES_SIZE=$(echo "$ALL_RESPONSES" | wc -c)
   echo "📊 Размер всех частей: $ALL_RESPONSES_SIZE bytes"
   
-  # AI merge отключен из-за ненадежности gpt-oss-tuned:latest
-  # Модель часто возвращает только последнюю часть, игнорируя остальные
-  # Используем простое объединение - это надежнее
-  echo "📦 Используем структурированное объединение всех частей"
-  AI_RESPONSE="# 🔍 AI Code Review (Полный анализ MR)\n\n"
-  AI_RESPONSE="$AI_RESPONSE> Diff был разбит на $CHUNKS_COUNT частей для детального анализа.\n"
-  AI_RESPONSE="$AI_RESPONSE> Ниже представлены все замечания по каждой части.\n\n"
+  # Объединяем все отзывы по файлам в итоговый отчет
+  echo "📦 Используем структурированное объединение всех файлов"
+  AI_RESPONSE="# 🔍 AI Code Review (Полный анализ MR по файлам)\n\n"
+  AI_RESPONSE="$AI_RESPONSE> MR был проанализирован по файлам для детального анализа.\n"
+  AI_RESPONSE="$AI_RESPONSE> Всего файлов: $FILES_COUNT\n"
+  AI_RESPONSE="$AI_RESPONSE> Ниже представлены все замечания по каждому файлу.\n\n"
   AI_RESPONSE="$AI_RESPONSE---\n\n"
   AI_RESPONSE="$AI_RESPONSE$ALL_RESPONSES\n\n"
   AI_RESPONSE="$AI_RESPONSE---\n\n"
   AI_RESPONSE="$AI_RESPONSE## 📋 Общие рекомендации\n\n"
-  AI_RESPONSE="$AI_RESPONSE- Внимательно просмотрите ВСЕ части выше\n"
+  AI_RESPONSE="$AI_RESPONSE- Внимательно просмотрите ВСЕ файлы выше\n"
   AI_RESPONSE="$AI_RESPONSE- Приоритезируйте критичные замечания по Архитектуре и Безопасности\n"
   AI_RESPONSE="$AI_RESPONSE- Обратите внимание на производительность и тестирование\n"
   
   # ============================================================================
-  # 2.3. Создаем итоговый комментарий с ссылками на все части
+  # 2.3. Создаем итоговый комментарий с ссылками на все файлы
   # ============================================================================
-  echo "💬 Формируем итоговый комментарий со ссылками на все части..."
+  echo "💬 Формируем итоговый комментарий со ссылками на все файлы..."
   
-  # Формируем список ссылок на все части
-  PARTS_LINKS=""
-  for PART_NUM in $(seq 1 $CHUNKS_COUNT); do
-    PART_FILE="ai-review-mr-${CI_MERGE_REQUEST_IID}-part${PART_NUM}.md"
-    PART_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/file/$PART_FILE"
-    PART_RAW="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/raw/$PART_FILE?inline=false"
-    PARTS_LINKS="$PARTS_LINKS\n- 📄 [Часть $PART_NUM]($PART_URL) | [💾 Скачать]($PART_RAW)"
-  done
+  # Формируем список ссылок на все файлы
+  FILES_LINKS=""
+  while read -r FILE_PATH; do
+    SAFE_FILE_NAME=$(echo "$FILE_PATH" | sed 's/\//-/g' | sed 's/\./-/g')
+    FILE_REPORT_FILE="ai-review-mr-${CI_MERGE_REQUEST_IID}-file-${SAFE_FILE_NAME}.md"
+    FILE_URL="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/file/$FILE_REPORT_FILE"
+    FILE_RAW="$CI_SERVER_URL/$CI_PROJECT_PATH/-/jobs/$CI_JOB_ID/artifacts/raw/$FILE_REPORT_FILE?inline=false"
+    FILES_LINKS="$FILES_LINKS\n- 📄 [\`$FILE_PATH\`]($FILE_URL) | [💾 Скачать]($FILE_RAW)"
+  done < <(echo "$DIFF_RAW" | jq -r '.changes[] | .new_path // .old_path')
   
   # Формируем краткое резюме для итогового комментария
   SUMMARY_COMMENT="🔍 **Full MR Analysis - Итоговая сводка** (Model: $FULL_MR_REVIEW_MODEL)\n\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT**MR:** !$CI_MERGE_REQUEST_IID\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT**Diff Size:** $DIFF_SIZE bytes\n"
-  SUMMARY_COMMENT="$SUMMARY_COMMENT**Chunks:** $CHUNKS_COUNT частей (по $CHUNK_SIZE bytes)\n\n"
+  SUMMARY_COMMENT="$SUMMARY_COMMENT**Files:** $FILES_COUNT файлов\n\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT---\n\n"
-  SUMMARY_COMMENT="$SUMMARY_COMMENT## 📦 Детальные отчеты по частям\n\n"
-  SUMMARY_COMMENT="$SUMMARY_COMMENT$PARTS_LINKS\n\n"
+  SUMMARY_COMMENT="$SUMMARY_COMMENT## 📦 Детальные отчеты по файлам\n\n"
+  SUMMARY_COMMENT="$SUMMARY_COMMENT$FILES_LINKS\n\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT---\n\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT## 📋 Краткие выводы\n\n"
-  SUMMARY_COMMENT="$SUMMARY_COMMENT- ✅ Анализ завершен: все $CHUNKS_COUNT частей проверены\n"
-  SUMMARY_COMMENT="$SUMMARY_COMMENT- 📄 Каждая часть доступна как отдельный MD файл (см. ссылки выше)\n"
+  SUMMARY_COMMENT="$SUMMARY_COMMENT- ✅ Анализ завершен: все $FILES_COUNT файлов проверены\n"
+  SUMMARY_COMMENT="$SUMMARY_COMMENT- 📄 Каждый файл доступен как отдельный MD файл (см. ссылки выше)\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT- 📊 Итоговый сводный отчет доступен ниже\n\n"
   SUMMARY_COMMENT="$SUMMARY_COMMENT*Pipeline ID: $CI_PIPELINE_ID*"
   
   # Отправляем итоговый комментарий
   SUMMARY_COMMENT_BODY=$(jq -n --arg body "$SUMMARY_COMMENT" '{body: $body}')
   
-  echo "💬 Отправка итогового комментария с ссылками на все части..."
+  echo "💬 Отправка итогового комментария с ссылками на все файлы..."
   curl -s --request POST \
     --header "PRIVATE-TOKEN: $API_TOKEN" \
     --header "Content-Type: application/json" \
@@ -467,10 +490,10 @@ echo "   💾 Download: $ARTIFACT_RAW_URL"
 FULL_REPORT_LINK="[📄 Просмотр]($ARTIFACT_FILE_URL) | [💾 Скачать]($ARTIFACT_RAW_URL)"
 
 # ============================================================================
-# 5. Добавляем комментарий в MR (ТОЛЬКО для non-chunked случая)
+# 5. Добавляем комментарий в MR (ТОЛЬКО для single-file случая)
 # ============================================================================
-# Для chunked случая комментарии уже отправлены (каждая часть + итоговая сводка)
-if [ "$WAS_CHUNKED" = "false" ]; then
+# Для file-based случая комментарии уже отправлены (каждый файл + итоговая сводка)
+if [ "$WAS_SPLIT_BY_FILES" = "false" ]; then
   # Формируем комментарий (ограничиваем длину для читаемости)
   RESPONSE_LENGTH=$(echo "$AI_RESPONSE" | wc -c)
   if [ "$RESPONSE_LENGTH" -gt 3000 ]; then
@@ -498,6 +521,6 @@ if [ "$WAS_CHUNKED" = "false" ]; then
   
   echo "✅ Full MR review posted successfully"
 else
-  echo "ℹ️ Комментарии для chunked анализа уже отправлены (каждая часть + итоговая сводка)"
+  echo "ℹ️ Комментарии для file-based анализа уже отправлены (каждый файл + итоговая сводка)"
 fi
 

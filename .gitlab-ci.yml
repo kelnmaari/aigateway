@@ -280,7 +280,7 @@ analyze_full_mr:
             {"role": "user", "content": $user}
           ],
           "temperature": 0.3,
-          "max_tokens": 50000,
+          "max_tokens": 4000,
           "stream": false
         }')
       
@@ -294,16 +294,40 @@ analyze_full_mr:
       ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
       if [ -n "$ERROR_MSG" ]; then
         echo "❌ Ошибка от proxy: $ERROR_MSG"
-        exit 1
+        
+        # Создаем fallback для timeout/connection errors (не фейлим job)
+        if echo "$ERROR_MSG" | grep -qi "timeout\|deadline\|exceeded\|connection\|refused"; then
+          echo "⚠️ Timeout или connection error - создаем fallback report"
+          AI_RESPONSE="AI Review Failed - Connection Timeout"
+          AI_RESPONSE="$AI_RESPONSE\n\nError - $ERROR_MSG"
+          AI_RESPONSE="$AI_RESPONSE\n\nModel - $REVIEW_MODEL"
+          AI_RESPONSE="$AI_RESPONSE\nDiff size - $(echo "$DIFF_TEXT" | wc -c) bytes"
+          AI_RESPONSE="$AI_RESPONSE\n\nPossible causes:"
+          AI_RESPONSE="$AI_RESPONSE\n- Ollama server is down or unreachable at localhost:11434"
+          AI_RESPONSE="$AI_RESPONSE\n- Request is too large for available resources"
+          AI_RESPONSE="$AI_RESPONSE\n- Model is not loaded or crashed"
+          AI_RESPONSE="$AI_RESPONSE\n- Network timeout or firewall blocking"
+          AI_RESPONSE="$AI_RESPONSE\n\nRecommendations:"
+          AI_RESPONSE="$AI_RESPONSE\n- Check Ollama server status on proxy host"
+          AI_RESPONSE="$AI_RESPONSE\n- Verify model is loaded with: ollama list"
+          AI_RESPONSE="$AI_RESPONSE\n- Check proxy logs at: journalctl -u aigateway-proxy"
+          AI_RESPONSE="$AI_RESPONSE\n- Try smaller diff or manual review trigger"
+          AI_RESPONSE="$AI_RESPONSE\n- Consider using lighter model like qwen2.5-coder:7b"
+          PROMPT_TOKENS=0
+          COMPLETION_TOKENS=0
+        else
+          # Другие ошибки - fail job
+          exit 1
+        fi
+      else
+        # Извлекаем ответ AI (успешный случай)
+        AI_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+        
+        # Debug: показываем usage stats
+        PROMPT_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.prompt_tokens // 0')
+        COMPLETION_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.completion_tokens // 0')
+        echo "📊 Tokens: prompt=$PROMPT_TOKENS, completion=$COMPLETION_TOKENS"
       fi
-      
-      # Извлекаем ответ AI
-      AI_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
-      
-      # Debug: показываем usage stats
-      PROMPT_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.prompt_tokens // 0')
-      COMPLETION_TOKENS=$(echo "$RESPONSE" | jq -r '.usage.completion_tokens // 0')
-      echo "📊 Tokens: prompt=$PROMPT_TOKENS, completion=$COMPLETION_TOKENS"
       
       # Проверка на пустой ответ (баг некоторых моделей)
       if [ -z "$AI_RESPONSE" ] || [ "$AI_RESPONSE" = "null" ]; then

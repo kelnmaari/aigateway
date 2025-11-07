@@ -1,0 +1,89 @@
+{{if .Keys}}
+<div class="api-keys-grid">
+    {{range .Keys}}
+    <div class="api-key-card" id="key-{{.ID}}">
+        <div class="key-header">
+            <h4>{{.Name}}</h4>
+            <span class="badge {{if eq .Status "active"}}badge-success{{else}}badge-secondary{{end}}">
+                {{.Status}}
+            </span>
+        </div>
+        
+        <div class="key-info">
+            <div class="info-row">
+                <span class="label">Key ID:</span>
+                <code>{{.ID}}</code>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Created:</span>
+                <span>{{.CreatedAt.Format "2006-01-02 15:04"}}</span>
+            </div>
+            
+            {{if .LastUsed}}
+            <div class="info-row">
+                <span class="label">Last Used:</span>
+                <span>{{.LastUsed.Format "2006-01-02 15:04"}}</span>
+            </div>
+            {{end}}
+            
+            {{if .ExpiresAt}}
+            <div class="info-row">
+                <span class="label">Expires:</span>
+                <span>{{.ExpiresAt.Format "2006-01-02"}}</span>
+            </div>
+            {{end}}
+            
+            <div class="info-row">
+                <span class="label">Models:</span>
+                <div class="models-list">
+                    {{if .ModelsAll}}
+                    <span class="badge badge-primary">All Models</span>
+                    {{else if .Models}}
+                    {{range .Models}}
+                    <span class="badge badge-info">{{.}}</span>
+                    {{end}}
+                    {{else}}
+                    <span class="text-muted">No models</span>
+                    {{end}}
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Usage:</span>
+                <span>{{.TotalRequests}} requests</span>
+            </div>
+        </div>
+        
+        <div class="key-actions">
+            <button class="btn btn-sm btn-primary"
+                    hx-get="/api/ui/api-keys/{{.ID}}/edit"
+                    hx-target="#modal-content"
+                    hx-trigger="click"
+                    onclick="document.getElementById('modal-container').style.display='flex'">
+                ✏️ Edit
+            </button>
+            
+            <button class="btn btn-sm btn-danger"
+                    hx-delete="/api/admin/keys/{{.ID}}"
+                    hx-target="closest .api-key-card"
+                    hx-swap="outerHTML swap:1s"
+                    hx-confirm="Delete API key {{.Name}}? This action cannot be undone.">
+                🗑️ Delete
+            </button>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{else}}
+<div class="empty-state">
+    <p>No API keys found.</p>
+    <button class="btn btn-primary"
+            hx-get="/api/ui/api-keys/create-form"
+            hx-target="#modal-content"
+            onclick="document.getElementById('modal-container').style.display='flex'">
+        ➕ Create First API Key
+    </button>
+</div>
+{{end}}
+

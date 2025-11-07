@@ -1,0 +1,66 @@
+{{if .Tenants}}
+<div class="tenants-grid">
+    {{range .Tenants}}
+    <div class="tenant-card" 
+         id="tenant-{{.ID}}"
+         hx-get="/api/ui/tenants/{{.ID}}"
+         hx-trigger="click"
+         hx-target="#tenant-details"
+         style="cursor: pointer;">
+        
+        <div class="tenant-header">
+            <h3>{{.Name}}</h3>
+            <span class="badge {{if eq .Status "active"}}badge-success{{else}}badge-secondary{{end}}">
+                {{.Status}}
+            </span>
+        </div>
+        
+        <div class="tenant-info">
+            {{if .Description}}
+            <p class="description">{{.Description}}</p>
+            {{end}}
+            
+            <div class="tenant-stats">
+                <div class="stat">
+                    <span class="stat-label">Members:</span>
+                    <span class="stat-value">{{.MembersCount}}</span>
+                </div>
+                
+                <div class="stat">
+                    <span class="stat-label">Created:</span>
+                    <span class="stat-value">{{.CreatedAt.Format "2006-01-02"}}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tenant-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-primary"
+                    hx-get="/api/ui/tenants/{{.ID}}/edit"
+                    hx-target="#modal-content"
+                    onclick="document.getElementById('modal-container').style.display='flex'">
+                ✏️ Edit
+            </button>
+            
+            <button class="btn btn-sm btn-danger"
+                    hx-delete="/api/tenants/{{.ID}}"
+                    hx-target="closest .tenant-card"
+                    hx-swap="outerHTML swap:1s"
+                    hx-confirm="Delete tenant {{.Name}}? This will remove all members and data.">
+                🗑️ Delete
+            </button>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{else}}
+<div class="empty-state">
+    <p>No tenants found.</p>
+    <button class="btn btn-primary"
+            hx-get="/api/ui/tenants/create-form"
+            hx-target="#modal-content"
+            onclick="document.getElementById('modal-container').style.display='flex'">
+        ➕ Create First Tenant
+    </button>
+</div>
+{{end}}
+

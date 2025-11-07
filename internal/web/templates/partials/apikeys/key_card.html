@@ -1,0 +1,51 @@
+<div class="api-key-card" id="key-{{.Key.ID}}">
+    <div class="key-header">
+        <h4>{{.Key.Name}}</h4>
+        <span class="badge {{if eq .Key.Status "active"}}badge-success{{else}}badge-secondary{{end}}">
+            {{.Key.Status}}
+        </span>
+    </div>
+    
+    <div class="key-info">
+        <div class="info-row">
+            <span class="label">Key ID:</span>
+            <code>{{.Key.ID}}</code>
+        </div>
+        
+        <div class="info-row">
+            <span class="label">Created:</span>
+            <span>{{.Key.CreatedAt.Format "2006-01-02 15:04"}}</span>
+        </div>
+        
+        <div class="info-row">
+            <span class="label">Models:</span>
+            <div class="models-list">
+                {{if .Key.ModelsAll}}
+                <span class="badge badge-primary">All Models</span>
+                {{else if .Key.Models}}
+                {{range .Key.Models}}
+                <span class="badge badge-info">{{.}}</span>
+                {{end}}
+                {{end}}
+            </div>
+        </div>
+    </div>
+    
+    <div class="key-actions">
+        <button class="btn btn-sm btn-primary"
+                hx-get="/api/ui/api-keys/{{.Key.ID}}/edit"
+                hx-target="#modal-content"
+                onclick="document.getElementById('modal-container').style.display='flex'">
+            ✏️ Edit
+        </button>
+        
+        <button class="btn btn-sm btn-danger"
+                hx-delete="/api/admin/keys/{{.Key.ID}}"
+                hx-target="closest .api-key-card"
+                hx-swap="outerHTML swap:1s"
+                hx-confirm="Delete API key {{.Key.Name}}?">
+            🗑️ Delete
+        </button>
+    </div>
+</div>
+

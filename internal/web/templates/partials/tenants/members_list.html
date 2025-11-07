@@ -1,0 +1,28 @@
+{{if .Members}}
+<ul class="members-list">
+    {{range .Members}}
+    <li class="member-item">
+        <div class="member-info">
+            <span class="member-name">{{.UserName}}</span>
+            <span class="badge badge-info">{{.Role}}</span>
+        </div>
+        <div class="member-actions">
+            <button class="btn btn-sm btn-danger"
+                    hx-delete="/api/tenants/{{$.TenantID}}/members/{{.UserID}}"
+                    hx-target="closest .member-item"
+                    hx-swap="outerHTML swap:0.5s"
+                    hx-confirm="Remove {{.UserName}} from this tenant?">
+                ✕ Remove
+            </button>
+        </div>
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<p class="text-muted">No members yet.</p>
+{{end}}
+
+<button class="btn btn-sm btn-secondary" style="margin-top: 0.5rem;">
+    ➕ Add Member
+</button>
+

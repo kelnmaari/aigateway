@@ -1,0 +1,50 @@
+<div class="modal-header">
+    <h3>{{if .IsEdit}}Edit Tenant{{else}}Create New Tenant{{end}}</h3>
+    <button class="btn-close" onclick="closeModal()">✕</button>
+</div>
+
+<form {{if .IsEdit}}hx-put="/api/tenants/{{.Tenant.ID}}"{{else}}hx-post="/api/tenants"{{end}}
+      hx-target="#tenants-grid"
+      hx-swap="beforeend"
+      hx-on::after-request="closeModal(); showToast('Tenant {{if .IsEdit}}updated{{else}}created{{end}} successfully', 'success')">
+    
+    <div class="form-group">
+        <label for="name">Tenant Name *</label>
+        <input type="text" 
+               id="name" 
+               name="name" 
+               value="{{if .Tenant}}{{.Tenant.Name}}{{end}}"
+               placeholder="e.g., Acme Corporation"
+               required>
+        <small>Organization or team name</small>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" 
+                  name="description" 
+                  rows="3"
+                  placeholder="Optional description...">{{if .Tenant}}{{.Tenant.Description}}{{end}}</textarea>
+    </div>
+
+    {{if .IsEdit}}
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="active" {{if eq .Tenant.Status "active"}}selected{{end}}>Active</option>
+            <option value="suspended" {{if eq .Tenant.Status "suspended"}}selected{{end}}>Suspended</option>
+            <option value="disabled" {{if eq .Tenant.Status "disabled"}}selected{{end}}>Disabled</option>
+        </select>
+    </div>
+    {{end}}
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">
+            {{if .IsEdit}}💾 Save Changes{{else}}➕ Create Tenant{{end}}
+        </button>
+    </div>
+</form>
+

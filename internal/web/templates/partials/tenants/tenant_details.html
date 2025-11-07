@@ -1,0 +1,64 @@
+<div class="tenant-details-panel">
+    <div class="panel-header">
+        <h3>{{.Tenant.Name}}</h3>
+        <button class="btn-close" onclick="this.closest('.tenant-details-panel').remove()">✕</button>
+    </div>
+    
+    <div class="panel-body">
+        <div class="detail-row">
+            <span class="label">Tenant ID:</span>
+            <code>{{.Tenant.ID}}</code>
+        </div>
+        
+        <div class="detail-row">
+            <span class="label">Status:</span>
+            <span class="badge {{if eq .Tenant.Status "active"}}badge-success{{else}}badge-secondary{{end}}">
+                {{.Tenant.Status}}
+            </span>
+        </div>
+        
+        {{if .Tenant.Description}}
+        <div class="detail-row">
+            <span class="label">Description:</span>
+            <p>{{.Tenant.Description}}</p>
+        </div>
+        {{end}}
+        
+        <div class="detail-row">
+            <span class="label">Created:</span>
+            <span>{{.Tenant.CreatedAt.Format "2006-01-02 15:04:05"}}</span>
+        </div>
+        
+        <div class="detail-row">
+            <span class="label">Updated:</span>
+            <span>{{.Tenant.UpdatedAt.Format "2006-01-02 15:04:05"}}</span>
+        </div>
+        
+        <div class="detail-section">
+            <h4>Members ({{.MembersCount}})</h4>
+            <div hx-get="/api/ui/tenants/{{.Tenant.ID}}/members" 
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                Loading members...
+            </div>
+        </div>
+    </div>
+    
+    <div class="panel-actions">
+        <button class="btn btn-primary"
+                hx-get="/api/ui/tenants/{{.Tenant.ID}}/edit"
+                hx-target="#modal-content"
+                onclick="document.getElementById('modal-container').style.display='flex'">
+            ✏️ Edit Tenant
+        </button>
+        
+        <button class="btn btn-danger"
+                hx-delete="/api/tenants/{{.Tenant.ID}}"
+                hx-target="closest .tenant-details-panel"
+                hx-swap="outerHTML swap:1s"
+                hx-confirm="Delete tenant {{.Tenant.Name}}?">
+            🗑️ Delete
+        </button>
+    </div>
+</div>
+

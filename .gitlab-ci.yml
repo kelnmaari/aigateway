@@ -15,7 +15,7 @@ variables:
   #   🏆 qwen2.5-coder:7b - лучший для Go кода
   #   ⭐ deepseek-coder:6.7b - хороший для анализа
   #   ✅ codellama:7b - универсальный
-  REVIEW_MODEL: "qwen2.5-coder:7b"
+  REVIEW_MODEL: "gpt-oss-tuned:latest"
 
 # ============================================================================
 # AI Code Review для Merge Requests

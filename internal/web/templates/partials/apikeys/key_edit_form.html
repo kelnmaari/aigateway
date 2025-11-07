@@ -1,0 +1,93 @@
+<div class="modal-header">
+    <h3>Edit API Key</h3>
+    <button class="btn-close" onclick="closeModal()">✕</button>
+</div>
+
+<form hx-put="/api/admin/keys/{{.Key.ID}}"
+      hx-target="#key-{{.Key.ID}}"
+      hx-swap="outerHTML"
+      hx-on::after-request="closeModal(); showToast('API Key updated successfully', 'success')">
+    
+    <div class="form-group">
+        <label for="name">Key Name *</label>
+        <input type="text" 
+               id="name" 
+               name="name" 
+               value="{{.Key.Name}}"
+               required>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" 
+                  name="description" 
+                  rows="2">{{.Key.Description}}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label>Model Access</label>
+        <div class="checkbox-group">
+            <label>
+                <input type="checkbox" 
+                       id="models_all" 
+                       name="models_all" 
+                       value="true"
+                       {{if .Key.ModelsAll}}checked{{end}}
+                       onchange="document.querySelectorAll('.model-checkbox').forEach(cb => cb.disabled = this.checked)">
+                All Models (Full Access)
+            </label>
+        </div>
+        
+        <small>Current models: 
+            {{if .Key.ModelsAll}}
+            <strong>All Models</strong>
+            {{else if .Key.Models}}
+            {{range .Key.Models}}<code>{{.}}</code> {{end}}
+            {{else}}
+            <em>None</em>
+            {{end}}
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="rate_limit_per_minute">Rate Limit (requests/min)</label>
+        <input type="number" 
+               id="rate_limit_per_minute" 
+               name="rate_limit_per_minute" 
+               min="1"
+               max="1000"
+               value="{{if .Key.RateLimitPerMinute}}{{.Key.RateLimitPerMinute}}{{else}}60{{end}}">
+    </div>
+
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="active" {{if eq .Key.Status "active"}}selected{{end}}>Active</option>
+            <option value="disabled" {{if eq .Key.Status "disabled"}}selected{{end}}>Disabled</option>
+            <option value="expired" {{if eq .Key.Status "expired"}}selected{{end}}>Expired</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="expires_at">Expiration Date</label>
+        <input type="date" 
+               id="expires_at" 
+               name="expires_at"
+               value="{{if .Key.ExpiresAt}}{{.Key.ExpiresAt.Format "2006-01-02"}}{{end}}">
+        <small>Leave empty for no expiration</small>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">
+            💾 Save Changes
+        </button>
+    </div>
+</form>
+
+<div class="alert alert-info" style="margin-top: 1rem;">
+    <strong>ℹ️ Note:</strong> The API key value cannot be changed. To get a new key, create a new API key and delete this one.
+</div>
+

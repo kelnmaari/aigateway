@@ -2551,3 +2551,185 @@ body {
     background: rgba(59, 130, 246, 0.5);
 }
 
+/* ===========================
+   VLM Image Attachments (v3.0.4+)
+   =========================== */
+
+/* Image button (next to attach button) */
+.image-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.image-btn svg {
+    stroke: white;
+}
+
+/* Attached images preview container */
+.attached-images-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Individual image item */
+.attached-image-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    min-width: 200px;
+    transition: all 0.2s ease;
+}
+
+.attached-image-item:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(16, 163, 127, 0.2);
+}
+
+/* Image thumbnail */
+.image-preview-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+/* Image info */
+.image-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0; /* Allow text truncation */
+}
+
+.image-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.image-size {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Remove button */
+.image-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--error-color);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.image-remove-btn svg {
+    stroke: currentColor;
+}
+
+/* Scrollbar for images preview */
+.attached-images-preview::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.attached-images-preview::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+}
+
+.attached-images-preview::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.3);
+    border-radius: 3px;
+}
+
+.attached-images-preview::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.5);
+}
+
+/* Image in message history */
+.message-image {
+    max-width: 400px;
+    max-height: 400px;
+    border-radius: 8px;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.message-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Multiple images in message */
+.message-images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.message-images-grid .message-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+/* VLM indicator badge */
+.vlm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.vlm-badge svg {
+    width: 12px;
+    height: 12px;
+}
+

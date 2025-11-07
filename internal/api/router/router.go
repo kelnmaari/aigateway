@@ -32,6 +32,7 @@ import (
 	filestorageBackend "aigateway/internal/filestorage/storage"
 	"aigateway/internal/huggingface"
 	"aigateway/internal/metrics"
+	"aigateway/internal/yzma"
 	"aigateway/internal/models"
 	"aigateway/internal/observability"
 	"aigateway/internal/providers"
@@ -173,7 +174,13 @@ type Router struct {
 	
 	// Hugging Face Integration (Version 3.0.0+: HF-01)
 	hfClient           *huggingface.Client
+	hfDownloader       *huggingface.Downloader           // Model downloader
 	hfUIHandler        *handlersUI.HuggingFaceUIHandler  // Hugging Face Model Browser
+	
+	// yzma Local Inference (Version 3.0.0+: YZMA-01)
+	yzmaClient         *yzma.Client
+	yzmaHandler        *handlers.YzmaHandler              // yzma inference handler
+	yzmaUIHandler      *handlersUI.YzmaUIHandler          // yzma UI handler (YZMA-UI-01)
 }
 
 // NewOptions содержит опции для создания роутера
@@ -663,6 +670,45 @@ func (r *Router) setupUIRoutes() {
 				dashboard.GET("/system-health", r.dashboardUIHandler.GetSystemHealthTable)
 			}
 		}
+		
+		// Hugging Face Model Browser (v3.0.0+: HF-UI-01)
+		if r.hfUIHandler != nil {
+			hf := ui.Group("/huggingface")
+			{
+				// Search and browse
+				hf.GET("/search", r.hfUIHandler.GetModelsSearch)
+				hf.GET("/popular", r.hfUIHandler.GetPopularModels)
+				
+				// Model details
+				hf.GET("/models/*model_id", r.hfUIHandler.GetModelDetails)
+				hf.GET("/gguf-files/*model_id", r.hfUIHandler.GetGGUFFilesList)
+				
+				// Downloads (HF-02: Download Manager)
+				hf.POST("/download", r.hfUIHandler.PostDownloadModel)
+				hf.GET("/downloads", r.hfUIHandler.GetDownloadsList)
+				hf.GET("/downloads/:download_id/progress", r.hfUIHandler.GetDownloadProgress)
+				hf.POST("/downloads/:download_id/pause", r.hfUIHandler.PostPauseDownload)
+				hf.POST("/downloads/:download_id/cancel", r.hfUIHandler.PostCancelDownload)
+			}
+		}
+		
+		// yzma Model Management UI (v3.0.0+: YZMA-UI-01)
+		if r.yzmaUIHandler != nil {
+			yzma := ui.Group("/yzma")
+			{
+				// Models management
+				yzma.GET("/models", r.yzmaUIHandler.GetModelsList)
+				yzma.GET("/loaded", r.yzmaUIHandler.GetLoadedModelsList)
+				yzma.POST("/load", r.yzmaUIHandler.PostLoadModel)
+				yzma.POST("/unload", r.yzmaUIHandler.PostUnloadModel)
+				
+				// Statistics
+				yzma.GET("/stats", r.yzmaUIHandler.GetStats)
+				
+				// Provider integration for chat
+				yzma.GET("/provider/models", r.yzmaUIHandler.GetProviderModels)
+			}
+		}
 	}
 
 	r.logger.Info("✅ HTMX UI routes registered successfully")
@@ -988,6 +1034,8 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/admin-audit.html", "./web/admin-audit.html")             // Audit Log (v1.11.4)
 	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html")                 // RAG Management (v1.13.0)
 	r.engine.StaticFile("/admin-registry.html", "./web/admin-registry.html")       // Model Registry (REGISTRY-03, v2.3.0)
+	r.engine.StaticFile("/huggingface.html", "./web/huggingface.html")             // Hugging Face Model Browser (HF-UI-01, v3.0.0)
+	r.engine.StaticFile("/yzma.html", "./web/yzma.html")                           // yzma Model Management (YZMA-UI-01, v3.0.0)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
@@ -1076,6 +1124,38 @@ func (r *Router) setupOpenAIRoutes() {
 		v1.POST("/completions", r.authenticator.PermissionMiddleware("completions"), r.completionsHandler.HandleCompletions)
 	} else {
 		v1.POST("/completions", r.completionsHandler.HandleCompletions)
+	}
+	
+	// yzma local inference (Version 3.0.0+: YZMA-03)
+	if r.yzmaHandler != nil {
+		r.logger.Info("Setting up yzma local inference endpoints")
+		
+		// yzma routes use same auth as other v1 endpoints
+		if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
+			// Hybrid auth уже применен к v1 группе
+			v1.POST("/yzma/chat/completions", r.yzmaHandler.HandleChatCompletion)
+			v1.GET("/yzma/models", r.yzmaHandler.HandleModels)
+			v1.GET("/yzma/models/:model", r.yzmaHandler.HandleModelInfo)
+			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
+			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
+			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
+		} else if r.config.Auth.Enabled && r.authenticator != nil {
+			// API Key auth
+			v1.POST("/yzma/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.yzmaHandler.HandleChatCompletion)
+			v1.GET("/yzma/models", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleModels)
+			v1.GET("/yzma/models/:model", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleModelInfo)
+			v1.POST("/yzma/models/load", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleLoadModel)
+			v1.POST("/yzma/models/unload", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleUnloadModel)
+			v1.GET("/yzma/stats", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleYzmaStats)
+		} else {
+			// No auth
+			v1.POST("/yzma/chat/completions", r.yzmaHandler.HandleChatCompletion)
+			v1.GET("/yzma/models", r.yzmaHandler.HandleModels)
+			v1.GET("/yzma/models/:model", r.yzmaHandler.HandleModelInfo)
+			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
+			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
+			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
+		}
 	}
 }
 
@@ -1814,11 +1894,72 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	}
 	
 	// Hugging Face Integration (Version 3.0.0+: HF-01)
-	hfAPIToken := cfg.HuggingFace.APIToken // Add to config
+	hfAPIToken := cfg.HuggingFace.APIToken
 	r.hfClient = huggingface.NewClient(hfAPIToken, logger)
-	if r.templateRenderer != nil {
-		r.hfUIHandler = handlersUI.NewHuggingFaceUIHandler(r.hfClient, r.templateRenderer, logger)
+	
+	// Initialize downloader (HF-02)
+	downloadsDir := cfg.HuggingFace.ModelsDir
+	if downloadsDir == "" {
+		downloadsDir = "./data/models"
+	}
+	maxConcurrent := cfg.HuggingFace.MaxConcurrentDownloads
+	if maxConcurrent <= 0 {
+		maxConcurrent = 2
+	}
+	autoResume := cfg.HuggingFace.AutoResume
+	
+	var err error
+	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, logger)
+	if err != nil {
+		logger.WithError(err).Error("Failed to initialize Hugging Face downloader")
+	} else {
+		logger.WithFields(logrus.Fields{
+			"downloads_dir":   downloadsDir,
+			"max_concurrent":  maxConcurrent,
+			"auto_resume":     autoResume,
+		}).Info("✅ Hugging Face downloader initialized")
+	}
+	
+	// Initialize UI handler
+	if r.templateRenderer != nil && r.hfDownloader != nil {
+		r.hfUIHandler = handlersUI.NewHuggingFaceUIHandler(r.hfClient, r.hfDownloader, r.templateRenderer, logger)
 		logger.Info("✅ Hugging Face browser initialized")
+	}
+	
+	// yzma Local Inference (Version 3.0.0+: YZMA-01)
+	if cfg.Yzma.Enabled {
+		logger.Info("Initializing yzma local inference...")
+		
+		yzmaConfig := yzma.ClientConfig{
+			ModelsDir:   cfg.Yzma.ModelsDir,
+			LibPath:     cfg.Yzma.LibPath,
+			ContextSize: cfg.Yzma.ContextSize,
+			BatchSize:   cfg.Yzma.BatchSize,
+			UBatchSize:  cfg.Yzma.UBatchSize,
+			Temperature: cfg.Yzma.Temperature,
+			TopK:        cfg.Yzma.TopK,
+			TopP:        cfg.Yzma.TopP,
+			MinP:        cfg.Yzma.MinP,
+			Verbose:     cfg.Yzma.Verbose,
+		}
+		
+		yzmaClient, err := yzma.NewClient(yzmaConfig, logger)
+		if err != nil {
+			logger.WithError(err).Error("Failed to initialize yzma client - local inference disabled")
+		} else {
+			r.yzmaClient = yzmaClient
+			r.yzmaHandler = handlers.NewYzmaHandler(yzmaClient, logger)
+			
+			// Initialize UI handler (YZMA-UI-01)
+			if r.templateRenderer != nil {
+				r.yzmaUIHandler = handlersUI.NewYzmaUIHandler(yzmaClient, r.templateRenderer, logger)
+				logger.Info("✅ yzma UI handler initialized")
+			}
+			
+			logger.Info("✅ yzma local inference initialized")
+		}
+	} else {
+		logger.Info("yzma local inference disabled in config")
 	}
 }
 

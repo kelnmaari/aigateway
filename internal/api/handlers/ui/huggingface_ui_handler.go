@@ -19,17 +19,19 @@ import (
 
 // HuggingFaceUIHandler handles Hugging Face UI endpoints
 type HuggingFaceUIHandler struct {
-	hfClient *huggingface.Client
-	renderer *templates.Renderer
-	logger   *logrus.Logger
+	hfClient   *huggingface.Client
+	downloader *huggingface.Downloader
+	renderer   *templates.Renderer
+	logger     *logrus.Logger
 }
 
 // NewHuggingFaceUIHandler creates a new Hugging Face UI handler
-func NewHuggingFaceUIHandler(hfClient *huggingface.Client, renderer *templates.Renderer, logger *logrus.Logger) *HuggingFaceUIHandler {
+func NewHuggingFaceUIHandler(hfClient *huggingface.Client, downloader *huggingface.Downloader, renderer *templates.Renderer, logger *logrus.Logger) *HuggingFaceUIHandler {
 	return &HuggingFaceUIHandler{
-		hfClient: hfClient,
-		renderer: renderer,
-		logger:   logger,
+		hfClient:   hfClient,
+		downloader: downloader,
+		renderer:   renderer,
+		logger:     logger,
 	}
 }
 
@@ -251,8 +253,10 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 // PostDownloadModel handles HTMX request to start model download
 func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 	type DownloadRequest struct {
-		ModelID  string `json:"model_id" binding:"required"`
-		Filename string `json:"filename" binding:"required"`
+		ModelID   string `json:"model_id" binding:"required"`
+		Filename  string `json:"filename" binding:"required"`
+		TotalSize int64  `json:"total_size"`
+		SHA256    string `json:"sha256"`
 	}
 	
 	var req DownloadRequest
@@ -261,29 +265,129 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 		return
 	}
 	
-	// TODO: Implement download manager
-	// For now, return success message with download URL
-	downloadURL := h.hfClient.GetFileURL(req.ModelID, req.Filename)
-	
 	h.logger.WithFields(logrus.Fields{
 		"model_id": req.ModelID,
 		"filename": req.Filename,
-		"url":      downloadURL,
+		"size":     req.TotalSize,
 	}).Info("Model download requested")
 	
-	// Return download started message
-	message := fmt.Sprintf(`
-		<div class="alert alert-success">
-			<h4>Download Started</h4>
-			<p><strong>Model:</strong> %s</p>
-			<p><strong>File:</strong> %s</p>
-			<p><strong>URL:</strong> <a href="%s" target="_blank">%s</a></p>
-			<p class="mt-2">Download will be implemented in next iteration.</p>
+	// Start download
+	download, err := h.downloader.StartDownload(req.ModelID, req.Filename, req.TotalSize, req.SHA256)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to start download")
+		h.renderError(c, "Failed to start download: "+err.Error())
+		return
+	}
+	
+	// Return download started response with progress
+	data := map[string]interface{}{
+		"Download": download,
+	}
+	
+	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_download_started", data); err != nil {
+		h.logger.WithError(err).Error("Failed to render template")
+		h.renderError(c, "Failed to render download status")
+		return
+	}
+}
+
+// GetDownloadProgress returns download progress for HTMX polling
+func (h *HuggingFaceUIHandler) GetDownloadProgress(c *gin.Context) {
+	downloadID := c.Param("download_id")
+	
+	download, exists := h.downloader.GetDownload(downloadID)
+	if !exists {
+		h.renderError(c, "Download not found")
+		return
+	}
+	
+	download.Mu.RLock()
+	defer download.Mu.RUnlock()
+	
+	// Return only progress bar HTML for efficient updates
+	html := fmt.Sprintf(`
+		<div class="progress-fill" 
+		     style="width: %.1f%%"
+		     hx-get="/api/ui/huggingface/downloads/%s/progress"
+		     hx-trigger="every 1s"
+		     hx-swap="outerHTML">
+			<span class="progress-text">%.1f%%</span>
 		</div>
-	`, req.ModelID, req.Filename, downloadURL, downloadURL)
+	`, download.Progress, downloadID, download.Progress)
+	
+	// If completed, stop polling
+	if download.Status == huggingface.DownloadStatusCompleted {
+		html = fmt.Sprintf(`
+			<div class="progress-fill" style="width: 100%%">
+				<span class="progress-text">✅ Completed</span>
+			</div>
+		`)
+	} else if download.Status == huggingface.DownloadStatusFailed {
+		html = fmt.Sprintf(`
+			<div class="progress-fill" style="width: %.1f%%; background: #dc3545;">
+				<span class="progress-text">❌ Failed: %s</span>
+			</div>
+		`, download.Progress, download.Error)
+	}
 	
 	c.Header("Content-Type", "text/html")
-	c.String(http.StatusOK, message)
+	c.String(http.StatusOK, html)
+}
+
+// PostPauseDownload pauses an active download
+func (h *HuggingFaceUIHandler) PostPauseDownload(c *gin.Context) {
+	downloadID := c.Param("download_id")
+	
+	if err := h.downloader.PauseDownload(downloadID); err != nil {
+		h.logger.WithError(err).Error("Failed to pause download")
+		h.renderError(c, "Failed to pause download: "+err.Error())
+		return
+	}
+	
+	download, _ := h.downloader.GetDownload(downloadID)
+	
+	// Return updated download card
+	data := map[string]interface{}{
+		"Download": download,
+	}
+	
+	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_download_paused", data); err != nil {
+		h.logger.WithError(err).Error("Failed to render template")
+		h.renderError(c, "Failed to render download status")
+		return
+	}
+}
+
+// PostCancelDownload cancels and removes a download
+func (h *HuggingFaceUIHandler) PostCancelDownload(c *gin.Context) {
+	downloadID := c.Param("download_id")
+	
+	if err := h.downloader.CancelDownload(downloadID); err != nil {
+		h.logger.WithError(err).Error("Failed to cancel download")
+		h.renderError(c, "Failed to cancel download: "+err.Error())
+		return
+	}
+	
+	// Return empty div (removes download card)
+	html := `<div class="alert alert-info">Download cancelled and removed.</div>`
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, html)
+}
+
+// GetDownloadsList returns all active downloads
+func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
+	downloads := h.downloader.ListDownloads()
+	
+	data := map[string]interface{}{
+		"Downloads": downloads,
+		"Count":     len(downloads),
+	}
+	
+	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_downloads_list", data); err != nil {
+		h.logger.WithError(err).Error("Failed to render template")
+		h.renderError(c, "Failed to render downloads list")
+		return
+	}
 }
 
 // renderError renders error message

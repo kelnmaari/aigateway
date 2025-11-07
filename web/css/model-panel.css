@@ -17,6 +17,46 @@
     gap: 8px;
 }
 
+/* Provider Selector - Compact Dropdown (v3.0.0+) */
+.provider-selector-compact {
+    flex: 0 0 140px;
+    position: relative;
+}
+
+.provider-select-compact {
+    width: 100%;
+    padding: 6px 28px 6px 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='white' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+
+.provider-select-compact:hover {
+    opacity: 0.9;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.provider-select-compact:focus {
+    outline: none;
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
+}
+
+.provider-select-compact option {
+    background: var(--bg-primary, #0d1117);
+    color: var(--text-color, #c9d1d9);
+    padding: 8px;
+}
+
 /* Model Selector - Compact Dropdown */
 .model-selector-compact {
     flex: 1;

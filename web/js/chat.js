@@ -269,6 +269,16 @@ class ChatManager {
     async sendMessage(content) {
         if (!content.trim() || this.isStreaming) return;
         
+        // VLM-04: Check if images attached (v3.0.4+)
+        const hasImages = window.vlmManager && window.vlmManager.hasImages();
+        if (hasImages) {
+            const validation = window.vlmManager.validateBeforeSend();
+            if (!validation.valid) {
+                this.showError(validation.error);
+                return;
+            }
+        }
+        
         // Get selected model from Model Panel (v1.9.1+)
         if (window.modelPanel) {
             this.currentModel = window.modelPanel.getSelectedModel() || this.currentModel;
@@ -292,10 +302,17 @@ class ChatManager {
         // Hide welcome screen
         this.hideWelcome();
 
+        // Build message content (VLM-04: multimodal if images attached)
+        let messageContent = content;
+        if (hasImages) {
+            // Build multimodal content array
+            messageContent = window.vlmManager.buildMultimodalContent(content);
+        }
+
         // Add user message
         const userMessage = {
             role: 'user',
-            content: content,
+            content: messageContent,
             file_ids: this.attachedFiles.map(f => f.id) // FILE-STORAGE-01: Phase 4 (snake_case!)
         };
         
@@ -304,12 +321,17 @@ class ChatManager {
         
         // Track in context manager (v1.9.1+)
         if (window.contextManager) {
-            window.contextManager.addMessage('user', content);
+            window.contextManager.addMessage('user', typeof messageContent === 'string' ? messageContent : content);
         }
         
         // Clear input
         this.messageInput.value = '';
         this.messageInput.style.height = 'auto';
+        
+        // Clear attached images (VLM-04: v3.0.4+)
+        if (hasImages && window.vlmManager) {
+            window.vlmManager.clearImages();
+        }
 
         // Scroll to bottom
         this.scrollToBottom();

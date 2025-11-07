@@ -164,6 +164,14 @@
         <!-- Compact Model Control Panel (v1.9.1 - Cursor-style) -->
         <div class="chat-model-panel">
             <div class="model-control-row">
+                <!-- Provider Selector (v3.0.0+) -->
+                <div class="provider-selector-compact">
+                    <select id="chat-provider-select" class="provider-select-compact">
+                        <option value="ollama">Ollama</option>
+                        <option value="yzma">yzma Local</option>
+                    </select>
+                </div>
+                
                 <!-- Model Selector (Cursor-style compact) -->
                 <div class="model-selector-compact">
                     <select id="chat-model-select" class="model-select-compact">
@@ -384,6 +392,11 @@
             <div id="attached-files-preview" class="attached-files-preview" style="display: none;">
                 <!-- Attached files will be shown here -->
             </div>
+            
+            <!-- Attached Images Preview (VLM-04: Phase 4, v3.0.4+) -->
+            <div id="attached-images-preview" class="attached-images-preview" style="display: none;">
+                <!-- Attached images will be shown here -->
+            </div>
 
             <form id="chat-form" class="chat-form">
                 <input 
@@ -393,6 +406,20 @@
                     multiple 
                     style="display: none;"
                 />
+                <input 
+                    type="file" 
+                    id="image-input" 
+                    accept="image/jpeg,image/png,image/webp,image/jpg" 
+                    multiple 
+                    style="display: none;"
+                />
+                <button type="button" class="btn btn-icon image-btn" id="image-btn" title="Attach images (VLM)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5" stroke-width="2"/>
+                        <path d="M21 15l-5-5L5 21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
                 <button type="button" class="btn btn-icon attach-btn" id="attach-btn" title="Attach files">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -518,6 +545,7 @@
     <script src="/js/utils/notifications.js"></script>
     <script src="/js/model-panel.js"></script>
     <script src="/js/context-manager.js"></script>
+    <script src="/js/vlm.js"></script>
     <script src="/js/chat.js"></script>
     <script src="/js/app.js"></script>
 </body>

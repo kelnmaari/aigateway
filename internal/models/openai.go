@@ -55,6 +55,19 @@ type ChatMessage struct {
 	FileIDs      []string      `json:"file_ids,omitempty"`      // FILE-STORAGE-01: Phase 4, v1.10.0+
 }
 
+// ContentPart represents a part of multimodal content (v3.0.4+: VLM support)
+type ContentPart struct {
+	Type     string       `json:"type"` // "text" or "image_url"
+	Text     string       `json:"text,omitempty"`
+	ImageURL *ImageURL    `json:"image_url,omitempty"`
+}
+
+// ImageURL represents an image URL or data URI (v3.0.4+: VLM support)
+type ImageURL struct {
+	URL    string `json:"url"`    // data:image/jpeg;base64,... or https://...
+	Detail string `json:"detail,omitempty"` // "auto", "low", "high"
+}
+
 // Tool представляет инструмент доступный для модели
 type Tool struct {
 	Type     string   `json:"type"` // "function"

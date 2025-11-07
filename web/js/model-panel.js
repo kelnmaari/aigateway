@@ -5,6 +5,7 @@ class ModelPanelController {
     constructor() {
         this.STORAGE_KEY_MODEL = 'chat_selected_model';
         this.STORAGE_KEY_PARAMS = 'chat_model_params';
+        this.STORAGE_KEY_PROVIDER = 'chat_selected_provider'; // v3.0.0+
         
         // Presets matching backend ModelParameters
         this.PRESETS = {
@@ -37,6 +38,7 @@ class ModelPanelController {
 
     // Initialize the panel
     init() {
+        this.providerSelect = document.getElementById('chat-provider-select'); // v3.0.0+
         this.modelSelect = document.getElementById('chat-model-select');
         this.paramsToggle = document.getElementById('params-toggle');
         this.paramsPanel = document.getElementById('params-panel');
@@ -69,6 +71,12 @@ class ModelPanelController {
         this.syncSliderWithInput(this.tempSlider, this.tempValue);
         this.syncSliderWithInput(this.topPSlider, this.topPValue);
 
+        // Provider selection change (v3.0.0+)
+        this.providerSelect?.addEventListener('change', () => {
+            this.saveSelectedProvider();
+            this.loadModels();
+        });
+        
         // Model selection change
         this.modelSelect?.addEventListener('change', () => {
             this.saveSelectedModel();
@@ -105,7 +113,7 @@ class ModelPanelController {
         });
     }
 
-    // Load models from API
+    // Load models from API (v3.0.0+ with provider support)
     async loadModels() {
         try {
             const token = localStorage.getItem('access_token');
@@ -113,7 +121,10 @@ class ModelPanelController {
                 throw new Error('No authentication token');
             }
 
-            const response = await fetch('/v1/models', {
+            const provider = this.providerSelect?.value || 'ollama';
+            const url = provider === 'yzma' ? '/v1/yzma/models' : '/v1/models';
+
+            const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -124,7 +135,7 @@ class ModelPanelController {
             }
 
             const data = await response.json();
-            this.populateModelSelect(data.data || []);
+            this.populateModelSelect(data.data || [], provider);
         } catch (error) {
             console.error('Failed to load models:', error);
             if (this.modelSelect) {
@@ -133,8 +144,8 @@ class ModelPanelController {
         }
     }
 
-    // Populate model select dropdown
-    populateModelSelect(models) {
+    // Populate model select dropdown (v3.0.0+ with provider param)
+    populateModelSelect(models, provider = 'ollama') {
         if (!this.modelSelect) return;
 
         // Keep recommended models at top
@@ -179,6 +190,12 @@ class ModelPanelController {
 
     // Restore saved settings from localStorage
     restoreSavedSettings() {
+        // Restore provider (v3.0.0+)
+        const savedProvider = localStorage.getItem(this.STORAGE_KEY_PROVIDER);
+        if (savedProvider && this.providerSelect) {
+            this.providerSelect.value = savedProvider;
+        }
+        
         // Restore model
         const savedModel = localStorage.getItem(this.STORAGE_KEY_MODEL);
         if (savedModel && this.modelSelect?.querySelector(`option[value="${savedModel}"]`)) {
@@ -215,6 +232,14 @@ class ModelPanelController {
         }
     }
 
+    // Save selected provider (v3.0.0+)
+    saveSelectedProvider() {
+        if (this.providerSelect) {
+            localStorage.setItem(this.STORAGE_KEY_PROVIDER, this.providerSelect.value);
+            console.log(`Provider saved: ${this.providerSelect.value}`);
+        }
+    }
+    
     // Save selected model
     saveSelectedModel() {
         if (this.modelSelect) {
@@ -274,9 +299,10 @@ class ModelPanelController {
         console.log('Reset to balanced defaults');
     }
 
-    // Get parameters for API request (convert to OpenAI format)
+    // Get parameters for API request (convert to OpenAI format) (v3.0.0+ with provider)
     getRequestParams() {
         const params = this.getCurrentParams();
+        const provider = this.providerSelect?.value || 'ollama';
         
         // Convert to OpenAI API format
         return {
@@ -284,11 +310,17 @@ class ModelPanelController {
             temperature: params.temperature,
             top_p: params.top_p,
             max_tokens: params.max_tokens === -1 ? null : params.max_tokens,
+            provider: provider,  // v3.0.0+: Include provider info
             // Ollama-specific: num_ctx goes in options
             options: {
                 num_ctx: params.num_ctx
             }
         };
+    }
+    
+    // Get selected provider (v3.0.0+)
+    getSelectedProvider() {
+        return this.providerSelect?.value || 'ollama';
     }
 }
 

@@ -1,0 +1,144 @@
+{{/* HF Downloads List - HTMX Component */}}
+<div class="downloads-list">
+    <div class="downloads-header">
+        <h2>📥 Active Downloads ({{.Count}})</h2>
+        <button class="btn btn-sm btn-secondary"
+                hx-get="/api/ui/huggingface/downloads"
+                hx-target=".downloads-list"
+                hx-swap="outerHTML"
+                hx-trigger="every 2s">
+            🔄 Auto-refresh
+        </button>
+    </div>
+    
+    {{if eq .Count 0}}
+    <div class="alert alert-info">
+        <p>No active downloads. Start downloading models from the Hugging Face browser.</p>
+    </div>
+    {{else}}
+    <div class="downloads-grid">
+        {{range .Downloads}}
+        <div class="download-card" id="download-{{.ID}}">
+            <div class="download-header">
+                <h3>{{.Filename}}</h3>
+                <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+            </div>
+            
+            <p class="model-id">{{.ModelID}}</p>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{.Progress}}%">
+                    <span class="progress-text">{{printf "%.1f" .Progress}}%</span>
+                </div>
+            </div>
+            
+            <div class="download-stats">
+                <div class="stat">
+                    <strong>Downloaded:</strong> 
+                    {{printf "%.2f MB" (divf .DownloadedSize 1048576.0)}} / 
+                    {{printf "%.2f GB" (divf .TotalSize 1073741824.0)}}
+                </div>
+                {{if gt .Speed 0}}
+                <div class="stat">
+                    <strong>Speed:</strong> {{printf "%.2f MB/s" (divf .Speed 1048576.0)}}
+                </div>
+                {{end}}
+                {{if gt .ETA 0}}
+                <div class="stat">
+                    <strong>ETA:</strong> {{.ETA.Round (1 * time.Second)}}
+                </div>
+                {{end}}
+            </div>
+            
+            <div class="download-actions">
+                {{if eq .Status "downloading"}}
+                <button class="btn btn-xs btn-warning"
+                        hx-post="/api/ui/huggingface/downloads/{{.ID}}/pause">
+                    ⏸️ Pause
+                </button>
+                {{else if eq .Status "paused"}}
+                <button class="btn btn-xs btn-success"
+                        hx-post="/api/ui/huggingface/downloads/{{.ID}}/resume">
+                    ▶️ Resume
+                </button>
+                {{end}}
+                
+                {{if ne .Status "completed"}}
+                <button class="btn btn-xs btn-danger"
+                        hx-post="/api/ui/huggingface/downloads/{{.ID}}/cancel"
+                        hx-confirm="Cancel download?">
+                    ❌ Cancel
+                </button>
+                {{end}}
+            </div>
+            
+            {{if .Error}}
+            <div class="alert alert-error">
+                <strong>Error:</strong> {{.Error}}
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+
+<style>
+.downloads-list {
+    padding: 2rem;
+}
+
+.downloads-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.downloads-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+}
+
+.download-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.download-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.download-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    word-break: break-word;
+}
+
+.model-id {
+    color: #666;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.btn-xs {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+</style>
+

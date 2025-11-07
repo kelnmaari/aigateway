@@ -14,7 +14,8 @@ import (
 // Config представляет конфигурацию всего приложения
 type Config struct {
 	Server        ServerConfig        `mapstructure:"server"`
-	Ollama        OllamaConfig        `mapstructure:"ollama"`
+	Inference     InferenceConfig     `mapstructure:"inference"`     // Version 3.0.5+: Unified inference backend (yzma primary, ollama fallback)
+	Ollama        OllamaConfig        `mapstructure:"ollama"`         // DEPRECATED: Use inference.ollama instead (kept for backward compatibility)
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Database      DatabaseConfig      `mapstructure:"database"` // Version 1.3.0+: Database abstraction
 	Logging       LoggingConfig       `mapstructure:"logging"`
@@ -31,6 +32,26 @@ type Config struct {
 	RAG           ragconfig.RAGConfig      `mapstructure:"rag"`           // Version 1.13.0+: RAG system configuration
 	ModelRegistry ModelRegistryConfig      `mapstructure:"model_registry"` // Version 2.3.0+: Model Registry system
 	Agent         AgentConfig              `mapstructure:"agent"`         // Version 2.5.0+: Agentic AI configuration
+	HuggingFace   HuggingFaceConfig        `mapstructure:"huggingface"`   // Version 3.0.0+: Hugging Face integration
+	Yzma          YzmaConfig               `mapstructure:"yzma"`          // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
+}
+
+// InferenceConfig represents unified inference backend configuration (v3.0.5+)
+type InferenceConfig struct {
+	// Backend selects the inference engine: "yzma" (default), "ollama" (fallback), "auto"
+	Backend string `mapstructure:"backend"` // "yzma", "ollama", "auto"
+	
+	// MaxLoadedModels limits how many models can be loaded simultaneously (yzma only)
+	MaxLoadedModels int `mapstructure:"max_loaded_models"`
+	
+	// GPULayers controls GPU offloading (-1 = auto, 0 = CPU only, >0 = specific layer count)
+	GPULayers int `mapstructure:"gpu_layers"`
+	
+	// Yzma nested configuration (primary backend)
+	Yzma YzmaConfig `mapstructure:"yzma"`
+	
+	// Ollama nested configuration (fallback backend)
+	Ollama OllamaConfig `mapstructure:"ollama"`
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -628,12 +649,74 @@ func Load(configPath string) (*Config, error) {
 	fmt.Printf("\n🚀 Server will bind to: %s:%d\n", config.Server.Host, config.Server.Port)
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
+	// Migration: Backward compatibility for old config format (v3.0.5+)
+	config = *migrateToInferenceConfig(&config)
+
 	// Валидация конфигурации
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	return &config, nil
+}
+
+// migrateToInferenceConfig migrates old config format to new inference-based structure (v3.0.5+)
+func migrateToInferenceConfig(config *Config) *Config {
+	// Check if new inference config is already set
+	if config.Inference.Backend != "" {
+		// New format detected - ensure nested configs are populated
+		if config.Inference.Yzma.ModelsDir == "" && config.Yzma.ModelsDir != "" {
+			// Copy from deprecated top-level Yzma
+			config.Inference.Yzma = config.Yzma
+		}
+		if config.Inference.Ollama.URL == "" && config.Ollama.URL != "" {
+			// Copy from deprecated top-level Ollama
+			config.Inference.Ollama = config.Ollama
+		}
+		return config
+	}
+
+	// Old format detected - migrate to new structure
+	fmt.Println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("📝 CONFIG MIGRATION (v3.0.5+):")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("⚠️  Old config format detected.")
+	fmt.Println("   Migrating to inference-based structure...")
+
+	// Determine backend based on what's configured
+	if config.Yzma.Enabled {
+		config.Inference.Backend = "yzma"
+		config.Inference.Yzma = config.Yzma
+		fmt.Println("   ✅ Detected yzma backend (primary)")
+	} else if config.Ollama.URL != "" {
+		config.Inference.Backend = "ollama"
+		config.Inference.Ollama = config.Ollama
+		fmt.Println("   ✅ Detected ollama backend (fallback)")
+	} else {
+		// Default to yzma
+		config.Inference.Backend = "yzma"
+		config.Inference.Yzma.Enabled = true
+		config.Inference.Yzma.ModelsDir = "./data/models"
+		fmt.Println("   ⚙️  No backend detected, defaulting to yzma")
+	}
+
+	// Set inference-level defaults
+	if config.Inference.MaxLoadedModels == 0 {
+		config.Inference.MaxLoadedModels = 3
+	}
+	if config.Inference.GPULayers == 0 {
+		config.Inference.GPULayers = -1 // Auto
+	}
+
+	fmt.Println("   ✅ Migration complete!")
+	fmt.Println("   💡 Update config to new format:")
+	fmt.Println("      inference:")
+	fmt.Printf("        backend: \"%s\"\n", config.Inference.Backend)
+	fmt.Println("        max_loaded_models: 3")
+	fmt.Println("        gpu_layers: -1")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+
+	return config
 }
 
 // setDefaults устанавливает значения по умолчанию
@@ -646,7 +729,32 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.idle_timeout", "60s")
 	v.SetDefault("server.max_header_bytes", 1048576)
 
-	// Ollama defaults
+	// Inference defaults (v3.0.5+)
+	v.SetDefault("inference.backend", "yzma")          // Primary: yzma (local inference)
+	v.SetDefault("inference.max_loaded_models", 3)     // Keep 3 models in memory
+	v.SetDefault("inference.gpu_layers", -1)           // Auto GPU offloading
+	
+	// Inference > Yzma defaults
+	v.SetDefault("inference.yzma.enabled", true)
+	v.SetDefault("inference.yzma.models_dir", "./data/models")
+	v.SetDefault("inference.yzma.context_size", 4096)
+	v.SetDefault("inference.yzma.batch_size", 2048)
+	v.SetDefault("inference.yzma.ubatch_size", 2048)
+	v.SetDefault("inference.yzma.temperature", 0.7)
+	v.SetDefault("inference.yzma.top_k", 40)
+	v.SetDefault("inference.yzma.top_p", 0.9)
+	v.SetDefault("inference.yzma.min_p", 0.1)
+	v.SetDefault("inference.yzma.verbose", false)
+	
+	// Inference > Ollama defaults (fallback)
+	v.SetDefault("inference.ollama.url", "http://localhost:11434")
+	v.SetDefault("inference.ollama.timeout", "30s")
+	v.SetDefault("inference.ollama.retry_attempts", 3)
+	v.SetDefault("inference.ollama.retry_delay", "1s")
+	v.SetDefault("inference.ollama.connection_pool_size", 10)
+	v.SetDefault("inference.ollama.keep_alive", true)
+
+	// DEPRECATED: Top-level Ollama defaults (backward compatibility)
 	v.SetDefault("ollama.url", "http://localhost:11434")
 	v.SetDefault("ollama.timeout", "30s")
 	v.SetDefault("ollama.retry_attempts", 3)
@@ -873,6 +981,63 @@ type AgentConfig struct {
 		BufferSize int  `mapstructure:"buffer_size"`
 	} `mapstructure:"streaming"`
 }
+
+	// HuggingFaceConfig represents Hugging Face integration settings (Version 3.0.0+)
+	type HuggingFaceConfig struct {
+		// APIToken - optional Hugging Face API token for private models
+		APIToken string `mapstructure:"api_token"`
+		
+		// ModelsDir - directory for storing downloaded models
+		ModelsDir string `mapstructure:"models_dir"`
+		
+		// CacheDir - directory for caching model metadata
+		CacheDir string `mapstructure:"cache_dir"`
+		
+		// DefaultDownloadTimeout - timeout for model downloads
+		DefaultDownloadTimeout time.Duration `mapstructure:"download_timeout"`
+		
+		// MaxConcurrentDownloads - maximum number of parallel downloads
+		MaxConcurrentDownloads int `mapstructure:"max_concurrent_downloads"`
+		
+		// AutoResume - automatically resume interrupted downloads
+		AutoResume bool `mapstructure:"auto_resume"`
+	}
+	
+	// YzmaConfig represents yzma local inference settings (Version 3.0.0+)
+	type YzmaConfig struct {
+		// Enabled - enable yzma local inference
+		Enabled bool `mapstructure:"enabled"`
+		
+		// LibPath - path to llama.cpp shared library (can also use YZMA_LIB env var)
+		LibPath string `mapstructure:"lib_path"`
+		
+		// ModelsDir - directory for GGUF models (shared with HuggingFace)
+		ModelsDir string `mapstructure:"models_dir"`
+		
+		// ContextSize - context window size (default: 4096)
+		ContextSize uint32 `mapstructure:"context_size"`
+		
+		// BatchSize - logical batch size (default: 2048)
+		BatchSize uint32 `mapstructure:"batch_size"`
+		
+		// UBatchSize - physical batch size (default: 2048)
+		UBatchSize uint32 `mapstructure:"ubatch_size"`
+		
+		// Temperature - default sampling temperature (default: 0.7)
+		Temperature float32 `mapstructure:"temperature"`
+		
+		// TopK - Top-K sampling (default: 40)
+		TopK int32 `mapstructure:"top_k"`
+		
+		// TopP - Top-P sampling (default: 0.9)
+		TopP float32 `mapstructure:"top_p"`
+		
+		// MinP - Min-P sampling (default: 0.1)
+		MinP float32 `mapstructure:"min_p"`
+		
+		// Verbose - enable llama.cpp logging
+		Verbose bool `mapstructure:"verbose"`
+	}
 
 // GetServerAddr возвращает адрес сервера в формате host:port
 func (c *Config) GetServerAddr() string {

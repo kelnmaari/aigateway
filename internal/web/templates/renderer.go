@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-//go:embed layouts/*.html partials/**/*.html components/*.html
+//go:embed layouts/*.html partials/**/*.html components/*.html *.html
 var templatesFS embed.FS
 
 // Renderer handles HTML template rendering
@@ -128,5 +128,61 @@ func (r *Renderer) RenderTenantsGrid(w io.Writer, data interface{}) error {
 // GetTemplatePath returns the full path for a template
 func GetTemplatePath(category, name string) string {
 	return filepath.Join("partials", category, name+".html")
+}
+
+// RenderInlineTemplate renders a template by name directly
+// Useful for HTMX components that don't need full page layout
+func (r *Renderer) RenderInlineTemplate(w io.Writer, name string, data interface{}) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// In dev mode, reload templates on each render
+	if r.devMode {
+		r.mu.RUnlock()
+		r.loadTemplates()
+		r.mu.RLock()
+	}
+
+	// Map template name to file path
+	templatePath := r.getInlineTemplatePath(name)
+	
+	// Parse and execute template
+	tmpl, err := template.ParseFS(templatesFS, templatePath)
+	if err != nil {
+		return err
+	}
+
+	return tmpl.Execute(w, data)
+}
+
+// getInlineTemplatePath maps template names to file paths
+func (r *Renderer) getInlineTemplatePath(name string) string {
+	// Hugging Face templates
+	switch name {
+	case "hf_models_list":
+		return "hf_models_list.html"
+	case "hf_model_details":
+		return "hf_model_details.html"
+	case "hf_gguf_files":
+		return "hf_gguf_files.html"
+	case "hf_popular_models":
+		return "hf_popular_models.html"
+	case "hf_download_started":
+		return "hf_download_started.html"
+	case "hf_download_paused":
+		return "hf_download_paused.html"
+	case "hf_downloads_list":
+		return "hf_downloads_list.html"
+	// Registry templates
+	case "models_table":
+		return "partials/registry/models_table.html"
+	case "api_keys_list":
+		return "partials/apikeys/keys_list.html"
+	case "tenants_grid":
+		return "partials/tenants/tenants_grid.html"
+	default:
+		// Fallback to direct path
+		return name
+	}
 }
 

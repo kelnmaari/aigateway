@@ -1,4 +1,5 @@
-# Development Configuration для Ollama-OpenAI Proxy
+# Development Configuration для AIGateway Platform v3.0.5+
+# Migration: Now using inference.backend instead of separate ollama/yzma configs
 
 server:
   port: 8085
@@ -8,11 +9,42 @@ server:
   idle_timeout: "120s"    # 2 минуты
   max_header_bytes: 1048576  # 1MB
 
+# Inference Configuration (v3.0.5+: Unified Backend)
+inference:
+  backend: "yzma"  # "yzma" (default), "ollama" (fallback), "auto"
+  max_loaded_models: 3    # Keep 3 models in memory (yzma only)
+  gpu_layers: -1          # GPU offloading: -1=auto, 0=CPU only, >0=specific layers
+  
+  # yzma Configuration (Primary Backend)
+  yzma:
+    enabled: true
+    lib_path: "" # Path to llama.cpp shared library (or use YZMA_LIB env var)
+    models_dir: "./data/models"
+    context_size: 4096
+    batch_size: 2048
+    ubatch_size: 2048
+    temperature: 0.7
+    top_k: 40
+    top_p: 0.9
+    min_p: 0.1
+    verbose: false
+  
+  # Ollama Configuration (Fallback Backend)
+  ollama:
+    url: "http://localhost:11434"
+    timeout: "30m"
+    retry_attempts: 3
+    retry_delay: "2s"
+    connection_pool_size: 10
+    keep_alive: true
+
+# DEPRECATED: Old ollama config (kept for backward compatibility)
+# Remove this section after migrating to inference.backend
 ollama:
   url: "http://localhost:11434"
-  timeout: "30m"          # 10 минут - для больших моделей и большого контекста
+  timeout: "30m"
   retry_attempts: 3
-  retry_delay: "2s"       # Увеличено с 1s до 2s
+  retry_delay: "2s"
   connection_pool_size: 10
   keep_alive: true
 
@@ -607,3 +639,20 @@ agent:
   streaming:
     enabled: true  # WebSocket streaming для real-time updates
     buffer_size: 100  # Размер буфера для events
+
+# v3.0.0+: Hugging Face Integration
+huggingface:
+  api_token: "" # Optional Hugging Face API token for private models
+  models_dir: "./data/models" # Directory for storing downloaded models
+  cache_dir: "./data/hf_cache" # Directory for caching model metadata
+  download_timeout: 5m # Default timeout for model downloads
+  max_concurrent_downloads: 2 # Maximum number of parallel downloads
+  auto_resume: true # Automatically resume interrupted downloads
+
+# DEPRECATED: v3.0.0-v3.0.4 (Old yzma config format)
+# Use inference.yzma instead (see above)
+# This section kept for backward compatibility, will be removed in v3.1.0
+#yzma:
+#  enabled: false
+#  lib_path: ""
+#  models_dir: "./data/models"

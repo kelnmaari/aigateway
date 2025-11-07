@@ -324,75 +324,43 @@ analyze_full_mr:
         # Удаляем временный файл
         rm -f "$TEMP_DIFF"
         
-        echo "🔗 Объединяем все части через AI для связного отчета..."
+        echo "📦 Формируем итоговый отчет из всех частей..."
         
-        # Проверяем размер входных данных для merge
+        # Проверяем размер всех ответов
         ALL_RESPONSES_SIZE=$(echo "$ALL_RESPONSES" | wc -c)
-        echo "📊 Размер всех частей для merge: $ALL_RESPONSES_SIZE bytes"
+        echo "📊 Размер всех частей: $ALL_RESPONSES_SIZE bytes"
         
-        # Если слишком большой - не пытаемся merge, используем простое объединение
-        if [ "$ALL_RESPONSES_SIZE" -gt 30000 ]; then
-          echo "⚠️ Все части слишком большие для AI merge (>30KB)"
-          echo "📦 Используем простое объединение без AI"
-          AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n\n$ALL_RESPONSES"
-        else
-          # Финальный запрос: объединение всех частей в связный отчет
-          MERGE_PROMPT="КРИТИЧНО: Ты получил $CHUNKS_COUNT частей code review. ОБЯЗАТЕЛЬНО используй ВСЕ части для создания итогового отчета. НЕ используй только последнюю часть. Объедини КАЖДУЮ часть в единый документ. Сгруппируй замечания по категориям: Архитектура, Безопасность, Производительность, Code Style, Тестирование. Убери дублирование. НЕ теряй информацию из частей 1 и 2. Отвечай на русском."
-          
-          MERGE_REQUEST=$(jq -n \
-            --arg model "$REVIEW_MODEL" \
-            --arg system "$MERGE_PROMPT" \
-            --arg user "Объедини ВСЕ $CHUNKS_COUNT частей анализа (НЕ только последнюю!):\n\n$ALL_RESPONSES" \
-            '{
-              "model": $model,
-              "messages": [
-                {"role": "system", "content": $system},
-                {"role": "user", "content": $user}
-              ],
-              "temperature": 0.1,
-              "max_tokens": 6000,
-              "stream": false
-            }')
-          
-          MERGE_RESPONSE=$(curl -s -X POST "$PROXY_URL" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $PROXY_API_KEY" \
-            -d "$MERGE_REQUEST")
-          
-          # Проверяем успешность объединения
-          MERGE_ERROR=$(echo "$MERGE_RESPONSE" | jq -r '.error.message // empty')
-          if [ -n "$MERGE_ERROR" ]; then
-            echo "⚠️ Ошибка объединения: $MERGE_ERROR"
-            echo "📦 Используем простое объединение частей"
-            AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n\n$ALL_RESPONSES"
-          else
-            MERGED_CONTENT=$(echo "$MERGE_RESPONSE" | jq -r '.choices[0].message.content // empty')
-            if [ -z "$MERGED_CONTENT" ] || [ "$MERGED_CONTENT" = "null" ]; then
-              echo "⚠️ Модель вернула пустой ответ при объединении"
-              echo "📦 Используем простое объединение частей"
-              AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n\n$ALL_RESPONSES"
-            else
-              # Проверяем что merge действительно объединил все части
-              MERGED_SIZE=$(echo "$MERGED_CONTENT" | wc -c)
-              echo "📊 Размер merged ответа: $MERGED_SIZE bytes (исходный: $ALL_RESPONSES_SIZE bytes)"
-              
-              # Если merged меньше 50% от исходного - подозрительно, возможно модель не объединила
-              MIN_EXPECTED_SIZE=$(($ALL_RESPONSES_SIZE / 2))
-              if [ "$MERGED_SIZE" -lt "$MIN_EXPECTED_SIZE" ]; then
-                echo "⚠️ Merged ответ подозрительно маленький ($MERGED_SIZE < $MIN_EXPECTED_SIZE)"
-                echo "⚠️ Модель возможно не объединила все части"
-                echo "📦 Используем простое объединение для сохранения всей информации"
-                AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n\n$ALL_RESPONSES"
-              else
-                echo "✅ Части успешно объединены в связный отчет"
-                AI_RESPONSE="$MERGED_CONTENT"
-              fi
-            fi
-          fi
-        fi
+        # AI merge отключен из-за ненадежности gpt-oss-tuned:latest
+        # Модель часто возвращает только последнюю часть, игнорируя остальные
+        # Используем простое объединение - это надежнее
+        echo "📦 Используем структурированное объединение всех частей"
+        AI_RESPONSE="# 🔍 AI Code Review (Полный анализ MR)\n\n"
+        AI_RESPONSE="$AI_RESPONSE> Diff был разбит на $CHUNKS_COUNT частей для детального анализа.\n"
+        AI_RESPONSE="$AI_RESPONSE> Ниже представлены все замечания по каждой части.\n\n"
+        AI_RESPONSE="$AI_RESPONSE---\n\n"
+        AI_RESPONSE="$AI_RESPONSE$ALL_RESPONSES\n\n"
+        AI_RESPONSE="$AI_RESPONSE---\n\n"
+        AI_RESPONSE="$AI_RESPONSE## 📋 Общие рекомендации\n\n"
+        AI_RESPONSE="$AI_RESPONSE- Внимательно просмотрите ВСЕ части выше\n"
+        AI_RESPONSE="$AI_RESPONSE- Приоритезируйте критичные замечания по Архитектуре и Безопасности\n"
+        AI_RESPONSE="$AI_RESPONSE- Обратите внимание на производительность и тестирование\n"
         
-        PROMPT_TOKENS=$(($CHUNKS_COUNT * 5000 + 3000))  # Включая merge request
-        COMPLETION_TOKENS=$(($CHUNKS_COUNT * 2000 + 4000))
+        # OPTIONAL: AI merge можно включить для более мощных моделей
+        # Раскомментируй следующий блок если используешь qwen2.5-coder:32b или claude
+        # if [ "$ALL_RESPONSES_SIZE" -lt 30000 ] && [ "$REVIEW_MODEL" != "gpt-oss-tuned:latest" ]; then
+        #   echo "🔗 Пробуем AI merge для улучшения отчета..."
+        #   MERGE_PROMPT="Ты опытный Go разработчик. Объедини $CHUNKS_COUNT частей code review в ЕДИНЫЙ отчет. Сгруппируй по категориям. НЕ теряй информацию."
+        #   MERGE_REQUEST=$(jq -n --arg model "$REVIEW_MODEL" --arg system "$MERGE_PROMPT" --arg user "Объедини:\n\n$ALL_RESPONSES" '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $user}], temperature: 0.1, max_tokens: 6000}')
+        #   MERGE_RESPONSE=$(curl -s -X POST "$PROXY_URL" -H "Content-Type: application/json" -H "Authorization: Bearer $PROXY_API_KEY" -d "$MERGE_REQUEST")
+        #   MERGED_CONTENT=$(echo "$MERGE_RESPONSE" | jq -r '.choices[0].message.content // empty')
+        #   if [ -n "$MERGED_CONTENT" ] && [ "$MERGED_CONTENT" != "null" ]; then
+        #     echo "✅ AI merge успешен"
+        #     AI_RESPONSE="$MERGED_CONTENT"
+        #   fi
+        # fi
+        
+        PROMPT_TOKENS=$(($CHUNKS_COUNT * 5000))  # Все части
+        COMPLETION_TOKENS=$(($CHUNKS_COUNT * 2000))  # Все ответы
         
       else
         # Маленький diff - отправляем целиком

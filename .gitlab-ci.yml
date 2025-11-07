@@ -28,8 +28,9 @@ analyze_latest_commit:
   before_script:
     - apk add --no-cache curl jq bash git
   script:
-    - echo "🚀 AI Code Review: Latest Commit (Fast)"
     - |
+      echo "🚀 AI Code Review: Latest Commit (Fast)"
+      
       # Получаем diff последнего коммита
       echo "📥 Fetching latest commit changes..."
       API_TOKEN="${GITLAB_API_TOKEN:-$CI_JOB_TOKEN}"
@@ -232,8 +233,9 @@ analyze_full_mr:
   before_script:
     - apk add --no-cache curl jq bash git
   script:
-    - echo "🔍 AI Code Review: Full MR Analysis (Comprehensive)"
     - |
+      echo "🔍 AI Code Review: Full MR Analysis (Comprehensive)"
+      
       # Получаем ВСЕ изменения в MR
       echo "📥 Fetching FULL MR changes..."
       API_TOKEN="${GITLAB_API_TOKEN:-$CI_JOB_TOKEN}"

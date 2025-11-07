@@ -330,10 +330,50 @@ analyze_full_mr:
         # Удаляем временный файл
         rm -f "$TEMP_DIFF"
         
-        # Итоговый ответ - объединение всех частей
-        AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n$ALL_RESPONSES"
-        PROMPT_TOKENS=$(($CHUNKS_COUNT * 5000))  # Примерная оценка
-        COMPLETION_TOKENS=$(($CHUNKS_COUNT * 2000))
+        echo "🔗 Объединяем все части через AI для связного отчета..."
+        
+        # Финальный запрос: объединение всех частей в связный отчет
+        MERGE_PROMPT="Ты опытный Go разработчик. У тебя есть $CHUNKS_COUNT частей code review одного MR. Твоя задача: объединить их в ЕДИНЫЙ СВЯЗНЫЙ ОТЧЕТ. Убери дублирование, сгруппируй замечания по категориям (Архитектура, Безопасность, Производительность, Code Style, Тестирование). Формат: Markdown с четкими разделами. Отвечай на русском."
+        
+        MERGE_REQUEST=$(jq -n \
+          --arg model "$REVIEW_MODEL" \
+          --arg system "$MERGE_PROMPT" \
+          --arg user "Объедини следующие части анализа в связный отчет:\n\n$ALL_RESPONSES" \
+          '{
+            "model": $model,
+            "messages": [
+              {"role": "system", "content": $system},
+              {"role": "user", "content": $user}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 4000,
+            "stream": false
+          }')
+        
+        MERGE_RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $PROXY_API_KEY" \
+          -d "$MERGE_REQUEST")
+        
+        # Проверяем успешность объединения
+        MERGE_ERROR=$(echo "$MERGE_RESPONSE" | jq -r '.error.message // empty')
+        if [ -n "$MERGE_ERROR" ]; then
+          echo "⚠️ Ошибка объединения: $MERGE_ERROR"
+          echo "📦 Используем простое объединение частей"
+          AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n\n$ALL_RESPONSES"
+        else
+          AI_RESPONSE=$(echo "$MERGE_RESPONSE" | jq -r '.choices[0].message.content // empty')
+          if [ -z "$AI_RESPONSE" ] || [ "$AI_RESPONSE" = "null" ]; then
+            echo "⚠️ Модель вернула пустой ответ при объединении"
+            echo "📦 Используем простое объединение частей"
+            AI_RESPONSE="# Анализ MR (разбит на $CHUNKS_COUNT частей)\n\n$ALL_RESPONSES"
+          else
+            echo "✅ Части успешно объединены в связный отчет"
+          fi
+        fi
+        
+        PROMPT_TOKENS=$(($CHUNKS_COUNT * 5000 + 3000))  # Включая merge request
+        COMPLETION_TOKENS=$(($CHUNKS_COUNT * 2000 + 4000))
         
       else
         # Маленький diff - отправляем целиком
@@ -465,20 +505,30 @@ analyze_full_mr:
       
       if [ -n "$UPLOAD_URL" ]; then
         echo "✅ File uploaded: $UPLOAD_URL"
-        FULL_REPORT_LINK="[📄 Полный отчет MR]($CI_SERVER_URL/$CI_PROJECT_PATH$UPLOAD_URL)"
+        # GitLab API уже возвращает путь типа /uploads/..., добавляем только server URL
+        FULL_REPORT_LINK="[📄 Полный отчет MR]($CI_SERVER_URL$UPLOAD_URL)"
       else
         echo "⚠️ Failed to upload file"
         FULL_REPORT_LINK=""
       fi
       
-      # Формируем комментарий (full MR всегда компактный т.к. summarized)
+      # Формируем комментарий (ограничиваем длину для читаемости)
+      RESPONSE_LENGTH=$(echo "$AI_RESPONSE" | wc -c)
+      if [ "$RESPONSE_LENGTH" -gt 3000 ]; then
+        echo "📝 Ответ слишком длинный ($RESPONSE_LENGTH chars), обрезаем для комментария"
+        COMMENT_RESPONSE=$(echo "$AI_RESPONSE" | head -c 3000)
+        COMMENT_RESPONSE="$COMMENT_RESPONSE\n\n...\n\n_Полный отчет слишком длинный для комментария. См. файл ниже._"
+      else
+        COMMENT_RESPONSE="$AI_RESPONSE"
+      fi
+      
       COMMENT_BODY=$(jq -n \
         --arg model "$REVIEW_MODEL" \
-        --arg response "$AI_RESPONSE" \
+        --arg response "$COMMENT_RESPONSE" \
         --arg pipeline "$CI_PIPELINE_ID" \
         --arg report "$FULL_REPORT_LINK" \
         --arg mr "$CI_MERGE_REQUEST_IID" \
-        '{body: ("🔍 **Full MR Analysis** (Model: " + $model + ")\n\n**MR:** !" + $mr + "\n\n---\n\n" + $response + "\n\n---\n" + $report + " | *Pipeline ID: " + $pipeline + "*")}')
+        '{body: ("🔍 **Full MR Analysis** (Model: " + $model + ")\n\n**MR:** !" + $mr + "\n\n---\n\n" + $response + "\n\n---\n\n" + $report + "\n\n*Pipeline ID: " + $pipeline + "*")}')
       
       echo "💬 Adding full MR review comment..."
       curl -s --request POST \

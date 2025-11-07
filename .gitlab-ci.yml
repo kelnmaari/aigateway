@@ -40,11 +40,11 @@ analyze_merge_request:
         exit 1
       fi
       
-      # Извлекаем diff текст (до 8000 символов для контекста)
+      # Извлекаем diff текст (до 100KB для 32k context window)
       DIFF_TEXT=$(echo "$DIFF_RAW" | jq -r '.changes[] | 
         "File: \(.new_path // .old_path)\n" + 
         "Status: \(.new_file // false | if . then "new" else "modified" end)\n" +
-        (.diff // "No diff") + "\n---\n"' | head -c 8000 || true)
+        (.diff // "No diff") + "\n---\n"' | head -c 100000 || true)
       
       if [ -z "$DIFF_TEXT" ]; then
         echo "⚠️ Diff пустой, пропускаем review"

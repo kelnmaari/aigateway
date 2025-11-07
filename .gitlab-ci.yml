@@ -11,16 +11,17 @@ variables:
   
   # Модели для code review (можно настроить разные для разных задач)
   # Рекомендуемые модели:
-  #   🏆 qwen2.5-coder:7b - лучший для Go кода, детальный анализ
+  #   👑 deepseek-coder:33b - BEST для детального Full MR review (медленнее, но качественнее)
+  #   🏆 qwen2.5-coder:7b - отличный для Go кода, хороший баланс скорость/качество
   #   ⭐ deepseek-coder:6.7b - быстрый, хороший для коммитов
   #   ✅ codellama:7b - универсальный
   #   ⚠️ gpt-oss-tuned:latest - НЕСТАБИЛЬНЫЙ, может возвращать пустые ответы!
   
   # Модель для быстрого review последнего коммита (автоматический)
-  COMMIT_REVIEW_MODEL: "deepseek-coder:6.7b"
+  COMMIT_REVIEW_MODEL: "deepseek-coder:33b"
   
   # Модель для полного детального review MR (мануальный)
-  FULL_MR_REVIEW_MODEL: "qwen2.5-coder:7b"
+  FULL_MR_REVIEW_MODEL: "deepseek-coder:33b"
 
 # Общие настройки для review jobs (YAML anchor)
 .review_base:
@@ -58,17 +59,17 @@ analyze_full_mr:
     - chmod +x .gitlab/scripts/review-full-mr.sh
     - .gitlab/scripts/review-full-mr.sh
 
-
   artifacts:
     paths:
       - ai-review-mr-*-full.md
+      - ai-review-mr-*-part*.md
     expire_in: 30 days
     when: always
   rules:
     - if: '$CI_MERGE_REQUEST_IID'  # Только для MR
       when: manual  # Запускается вручную
   allow_failure: true
-  timeout: 20m  # Больше времени для полного анализа
+  timeout: 40m  # Увеличено для deepseek-coder:33b + вдвое больше чанков (10KB chunks)
   
 # ============================================================================
 # SETUP INSTRUCTIONS:

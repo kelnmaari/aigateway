@@ -1,0 +1,90 @@
+{{if .Models}}
+<table class="models-table">
+    <thead>
+        <tr>
+            <th>Model ID</th>
+            <th>Display Name</th>
+            <th>Provider</th>
+            <th>Capabilities</th>
+            <th>GPU</th>
+            <th>Status</th>
+            <th>Health</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Models}}
+        <tr id="model-{{.ID}}">
+            <td class="model-id">
+                <code>{{.ModelID}}</code>
+            </td>
+            <td class="model-name">
+                {{.ModelName}}
+            </td>
+            <td class="provider-id">
+                <span class="badge badge-secondary">{{.ProviderID}}</span>
+            </td>
+            <td class="capabilities">
+                {{range .Capabilities}}
+                <span class="badge badge-info">{{.}}</span>
+                {{end}}
+            </td>
+            <td class="gpu-required">
+                {{if .RequiresGPU}}
+                <span class="badge badge-warning">GPU</span>
+                {{else}}
+                <span class="badge badge-light">CPU</span>
+                {{end}}
+            </td>
+            <td class="status">
+                {{if eq .Status "enabled"}}
+                <span class="badge badge-success">Enabled</span>
+                {{else if eq .Status "disabled"}}
+                <span class="badge badge-secondary">Disabled</span>
+                {{else}}
+                <span class="badge badge-warning">{{.Status}}</span>
+                {{end}}
+            </td>
+            <td class="health">
+                {{if eq .HealthStatus "healthy"}}
+                <span class="badge badge-success">✓ Healthy</span>
+                {{else if eq .HealthStatus "unhealthy"}}
+                <span class="badge badge-danger">✗ Unhealthy</span>
+                {{else if eq .HealthStatus "unknown"}}
+                <span class="badge badge-secondary">? Unknown</span>
+                {{else}}
+                <span class="badge badge-warning">{{.HealthStatus}}</span>
+                {{end}}
+            </td>
+            <td class="actions">
+                <button class="btn btn-sm btn-primary"
+                        hx-get="/api/ui/registry/models/{{.ID}}/edit"
+                        hx-target="#modal-content"
+                        hx-trigger="click"
+                        onclick="document.getElementById('modal-container').style.display='flex'">
+                    ✏️ Edit
+                </button>
+                <button class="btn btn-sm btn-danger"
+                        hx-delete="/api/admin/registry/models/{{.ID}}"
+                        hx-target="closest tr"
+                        hx-swap="outerHTML swap:1s"
+                        hx-confirm="Delete model {{.ModelID}}? This action cannot be undone.">
+                    🗑️ Delete
+                </button>
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<div class="empty-state">
+    <p>No models found.</p>
+    <button class="btn btn-primary"
+            hx-get="/api/ui/registry/models/new-form"
+            hx-target="#modal-content"
+            onclick="document.getElementById('modal-container').style.display='flex'">
+        ➕ Add First Model
+    </button>
+</div>
+{{end}}
+

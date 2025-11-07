@@ -3,24 +3,24 @@ package ui
 import (
 	"net/http"
 
-	"aigateway/internal/logger"
-	"aigateway/internal/registry"
+	"aigateway/internal/storage"
 	"aigateway/internal/web/templates"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 // RegistryUIHandler handles UI rendering for Model Registry
 type RegistryUIHandler struct {
-	registry *registry.Registry
+	db       storage.Database
 	renderer *templates.Renderer
-	logger   *logger.Logger
+	logger   *logrus.Logger
 }
 
 // NewRegistryUIHandler creates a new registry UI handler
-func NewRegistryUIHandler(reg *registry.Registry, renderer *templates.Renderer, log *logger.Logger) *RegistryUIHandler {
+func NewRegistryUIHandler(db storage.Database, renderer *templates.Renderer, log *logrus.Logger) *RegistryUIHandler {
 	return &RegistryUIHandler{
-		registry: reg,
+		db:       db,
 		renderer: renderer,
 		logger:   log,
 	}

@@ -17,6 +17,7 @@ import (
 type MonitorUIHandler struct {
 	logger     *logrus.Logger
 	gpuMonitor *metrics.GPUMonitor
+	db         storage.Database
 	templates  *template.Template
 }
 

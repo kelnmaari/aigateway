@@ -139,22 +139,49 @@ if [ "$FILES_COUNT" -gt 1 ]; then
     echo "$REQUEST_JSON" | jq -C '.' | head -50
     echo ""
     
-    # Отправляем запрос
-    RESPONSE=$(curl -s -X POST "$PROXY_URL" \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer $PROXY_API_KEY" \
-      -d "$REQUEST_JSON")
+    # Отправляем запрос с retry логикой для timeout
+    MAX_RETRIES=3
+    RETRY_DELAY=10
+    ATTEMPT=1
+    SUCCESS=false
     
-    # DEBUG: Выводим ответ
-    echo "   🔍 DEBUG RESPONSE:"
+    while [ $ATTEMPT -le $MAX_RETRIES ] && [ "$SUCCESS" = "false" ]; do
+      if [ $ATTEMPT -gt 1 ]; then
+        echo "   🔄 Попытка $ATTEMPT/$MAX_RETRIES (задержка ${RETRY_DELAY}s)..."
+        sleep $RETRY_DELAY
+      else
+        echo "   📤 Отправка запроса (попытка $ATTEMPT/$MAX_RETRIES)..."
+      fi
+      
+      RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $PROXY_API_KEY" \
+        -d "$REQUEST_JSON")
+      
+      # Проверяем на timeout ошибку
+      ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+      
+      if echo "$ERROR_MSG" | grep -q "context deadline exceeded"; then
+        echo "   ⏱️ Timeout от модели, повторяем..."
+        ATTEMPT=$((ATTEMPT + 1))
+      elif [ -n "$ERROR_MSG" ]; then
+        echo "   ❌ Ошибка (не timeout): $ERROR_MSG"
+        break  # Не timeout - не ретраим
+      else
+        SUCCESS=true
+      fi
+    done
+    
+    # DEBUG: Выводим финальный ответ
+    echo "   🔍 DEBUG RESPONSE (attempt $ATTEMPT):"
     echo "$RESPONSE" | jq -C '.'
     echo ""
     
-    # Проверяем ошибки
+    # Проверяем финальный результат
     ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
     if [ -n "$ERROR_MSG" ]; then
-      echo "   ⚠️ Ошибка анализа: $ERROR_MSG"
-      FILE_RESPONSE="[Ошибка анализа $FILE_PATH: $ERROR_MSG]"
+      echo "   ⚠️ Ошибка анализа после $ATTEMPT попыток: $ERROR_MSG"
+      FILE_RESPONSE="[Ошибка анализа $FILE_PATH после $ATTEMPT попыток: $ERROR_MSG]"
       FILE_RESPONSE_SIZE=0
     else
       FILE_RESPONSE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "[Пустой ответ]"')
@@ -388,23 +415,52 @@ Full MR diff для анализа:\n\n$DIFF_TEXT" \
       "stream": false
     }')
   
-  # Отправляем в прокси
-  RESPONSE=$(curl -s -X POST "$PROXY_URL" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $PROXY_API_KEY" \
-    -d "$REQUEST_JSON")
+  # Отправляем в прокси с retry логикой для timeout
+  echo "📤 Отправка полного MR diff в AI модель..."
+  MAX_RETRIES=3
+  RETRY_DELAY=10
+  ATTEMPT=1
+  SUCCESS=false
   
-  # Проверяем ошибки (для не-chunked)
+  while [ $ATTEMPT -le $MAX_RETRIES ] && [ "$SUCCESS" = "false" ]; do
+    if [ $ATTEMPT -gt 1 ]; then
+      echo "🔄 Попытка $ATTEMPT/$MAX_RETRIES (задержка ${RETRY_DELAY}s)..."
+      sleep $RETRY_DELAY
+    else
+      echo "📤 Отправка запроса (попытка $ATTEMPT/$MAX_RETRIES)..."
+    fi
+    
+    RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $PROXY_API_KEY" \
+      -d "$REQUEST_JSON")
+    
+    # Проверяем на timeout ошибку
+    ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+    
+    if echo "$ERROR_MSG" | grep -q "context deadline exceeded"; then
+      echo "⏱️ Timeout от модели, повторяем..."
+      ATTEMPT=$((ATTEMPT + 1))
+    elif [ -n "$ERROR_MSG" ]; then
+      echo "❌ Ошибка (не timeout): $ERROR_MSG"
+      break  # Не timeout - не ретраим
+    else
+      SUCCESS=true
+    fi
+  done
+  
+  # Проверяем финальный результат (для не-chunked)
   ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
   if [ -n "$ERROR_MSG" ]; then
     echo "❌ Ошибка от proxy: $ERROR_MSG"
     
     # Создаем fallback для timeout/connection errors (не фейлим job)
     if echo "$ERROR_MSG" | grep -qi "timeout\|deadline\|exceeded\|connection\|refused"; then
-      echo "⚠️ Timeout или connection error - создаем fallback report"
-      AI_RESPONSE="AI Review Failed - Connection Timeout"
+      echo "⚠️ Timeout или connection error после $ATTEMPT попыток - создаем fallback report"
+      AI_RESPONSE="AI Review Failed - Connection Timeout (after $ATTEMPT retries)"
       AI_RESPONSE="$AI_RESPONSE\n\nError - $ERROR_MSG"
       AI_RESPONSE="$AI_RESPONSE\n\nModel - $FULL_MR_REVIEW_MODEL"
+      AI_RESPONSE="$AI_RESPONSE\nAttempts - $ATTEMPT/$MAX_RETRIES (with ${RETRY_DELAY}s delay)"
       AI_RESPONSE="$AI_RESPONSE\nDiff size - $(echo "$DIFF_TEXT" | wc -c) bytes"
       AI_RESPONSE="$AI_RESPONSE\n\nPossible causes:"
       AI_RESPONSE="$AI_RESPONSE\n- Ollama server is down or unreachable at localhost:11434"

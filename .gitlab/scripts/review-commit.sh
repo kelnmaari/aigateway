@@ -111,16 +111,44 @@ Diff для анализа:\n\n$DIFF_TEXT" \
     "stream": false
   }')
 
-# Отправляем в прокси
-RESPONSE=$(curl -s -X POST "$PROXY_URL" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $PROXY_API_KEY" \
-  -d "$REQUEST_JSON")
+# Отправляем в прокси с retry логикой для timeout
+echo "📤 Отправка в AI модель..."
+MAX_RETRIES=3
+RETRY_DELAY=10
+ATTEMPT=1
+SUCCESS=false
 
-# Проверяем ошибки
+while [ $ATTEMPT -le $MAX_RETRIES ] && [ "$SUCCESS" = "false" ]; do
+  if [ $ATTEMPT -gt 1 ]; then
+    echo "🔄 Попытка $ATTEMPT/$MAX_RETRIES (задержка ${RETRY_DELAY}s)..."
+    sleep $RETRY_DELAY
+  else
+    echo "📤 Отправка запроса (попытка $ATTEMPT/$MAX_RETRIES)..."
+  fi
+  
+  RESPONSE=$(curl -s -X POST "$PROXY_URL" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $PROXY_API_KEY" \
+    -d "$REQUEST_JSON")
+  
+  # Проверяем на timeout ошибку
+  ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+  
+  if echo "$ERROR_MSG" | grep -q "context deadline exceeded"; then
+    echo "⏱️ Timeout от модели, повторяем..."
+    ATTEMPT=$((ATTEMPT + 1))
+  elif [ -n "$ERROR_MSG" ]; then
+    echo "❌ Ошибка (не timeout): $ERROR_MSG"
+    break  # Не timeout - не ретраим
+  else
+    SUCCESS=true
+  fi
+done
+
+# Проверяем финальный результат
 ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
 if [ -n "$ERROR_MSG" ]; then
-  echo "❌ Ошибка от proxy: $ERROR_MSG"
+  echo "❌ Ошибка от proxy после $ATTEMPT попыток: $ERROR_MSG"
   exit 1
 fi
 

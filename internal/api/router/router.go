@@ -161,11 +161,11 @@ type Router struct {
 	ragOrchestrator *ragorchestrator.RAGOrchestrator
 
 	// HTMX UI Handlers (Version 2.6.0+: HTMX-01)
-	templateRenderer     *templates.Renderer
-	registryUIHandler    *handlersUI.RegistryUIHandler
-	apiKeysUIHandler     *handlersUI.APIKeysUIHandler
-	tenantsUIHandler     *handlersUI.TenantsUIHandler
-	monitorUIHandler     *handlersUI.MonitorUIHandler // Monitor UI (GPU, Audit, Usage) - HTMX-02
+	templateRenderer  *templates.Renderer
+	registryUIHandler *handlersUI.RegistryUIHandler
+	apiKeysUIHandler  *handlersUI.APIKeysUIHandler
+	tenantsUIHandler  *handlersUI.TenantsUIHandler
+	monitorUIHandler  *handlersUI.MonitorUIHandler // Monitor UI (GPU, Audit, Usage) - HTMX-02
 }
 
 // NewOptions содержит опции для создания роутера

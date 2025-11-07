@@ -1747,7 +1747,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	if r.db != nil {
 		// Initialize template renderer
 		var err error
-		devMode := false // TODO: Add config.DevMode option for hot reload in development
+		devMode := cfg.Development.HotReload // Enable hot reload for templates in dev mode
 		r.templateRenderer, err = templates.NewRenderer(devMode)
 		if err != nil {
 			logger.WithError(err).Error("Failed to initialize template renderer")

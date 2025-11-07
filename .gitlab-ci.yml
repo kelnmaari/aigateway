@@ -44,7 +44,7 @@ analyze_merge_request:
       DIFF_TEXT=$(echo "$DIFF_RAW" | jq -r '.changes[] | 
         "File: \(.new_path // .old_path)\n" + 
         "Status: \(.new_file // false | if . then "new" else "modified" end)\n" +
-        (.diff // "No diff") + "\n---\n"' | head -c 8000)
+        (.diff // "No diff") + "\n---\n"' | head -c 8000 || true)
       
       if [ -z "$DIFF_TEXT" ]; then
         echo "⚠️ Diff пустой, пропускаем review"
@@ -97,7 +97,7 @@ analyze_merge_request:
       
       echo "✅ AI analysis completed"
       echo "Response preview:"
-      echo "$AI_RESPONSE" | head -n 10
+      echo "$AI_RESPONSE" | head -n 10 || true
       
       # Формируем комментарий для MR и экранируем для JSON
       COMMENT_BODY=$(jq -n \

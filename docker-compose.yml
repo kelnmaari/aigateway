@@ -23,7 +23,20 @@ services:
       - AIGATEWAY_SERVER_PORT=8080
       - AIGATEWAY_SERVER_HOST=0.0.0.0
       
-      # Ollama settings
+      # Inference Backend (v3.0.5+)
+      - AIGATEWAY_INFERENCE_BACKEND=yzma  # "yzma" (default), "ollama" (fallback)
+      - AIGATEWAY_INFERENCE_MAX_LOADED_MODELS=3
+      - AIGATEWAY_INFERENCE_GPU_LAYERS=-1  # Auto GPU offloading
+      
+      # Yzma settings (Primary Backend)
+      - YZMA_LIB=/app/lib/libllama.so  # Path to llama.cpp shared library
+      - AIGATEWAY_INFERENCE_YZMA_MODELS_DIR=/app/data/models
+      
+      # Ollama settings (Fallback Backend - optional)
+      - AIGATEWAY_INFERENCE_OLLAMA_URL=http://ollama:11434
+      - AIGATEWAY_INFERENCE_OLLAMA_TIMEOUT=30s
+      
+      # DEPRECATED: Old Ollama config (backward compatibility)
       - AIGATEWAY_OLLAMA_URL=http://ollama:11434
       - AIGATEWAY_OLLAMA_TIMEOUT=30s
       
@@ -47,8 +60,9 @@ services:
       - AIGATEWAY_data:/app/data
       - AIGATEWAY_logs:/app/logs
       - ./configs:/app/configs:ro
-    depends_on:
-      - ollama
+      - ./data/models:/app/data/models  # GGUF models directory (v3.0.5+)
+    # depends_on:
+    #   - ollama  # OPTIONAL: Ollama is now a fallback backend, not required
     networks:
       - ollama_network
     restart: unless-stopped
@@ -59,26 +73,28 @@ services:
       retries: 3
       start_period: 10s
 
-  # Ollama сервер
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-server
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - ollama_network
-    restart: unless-stopped
-    environment:
-      - OLLAMA_ORIGINS=*
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+  # Ollama сервер (OPTIONAL - Fallback Backend)
+  # Uncomment this service if you want to use Ollama as fallback backend
+  # Set AIGATEWAY_INFERENCE_BACKEND=ollama to use it
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama-server
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - ollama_network
+  #   restart: unless-stopped
+  #   environment:
+  #     - OLLAMA_ORIGINS=*
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
     profiles:
       - ollama
 

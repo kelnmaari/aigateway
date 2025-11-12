@@ -191,24 +191,10 @@ class VLMManager {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    // Check if current provider supports VLM
-    isVLMProvider() {
-        const provider = window.modelPanel?.getSelectedProvider() || 'ollama';
-        return provider === 'yzma'; // Only yzma supports VLM
-    }
-
-    // Validate before sending
+    // Validate before sending (v3.0.5+: VLM always supported via yzma)
     validateBeforeSend() {
         if (!this.hasImages()) {
             return { valid: true };
-        }
-
-        // Check provider
-        if (!this.isVLMProvider()) {
-            return {
-                valid: false,
-                error: 'Images are only supported with yzma provider. Switch to "yzma Local" provider.'
-            };
         }
 
         // Check model is VLM

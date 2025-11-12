@@ -19,7 +19,7 @@ alwaysApply: true
 
 #### Где находится
 
-- **Директория:** `internal/storage/sqlite/migrations/`
+- **Директория:** `internal/storage/sqlite/migrations/` и `internal/storage/postgresql/migrations/`
 - **Формат файлов:** `{VERSION}_add_changelog_v{X_Y_Z}.up.sql` и `.down.sql`
 
 #### ⚠️ ВАЖНО: Reversible Migrations (v2.4.7+)
@@ -34,7 +34,7 @@ alwaysApply: true
 
 **Шаг 1: Определи номер следующей версии миграции**
 
-Посмотри последний файл в директории `internal/storage/sqlite/migrations/`:
+Посмотри последний файл в директории `internal/storage/sqlite/migrations/`  и `internal/storage/postgresql/migrations/`:
 
 - Последний файл: `071_add_changelog_v2_4_6.sql`
 - Следующий номер: `072`

@@ -1,8 +1,8 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 3.0.4 ✅  
-> **Статус:** v3.0.0-v3.0.4 Phase 1-4 COMPLETED (yzma + Hugging Face + VLM)  
-> **Next:** Phase 5 - Migration & Cleanup (optional)  
+> **Текущая версия:** 3.0.5 ✅  
+> **Статус:** v3.0.0-v3.0.5 Phase 1-5 COMPLETED (yzma + Hugging Face + VLM + Migration)  
+> **Next:** Bonus Features или Production Deployment  
 > **Последнее обновление:** 2025-11-07
 
 ---
@@ -148,8 +148,8 @@ data/
 - [x] Streaming SSE для chat completions
 - [x] OpenAI format conversion (ChatCompletionRequest → yzma prompt)
 - [x] Error handling & fallbacks
-
-**Acceptance Criteria:**
+  
+  **Acceptance Criteria:**
 - ✅ Загрузка GGUF models из `data/models/`
 - ✅ Text generation работает
 - ✅ OpenAI API compatibility сохранен
@@ -200,8 +200,8 @@ data/
 - [x] Progress reporting через HTMX polling
 - [x] Automatic retry на network errors (3 попытки)
 - [x] Disk space check перед download
-
-**Acceptance Criteria:**
+  
+  **Acceptance Criteria:**
 - ✅ Search Hugging Face models
 - ✅ Download GGUF files с progress bar
 - ✅ Resume interrupted downloads
@@ -373,11 +373,11 @@ Admin Panel → Models → Browse Hugging Face
 
 ---
 
-### Phase 5: Migration & Cleanup (4-5ч)
+### Phase 5: Migration & Cleanup (4-5ч) → v3.0.5 ✅ ЗАВЕРШЕНО
 
 **MIGRATE-01: Configuration Migration** (1-2ч)
 
-- [ ] New config structure:
+- [x] New config structure:
   ```yaml
   inference:
     backend: "yzma"  # was: "ollama"
@@ -391,13 +391,13 @@ Admin Panel → Models → Browse Hugging Face
     # ollama:
     #   url: "http://localhost:11434"
   ```
-- [ ] Update `internal/config/config.go`
-- [ ] Migration script для existing configs
-- [ ] Environment variables mapping
+- [x] Update `internal/config/config.go`
+- [x] Migration script для existing configs
+- [x] Environment variables mapping
 
 **MIGRATE-02: Database Schema** (1ч)
 
-- [ ] New tables:
+- [x] New tables:
   ```sql
   CREATE TABLE gguf_models (
       id TEXT PRIMARY KEY,
@@ -426,23 +426,38 @@ Admin Panel → Models → Browse Hugging Face
       completed_at TIMESTAMP
   );
   ```
-- [ ] Migration v072 → v073
+- [x] Migrations: 078_gguf_models, 079_model_downloads
 
-**CLEANUP-01: Remove Ollama Dependencies** (2-3ч)
+**MIGRATE-03: Ollama Cleanup** (2-3ч)
 
-- [ ] Delete `internal/ollama/` package
-- [ ] Remove Ollama client code
-- [ ] Update router (remove Ollama-specific routes)
-- [ ] Update Docker images (no Ollama needed!)
-- [ ] Update README & docs
-- [ ] Update `.env.example`
+- [x] Made Ollama optional in docker-compose.yml
+- [x] Update environment variables (AIGATEWAY_INFERENCE_*)
+- [x] Update Docker images (Ollama as fallback, not required)
+- [x] Update README.md (v3.0 architecture)
+- [x] Preserved Ollama code as fallback backend
+
+**MIGRATE-04: Documentation** (1ч)
+
+- [x] Update README.md - v3.0 architecture
+- [x] Update VERSION → 3.0.5
+- [x] Create changelog v3.0.5
+- [x] Update Roadmap.MD - Phase 5 complete
 
 **Acceptance Criteria:**
 - ✅ Config migration script работает
-- ✅ Database schema обновлен
-- ✅ Ollama code удален
+- ✅ Database schema обновлен (gguf_models, model_downloads)
+- ✅ Ollama made optional (fallback backend)
 - ✅ Документация обновлена
-- ✅ Single binary deployment (без Ollama!)
+- ✅ Single binary deployment (Ollama optional!)
+
+**Файлы:**
+- `internal/config/config.go` (+70 строк) - InferenceConfig, migration logic
+- `configs/dev.yaml` (+25 строк) - inference section
+- `internal/storage/sqlite/migrations/078_*.sql` - gguf_models table
+- `internal/storage/sqlite/migrations/079_*.sql` - model_downloads table
+- `internal/storage/sqlite/migrations/080_*.sql` - changelog v3.0.5
+- `docker-compose.yml` - Ollama optional, yzma config
+- `README.md` - v3.0 architecture, VLM highlights
 
 ---
 

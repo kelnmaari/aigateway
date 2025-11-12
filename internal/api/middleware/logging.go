@@ -2,6 +2,7 @@
 package middleware
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,15 +29,16 @@ func RequestLogging(config LoggingConfig) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		// Пропускаем логирование для определенных путей
-		if skipPaths[c.Request.URL.Path] {
+		path := c.Request.URL.Path
+		
+		// Пропускаем логирование для определенных путей и UI endpoints (v3.0.6+)
+		if skipPaths[path] || strings.HasPrefix(path, "/api/ui/") {
 			c.Next()
 			return
 		}
 
 		// Записываем время начала
 		start := time.Now()
-		path := c.Request.URL.Path
 		raw := c.Request.URL.RawQuery
 
 		// Обрабатываем запрос

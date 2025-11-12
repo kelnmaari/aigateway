@@ -143,15 +143,15 @@ func (h *RBACUIHandler) GetCreateRoleForm(c *gin.Context) {
 	<h2>Create New Role</h2>
 	<button class="btn-close" onclick="closeModal()">×</button>
 </div>
-<form hx-post="/api/admin/rbac/roles" 
-	  hx-target="#roles-table" 
-	  hx-swap="innerHTML"
-	  hx-on::after-request="if(event.detail.successful) closeModal()">
+<form hx-post="/api/admin/rbac/roles"
+      hx-target="#roles-table"
+      hx-swap="innerHTML"
+      class="rbac-json-form">
 	<div class="modal-body">
 		<div class="form-group">
-			<label for="name" class="required">Role Name</label>
+			<label for="role-name" class="required">Role Name</label>
 			<input type="text" 
-				   id="name" 
+				   id="role-name" 
 				   name="name" 
 				   class="form-control" 
 				   required
@@ -162,8 +162,20 @@ func (h *RBACUIHandler) GetCreateRoleForm(c *gin.Context) {
 		</div>
 		
 		<div class="form-group">
-			<label for="description" class="required">Description</label>
-			<textarea id="description" 
+			<label for="role-display-name" class="required">Display Name</label>
+			<input type="text" 
+				   id="role-display-name" 
+				   name="display_name" 
+				   class="form-control" 
+				   required
+				   minlength="3"
+				   placeholder="e.g. Content Editor">
+			<small class="form-text">Human-readable name shown in UI</small>
+		</div>
+		
+		<div class="form-group">
+			<label for="role-description" class="required">Description</label>
+			<textarea id="role-description" 
 					  name="description" 
 					  class="form-control" 
 					  required
@@ -173,11 +185,18 @@ func (h *RBACUIHandler) GetCreateRoleForm(c *gin.Context) {
 		</div>
 		
 		<div class="form-group">
-			<label class="checkbox-label">
-				<input type="checkbox" name="is_system" value="true">
-				<span>System Role</span>
-			</label>
-			<small class="form-text">System roles cannot be deleted and are predefined</small>
+			<label class="required">Scope</label>
+			<div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+				<label class="checkbox-label" style="cursor: pointer;">
+					<input type="radio" name="scope" value="global" checked>
+					<span>Global</span>
+				</label>
+				<label class="checkbox-label" style="cursor: pointer;">
+					<input type="radio" name="scope" value="tenant">
+					<span>Tenant-specific</span>
+				</label>
+			</div>
+			<small class="form-text">Global roles apply to all users, tenant roles are organization-specific</small>
 		</div>
 	</div>
 	
@@ -220,26 +239,21 @@ func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 		return
 	}
 	
-	isSystemChecked := ""
-	if role.Type == "system" {
-		isSystemChecked = "checked"
-	}
-	
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
 <div class="modal-header">
 	<h2>Edit Role: %s</h2>
 	<button class="btn-close" onclick="closeModal()">×</button>
 </div>
-<form hx-put="/api/admin/rbac/roles/%s" 
-	  hx-target="#roles-table" 
-	  hx-swap="innerHTML"
-	  hx-on::after-request="if(event.detail.successful) closeModal()">
+<form hx-put="/api/admin/rbac/roles/%s"
+      hx-target="#roles-table"
+      hx-swap="innerHTML"
+      class="rbac-json-form">
 	<div class="modal-body">
 		<div class="form-group">
-			<label for="name">Role Name</label>
+			<label for="edit-role-name">Role Name</label>
 			<input type="text" 
-				   id="name" 
+				   id="edit-role-name" 
 				   name="name" 
 				   class="form-control" 
 				   value="%s"
@@ -249,20 +263,25 @@ func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 		</div>
 		
 		<div class="form-group">
-			<label for="description" class="required">Description</label>
-			<textarea id="description" 
+			<label for="edit-role-display-name" class="required">Display Name</label>
+			<input type="text" 
+				   id="edit-role-display-name" 
+				   name="display_name" 
+				   class="form-control" 
+				   value="%s"
+				   required
+				   minlength="3"
+				   placeholder="e.g. Content Editor">
+			<small class="form-text">Human-readable name shown in UI</small>
+		</div>
+		
+		<div class="form-group">
+			<label for="edit-role-description" class="required">Description</label>
+			<textarea id="edit-role-description" 
 					  name="description" 
 					  class="form-control" 
 					  required
 					  rows="3">%s</textarea>
-		</div>
-		
-		<div class="form-group">
-			<label class="checkbox-label">
-				<input type="checkbox" name="is_system" value="true" %s>
-				<span>System Role</span>
-			</label>
-			<small class="form-text">System roles cannot be deleted</small>
 		</div>
 	</div>
 	
@@ -280,8 +299,8 @@ func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 		template.HTMLEscapeString(role.Name),
 		role.ID,
 		template.HTMLEscapeString(role.Name),
-		template.HTMLEscapeString(role.Description),
-		isSystemChecked))
+		template.HTMLEscapeString(role.DisplayName),
+		template.HTMLEscapeString(role.Description)))
 }
 
 // GetRolePermissionsForm returns HTML form for managing role permissions

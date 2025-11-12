@@ -309,6 +309,7 @@
             border-color: var(--primary-color);
             color: var(--primary-color);
         }
+        
     </style>
 </head>
 <body>
@@ -391,6 +392,7 @@
         <span>Processing...</span>
     </div>
 
+    <script src="/js/utils/notifications.js"></script>
     <script src="/js/components/navbar.js"></script>
     <script src="/js/auth-guard.js"></script>
     <script>
@@ -406,6 +408,34 @@
         document.body.addEventListener('refreshModels', function() {
             htmx.trigger('#yzma-stats', 'load');
         });
+        
+        // YZMA Model Deletion with Beautiful Modal
+        async function deleteYzmaModel(button, modelPath, modelName, isPartial) {
+            const message = isPartial 
+                ? `Delete incomplete download?`
+                : `Are you sure you want to permanently delete this model?`;
+            
+            const details = `File: ${modelName}\n\nThis action cannot be undone.`;
+            
+            const confirmed = await modal.danger(message, 'Delete Model', details);
+            
+            if (!confirmed) return;
+            
+            // Get form from button
+            const form = button.closest('form');
+            if (!form) {
+                console.error('Form not found for model:', modelPath);
+                return;
+            }
+            
+            // Programmatically trigger HTMX delete
+            htmx.ajax('POST', '/api/ui/yzma/delete', {
+                source: form,
+                target: form.closest('.model-row'),
+                swap: 'outerHTML swap:300ms',
+                values: { model_path: modelPath }
+            });
+        }
     </script>
 </body>
 </html>

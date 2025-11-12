@@ -1,4 +1,4 @@
-// Package config provides configuration management for Ollama-OpenAI Proxy
+// Package config provides configuration management for AIGateway Platform
 // Поддерживает Go 1.25 features и современные паттерны
 package config
 
@@ -14,8 +14,7 @@ import (
 // Config представляет конфигурацию всего приложения
 type Config struct {
 	Server        ServerConfig        `mapstructure:"server"`
-	Inference     InferenceConfig     `mapstructure:"inference"`     // Version 3.0.5+: Unified inference backend (yzma primary, ollama fallback)
-	Ollama        OllamaConfig        `mapstructure:"ollama"`         // DEPRECATED: Use inference.ollama instead (kept for backward compatibility)
+	Inference     InferenceConfig     `mapstructure:"inference"`     // Version 3.0.5+: Unified inference backend (yzma only)
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Database      DatabaseConfig      `mapstructure:"database"` // Version 1.3.0+: Database abstraction
 	Logging       LoggingConfig       `mapstructure:"logging"`
@@ -36,22 +35,19 @@ type Config struct {
 	Yzma          YzmaConfig               `mapstructure:"yzma"`          // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
 }
 
-// InferenceConfig represents unified inference backend configuration (v3.0.5+)
+// InferenceConfig represents unified inference backend configuration (v3.0.6+)
 type InferenceConfig struct {
-	// Backend selects the inference engine: "yzma" (default), "ollama" (fallback), "auto"
-	Backend string `mapstructure:"backend"` // "yzma", "ollama", "auto"
+	// Backend is always "yzma" (v3.0.6+: Ollama removed)
+	Backend string `mapstructure:"backend"` // "yzma" only
 	
-	// MaxLoadedModels limits how many models can be loaded simultaneously (yzma only)
+	// MaxLoadedModels limits how many models can be loaded simultaneously
 	MaxLoadedModels int `mapstructure:"max_loaded_models"`
 	
 	// GPULayers controls GPU offloading (-1 = auto, 0 = CPU only, >0 = specific layer count)
 	GPULayers int `mapstructure:"gpu_layers"`
 	
-	// Yzma nested configuration (primary backend)
+	// Yzma configuration (only backend)
 	Yzma YzmaConfig `mapstructure:"yzma"`
-	
-	// Ollama nested configuration (fallback backend)
-	Ollama OllamaConfig `mapstructure:"ollama"`
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -79,30 +75,6 @@ type ServerConfig struct {
 		AllowedHeaders []string `mapstructure:"allowed_headers"`
 		MaxAge         int      `mapstructure:"max_age"`
 	} `mapstructure:"cors"`
-}
-
-// OllamaConfig конфигурация подключения к Ollama
-type OllamaConfig struct {
-	URL                string        `mapstructure:"url"`
-	Timeout            time.Duration `mapstructure:"timeout"`
-	RetryAttempts      int           `mapstructure:"retry_attempts"`
-	RetryDelay         time.Duration `mapstructure:"retry_delay"`
-	ConnectionPoolSize int           `mapstructure:"connection_pool_size"`
-	KeepAlive          bool          `mapstructure:"keep_alive"`
-
-	// Health check настройки
-	HealthCheck struct {
-		Enabled  bool          `mapstructure:"enabled"`
-		Interval time.Duration `mapstructure:"interval"`
-		Timeout  time.Duration `mapstructure:"timeout"`
-	} `mapstructure:"health_check"`
-
-	// Circuit breaker настройки
-	CircuitBreaker struct {
-		Enabled      bool          `mapstructure:"enabled"`
-		MaxFailures  int           `mapstructure:"max_failures"`
-		ResetTimeout time.Duration `mapstructure:"reset_timeout"`
-	} `mapstructure:"circuit_breaker"`
 }
 
 // AuthConfig конфигурация аутентификации
@@ -311,7 +283,7 @@ type LoggingConfig struct {
 
 // ModelsConfig конфигурация управления моделями
 type ModelsConfig struct {
-	// Маппинг имен моделей OpenAI -> Ollama
+	// Маппинг имен моделей OpenAI -> yzma
 	Mapping map[string]string `mapstructure:"mapping"`
 
 	// Алиасы моделей
@@ -454,13 +426,6 @@ type DevelopmentConfig struct {
 	PProfEnabled   bool `mapstructure:"pprof_enabled"`
 	RaceDetection  bool `mapstructure:"race_detection"`
 
-	// Mock настройки
-	MockOllama struct {
-		Enabled       bool          `mapstructure:"enabled"`
-		ResponseDelay time.Duration `mapstructure:"response_delay"`
-		RandomErrors  bool          `mapstructure:"random_errors"`
-		ErrorRate     float64       `mapstructure:"error_rate"`
-	} `mapstructure:"mock_ollama"`
 }
 
 // ObservabilityConfig настройки для observability и tracing (Version 1.6.0+)
@@ -669,10 +634,6 @@ func migrateToInferenceConfig(config *Config) *Config {
 			// Copy from deprecated top-level Yzma
 			config.Inference.Yzma = config.Yzma
 		}
-		if config.Inference.Ollama.URL == "" && config.Ollama.URL != "" {
-			// Copy from deprecated top-level Ollama
-			config.Inference.Ollama = config.Ollama
-		}
 		return config
 	}
 
@@ -687,11 +648,7 @@ func migrateToInferenceConfig(config *Config) *Config {
 	if config.Yzma.Enabled {
 		config.Inference.Backend = "yzma"
 		config.Inference.Yzma = config.Yzma
-		fmt.Println("   ✅ Detected yzma backend (primary)")
-	} else if config.Ollama.URL != "" {
-		config.Inference.Backend = "ollama"
-		config.Inference.Ollama = config.Ollama
-		fmt.Println("   ✅ Detected ollama backend (fallback)")
+		fmt.Println("   ✅ Detected yzma backend")
 	} else {
 		// Default to yzma
 		config.Inference.Backend = "yzma"
@@ -745,22 +702,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("inference.yzma.top_p", 0.9)
 	v.SetDefault("inference.yzma.min_p", 0.1)
 	v.SetDefault("inference.yzma.verbose", false)
-	
-	// Inference > Ollama defaults (fallback)
-	v.SetDefault("inference.ollama.url", "http://localhost:11434")
-	v.SetDefault("inference.ollama.timeout", "30s")
-	v.SetDefault("inference.ollama.retry_attempts", 3)
-	v.SetDefault("inference.ollama.retry_delay", "1s")
-	v.SetDefault("inference.ollama.connection_pool_size", 10)
-	v.SetDefault("inference.ollama.keep_alive", true)
-
-	// DEPRECATED: Top-level Ollama defaults (backward compatibility)
-	v.SetDefault("ollama.url", "http://localhost:11434")
-	v.SetDefault("ollama.timeout", "30s")
-	v.SetDefault("ollama.retry_attempts", 3)
-	v.SetDefault("ollama.retry_delay", "1s")
-	v.SetDefault("ollama.connection_pool_size", 10)
-	v.SetDefault("ollama.keep_alive", true)
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
@@ -784,7 +725,7 @@ func setDefaults(v *viper.Viper) {
 	// Observability defaults (Version 1.6.0+)
 	v.SetDefault("observability.tracing.enabled", false)
 	v.SetDefault("observability.tracing.provider", "jaeger")
-	v.SetDefault("observability.tracing.service_name", "ollama-proxy")
+	v.SetDefault("observability.tracing.service_name", "aigateway")
 	v.SetDefault("observability.tracing.sampling_rate", 1.0)
 	v.SetDefault("observability.tracing.jaeger.endpoint", "http://localhost:14268/api/traces")
 	v.SetDefault("observability.tracing.zipkin.endpoint", "http://localhost:9411/api/v2/spans")
@@ -814,11 +755,6 @@ func (c *Config) Validate() error {
 	// Валидация порта
 	if c.Server.Port < 1 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
-	}
-
-	// Валидация Ollama URL
-	if c.Ollama.URL == "" {
-		return fmt.Errorf("ollama URL cannot be empty")
 	}
 
 	// Валидация storage type

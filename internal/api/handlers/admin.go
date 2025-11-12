@@ -23,7 +23,6 @@ type AdminHandler struct {
 	logger       *logrus.Logger
 	keyManager   *apikey.Manager  // Legacy JSON storage (deprecated)
 	db           storage.Database // Database for API keys (Version 1.3.0+)
-	ollamaClient OllamaClientInterface
 }
 
 // NewAdminHandler создает новый admin handler
@@ -47,10 +46,6 @@ func NewAdminHandlerWithoutKeys(cfg *config.Config, logger *logrus.Logger, db st
 	}
 }
 
-// SetOllamaClient устанавливает Ollama client для AdminHandler
-func (h *AdminHandler) SetOllamaClient(client OllamaClientInterface) {
-	h.ollamaClient = client
-}
 
 // ListAPIKeys обрабатывает GET /admin/api-keys
 func (h *AdminHandler) ListAPIKeys(c *gin.Context) {
@@ -780,83 +775,6 @@ func (h *AdminHandler) UpdateAPIKeyPermissions(c *gin.Context) {
 		"message": "API key permissions updated successfully",
 		"api_key": updatedKey,
 	})
-}
-
-// GetModelDetails обрабатывает GET /api/admin/models/:name/details
-// Возвращает расширенную информацию о модели из Ollama
-func (h *AdminHandler) GetModelDetails(c *gin.Context) {
-	modelName := c.Param("name")
-	if modelName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Model name is required",
-				"type":    "invalid_request_error",
-				"code":    "model_name_required",
-			},
-		})
-		return
-	}
-
-	if h.ollamaClient == nil {
-		h.logger.Error("Ollama client not available")
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": gin.H{
-				"message": "Ollama client not configured",
-				"type":    "service_unavailable",
-				"code":    "ollama_unavailable",
-			},
-		})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-	defer cancel()
-
-	// Получаем детали модели из Ollama
-	ollamaResp, err := h.ollamaClient.ShowModel(ctx, modelName)
-	if err != nil {
-		h.logger.WithError(err).WithField("model", modelName).Error("Failed to get model details from Ollama")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": "Failed to retrieve model details",
-				"type":    "api_error",
-				"code":    "ollama_error",
-				"details": err.Error(),
-			},
-		})
-		return
-	}
-
-	// Преобразуем Ollama response в наш формат
-	response := models.ModelDetailsResponse{
-		Name:       modelName,
-		License:    ollamaResp.License,
-		Template:   ollamaResp.Template,
-		Modelfile:  ollamaResp.Modelfile,
-		Parameters: parseModelParameters(ollamaResp.Parameters),
-	}
-
-	// Добавляем детали если есть
-	if ollamaResp.Details != nil {
-		response.Format = ollamaResp.Details.Format
-		response.Family = ollamaResp.Details.Family
-		response.ParameterSize = ollamaResp.Details.ParameterSize
-		response.Quantization = ollamaResp.Details.QuantizationLevel
-	}
-
-	// Добавляем информацию о модели если есть
-	if ollamaResp.ModelInfo != nil {
-		info := ollamaResp.ModelInfo
-		response.Architecture = getStringValue(info, "general.architecture")
-		response.ContextLength = getIntValue(info, "llama.context_length")
-		response.EmbeddingSize = getIntValue(info, "llama.embedding_length")
-		response.Layers = getIntValue(info, "llama.block_count")
-		response.Heads = getIntValue(info, "llama.attention.head_count")
-		response.VocabSize = getIntValue(info, "tokenizer.ggml.vocab_size")
-	}
-
-	h.logger.WithField("model", modelName).Info("Model details retrieved successfully")
-	c.JSON(http.StatusOK, response)
 }
 
 // Helper functions

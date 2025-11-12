@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="stylesheet" href="/css/notifications.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
 <body class="dashboard-page">
     <!-- Top Navigation inserted by navbar.js -->
@@ -30,6 +31,7 @@
             <button class="tab-btn" data-tab="users">Users & RBAC</button>
             <button class="tab-btn" data-tab="apikeys">API Keys</button>
             <button class="tab-btn" data-tab="models">Models</button>
+            <button class="tab-btn" data-tab="downloads">Downloads</button>
             <button class="tab-btn" data-tab="files">Files</button>
             <button class="tab-btn" data-tab="rag">RAG Sources</button>
             <button class="tab-btn" data-tab="mcp">MCP</button>
@@ -524,94 +526,250 @@
                 </div>
             </div>
 
-            <!-- Models Tab (v1.9.3+ + REGISTRY-03, v2.3.0) -->
+            <!-- Models Tab (v3.0.6+: yzma only) -->
             <div id="models-tab" class="tab-pane">
                 <!-- Sub-tabs -->
                 <div class="sub-tabs">
-                    <button class="sub-tab-btn active" data-subtab="available-models">Available Models</button>
-                    <button class="sub-tab-btn" data-subtab="model-registry">Model Registry</button>
+                    <button class="sub-tab-btn active" data-subtab="available-models">Local Models (yzma)</button>
+                    <button class="sub-tab-btn" data-subtab="huggingface-browser">Hugging Face Browser</button>
                 </div>
 
-                <!-- Available Models Sub-tab -->
+                <!-- Available Models Sub-tab (yzma) -->
                 <div id="available-models-subtab" class="sub-tab-pane active">
                     <div class="section-header">
-                        <h2>🤖 Available Models</h2>
-                        <button class="btn btn-secondary" id="refresh-models-btn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke-width="2" stroke-linecap="round"/>
-                                <path d="M3 3v5h5" stroke-width="2" stroke-linecap="round"/>
-                            </svg>
-                            Refresh Models
-                        </button>
+                        <h2>🚀 Local Inference with yzma</h2>
+                        <p style="color: var(--text-secondary); margin-top: 8px;">
+                            Pure Go inference engine powered by llama.cpp - run GGUF models locally
+                        </p>
                     </div>
-                    <div id="models-accordion" class="models-accordion">
-                        <div class="loading-placeholder">Loading models...</div>
+
+                    <!-- yzma Statistics (HTMX) -->
+                    <div class="stats-grid" style="margin: 2rem 0;"
+                         hx-get="/api/ui/yzma/stats"
+                         hx-trigger="load, every 5s"
+                         hx-swap="innerHTML">
+                        <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Loading...</div></div>
+                    </div>
+
+                    <!-- Loading Indicator for yzma operations -->
+                    <div id="loading-indicator" class="htmx-indicator" style="
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(0, 0, 0, 0.8);
+                        color: white;
+                        padding: 20px 40px;
+                        border-radius: 8px;
+                        z-index: 9999;
+                        display: none;
+                        align-items: center;
+                        gap: 15px;
+                    ">
+                        <div class="spinner" style="
+                            border: 3px solid rgba(255, 255, 255, 0.3);
+                            border-top: 3px solid #48dbfb;
+                            border-radius: 50%;
+                            width: 24px;
+                            height: 24px;
+                            animation: spin 1s linear infinite;
+                        "></div>
+                        <span>Loading model...</span>
+                    </div>
+
+                    <!-- Currently Loaded Models Section -->
+                    <div class="section" style="margin-bottom: 2rem;">
+                        <div class="section-header">
+                            <h3 style="margin: 0;">✅ Currently Loaded Models</h3>
+                        </div>
+                        
+                        <div id="yzma-loaded-models"
+                             hx-get="/api/ui/yzma/loaded"
+                             hx-trigger="load, every 3s"
+                             hx-swap="innerHTML">
+                            <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available GGUF Models Section -->
+                    <div class="section">
+                        <div class="section-header">
+                            <h3 style="margin: 0;">📦 Available GGUF Models</h3>
+                            <button class="btn btn-secondary" 
+                                    hx-get="/api/ui/yzma/models"
+                                    hx-target="#yzma-models-list"
+                                    hx-swap="innerHTML">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke-width="2"/>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                        
+                        <div id="yzma-models-list"
+                             hx-get="/api/ui/yzma/models"
+                             hx-trigger="load"
+                             hx-swap="innerHTML">
+                            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                Loading models...
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Model Registry Sub-tab (REGISTRY-03, v2.3.0) -->
-                <div id="model-registry-subtab" class="sub-tab-pane">
-                <div class="section">
+                <!-- Hugging Face Browser Sub-tab (v3.0.0+) -->
+                <div id="huggingface-browser-subtab" class="sub-tab-pane">
                     <div class="section-header">
-                        <h2>🗄️ Model Registry</h2>
-                        <a href="/admin-registry.html" class="btn btn-primary">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke-width="2" stroke-linecap="round"/>
-                                <polyline points="15 3 21 3 21 9" stroke-width="2" stroke-linecap="round"/>
-                                <line x1="10" y1="14" x2="21" y2="3" stroke-width="2" stroke-linecap="round"/>
-                            </svg>
-                            Open Model Registry Manager
-                        </a>
+                        <h2>🤗 Hugging Face Model Browser</h2>
+                        <p style="color: var(--text-secondary); margin-top: 8px;">
+                            Download GGUF models directly from Hugging Face Hub
+                        </p>
                     </div>
-                    
-                    <div class="info-card">
-                        <div class="info-card-icon">🗄️</div>
-                        <div class="info-card-content">
-                            <h3>Universal Model Registry</h3>
-                            <p>
-                                Centralized management for all AI model providers and models.
-                                Track model capabilities, health status, and configure smart routing.
-                            </p>
-                            <ul style="margin-top: 10px; padding-left: 20px; color: var(--text-secondary);">
-                                <li>🔄 Multi-Provider Support (Ollama, vLLM, OpenAI, etc)</li>
-                                <li>🎯 Smart Routing & Load Balancing</li>
-                                <li>🏥 Health Monitoring & Auto-Discovery</li>
-                                <li>📊 Performance Metrics Tracking</li>
-                                <li>🔀 Automatic Fallback Chains</li>
-                            </ul>
+
+                    <!-- Search Bar -->
+                    <div class="section" style="margin-top: 20px;">
+                        <form id="hf-search-form"
+                              hx-get="/api/ui/huggingface/search"
+                              hx-target="#hf-models-results"
+                              hx-swap="innerHTML"
+                              hx-indicator="#hf-search-loading"
+                              style="display: grid; grid-template-columns: 1fr auto 200px 100px auto auto; gap: 1rem; align-items: end;">
+                            
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Search models</label>
+                                <input type="text" 
+                                       id="hf-search-input"
+                                       name="search" 
+                                       class="form-input" 
+                                       placeholder="e.g., llama, mistral, phi"
+                                       style="width: 100%;">
+                            </div>
+                            
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Author</label>
+                                <input type="text" 
+                                       id="hf-author-input"
+                                       name="author" 
+                                       class="form-input" 
+                                       placeholder="e.g., TheBloke"
+                                       style="width: 100%;">
+                            </div>
+                            
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Sort by</label>
+                                <select id="hf-sort-select" name="sort" class="form-input">
+                                    <option value="downloads">Most Downloads</option>
+                                    <option value="trending">Trending</option>
+                                    <option value="updated">Recently Updated</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Results</label>
+                                <select id="hf-limit-select" name="limit" class="form-input">
+                                    <option value="30">30</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <button type="submit" class="btn btn-primary" style="margin-top: 1.65rem;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <circle cx="11" cy="11" r="8" stroke-width="2"/>
+                                        <path d="m21 21-4.35-4.35" stroke-width="2"/>
+                                    </svg>
+                                    Search
+                                </button>
+                            </div>
+                            
+                            <div>
+                                <button type="button" 
+                                        id="hf-repeat-search-btn"
+                                        class="btn btn-secondary" 
+                                        style="margin-top: 1.65rem; display: none;"
+                                        title="Repeat last search">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke-width="2"/>
+                                    </svg>
+                                    Repeat
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Quick Filters -->
+                        <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                            <span style="font-weight: 600; color: var(--text-secondary);">Quick Filters:</span>
+                            <button class="btn btn-sm" 
+                                    hx-get="/api/ui/huggingface/search?search=llama&sort=downloads&limit=30"
+                                    hx-target="#hf-models-results"
+                                    hx-swap="innerHTML">
+                                🦙 Llama Models
+                            </button>
+                            <button class="btn btn-sm"
+                                    hx-get="/api/ui/huggingface/search?search=mistral&sort=downloads&limit=30"
+                                    hx-target="#hf-models-results"
+                                    hx-swap="innerHTML">
+                                🌪️ Mistral Models
+                            </button>
+                            <button class="btn btn-sm"
+                                    hx-get="/api/ui/huggingface/search?search=phi&sort=downloads&limit=30"
+                                    hx-target="#hf-models-results"
+                                    hx-swap="innerHTML">
+                                φ Phi Models
+                            </button>
+                            <button class="btn btn-sm"
+                                    hx-get="/api/ui/huggingface/search?search=gemma&sort=downloads&limit=30"
+                                    hx-target="#hf-models-results"
+                                    hx-swap="innerHTML">
+                                💎 Gemma Models
+                            </button>
+                            <button class="btn btn-sm"
+                                    hx-get="/api/ui/huggingface/search?search=vision&sort=downloads&limit=30"
+                                    hx-target="#hf-models-results"
+                                    hx-swap="innerHTML">
+                                👁️ Vision Models
+                            </button>
+                        </div>
+
+                        <div id="hf-search-loading" class="htmx-indicator" style="margin-top: 1rem; text-align: center; color: var(--text-secondary);">
+                            Searching...
                         </div>
                     </div>
 
-                    <div style="margin-top: 20px; padding: 15px; background: var(--bg-tertiary); border-radius: 8px; border-left: 4px solid var(--primary-color);">
-                        <h4 style="margin-bottom: 10px; color: var(--text-primary);">📚 Features</h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
-                            <div>
-                                <strong style="color: var(--text-primary);">Provider Management</strong>
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px;">
-                                    Add, configure, and monitor multiple model providers
-                                </p>
-                            </div>
-                            <div>
-                                <strong style="color: var(--text-primary);">Model Discovery</strong>
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px;">
-                                    Automatic discovery of available models from providers
-                                </p>
-                            </div>
-                            <div>
-                                <strong style="color: var(--text-primary);">Smart Routing</strong>
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px;">
-                                    Intelligent request routing with fallback support
-                                </p>
-                            </div>
-                            <div>
-                                <strong style="color: var(--text-primary);">Health Checks</strong>
-                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px;">
-                                    Real-time provider health monitoring
-                                </p>
-                            </div>
+                    <!-- Search Results -->
+                    <div id="hf-models-results" style="margin-top: 2rem;">
+                        <div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="opacity: 0.3; margin-bottom: 16px;">
+                                <circle cx="11" cy="11" r="8" stroke-width="2"/>
+                                <path d="m21 21-4.35-4.35" stroke-width="2"/>
+                            </svg>
+                            <h3>Use search or quick filters above to browse models</h3>
                         </div>
                     </div>
+
                 </div>
+            </div>
+
+            <!-- Downloads Tab (Active Model Downloads) -->
+            <div id="downloads-tab" class="tab-pane">
+                <div id="downloads-list"
+                     hx-get="/api/ui/huggingface/downloads"
+                     hx-trigger="load, every 2s"
+                     hx-swap="innerHTML settle:300ms"
+                     class="downloads-content-wrapper">
+                    <div class="loading-state">
+                        <div class="loading-spinner">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                        </div>
+                        <p>Loading downloads...</p>
+                    </div>
                 </div>
             </div>
 
@@ -1133,6 +1291,82 @@
     <script src="/js/admin.js"></script>
     <script src="/js/admin-files.js"></script>
     
+    <!-- Hugging Face Search - Repeat Last Search (v3.0.7+) -->
+    <script>
+        // Save search parameters after form submission
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchForm = document.getElementById('hf-search-form');
+            const repeatBtn = document.getElementById('hf-repeat-search-btn');
+            
+            if (!searchForm || !repeatBtn) return;
+            
+            // Listen for form submission
+            searchForm.addEventListener('submit', (e) => {
+                const formData = new FormData(searchForm);
+                const searchParams = {
+                    search: formData.get('search') || '',
+                    author: formData.get('author') || '',
+                    sort: formData.get('sort') || 'downloads',
+                    limit: formData.get('limit') || '30'
+                };
+                
+                // Save to localStorage
+                localStorage.setItem('hf_last_search', JSON.stringify(searchParams));
+                
+                // Show repeat button
+                repeatBtn.style.display = 'block';
+            });
+            
+            // Repeat last search handler
+            repeatBtn.addEventListener('click', () => {
+                const savedSearch = localStorage.getItem('hf_last_search');
+                if (!savedSearch) return;
+                
+                try {
+                    const params = JSON.parse(savedSearch);
+                    
+                    // Fill form fields
+                    document.getElementById('hf-search-input').value = params.search || '';
+                    document.getElementById('hf-author-input').value = params.author || '';
+                    document.getElementById('hf-sort-select').value = params.sort || 'downloads';
+                    document.getElementById('hf-limit-select').value = params.limit || '30';
+                    
+                    // Trigger form submission
+                    searchForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                } catch (err) {
+                    console.error('Failed to restore search params:', err);
+                }
+            });
+            
+            // Check if there's a saved search on page load
+            const savedSearch = localStorage.getItem('hf_last_search');
+            if (savedSearch) {
+                repeatBtn.style.display = 'block';
+            }
+            
+            // Also listen for HTMX successful searches (from Quick Filters)
+            document.body.addEventListener('htmx:afterRequest', (event) => {
+                if (event.detail.elt === searchForm || event.detail.target?.id === 'hf-models-results') {
+                    // Check if this was a search request
+                    const xhr = event.detail.xhr;
+                    if (xhr && xhr.status === 200 && event.detail.pathInfo?.requestPath?.includes('/huggingface/search')) {
+                        // Extract params from URL
+                        const url = new URL(xhr.responseURL);
+                        const searchParams = {
+                            search: url.searchParams.get('search') || '',
+                            author: url.searchParams.get('author') || '',
+                            sort: url.searchParams.get('sort') || 'downloads',
+                            limit: url.searchParams.get('limit') || '30'
+                        };
+                        
+                        localStorage.setItem('hf_last_search', JSON.stringify(searchParams));
+                        repeatBtn.style.display = 'block';
+                    }
+                }
+            });
+        });
+    </script>
+    
     <!-- Invitations Tab Script (AUTH-03, v2.2.0) -->
     <script>
         // Load invitations preview
@@ -1194,12 +1428,13 @@
             return '<span style="display: inline-block; padding: 4px 8px; background: #6b728020; color: #9ca3af; border-radius: 4px; font-size: 12px;">Pending</span>';
         }
 
-        // Auto-load when invitations tab is selected
+        // Auto-load when invitations subtab is selected
         document.addEventListener('DOMContentLoaded', () => {
-            const invitationsTab = document.querySelector('[data-tab="invitations"]');
-            if (invitationsTab) {
-                invitationsTab.addEventListener('click', () => {
-                    loadInvitationsPreview();
+            const invitationsSubtab = document.querySelector('[data-subtab="user-invitations"]');
+            if (invitationsSubtab) {
+                invitationsSubtab.addEventListener('click', () => {
+                    // Small delay to ensure DOM is updated
+                    setTimeout(loadInvitationsPreview, 100);
                 });
             }
         });
@@ -1355,6 +1590,28 @@
         .modal-header h2 {
             margin: 0;
             font-size: 20px;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            font-size: 28px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .btn-close {
@@ -1538,25 +1795,368 @@
             color: var(--danger-color);
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
+
+        /* =================================================
+           yzma & Hugging Face Component Styles (v3.0)
+           ================================================= */
+
+        /* Models list - Simple list */
+        #yzma-models-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .model-row {
+            display: flex;
+            align-items: center;
+            background: var(--bg-tertiary, #3a3a3a);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px 20px;
+            gap: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .model-row:hover {
+            border-color: rgba(72, 219, 251, 0.5);
+            box-shadow: 0 4px 12px rgba(72, 219, 251, 0.15);
+        }
+
+        .model-row.model-loaded {
+            border-color: #10b981;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, transparent);
+        }
+
+        /* Badge */
+        .model-row .model-badge {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .model-row .badge-success {
+            background: #10b981;
+            color: #ffffff;
+        }
+
+        .model-row .badge-secondary {
+            background: #6366f1;
+            color: #ffffff;
+        }
+
+        /* Name */
+        .model-row .model-name {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin: 0;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 200px;
+            max-width: 350px;
+        }
+
+        /* Provider badge */
+        .model-row .model-provider {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            background: rgba(99, 102, 241, 0.15);
+            border-radius: 6px;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+        }
+
+        /* Path - takes remaining space */
+        .model-row .model-path {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Courier New', monospace;
+            min-width: 0;
+        }
+
+        .model-row .model-path i {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .model-row .model-path span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Button */
+        .model-row form {
+            flex-shrink: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .text-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Loaded models list */
+        .loaded-models-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .loaded-model-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+
+        .loaded-model-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(72, 219, 251, 0.3);
+        }
+
+        .loaded-model-item .model-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .loaded-model-item .model-path {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-left: auto;
+        }
+
+        /* Stat cards for yzma */
+        .stats-grid .stat-card {
+            background: var(--bg-tertiary, #3a3a3a);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .stats-grid .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(72, 219, 251, 0.2);
+            border-color: rgba(72, 219, 251, 0.4);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .stat-icon.bg-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+        }
+        
+        .stat-icon.bg-success { 
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+        }
+        
+        .stat-icon.bg-info { 
+            background: linear-gradient(135deg, #48dbfb 0%, #0abde3 100%); 
+        }
+        
+        .stat-icon.bg-secondary { 
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); 
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
+
+        /* Form inputs for Hugging Face search */
+        .form-input {
+            padding: 10px 14px;
+            background: var(--bg-tertiary, #3a3a3a);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: rgba(72, 219, 251, 0.6);
+            box-shadow: 0 0 0 3px rgba(72, 219, 251, 0.15);
+        }
+        /* Spinner animation for loading indicator */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* HTMX indicator display */
+        .htmx-request #loading-indicator {
+            display: flex !important;
+        }
+        
+        /* Downloads Tab Loading State */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            text-align: center;
+        }
+        
+        .loading-spinner {
+            margin-bottom: 20px;
+            opacity: 0.4;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .loading-spinner svg {
+            stroke: currentColor;
+            filter: drop-shadow(0 4px 12px rgba(72, 219, 251, 0.3));
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .loading-state p {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin: 0;
+        }
+        
+        /* Downloads Content Wrapper - Smooth Transitions */
+        .downloads-content-wrapper {
+            position: relative;
+        }
+        
+        /* HTMX Settling Animation for Downloads */
+        .downloads-content-wrapper.htmx-settling {
+            opacity: 1;
+        }
+        
+        .downloads-content-wrapper.htmx-swapping {
+            opacity: 0.95;
+            transition: opacity 150ms ease-in;
+        }
+        
+        /* Smooth transitions for dynamic elements */
+        .download-card {
+            animation: cardFadeIn 0.3s ease-out;
+        }
+        
+        @keyframes cardFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Prevent layout shift during updates */
+        .downloads-container {
+            min-height: 200px;
+        }
+        
+        /* Smooth value transitions */
+        .stat-value, .progress-percentage, .progress-bar-fill {
+            will-change: auto;
+        }
     </style>
 
     <script>
-        // Sub-tab switching
+        // Sub-tab switching (supports nested sub-tabs)
         document.addEventListener('DOMContentLoaded', () => {
             const subTabBtns = document.querySelectorAll('.sub-tab-btn');
             
             subTabBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
                     const subtabName = btn.getAttribute('data-subtab');
-                    const parentTab = btn.closest('.tab-pane');
                     
-                    // Remove active class from all sub-buttons and sub-panes in this parent tab
-                    parentTab.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
-                    parentTab.querySelectorAll('.sub-tab-pane').forEach(p => p.classList.remove('active'));
+                    // Find the parent container for this sub-tab group
+                    // Either a .tab-pane (top-level) or .sub-tab-pane (nested)
+                    const parentContainer = btn.closest('.sub-tab-pane') || btn.closest('.tab-pane');
                     
-                    // Add active class to clicked button and corresponding pane
+                    if (!parentContainer) {
+                        console.error('Could not find parent container for sub-tab', subtabName);
+                        return;
+                    }
+                    
+                    // Find the immediate sub-tabs container
+                    const subTabsContainer = btn.closest('.sub-tabs');
+                    if (!subTabsContainer) return;
+                    
+                    // Remove active class from sibling buttons in the same sub-tabs group
+                    subTabsContainer.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+                    
+                    // Find all direct child sub-tab-panes (not nested ones)
+                    const directParent = subTabsContainer.parentElement;
+                    const directChildPanes = Array.from(directParent.children).filter(
+                        child => child.classList.contains('sub-tab-pane') && child.parentElement === directParent
+                    );
+                    
+                    // Remove active class from direct child panes
+                    directChildPanes.forEach(p => p.classList.remove('active'));
+                    
+                    // Add active class to clicked button
                     btn.classList.add('active');
-                    parentTab.querySelector(`#${subtabName}-subtab`).classList.add('active');
+                    
+                    // Find and activate the corresponding pane
+                    const targetPane = directParent.querySelector(`#${subtabName}-subtab`);
+                    if (targetPane) {
+                        targetPane.classList.add('active');
+                    } else {
+                        console.error('Could not find target pane:', `#${subtabName}-subtab`);
+                    }
                 });
             });
         });
@@ -1574,14 +2174,66 @@
             document.getElementById('modal-content').innerHTML = '';
         }
 
+        // Hugging Face modal functions (v3.0)
+        function showHFModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeHFModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+                // Clear modal content
+                const contentId = modalId + '-content';
+                const content = document.getElementById(contentId);
+                if (content) {
+                    content.innerHTML = '';
+                }
+            }
+        }
+
         // Close modal on ESC
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
+            if (e.key === 'Escape') {
+                closeModal();
+                closeHFModal('model-details-modal');
+                closeHFModal('download-modal');
+            }
         });
 
         // Close modal on backdrop click
         document.getElementById('htmx-modal')?.addEventListener('click', (e) => {
             if (e.target.id === 'htmx-modal') closeModal();
+        });
+
+        document.getElementById('model-details-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'model-details-modal') closeHFModal('model-details-modal');
+        });
+
+        document.getElementById('download-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'download-modal') closeHFModal('download-modal');
+        });
+
+        // Close download modal and trigger downloads refresh after download starts
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            // If download was successfully started
+            if (event.detail.target.id === 'download-status' && event.detail.xhr.status === 200) {
+                // Close modal immediately
+                closeHFModal('download-modal');
+                
+                // Trigger refresh of downloads list
+                setTimeout(() => {
+                    const downloadsList = document.getElementById('hf-downloads-list');
+                    if (downloadsList) {
+                        htmx.trigger(downloadsList, 'load');
+                    }
+                }, 500);
+            }
         });
 
         // HTMX event: Trigger userUpdated event after successful form submission
@@ -1602,6 +2254,144 @@
             </div>
         </div>
     </div>
+
+    <!-- Hugging Face Modals (v3.0) -->
+    <div id="model-details-modal" class="modal" style="display: none;">
+        <div class="modal-dialog" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>Model Details</h2>
+                <button class="modal-close" onclick="closeHFModal('model-details-modal')">&times;</button>
+            </div>
+            <div id="model-details-modal-content">
+                <!-- Dynamic content loaded via HTMX -->
+            </div>
+        </div>
+    </div>
+
+    <div id="download-modal" class="modal" style="display: none;">
+        <div class="modal-dialog" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>Download GGUF Files</h2>
+                <button class="modal-close" onclick="closeHFModal('download-modal')">&times;</button>
+            </div>
+            <div id="download-modal-content">
+                <!-- Dynamic content loaded via HTMX -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- HTMX JWT Auth Configuration -->
+    <script>
+        // Add JWT token to all HTMX requests
+        document.body.addEventListener('htmx:configRequest', function(evt) {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                evt.detail.headers['Authorization'] = 'Bearer ' + token;
+            }
+            
+            // Convert RBAC forms to JSON (RBAC forms need JSON payloads)
+            const form = evt.detail.elt;
+            if (form && form.classList.contains('rbac-json-form')) {
+                evt.detail.headers['Content-Type'] = 'application/json';
+                
+                // Convert FormData parameters to JSON
+                const jsonData = {};
+                for (const key in evt.detail.parameters) {
+                    jsonData[key] = evt.detail.parameters[key];
+                }
+                
+                // Replace parameters with JSON string
+                evt.detail.parameters = JSON.stringify(jsonData);
+            }
+        });
+        
+        // Handle 401 responses (expired token)
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            if (evt.detail.xhr.status === 401) {
+                console.log('HTMX request failed with 401 - token expired, redirecting to login');
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user');
+                window.location.href = '/login.html';
+            }
+        });
+        
+        // Handle successful RBAC form submissions
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            const form = evt.detail.elt;
+            if (form && form.classList.contains('rbac-json-form')) {
+                if (evt.detail.successful) {
+                    closeModal();
+                    if (window.notifications) {
+                        const isUpdate = form.hasAttribute('hx-put');
+                        notifications.showSuccess(isUpdate ? 'Role updated successfully' : 'Role created successfully');
+                    }
+                } else if (evt.detail.xhr.status >= 400) {
+                    try {
+                        const error = JSON.parse(evt.detail.xhr.responseText);
+                        if (window.notifications) {
+                            notifications.showError(error.error || 'Operation failed');
+                        } else {
+                            console.error('Error:', error.error || 'Operation failed');
+                        }
+                    } catch (e) {
+                        if (window.notifications) {
+                            notifications.showError('Operation failed');
+                        } else {
+                            console.error('Operation failed');
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <script>
+        // YZMA Model Deletion with Beautiful Modal
+        async function deleteYzmaModel(button, modelPath, modelName, isPartial) {
+            const message = isPartial 
+                ? `Delete incomplete download?`
+                : `Are you sure you want to permanently delete this model?`;
+            
+            const details = `File: ${modelName}\n\nThis action cannot be undone.`;
+            
+            const confirmed = await modal.danger(message, 'Delete Model', details);
+            
+            if (!confirmed) return;
+            
+            // Get form from button
+            const form = button.closest('form');
+            if (!form) {
+                console.error('Form not found for model:', modelPath);
+                return;
+            }
+            
+            // Programmatically trigger HTMX delete
+            htmx.ajax('POST', '/api/ui/yzma/delete', {
+                source: form,
+                target: form.closest('.model-row'),
+                swap: 'outerHTML swap:300ms',
+                values: { model_path: modelPath }
+            });
+        }
+
+        // HuggingFace Download Cancellation with Beautiful Modal
+        async function cancelHFDownload(downloadId, filename) {
+            const confirmed = await modal.danger(
+                'Are you sure you want to cancel this download?',
+                'Cancel Download',
+                `File: ${filename}\n\nThis action cannot be undone.`
+            );
+            
+            if (!confirmed) return;
+            
+            // Programmatically trigger HTMX cancel
+            htmx.ajax('POST', `/api/ui/huggingface/downloads/${downloadId}/cancel`, {
+                target: `#download-${downloadId}`,
+                swap: 'outerHTML'
+            });
+        }
+    </script>
 </body>
 </html>
 

@@ -11,14 +11,14 @@ server:
 
 # Inference Configuration (v3.0.5+: Unified Backend)
 inference:
-  backend: "yzma"  # "yzma" (default), "ollama" (fallback), "auto"
+  backend: "yzma"  # Only yzma is supported (v3.0.6+)
   max_loaded_models: 3    # Keep 3 models in memory (yzma only)
-  gpu_layers: -1          # GPU offloading: -1=auto, 0=CPU only, >0=specific layers
+  gpu_layers: -1          # GPU offloading (v3.0.6+): -1=auto (all layers to GPU), 0=CPU only, >0=specific layers count
   
   # yzma Configuration (Primary Backend)
   yzma:
     enabled: true
-    lib_path: "" # Path to llama.cpp shared library (or use YZMA_LIB env var)
+    lib_path: "C:/llama" # Path to directory containing llama.cpp DLLs
     models_dir: "./data/models"
     context_size: 4096
     batch_size: 2048
@@ -27,26 +27,8 @@ inference:
     top_k: 40
     top_p: 0.9
     min_p: 0.1
-    verbose: false
-  
-  # Ollama Configuration (Fallback Backend)
-  ollama:
-    url: "http://localhost:11434"
-    timeout: "30m"
-    retry_attempts: 3
-    retry_delay: "2s"
-    connection_pool_size: 10
-    keep_alive: true
+    verbose: true  # Enable verbose logging from llama.cpp
 
-# DEPRECATED: Old ollama config (kept for backward compatibility)
-# Remove this section after migrating to inference.backend
-ollama:
-  url: "http://localhost:11434"
-  timeout: "30m"
-  retry_attempts: 3
-  retry_delay: "2s"
-  connection_pool_size: 10
-  keep_alive: true
 
 auth:
   enabled: true   # Включено для тестирования API Key Management
@@ -250,9 +232,9 @@ models:
   # Model Preloading & Warming (Version 1.12.1+)
   # Устраняет cold start задержку при первом запросе
   preload:
-    enabled: true  # Включить preloading
-    on_startup: true  # Загружать модели при старте сервера
-    keep_warm: true  # Поддерживать модели в горячем состоянии
+    enabled: false  # Включить preloading
+    on_startup: false  # Загружать модели при старте сервера
+    keep_warm: false  # Поддерживать модели в горячем состоянии
     
     # Модели для preload (добавь нужные модели)
     models:
@@ -367,13 +349,6 @@ development:
   profile_enabled: true
   pprof_enabled: true
   race_detection: true
-  
-  # Mock настройки (когда Ollama недоступен)
-  mock_ollama:
-    enabled: true
-    response_delay: "500ms"
-    random_errors: false
-    error_rate: 0.1
 
 # 🔍 OBSERVABILITY - Distributed Tracing & Monitoring (Version 1.6.0+)
 observability:
@@ -522,8 +497,7 @@ rag:
   
   # Embeddings Configuration
   embeddings:
-    provider: "ollama"
-    ollama_url: "http://localhost:11434"
+    provider: "yzma"
     model: "mxbai-embed-large"  # или nomic-embed-text
     batch_size: 32
     timeout: "30s"
@@ -556,17 +530,18 @@ rag:
     credentials_encryption_enabled: true
 
 # Model Registry System Configuration (Version 2.3.0+: REGISTRY-01)
+# v3.0.6+: DISABLED for YZMA backend (uses its own model management)
 model_registry:
-  enabled: true  # Включить Model Registry систему
+  enabled: false  # Отключено - YZMA использует свою систему управления моделями
   
   # Auto-Discovery Configuration
   auto_discovery:
-    enabled: true  # Автоматическое обнаружение моделей при старте
+    enabled: false  # Отключено для YZMA (не нужен Ollama discovery)
     interval: "30m"  # Интервал между повторными auto-discovery (0 = только при старте)
   
   # Provider Health Check
   health_check:
-    enabled: true  # Периодическая проверка здоровья providers
+    enabled: false  # Отключено для YZMA
     interval: "5m"  # Интервал между health checks
 
 # ================================================================================
@@ -642,7 +617,7 @@ agent:
 
 # v3.0.0+: Hugging Face Integration
 huggingface:
-  api_token: "" # Optional Hugging Face API token for private models
+  api_token: "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" # Optional Hugging Face API token for private models
   models_dir: "./data/models" # Directory for storing downloaded models
   cache_dir: "./data/hf_cache" # Directory for caching model metadata
   download_timeout: 5m # Default timeout for model downloads

@@ -31,8 +31,14 @@ class AdminPanel {
         // Setup event listeners
         this.setupEventListeners();
         
-        // Load initial data
-        await this.loadDashboard();
+        // Restore last active tab from localStorage
+        const savedTab = localStorage.getItem('admin_active_tab');
+        if (savedTab && document.querySelector(`[data-tab="${savedTab}"]`)) {
+            await this.switchTab(savedTab);
+        } else {
+            // Load initial data (dashboard)
+            await this.loadDashboard();
+        }
         
         console.log('✅ Admin Panel initialized');
     }
@@ -122,11 +128,8 @@ class AdminPanel {
             });
         }
 
-        // Refresh models button (v1.9.3+) (if exists)
-        const refreshModelsBtn = document.getElementById('refresh-models-btn');
-        if (refreshModelsBtn) {
-            refreshModelsBtn.addEventListener('click', () => this.refreshModels());
-        }
+        // Refresh models button (DEPRECATED v3.0.5+)
+        // Models refresh now handled by HTMX refresh buttons in Models tab
 
         // Modal close buttons
         document.querySelectorAll('.modal-close, .cancel-btn').forEach(btn => {
@@ -164,6 +167,9 @@ class AdminPanel {
         document.getElementById(`${tabName}-tab`).classList.add('active');
 
         this.currentTab = tabName;
+        
+        // Save active tab to localStorage
+        localStorage.setItem('admin_active_tab', tabName);
 
         // Load tab data
         switch(tabName) {
@@ -177,7 +183,9 @@ class AdminPanel {
                 await this.loadAPIKeys();
                 break;
             case 'models':
-                await this.loadModels();
+                // Models tab now uses HTMX for data loading
+                // See admin.html lines 530-761 (yzma and Hugging Face sections)
+                console.log('Models tab loaded - using HTMX');
                 break;
             case 'mcp':
                 await this.loadMCPServers();
@@ -215,12 +223,8 @@ class AdminPanel {
                 document.getElementById('stat-total-keys').textContent = keysCount;
             }
 
-            // Load models count
-            const modelsResp = await api.request(`${api.baseURL}/api/admin/models`);
-            if (modelsResp.ok) {
-                const data = await modelsResp.json();
-                document.getElementById('stat-total-models').textContent = data.data?.length || data.models?.length || 0;
-            }
+            // Models count is now loaded via HTMX: /api/ui/dashboard/stats/models
+            // See admin.html line 85-87
 
             // Load system stats
             const statsResp = await api.request(`${api.baseURL}/api/admin/stats`);
@@ -726,21 +730,14 @@ class AdminPanel {
     // ==================== SYSTEM ====================
 
     // Load Models (v1.9.3+)
+    // DEPRECATED v3.0.5+: Ollama-based /api/admin/models endpoint removed
+    // Models tab now uses HTMX with yzma endpoints:
+    // - /api/ui/yzma/models (available GGUF models)
+    // - /api/ui/yzma/loaded (currently loaded models)
+    // - /api/ui/huggingface/search (Hugging Face browser)
     async loadModels() {
-        try {
-            const response = await api.request(`${api.baseURL}/api/admin/models`);
-            if (response.ok) {
-                const data = await response.json();
-                this.models = data.data || data.models || [];
-                this.renderModels();
-            }
-        } catch (error) {
-            console.error('Failed to load models:', error);
-            const container = document.getElementById('models-accordion');
-            if (container) {
-                container.innerHTML = '<div class="error-placeholder">Failed to load models</div>';
-            }
-        }
+        console.warn('loadModels() is deprecated since v3.0.5+ - Models tab uses HTMX');
+        // No-op: Models are loaded via HTMX in admin.html
     }
 
     async loadSystem() {
@@ -758,96 +755,18 @@ class AdminPanel {
         }
     }
 
+    // DEPRECATED v3.0.5+: Models accordion UI removed
+    // Models are now managed via yzma HTMX UI
     renderModels() {
-        const container = document.getElementById('models-accordion');
-        
-        if (this.models.length === 0) {
-            container.innerHTML = '<div class="loading-placeholder">No models found</div>';
-            return;
-        }
-
-        container.innerHTML = this.models.map(model => {
-            const modelName = model.id || model.name;
-            const modelId = this.sanitizeId(modelName);
-            
-            return `
-                <div class="accordion-item" data-model="${this.escapeHtml(modelName)}">
-                    <div class="accordion-header" onclick="adminPanel.toggleAccordion('${modelId}')">
-                        <div class="accordion-header-content">
-                            <div class="model-item">
-                                <code class="model-name">${this.escapeHtml(modelName)}</code>
-                                <button 
-                                    class="copy-model-btn"
-                                    onclick="event.stopPropagation(); copyModelName('${this.escapeHtml(modelName)}')"
-                                    aria-label="Copy model name"
-                                    title="Copy model name">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                            <div class="model-meta">
-                                <span class="model-size">${this.formatSize(model.size)}</span>
-                                <span class="model-modified">${this.formatDate(model.modified_at || model.created)}</span>
-                            </div>
-                        </div>
-                        <div class="accordion-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M6 9l6 6 6-6" stroke-width="2"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="accordion-body" id="accordion-${modelId}">
-                        <div class="loading-details">Click to load details...</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        console.warn('renderModels() is deprecated since v3.0.5+');
     }
 
-    async toggleAccordion(modelId) {
-        const body = document.getElementById(`accordion-${modelId}`);
-        const item = body.closest('.accordion-item');
-        const modelName = item.dataset.model;
-        
-        // Закрыть если уже открыт
-        if (item.classList.contains('active')) {
-            item.classList.remove('active');
-            return;
-        }
-
-        // Закрыть все другие
-        document.querySelectorAll('.accordion-item.active').forEach(el => {
-            if (el !== item) el.classList.remove('active');
-        });
-
-        // Открыть текущий
-        item.classList.add('active');
-
-        // Загрузить детали если еще не загружены
-        if (body.querySelector('.loading-details')) {
-            body.innerHTML = '<div class="loading-details"><i class="fas fa-spinner fa-spin"></i> Loading details...</div>';
-            await this.loadModelDetails(modelName, body);
-        }
+    toggleAccordion(modelId) {
+        console.warn('toggleAccordion() is deprecated since v3.0.5+');
     }
 
     async loadModelDetails(modelName, container) {
-        try {
-            const response = await api.request(`${api.baseURL}/api/admin/models/${encodeURIComponent(modelName)}/details`);
-            
-            if (!response.ok) {
-                throw new Error('Failed to load model details');
-            }
-
-            const details = await response.json();
-            container.innerHTML = this.renderModelDetails(details);
-        } catch (error) {
-            console.error('Failed to load model details:', error);
-            container.innerHTML = `
-                <div class="error-message">
-                    <i class="fas fa-exclamation-circle"></i>
-                    Failed to load model details: ${error.message}
-                </div>
-            `;
-        }
+        console.warn('loadModelDetails() is deprecated since v3.0.5+');
     }
 
     renderModelDetails(details) {
@@ -958,33 +877,10 @@ class AdminPanel {
     }
 
     // Refresh models (v1.9.3+)
+    // DEPRECATED v3.0.5+: Models refresh now handled by HTMX
+    // Use hx-get="/api/ui/yzma/models" with hx-trigger="load" in HTML
     async refreshModels() {
-        const btn = document.getElementById('refresh-models-btn');
-        const originalHTML = btn.innerHTML;
-        
-        try {
-            // Disable button and show loading
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
-            
-            // Reload models
-            const response = await api.request(`${api.baseURL}/api/admin/models`);
-            if (response.ok) {
-                const data = await response.json();
-                this.models = data.data || data.models || [];
-                this.renderModels();
-                notifications.showSuccess('Models refreshed successfully');
-            } else {
-                throw new Error('Failed to refresh models');
-            }
-        } catch (error) {
-            console.error('Failed to refresh models:', error);
-            notifications.showError('Failed to refresh models');
-        } finally {
-            // Re-enable button
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-        }
+        console.warn('refreshModels() is deprecated since v3.0.5+ - Use HTMX refresh buttons');
     }
 
     // User Management

@@ -176,6 +176,28 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 		return
 	}
 	
+	// Log file sizes for debugging
+	h.logger.WithFields(logrus.Fields{
+		"model_id":    model.ID,
+		"gguf_count":  len(model.GGUFFiles),
+		"total_size":  model.TotalSize,
+	}).Debug("Rendering GGUF files list")
+	
+	for i, file := range model.GGUFFiles {
+		h.logger.WithFields(logrus.Fields{
+			"file_index": i,
+			"filename":   file.Filename,
+			"size":       file.Size,
+			"has_lfs":    file.LFS != nil,
+		}).Debug("GGUF file details")
+		if file.LFS != nil {
+			h.logger.WithFields(logrus.Fields{
+				"lfs_size": file.LFS.Size,
+				"lfs_oid":  file.LFS.OID,
+			}).Debug("LFS details")
+		}
+	}
+	
 	// Render GGUF files list
 	data := map[string]interface{}{
 		"ModelID": model.ID,
@@ -253,16 +275,24 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 // PostDownloadModel handles HTMX request to start model download
 func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 	type DownloadRequest struct {
-		ModelID   string `json:"model_id" binding:"required"`
-		Filename  string `json:"filename" binding:"required"`
-		TotalSize int64  `json:"total_size"`
-		SHA256    string `json:"sha256"`
+		ModelID   string `json:"model_id" form:"model_id" binding:"required"`
+		Filename  string `json:"filename" form:"filename" binding:"required"`
+		TotalSize int64  `json:"total_size" form:"total_size"`
+		SHA256    string `json:"sha256" form:"sha256"`
 	}
 	
 	var req DownloadRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.renderError(c, "Invalid request: "+err.Error())
-		return
+	// Support both JSON and form data for HTMX compatibility
+	if c.ContentType() == "application/json" {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			h.renderError(c, "Invalid request: "+err.Error())
+			return
+		}
+	} else {
+		if err := c.ShouldBind(&req); err != nil {
+			h.renderError(c, "Invalid request: "+err.Error())
+			return
+		}
 	}
 	
 	h.logger.WithFields(logrus.Fields{

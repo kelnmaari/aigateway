@@ -1,42 +1,66 @@
-{{/* Single yzma model card - HTMX fragment */}}
-<div class="model-card {{if .loaded}}model-loaded{{end}}" data-model-path="{{.path}}">
-    <div class="model-header">
-        <h3 class="model-name" title="{{.path}}">{{.name}}</h3>
-        <span class="model-badge {{if .loaded}}badge-success{{else}}badge-secondary{{end}}">
-            {{if .loaded}}LOADED{{else}}Available{{end}}
-        </span>
+{{/* Single yzma model row - HTMX fragment */}}
+<div class="model-row {{if .loaded}}model-loaded{{end}} {{if .is_partial}}model-partial{{end}}" data-model-path="{{.path}}">
+    <span class="model-badge {{if .loaded}}badge-success{{else if .is_partial}}badge-warning{{else}}badge-secondary{{end}}">
+        {{if .loaded}}LOADED{{else if .is_partial}}INCOMPLETE{{else}}Available{{end}}
+    </span>
+    <h3 class="model-name" title="{{.name}}">{{.name}}</h3>
+    {{if .is_partial}}
+    <span class="model-warning" style="color: #f59e0b; font-size: 0.85rem;">
+        <i class="fas fa-exclamation-triangle"></i> Partial download - cannot be loaded
+    </span>
+    {{end}}
+    <span class="model-provider"><i class="fas fa-cube"></i> yzma</span>
+    <div class="model-path" title="{{.path}}">
+        <i class="fas fa-folder-open"></i>
+        <span>{{.path}}</span>
     </div>
-    <div class="model-info">
-        <div class="info-item">
-            <i class="fas fa-cube"></i>
-            <span>yzma</span>
-        </div>
-        <div class="info-item">
-            <i class="fas fa-file"></i>
-            <span class="text-truncate">{{.path}}</span>
-        </div>
-    </div>
-    <div class="model-actions">
+    <div style="display: flex; gap: 8px;">
         {{if .loaded}}
-        <button 
-            class="btn btn-sm btn-danger"
-            hx-post="/api/ui/yzma/unload"
-            hx-vals='{"model_path": "{{.path}}"}'
-            hx-target="closest .model-card"
-            hx-swap="outerHTML"
-            hx-indicator="#loading-indicator">
-            <i class="fas fa-eject"></i> Unload
-        </button>
+        <!-- Loaded model: show Unload button -->
+        <form style="display: inline;">
+            <input type="hidden" name="model_path" value="{{.path}}">
+            <button 
+                class="btn btn-sm btn-warning"
+                hx-post="/api/ui/yzma/unload"
+                hx-include="closest form"
+                hx-target="closest .model-row"
+                hx-swap="outerHTML"
+                hx-indicator="#loading-indicator">
+                <i class="fas fa-eject"></i> Unload
+            </button>
+        </form>
+            {{else if .is_partial}}
+            <!-- Partial download: only Delete button -->
+            <form style="display: inline;">
+                <button 
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    onclick="deleteYzmaModel(this, '{{.path}}', '{{.name}}', true)">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </form>
         {{else}}
-        <button 
-            class="btn btn-sm btn-primary"
-            hx-post="/api/ui/yzma/load"
-            hx-vals='{"model_path": "{{.path}}"}'
-            hx-target="closest .model-card"
-            hx-swap="outerHTML"
-            hx-indicator="#loading-indicator">
-            <i class="fas fa-download"></i> Load
-        </button>
+        <!-- Available model: show Load and Delete buttons -->
+        <form style="display: inline;">
+            <input type="hidden" name="model_path" value="{{.path}}">
+            <button 
+                class="btn btn-sm btn-primary"
+                hx-post="/api/ui/yzma/load"
+                hx-include="closest form"
+                hx-target="closest .model-row"
+                hx-swap="outerHTML"
+                hx-indicator="#loading-indicator">
+                <i class="fas fa-download"></i> Load
+            </button>
+        </form>
+            <form style="display: inline;">
+                <button 
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    onclick="deleteYzmaModel(this, '{{.path}}', '{{.name}}', false)">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </form>
         {{end}}
     </div>
 </div>

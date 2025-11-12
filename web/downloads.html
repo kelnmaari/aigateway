@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Downloads - AI Gateway</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: rgba(255, 255, 255, 0.95);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .close-btn {
+            padding: 0.5rem 1.5rem;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+
+        .close-btn:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+        }
+
+        #downloads-container {
+            /* Container will be filled by HTMX */
+        }
+
+        /* Loading spinner */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #48dbfb;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📦 Active Downloads</h1>
+            <button class="close-btn" onclick="window.close()">✕ Close Window</button>
+        </div>
+
+        <div id="downloads-container" 
+             hx-get="/api/ui/huggingface/downloads" 
+             hx-trigger="load, every 2s"
+             hx-swap="innerHTML">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading downloads...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configure HTMX to include JWT token
+        document.body.addEventListener('htmx:configRequest', function(event) {
+            const token = localStorage.getItem('token');
+            if (token) {
+                event.detail.headers['Authorization'] = 'Bearer ' + token;
+            }
+        });
+
+        // Handle authentication errors
+        document.body.addEventListener('htmx:responseError', function(event) {
+            if (event.detail.xhr.status === 401) {
+                console.error('Session expired. Please login again.');
+                window.close();
+            }
+        });
+
+        // Auto-close if parent window is closed
+        if (window.opener) {
+            setInterval(() => {
+                if (window.opener.closed) {
+                    window.close();
+                }
+            }, 1000);
+        }
+        
+        // HuggingFace Download Cancellation with Beautiful Modal
+        async function cancelHFDownload(downloadId, filename) {
+            const confirmed = await modal.danger(
+                'Are you sure you want to cancel this download?',
+                'Cancel Download',
+                `File: ${filename}\n\nThis action cannot be undone.`
+            );
+            
+            if (!confirmed) return;
+            
+            // Programmatically trigger HTMX cancel
+            htmx.ajax('POST', `/api/ui/huggingface/downloads/${downloadId}/cancel`, {
+                target: `#download-${downloadId}`,
+                swap: 'outerHTML'
+            });
+        }
+    </script>
+</body>
+</html>
+

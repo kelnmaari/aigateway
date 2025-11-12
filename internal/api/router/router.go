@@ -25,40 +25,40 @@ import (
 	oidcauth "aigateway/internal/auth/oidc"
 	"aigateway/internal/auth/ratelimit"
 	authService "aigateway/internal/auth/service"
-	"aigateway/internal/client/ollama"
+
+	// "aigateway/internal/client/ollama" // Removed: v3.0.5+
 	"aigateway/internal/config"
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
 	"aigateway/internal/huggingface"
+	internalLogger "aigateway/internal/logger"
 	"aigateway/internal/metrics"
-	"aigateway/internal/yzma"
 	"aigateway/internal/models"
 	"aigateway/internal/observability"
 	"aigateway/internal/providers"
 	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/request"
-	"aigateway/internal/services/agent"
+	agentService "aigateway/internal/services/agent"
 	"aigateway/internal/services/audit"
-	"aigateway/internal/services/model"
 	"aigateway/internal/services/quota"
 	ragservice "aigateway/internal/services/rag"
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/storage"
 	"aigateway/internal/web/templates"
 	"aigateway/internal/websocket"
+	"aigateway/internal/yzma"
 
 	"go.opentelemetry.io/otel/trace"
 )
 
 // Router представляет HTTP роутер приложения с опциональным API Key Management
 type Router struct {
-	config       *config.Config
-	logger       *logrus.Logger
-	engine       *gin.Engine
-	ollamaClient *ollama.ClientWithCircuitBreaker
-	version      string       // Версия сервера
-	tracer       trace.Tracer // OpenTelemetry tracer (v1.6.0+)
+	config  *config.Config
+	logger  *logrus.Logger
+	engine  *gin.Engine
+	version string       // Версия сервера
+	tracer  trace.Tracer // OpenTelemetry tracer (v1.6.0+)
 
 	// API Key Management компоненты (опциональные)
 	storage       storage.APIKeyStorage
@@ -73,7 +73,6 @@ type Router struct {
 	bootstrapService *authService.BootstrapService // Bootstrap service для первичной настройки
 
 	// Handlers
-	healthHandler             *handlers.HealthHandler
 	systemHandler             *handlers.SystemHandler             // System endpoints (bootstrap, init-status)
 	authHandler               *handlers.AuthHandler               // Auth endpoints (login, register, etc)
 	deviceHandler             *handlers.DeviceHandler             // Device management (Version 2.4.0+)
@@ -83,32 +82,27 @@ type Router struct {
 	conversationExportHandler *handlers.ConversationExportHandler // Conversation export/import (Version 1.12.3+)
 	adminUserHandler          *handlers.AdminUserHandler          // Admin User Management (Version 1.3.0)
 	usageHandler              *handlers.UsageHandler              // Usage Statistics (Version 1.3.0)
-	modelsHandler             *handlers.ModelsHandler
-	modelPreloadHandler       *handlers.ModelPreloadHandler // Model Preload Management (Version 1.12.1+)
-	chatHandler               *handlers.ChatHandler
-	embeddingsHandler         *handlers.EmbeddingsHandler
-	completionsHandler        *handlers.CompletionsHandler
-	adminHandler              *handlers.AdminHandler
-	adminFilesHandler         *handlers.AdminFilesHandler     // Admin files management (v1.10.0)
-	statsHandler              *handlers.StatsHandler          // Handler для TUI статистики
-	configHandler             *handlers.ConfigHandler         // Handler для конфигурации
-	logsHandler               *handlers.LogsHandler           // Handler для логов
-	metricsHistoryHandler     *handlers.MetricsHistoryHandler // Handler для historical metrics
-	requestsHandler           *handlers.RequestsHandler       // Handler для request monitoring (TUI-04)
-	mcpHandler                *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
-	changelogHandler          *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
-	backupHandler             *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
-	performanceHandler        *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
-	fileHandler               *handlers.FileHandler           // Handler для file operations (v1.10.0)
-	oidcHandler               *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
-	ldapHandler               *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
-	auditHandler              *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
-	rbacHandler               *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
-	quotaHandler              *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
-	invitationHandler         *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
-	ragDataSourcesHandler     *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
-	registryHandler           *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
-	agentHandler              *handlers.AgentHandler          // Handler для Agent API (AGENT-01, v2.5.0)
+	// Removed: modelsHandler, chatHandler, embeddingsHandler, completionsHandler (Ollama-based, v3.0.5+)
+	adminHandler          *handlers.AdminHandler
+	adminFilesHandler     *handlers.AdminFilesHandler     // Admin files management (v1.10.0)
+	statsHandler          *handlers.StatsHandler          // Handler для TUI статистики
+	logsHandler           *handlers.LogsHandler           // Handler для логов
+	metricsHistoryHandler *handlers.MetricsHistoryHandler // Handler для historical metrics
+	requestsHandler       *handlers.RequestsHandler       // Handler для request monitoring (TUI-04)
+	mcpHandler            *handlers.MCPHandler            // Handler для MCP servers catalog (v1.4.5)
+	changelogHandler      *handlers.ChangelogHandler      // Handler для changelog (v1.4.11)
+	backupHandler         *handlers.BackupHandler         // Handler для backup/restore (v1.5.14)
+	performanceHandler    *handlers.PerformanceHandler    // Handler для performance monitoring (v1.6.2)
+	fileHandler           *handlers.FileHandler           // Handler для file operations (v1.10.0)
+	oidcHandler           *handlers.OIDCHandler           // Handler для OIDC/Keycloak SSO (v1.11.1)
+	ldapHandler           *handlers.LDAPHandler           // Handler для LDAP/AD authentication (v1.11.3)
+	auditHandler          *handlers.AuditHandler          // Handler для audit logging (v1.11.4)
+	rbacHandler           *handlers.RBACHandler           // Handler для RBAC management (v1.11.5)
+	quotaHandler          *handlers.QuotaHandler          // Handler для quota management (v1.11.7)
+	invitationHandler     *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
+	agentHandler          *handlers.AgentHandler          // Handler для agent API (v2.5.0+, v3.0.6+)
+	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
+	registryHandler       *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
 
 	// Provider Management (Version 2.3.0+: REGISTRY-01)
 	providerManager *providers.ProviderManager // Model providers manager
@@ -116,7 +110,6 @@ type Router struct {
 	// WebSocket components
 	wsHub              *websocket.Hub
 	wsHandler          *websocket.Handler
-	wsChatHandler      *websocket.ChatHandler // Chat handler for desktop (DESKTOP-03)
 	eventBroadcaster   *websocket.EventBroadcaster
 	metricsBroadcaster *websocket.MetricsBroadcaster
 
@@ -152,14 +145,10 @@ type Router struct {
 	// Metrics (Version 1.11.6+: Prometheus Metrics Export)
 	metricsCollector *metrics.MetricsCollector
 
-	// Model Preloading (Version 1.12.1+: Model Preloading & Warming)
-	modelPreloader *model.ModelPreloader
-
 	// RAG System (Version 1.13.0+: RAG System)
 	ragDataSourceService *ragservice.DataSourceService
 
-	// Agent Service (Version 2.5.0+: AGENT-01)
-	agentService    *agent.Service
+	// RAG Orchestrator
 	ragOrchestrator *ragorchestrator.RAGOrchestrator
 
 	// HTMX UI Handlers (Version 2.6.0+: HTMX-01)
@@ -167,20 +156,23 @@ type Router struct {
 	registryUIHandler  *handlersUI.RegistryUIHandler
 	apiKeysUIHandler   *handlersUI.APIKeysUIHandler
 	tenantsUIHandler   *handlersUI.TenantsUIHandler
-	monitorUIHandler   *handlersUI.MonitorUIHandler      // Monitor UI (GPU, Audit, Usage) - HTMX-02
-	usersUIHandler     *handlersUI.UsersUIHandler        // Users UI (HTMX-03)
-	rbacUIHandler      *handlersUI.RBACUIHandler         // RBAC UI (HTMX-03)
-	dashboardUIHandler *handlersUI.DashboardUIHandler    // Dashboard UI (HTMX-03)
-	
+	monitorUIHandler   *handlersUI.MonitorUIHandler   // Monitor UI (GPU, Audit, Usage) - HTMX-02
+	usersUIHandler     *handlersUI.UsersUIHandler     // Users UI (HTMX-03)
+	rbacUIHandler      *handlersUI.RBACUIHandler      // RBAC UI (HTMX-03)
+	dashboardUIHandler *handlersUI.DashboardUIHandler // Dashboard UI (HTMX-03)
+
 	// Hugging Face Integration (Version 3.0.0+: HF-01)
-	hfClient           *huggingface.Client
-	hfDownloader       *huggingface.Downloader           // Model downloader
-	hfUIHandler        *handlersUI.HuggingFaceUIHandler  // Hugging Face Model Browser
-	
+	hfClient     *huggingface.Client
+	hfDownloader *huggingface.Downloader          // Model downloader
+	hfUIHandler  *handlersUI.HuggingFaceUIHandler // Hugging Face Model Browser
+
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
-	yzmaClient         *yzma.Client
-	yzmaHandler        *handlers.YzmaHandler              // yzma inference handler
-	yzmaUIHandler      *handlersUI.YzmaUIHandler          // yzma UI handler (YZMA-UI-01)
+	yzmaClient    *yzma.Client
+	yzmaHandler   *handlers.YzmaHandler     // yzma inference handler
+	yzmaUIHandler *handlersUI.YzmaUIHandler // yzma UI handler (YZMA-UI-01)
+
+	// Agent Service (v2.5.0+, v3.0.6+: restored for YZMA)
+	agentService *agentService.AgentService // Conversational agent with tools
 }
 
 // NewOptions содержит опции для создания роутера
@@ -195,7 +187,6 @@ type NewOptions struct {
 	LeakDetector         *observability.LeakDetector       // Опциональный leak detector (v1.6.2+)
 	MonigoPort           int                               // Порт MoniGo dashboard (0 если отключен) (v1.9.3+)
 	GPUMonitor           *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
-	ModelPreloader       *model.ModelPreloader             // Опциональный model preloader (v1.12.1+)
 	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
 	RAGOrchestrator      *ragorchestrator.RAGOrchestrator  // Опциональный RAG Orchestrator (v1.13.1+)
 }
@@ -209,18 +200,11 @@ func New(cfg *config.Config, logger *logrus.Logger, version string) (*Router, er
 	})
 }
 
-// NewWithOptions создает роутер с расширенными опциями
+// NewWithOptions создает роутер с расширенными опциями (v3.0.5+: Ollama removed)
 func NewWithOptions(opts NewOptions) (*Router, error) {
-	// Создаем Ollama клиент с circuit breaker
-	ollamaClient, err := ollama.NewClientWithCircuitBreaker(opts.Config, opts.Logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
-	}
-
 	r := &Router{
 		config:               opts.Config,
 		logger:               opts.Logger,
-		ollamaClient:         ollamaClient,
 		version:              opts.Version,
 		db:                   opts.Database,
 		jwtManager:           opts.JWTManager,
@@ -228,7 +212,6 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		leakDetector:         opts.LeakDetector,
 		monigoPort:           opts.MonigoPort,
 		gpuMonitor:           opts.GPUMonitor,
-		modelPreloader:       opts.ModelPreloader,
 		ragDataSourceService: opts.RAGDataSourceService,
 		ragOrchestrator:      opts.RAGOrchestrator,
 	}
@@ -261,8 +244,8 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		opts.Logger.Info("Model Registry initialized successfully")
 	}
 
-	// Инициализация handlers
-	r.setupHandlers(opts.Config, opts.Logger, ollamaClient)
+	// Инициализация handlers (v3.0.5+: removed ollamaClient)
+	r.setupHandlers(opts.Config, opts.Logger)
 
 	r.setupEngine()
 	r.setupRoutes()
@@ -304,14 +287,18 @@ func (r *Router) Close() error {
 		r.keyManager.Close()
 	}
 
-	// Stop model preloader (Version 1.12.1+)
-	if r.modelPreloader != nil {
-		r.modelPreloader.Stop()
+	// Shutdown yzma client (v3.0.5+: Free GPU memory!)
+	if r.yzmaClient != nil {
+		r.logger.Info("🗑️ Shutting down yzma client...")
+		if err := r.yzmaClient.Shutdown(); err != nil {
+			r.logger.WithError(err).Error("Failed to shutdown yzma client")
+		} else {
+			r.logger.Info("✅ yzma client shut down successfully")
+		}
 	}
 
-	if r.ollamaClient != nil {
-		r.ollamaClient.Close()
-	}
+	// Legacy: Ollama client removed (v3.0.5+)
+	// All inference now goes through yzma
 
 	return nil
 }
@@ -430,7 +417,7 @@ func (r *Router) setupMiddleware() {
 
 // setupRoutes настраивает все маршруты приложения
 func (r *Router) setupRoutes() {
-	r.setupHealthRoutes()
+	r.setupHealthRoutes() // Health check endpoint (for desktop client)
 	r.setupMetricsRoutes()
 	r.setupMonigoRoutes()         // MoniGo Performance Dashboard (v1.9.3+)
 	r.setupStatsRoutes()          // Для TUI
@@ -453,11 +440,16 @@ func (r *Router) setupRoutes() {
 	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
 }
 
-// setupHealthRoutes настраивает эндпоинты проверки здоровья
+// setupHealthRoutes настраивает health check endpoint для desktop client
 func (r *Router) setupHealthRoutes() {
-	r.engine.GET("/health", r.healthHandler.Health)
-	r.engine.GET("/ready", r.healthHandler.Ready)
-	r.engine.GET("/healthz", r.healthHandler.Live)
+	// Health endpoint without authentication (needed for API key verification)
+	r.engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"version": r.version,
+		})
+	})
+	r.logger.Info("Health check endpoint configured: GET /health")
 }
 
 // setupMetricsRoutes настраивает эндпоинты метрик
@@ -579,18 +571,14 @@ func (r *Router) setupFileRoutes() {
 
 // setupUIRoutes настраивает HTMX UI routes (v2.6.0+: HTMX-01)
 func (r *Router) setupUIRoutes() {
-	if r.registryUIHandler == nil || r.apiKeysUIHandler == nil || r.tenantsUIHandler == nil {
-		r.logger.Info("HTMX UI disabled - handlers not initialized")
-		return
-	}
-
 	// UI routes требуют JWT аутентификации
 	ui := r.engine.Group("/api/ui")
 	if r.jwtManager != nil {
 		ui.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
 	}
-	{
-		// Model Registry UI
+
+	// Model Registry UI (conditional)
+	if r.registryUIHandler != nil {
 		registry := ui.Group("/registry")
 		{
 			registry.GET("/models", r.registryUIHandler.GetModelsTable)
@@ -599,8 +587,11 @@ func (r *Router) setupUIRoutes() {
 			registry.GET("/models/:id/edit", r.registryUIHandler.GetEditModelForm)
 			registry.GET("/providers/new-form", r.registryUIHandler.GetNewProviderForm)
 		}
+		r.logger.Info("✅ Model Registry UI routes registered")
+	}
 
-		// API Keys UI
+	// API Keys UI (conditional)
+	if r.apiKeysUIHandler != nil {
 		apikeys := ui.Group("/api-keys")
 		{
 			apikeys.GET("/personal", r.apiKeysUIHandler.GetAPIKeysList)
@@ -609,8 +600,11 @@ func (r *Router) setupUIRoutes() {
 			apikeys.GET("/:id", r.apiKeysUIHandler.GetAPIKeyCard)
 			apikeys.GET("/:id/edit", r.apiKeysUIHandler.GetEditAPIKeyForm)
 		}
+		r.logger.Info("✅ API Keys UI routes registered")
+	}
 
-		// Tenants UI
+	// Tenants UI (conditional)
+	if r.tenantsUIHandler != nil {
 		tenants := ui.Group("/tenants")
 		{
 			tenants.GET("", r.tenantsUIHandler.GetTenantsGrid)
@@ -619,99 +613,107 @@ func (r *Router) setupUIRoutes() {
 			tenants.GET("/:id/edit", r.tenantsUIHandler.GetEditTenantForm)
 			tenants.GET("/:id/members", r.tenantsUIHandler.GetTenantMembers)
 		}
-
-		// Monitor UI (HTMX-02: Live Updates & Real-time Features)
-		if r.monitorUIHandler != nil {
-			monitor := ui.Group("/monitor")
-			{
-				monitor.GET("/gpu-metrics", r.monitorUIHandler.RenderGPUMetrics)
-				monitor.GET("/audit-logs", r.monitorUIHandler.RenderAuditLogRows)
-				monitor.GET("/usage-stats", r.monitorUIHandler.RenderUsageStats)
-			}
-		}
-
-		// Users UI (HTMX-03: Advanced Forms & Search)
-		if r.usersUIHandler != nil {
-			users := ui.Group("/users")
-			{
-				users.GET("", r.usersUIHandler.GetUsersList)
-				users.GET("/create-form", r.usersUIHandler.GetCreateUserForm)
-				users.GET("/:id/edit", r.usersUIHandler.GetEditUserForm)
-				users.GET("/:id/roles", r.usersUIHandler.GetUserRolesForm)
-			}
-		}
-
-		// RBAC UI (HTMX-03: Advanced Forms & Search)
-		if r.rbacUIHandler != nil {
-			rbac := ui.Group("/rbac")
-			{
-				// Roles
-				rbac.GET("/roles", r.rbacUIHandler.GetRolesList)
-				rbac.GET("/roles/create-form", r.rbacUIHandler.GetCreateRoleForm)
-				rbac.GET("/roles/:id/edit", r.rbacUIHandler.GetEditRoleForm)
-				rbac.GET("/roles/:id/permissions", r.rbacUIHandler.GetRolePermissionsForm)
-
-				// Permissions
-				rbac.GET("/permissions", r.rbacUIHandler.GetPermissionsList)
-			}
-		}
-
-		// Dashboard UI (HTMX-03: Advanced Forms & Search)
-		if r.dashboardUIHandler != nil {
-			dashboard := ui.Group("/dashboard")
-			{
-				// Stat cards
-				dashboard.GET("/stats/users", r.dashboardUIHandler.GetUsersStatCard)
-				dashboard.GET("/stats/api-keys", r.dashboardUIHandler.GetAPIKeysStatCard)
-				dashboard.GET("/stats/models", r.dashboardUIHandler.GetModelsStatCard)
-				dashboard.GET("/stats/requests", r.dashboardUIHandler.GetRequestsStatCard)
-
-				// System health
-				dashboard.GET("/system-health", r.dashboardUIHandler.GetSystemHealthTable)
-			}
-		}
-		
-		// Hugging Face Model Browser (v3.0.0+: HF-UI-01)
-		if r.hfUIHandler != nil {
-			hf := ui.Group("/huggingface")
-			{
-				// Search and browse
-				hf.GET("/search", r.hfUIHandler.GetModelsSearch)
-				hf.GET("/popular", r.hfUIHandler.GetPopularModels)
-				
-				// Model details
-				hf.GET("/models/*model_id", r.hfUIHandler.GetModelDetails)
-				hf.GET("/gguf-files/*model_id", r.hfUIHandler.GetGGUFFilesList)
-				
-				// Downloads (HF-02: Download Manager)
-				hf.POST("/download", r.hfUIHandler.PostDownloadModel)
-				hf.GET("/downloads", r.hfUIHandler.GetDownloadsList)
-				hf.GET("/downloads/:download_id/progress", r.hfUIHandler.GetDownloadProgress)
-				hf.POST("/downloads/:download_id/pause", r.hfUIHandler.PostPauseDownload)
-				hf.POST("/downloads/:download_id/cancel", r.hfUIHandler.PostCancelDownload)
-			}
-		}
-		
-		// yzma Model Management UI (v3.0.0+: YZMA-UI-01)
-		if r.yzmaUIHandler != nil {
-			yzma := ui.Group("/yzma")
-			{
-				// Models management
-				yzma.GET("/models", r.yzmaUIHandler.GetModelsList)
-				yzma.GET("/loaded", r.yzmaUIHandler.GetLoadedModelsList)
-				yzma.POST("/load", r.yzmaUIHandler.PostLoadModel)
-				yzma.POST("/unload", r.yzmaUIHandler.PostUnloadModel)
-				
-				// Statistics
-				yzma.GET("/stats", r.yzmaUIHandler.GetStats)
-				
-				// Provider integration for chat
-				yzma.GET("/provider/models", r.yzmaUIHandler.GetProviderModels)
-			}
-		}
+		r.logger.Info("✅ Tenants UI routes registered")
 	}
 
-	r.logger.Info("✅ HTMX UI routes registered successfully")
+	// Monitor UI (HTMX-02: Live Updates & Real-time Features)
+	if r.monitorUIHandler != nil {
+		monitor := ui.Group("/monitor")
+		{
+			monitor.GET("/gpu-metrics", r.monitorUIHandler.RenderGPUMetrics)
+			monitor.GET("/audit-logs", r.monitorUIHandler.RenderAuditLogRows)
+			monitor.GET("/usage-stats", r.monitorUIHandler.RenderUsageStats)
+		}
+		r.logger.Info("✅ Monitor UI routes registered")
+	}
+
+	// Users UI (HTMX-03: Advanced Forms & Search)
+	if r.usersUIHandler != nil {
+		users := ui.Group("/users")
+		{
+			users.GET("", r.usersUIHandler.GetUsersList)
+			users.GET("/create-form", r.usersUIHandler.GetCreateUserForm)
+			users.GET("/:id/edit", r.usersUIHandler.GetEditUserForm)
+			users.GET("/:id/roles", r.usersUIHandler.GetUserRolesForm)
+		}
+		r.logger.Info("✅ Users UI routes registered")
+	}
+
+	// RBAC UI (HTMX-03: Advanced Forms & Search)
+	if r.rbacUIHandler != nil {
+		rbac := ui.Group("/rbac")
+		{
+			// Roles
+			rbac.GET("/roles", r.rbacUIHandler.GetRolesList)
+			rbac.GET("/roles/create-form", r.rbacUIHandler.GetCreateRoleForm)
+			rbac.GET("/roles/:id/edit", r.rbacUIHandler.GetEditRoleForm)
+			rbac.GET("/roles/:id/permissions", r.rbacUIHandler.GetRolePermissionsForm)
+
+			// Permissions
+			rbac.GET("/permissions", r.rbacUIHandler.GetPermissionsList)
+		}
+		r.logger.Info("✅ RBAC UI routes registered")
+	}
+
+	// Dashboard UI (HTMX-03: Advanced Forms & Search)
+	if r.dashboardUIHandler != nil {
+		dashboard := ui.Group("/dashboard")
+		{
+			// Stat cards
+			dashboard.GET("/stats/users", r.dashboardUIHandler.GetUsersStatCard)
+			dashboard.GET("/stats/api-keys", r.dashboardUIHandler.GetAPIKeysStatCard)
+			dashboard.GET("/stats/models", r.dashboardUIHandler.GetModelsStatCard)
+			dashboard.GET("/stats/requests", r.dashboardUIHandler.GetRequestsStatCard)
+
+			// System health
+			dashboard.GET("/system-health", r.dashboardUIHandler.GetSystemHealthTable)
+		}
+		r.logger.Info("✅ Dashboard UI routes registered")
+	}
+
+	// Hugging Face Model Browser (v3.0.0+: HF-UI-01)
+	if r.hfUIHandler != nil {
+		hf := ui.Group("/huggingface")
+		{
+			// Search and browse
+			hf.GET("/search", r.hfUIHandler.GetModelsSearch)
+			hf.GET("/popular", r.hfUIHandler.GetPopularModels)
+
+			// Model details
+			hf.GET("/models/*model_id", r.hfUIHandler.GetModelDetails)
+			hf.GET("/gguf-files/*model_id", r.hfUIHandler.GetGGUFFilesList)
+
+			// Downloads (HF-02: Download Manager)
+			hf.POST("/download", r.hfUIHandler.PostDownloadModel)
+			hf.GET("/downloads", r.hfUIHandler.GetDownloadsList)
+			hf.GET("/downloads/:download_id/progress", r.hfUIHandler.GetDownloadProgress)
+			hf.POST("/downloads/:download_id/pause", r.hfUIHandler.PostPauseDownload)
+			hf.POST("/downloads/:download_id/cancel", r.hfUIHandler.PostCancelDownload)
+		}
+		r.logger.Info("✅ Hugging Face UI routes registered")
+	}
+
+	// yzma Model Management UI (v3.0.0+: YZMA-UI-01)
+	if r.yzmaUIHandler != nil {
+		yzma := ui.Group("/yzma")
+		{
+			// Models management
+			yzma.GET("/models", r.yzmaUIHandler.GetModelsList)
+			yzma.GET("/loaded", r.yzmaUIHandler.GetLoadedModelsList)
+			yzma.POST("/load", r.yzmaUIHandler.PostLoadModel)
+			yzma.POST("/unload", r.yzmaUIHandler.PostUnloadModel)
+			yzma.POST("/delete", r.yzmaUIHandler.PostDeleteModel)
+
+			// Statistics
+			yzma.GET("/stats", r.yzmaUIHandler.GetStats)
+
+			// Provider integration for chat
+			yzma.GET("/provider/models", r.yzmaUIHandler.GetProviderModels)
+		}
+		r.logger.Info("✅ yzma UI routes registered")
+	}
+
+	r.logger.Info("✅ HTMX UI routes setup completed")
 }
 
 // setupRAGRoutes настраивает RAG System routes (v1.13.1+)
@@ -746,17 +748,18 @@ func (r *Router) setupRAGRoutes() {
 // setupStatsRoutes настраивает эндпоинты статистики для TUI
 func (r *Router) setupStatsRoutes() {
 	// Эндпоинт для TUI (без аутентификации, только для локального использования)
-	r.engine.GET("/api/stats", r.statsHandler.GetStats)
+	if r.statsHandler != nil {
+		r.engine.GET("/api/stats", r.statsHandler.GetStats)
+		r.logger.Info("✅ Stats endpoint registered: /api/stats")
+	}
 }
 
 // setupConfigRoutes настраивает эндпоинты конфигурации для TUI
 func (r *Router) setupConfigRoutes() {
-	// Эндпоинт для TUI (без аутентификации, только для локального использования)
-	r.engine.GET("/api/config", r.configHandler.GetConfig)
-
-	// Публичные эндпоинты для списка моделей (для WebUI/TUI/Login page)
-	r.engine.GET("/api/models", r.modelsHandler.List)
-	r.engine.GET("/api/v1/models", r.modelsHandler.List) // OpenAI-compatible path
+	// v3.0.5+: Legacy Ollama routes removed
+	// Use yzma endpoints: /v1/yzma/models
+	// r.engine.GET("/api/models", r.modelsHandler.List)
+	// r.engine.GET("/api/v1/models", r.modelsHandler.List)
 }
 
 // setupMetricsHistoryRoutes настраивает эндпоинты для historical metrics (Phase 12.1)
@@ -1036,6 +1039,7 @@ func (r *Router) setupWebUIRoutes() {
 	r.engine.StaticFile("/admin-registry.html", "./web/admin-registry.html")       // Model Registry (REGISTRY-03, v2.3.0)
 	r.engine.StaticFile("/huggingface.html", "./web/huggingface.html")             // Hugging Face Model Browser (HF-UI-01, v3.0.0)
 	r.engine.StaticFile("/yzma.html", "./web/yzma.html")                           // yzma Model Management (YZMA-UI-01, v3.0.0)
+	r.engine.StaticFile("/downloads.html", "./web/downloads.html")                 // Active Downloads Window (HF-UI-02, v3.0.5)
 
 	// Serve CSS and JS directories
 	r.engine.Static("/css", "./web/css")
@@ -1069,8 +1073,9 @@ func (r *Router) setupOpenAIRoutes() {
 		// Rate limiting только для API Keys (JWT users не ограничены per-key лимитами)
 		// Model authorization остается
 
-		v1.GET("/models", r.modelsHandler.List)
-		v1.POST("/chat/completions", r.chatHandler.Completion)
+		// v3.0.5+: Legacy Ollama routes removed - use /v1/yzma/* endpoints
+		// v1.GET("/models", r.modelsHandler.List)
+		// v1.POST("/chat/completions", r.chatHandler.Completion)
 
 	} else if r.config.Auth.Enabled && r.authenticator != nil {
 		// Только API Key auth (legacy mode)
@@ -1090,8 +1095,9 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.Use(r.authenticator.RecordUsageMiddleware())
 		}
 
-		v1.GET("/models", r.authenticator.PermissionMiddleware("models"), r.modelsHandler.List)
-		v1.POST("/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.chatHandler.Completion)
+		// v3.0.5+: Legacy Ollama routes removed - use /v1/yzma/* endpoints
+		// v1.GET("/models", r.authenticator.PermissionMiddleware("models"), r.modelsHandler.List)
+		// v1.POST("/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.chatHandler.Completion)
 	} else {
 		// Открытые эндпоинты (MVP mode без аутентификации)
 		r.logger.Info("Using NO authentication for /v1 endpoints (MVP mode)")
@@ -1102,34 +1108,80 @@ func (r *Router) setupOpenAIRoutes() {
 			r.logger.Info("Usage tracking enabled for /v1 endpoints (No auth mode)")
 		}
 
-		v1.GET("/models", r.modelsHandler.List)
-		v1.POST("/chat/completions", r.chatHandler.Completion)
+		// v3.0.5+: Legacy Ollama routes removed - use /v1/yzma/* endpoints
+		// v1.GET("/models", r.modelsHandler.List)
+		// v1.POST("/chat/completions", r.chatHandler.Completion)
 	}
 
-	// Embeddings endpoint
-	if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
-		// Hybrid auth уже применен к v1 группе
-		v1.POST("/embeddings", r.embeddingsHandler.HandleEmbeddings)
-	} else if r.config.Auth.Enabled && r.authenticator != nil {
-		v1.POST("/embeddings", r.authenticator.PermissionMiddleware("embeddings"), r.embeddingsHandler.HandleEmbeddings)
-	} else {
-		v1.POST("/embeddings", r.embeddingsHandler.HandleEmbeddings)
-	}
+	// v3.0.5+: Embeddings and Completions endpoints removed (Ollama-based)
+	// All inference now goes through yzma: /v1/yzma/chat/completions
+	// if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
+	// 	v1.POST("/embeddings", r.embeddingsHandler.HandleEmbeddings)
+	// } else if r.config.Auth.Enabled && r.authenticator != nil {
+	// 	v1.POST("/embeddings", r.authenticator.PermissionMiddleware("embeddings"), r.embeddingsHandler.HandleEmbeddings)
+	// } else {
+	// 	v1.POST("/embeddings", r.embeddingsHandler.HandleEmbeddings)
+	// }
 
-	// Legacy text completions
-	if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
-		// Hybrid auth уже применен к v1 группе
-		v1.POST("/completions", r.completionsHandler.HandleCompletions)
-	} else if r.config.Auth.Enabled && r.authenticator != nil {
-		v1.POST("/completions", r.authenticator.PermissionMiddleware("completions"), r.completionsHandler.HandleCompletions)
-	} else {
-		v1.POST("/completions", r.completionsHandler.HandleCompletions)
-	}
-	
+	// if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
+	// 	v1.POST("/completions", r.completionsHandler.HandleCompletions)
+	// } else if r.config.Auth.Enabled && r.authenticator != nil {
+	// 	v1.POST("/completions", r.authenticator.PermissionMiddleware("completions"), r.completionsHandler.HandleCompletions)
+	// } else {
+	// 	v1.POST("/completions", r.completionsHandler.HandleCompletions)
+	// }
+
 	// yzma local inference (Version 3.0.0+: YZMA-03)
 	if r.yzmaHandler != nil {
 		r.logger.Info("Setting up yzma local inference endpoints")
-		
+
+		// v3.0.5+: OpenAI-compatible routes (no /yzma prefix)
+		// These routes make yzma a drop-in replacement for OpenAI API
+		if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
+			// Hybrid auth
+			v1.POST("/chat/completions", r.yzmaHandler.HandleChatCompletion)
+			v1.POST("/completions", r.yzmaHandler.HandleCompletions)
+			v1.POST("/embeddings", r.yzmaHandler.HandleEmbeddings)
+			v1.GET("/models", r.yzmaHandler.HandleModels)
+		} else if r.config.Auth.Enabled && r.authenticator != nil {
+			// API Key auth
+			v1.POST("/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.yzmaHandler.HandleChatCompletion)
+			v1.POST("/completions", r.authenticator.PermissionMiddleware("completions"), r.yzmaHandler.HandleCompletions)
+			v1.POST("/embeddings", r.authenticator.PermissionMiddleware("embeddings"), r.yzmaHandler.HandleEmbeddings)
+			v1.GET("/models", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleModels)
+		} else {
+			// No auth
+			v1.POST("/chat/completions", r.yzmaHandler.HandleChatCompletion)
+			v1.POST("/completions", r.yzmaHandler.HandleCompletions)
+			v1.POST("/embeddings", r.yzmaHandler.HandleEmbeddings)
+			v1.GET("/models", r.yzmaHandler.HandleModels)
+		}
+
+		r.logger.Info("✅ OpenAI-compatible routes: /v1/chat/completions, /v1/completions, /v1/embeddings, /v1/models")
+
+		// Agent API endpoints (v2.5.0+, v3.0.6+: restored for YZMA)
+		if r.agentHandler != nil {
+			r.logger.Info("Setting up Agent API endpoints")
+
+			// Agent tools endpoint (same auth as yzma routes)
+			if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
+				// Hybrid auth
+				v1.GET("/agent/tools", r.agentHandler.HandleListTools)
+				v1.GET("/agent/tools/:category", r.agentHandler.HandleListToolsByCategory)
+			} else if r.config.Auth.Enabled && r.authenticator != nil {
+				// API Key auth
+				v1.GET("/agent/tools", r.authenticator.PermissionMiddleware("chat"), r.agentHandler.HandleListTools)
+				v1.GET("/agent/tools/:category", r.authenticator.PermissionMiddleware("chat"), r.agentHandler.HandleListToolsByCategory)
+			} else {
+				// No auth
+				v1.GET("/agent/tools", r.agentHandler.HandleListTools)
+				v1.GET("/agent/tools/:category", r.agentHandler.HandleListToolsByCategory)
+			}
+
+			r.logger.Info("✅ Agent API routes: /v1/agent/tools, /v1/agent/tools/:category")
+		}
+
+		// yzma-specific routes (with /yzma prefix for advanced features)
 		// yzma routes use same auth as other v1 endpoints
 		if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
 			// Hybrid auth уже применен к v1 группе
@@ -1165,18 +1217,6 @@ func (r *Router) setupAdminRoutes() {
 
 	// Agent API (AGENT-01, v2.5.0+) - hybrid auth (API Key or JWT Session)
 	r.logger.Info("Setting up Agent API routes (hybrid auth)")
-
-	// Agent routes use the same hybrid auth as chat (API Key or JWT Session)
-	agent := r.engine.Group("/api/agent")
-	agent.Use(middleware.HybridAuth(r.jwtManager, r.config, r.db, r.logger))
-	{
-		agent.POST("/plan", r.agentHandler.CreateSession)
-		agent.GET("/sessions/:id", r.agentHandler.GetSession)
-		agent.POST("/sessions/:id/cancel", r.agentHandler.CancelSession)
-		// TODO: Iteration 3 - agent.POST("/approvals/:id", r.agentHandler.RespondToApproval)
-		// TODO: Iteration 2 - agent.POST("/sessions/:id/execute/:step", r.agentHandler.ExecuteStep)
-	}
-	r.logger.Info("Agent API routes configured successfully")
 
 	admin := r.engine.Group("/api/admin")
 
@@ -1234,16 +1274,6 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/keys/:id", r.adminHandler.GetAPIKey)
 		admin.PUT("/keys/:id", r.adminHandler.UpdateAPIKey)
 		admin.DELETE("/keys/:id", r.adminHandler.DeleteAPIKey)
-
-		// Models management (v1.4.4)
-		admin.GET("/models/:name/details", r.adminHandler.GetModelDetails)
-	}
-
-	// Model Preloading endpoints (v1.12.1+)
-	if r.modelPreloadHandler != nil {
-		r.logger.Info("Admin routes: Registering Model Preloading endpoints")
-		admin.GET("/models/loaded", r.modelPreloadHandler.GetLoadedModels)
-		admin.POST("/models/:name/preload", r.modelPreloadHandler.PreloadModel)
 	}
 
 	// Files management (v1.10.0) - Admin can manage all files
@@ -1334,11 +1364,8 @@ func (r *Router) setupAdminRoutes() {
 		}
 	})
 
-	// Models list for admin
-	admin.GET("/models", r.modelsHandler.List)
-
-	// Config viewer
-	admin.GET("/config", r.configHandler.GetConfig)
+	// v3.0.5+: Legacy models endpoint removed - use /v1/yzma/models
+	// admin.GET("/models", r.modelsHandler.List)
 
 	// Logs viewer (v1.5.1 - Enhanced Logs System)
 	if r.logsHandler != nil {
@@ -1536,44 +1563,22 @@ func (r *Router) setupInvitationsRoutes() {
 }
 
 // setupHandlers инициализирует все handlers
-func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollamaClient *ollama.ClientWithCircuitBreaker) {
+func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	logger.WithField("db_is_nil", r.db == nil).Info("DEBUG: setupHandlers called")
 
-	r.healthHandler = handlers.NewHealthHandler(cfg, logger, ollamaClient)
-	r.modelsHandler = handlers.NewModelsHandler(cfg, logger, ollamaClient)
-
-	// Model Preload handler (v1.12.1+)
-	if r.modelPreloader != nil {
-		r.modelPreloadHandler = handlers.NewModelPreloadHandler(logger, r.modelPreloader)
-	}
+	// v3.0.5+: Health and Models removed (Ollama-based)
+	// Use yzma endpoints: /v1/yzma/models, /v1/yzma/stats
 
 	// RAG Data Sources handler (v1.13.1+)
 	if r.ragDataSourceService != nil {
 		r.ragDataSourcesHandler = handlers.NewRAGDataSourcesHandler(r.ragDataSourceService, logger)
 	}
 
-	// Chat handler with database for model configs (v1.9.1+)
-	if r.db != nil {
-		r.chatHandler = handlers.NewChatHandlerWithDB(cfg, logger, ollamaClient, r.db)
-	} else {
-		r.chatHandler = handlers.NewChatHandler(cfg, logger, ollamaClient)
-	}
-
-	// Setup model preloader для tracking (v1.12.1+)
-	if r.modelPreloader != nil {
-		r.chatHandler.SetModelPreloader(r.modelPreloader)
-		logger.Info("Model preloader attached to chat handler")
-	}
-
-	// Setup RAG orchestrator для chat retrieval (v1.13.1+)
-	if r.ragOrchestrator != nil {
-		r.chatHandler.SetRAGOrchestrator(r.ragOrchestrator)
-		logger.Info("RAG Orchestrator attached to chat handler")
-	}
-
-	r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)
-	r.completionsHandler = handlers.NewCompletionsHandler(cfg, logger, ollamaClient)
-	r.configHandler = handlers.NewConfigHandler(cfg, logger) // Для TUI configuration viewer
+	// v3.0.5+: Chat, Embeddings, Completions handlers removed (Ollama-based)
+	// Use yzma endpoints: /v1/yzma/chat/completions
+	// r.chatHandler = handlers.NewChatHandlerWithDB(cfg, logger, ollamaClient, r.db)
+	// r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)
+	// r.completionsHandler = handlers.NewCompletionsHandler(cfg, logger, ollamaClient)
 
 	// Logs handler (v1.5.1) - извлекаем директорию из Logging.FilePath
 	logsDir := "./logs" // По умолчанию
@@ -1691,43 +1696,6 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			logger.Info("Model Registry handler initialized successfully")
 		}
 
-		// Agent Service initialization (AGENT-01, v2.5.0)
-		agentCfg := agent.DefaultConfig()
-		r.agentService = agent.NewService(r.db, logger, agentCfg)
-
-		// Setup WebSocket event callback for agent real-time updates (AGENT-05, v2.5.0+)
-		r.agentService.SetEventCallback(func(event *models.AgentEvent) {
-			// Broadcast agent events через WebSocket
-			if r.eventBroadcaster != nil {
-				// Map AgentEvent to WebSocket event type
-				wsEventType := mapAgentEventToWebSocketType(event.Type)
-				if wsEventType != "" {
-					// Добавляем session_id в data
-					eventData := event.Data
-					if eventData == nil {
-						eventData = make(map[string]interface{})
-					}
-					eventData["session_id"] = event.SessionID
-
-					// Broadcast
-					err := r.eventBroadcaster.BroadcastAgentEvent(wsEventType, eventData)
-					if err != nil {
-						logger.WithError(err).WithField("event_type", event.Type).Warn("Failed to broadcast agent event")
-					}
-				}
-			}
-
-			// Также логируем для debug
-			logger.WithFields(logrus.Fields{
-				"type":       event.Type,
-				"session_id": event.SessionID,
-			}).Debug("Agent event emitted")
-		})
-
-		// Agent Handler initialization
-		r.agentHandler = handlers.NewAgentHandler(r.agentService, logger)
-		logger.Info("Agent Service and handler initialized successfully (v2.5.0)")
-
 		// Quota Middleware initialization
 		r.quotaMiddleware = middleware.NewQuotaMiddleware(r.quotaService, logger)
 		logger.Info("Quota middleware initialized successfully")
@@ -1763,11 +1731,11 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		r.adminHandler = handlers.NewAdminHandlerWithoutKeys(cfg, logger, r.db)
 	}
 
-	// Set Ollama client for admin handler (v1.4.4)
-	if r.adminHandler != nil && r.ollamaClient != nil {
-		r.adminHandler.SetOllamaClient(r.ollamaClient)
-		logger.Info("Ollama client set for AdminHandler")
-	}
+	// v3.0.5+: Ollama client removed
+	// if r.adminHandler != nil && r.ollamaClient != nil {
+	// 	r.adminHandler.SetOllamaClient(r.ollamaClient)
+	// 	logger.Info("Ollama client set for AdminHandler")
+	// }
 
 	logger.Info("DEBUG: AdminHandler created successfully")
 
@@ -1827,7 +1795,8 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	r.requestStorage.Start()
 
 	// Stats Handler с metrics storage для latency данных и Database (Version 1.3.0+)
-	r.statsHandler = handlers.NewStatsHandler(cfg, logger, ollamaClient, r.keyManager, r.version, r.metricsStorage, r.db)
+	// v3.0.5+: StatsHandler with yzma client
+	r.statsHandler = handlers.NewStatsHandler(cfg, logger, r.yzmaClient, r.keyManager, r.version, r.metricsStorage, r.db)
 
 	// Metrics History Handler
 	r.metricsHistoryHandler = handlers.NewMetricsHistoryHandler(cfg, logger, r.metricsStorage)
@@ -1842,21 +1811,19 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 	// WebSocket Handler
 	r.wsHandler = websocket.NewHandler(r.wsHub, logger)
 
-	// Chat Handler для WebSocket (DESKTOP-03 v2.4.3)
-	r.wsChatHandler = websocket.NewChatHandler(cfg, logger, r.ollamaClient, r.wsHub)
-
-	// Настраиваем WebSocket handler (DESKTOP-03)
+	// Set database for API key validation (DESKTOP-03)
 	r.wsHandler.SetDatabase(r.db)
-	r.wsHandler.SetChatHandler(r.wsChatHandler)
 
-	// Enable agent support for WebSocket chat (v2.5.1+: Conversational Agent)
-	if r.agentService != nil && r.db != nil {
-		toolRegistry := r.agentService.GetToolRegistry()
-		if toolRegistry != nil {
-			r.wsChatHandler.SetAgentSupport(r.db, toolRegistry)
-			logger.Info("Agent support enabled for WebSocket chat handler")
-		}
-	}
+	// v3.0.5+: WebSocket chat handler temporarily disabled (needs refactoring for yzma)
+	// r.wsChatHandler = websocket.NewChatHandler(cfg, logger, r.ollamaClient, r.wsHub)
+	// r.wsHandler.SetChatHandler(r.wsChatHandler)
+	// if r.agentService != nil && r.db != nil {
+	// 	toolRegistry := r.agentService.GetToolRegistry()
+	// 	if toolRegistry != nil {
+	// 		r.wsChatHandler.SetAgentSupport(r.db, toolRegistry)
+	// 		logger.Info("Agent support enabled for WebSocket chat handler")
+	// 	}
+	// }
 
 	// Event Broadcaster
 	r.eventBroadcaster = websocket.NewEventBroadcaster(r.wsHub)
@@ -1892,11 +1859,15 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 			logger.Info("✅ HTMX UI handlers initialized successfully")
 		}
 	}
-	
+
 	// Hugging Face Integration (Version 3.0.0+: HF-01)
+	// Create separate logger for Hugging Face with dedicated log file
+	hfLogger := internalLogger.NewFileLogger("logs/huggingface.log", cfg.Logging.Level)
+	hfLogger.Info("🤗 Hugging Face logger initialized with separate log file")
+
 	hfAPIToken := cfg.HuggingFace.APIToken
-	r.hfClient = huggingface.NewClient(hfAPIToken, logger)
-	
+	r.hfClient = huggingface.NewClient(hfAPIToken, hfLogger)
+
 	// Initialize downloader (HF-02)
 	downloadsDir := cfg.HuggingFace.ModelsDir
 	if downloadsDir == "" {
@@ -1907,56 +1878,151 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger, ollama
 		maxConcurrent = 2
 	}
 	autoResume := cfg.HuggingFace.AutoResume
-	
+
 	var err error
-	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, logger)
+	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, hfLogger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to initialize Hugging Face downloader")
+		hfLogger.WithError(err).Error("Failed to initialize Hugging Face downloader")
 	} else {
-		logger.WithFields(logrus.Fields{
-			"downloads_dir":   downloadsDir,
-			"max_concurrent":  maxConcurrent,
-			"auto_resume":     autoResume,
+		hfLogger.WithFields(logrus.Fields{
+			"downloads_dir":  downloadsDir,
+			"max_concurrent": maxConcurrent,
+			"auto_resume":    autoResume,
 		}).Info("✅ Hugging Face downloader initialized")
 	}
-	
+
 	// Initialize UI handler
 	if r.templateRenderer != nil && r.hfDownloader != nil {
-		r.hfUIHandler = handlersUI.NewHuggingFaceUIHandler(r.hfClient, r.hfDownloader, r.templateRenderer, logger)
-		logger.Info("✅ Hugging Face browser initialized")
+		r.hfUIHandler = handlersUI.NewHuggingFaceUIHandler(r.hfClient, r.hfDownloader, r.templateRenderer, hfLogger)
+		hfLogger.Info("✅ Hugging Face browser initialized")
 	}
-	
+
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
-	if cfg.Yzma.Enabled {
+	// v3.0.5+: Use Inference.Yzma
+	yzmaEnabled := cfg.Inference.Yzma.Enabled
+	if !yzmaEnabled && cfg.Yzma.Enabled {
+		// Backward compatibility: fallback to old cfg.Yzma.Enabled
+		yzmaEnabled = true
+		logger.Warn("Using deprecated cfg.Yzma - migrate to cfg.Inference.Yzma")
+	}
+
+	if yzmaEnabled {
 		logger.Info("Initializing yzma local inference...")
-		
-		yzmaConfig := yzma.ClientConfig{
-			ModelsDir:   cfg.Yzma.ModelsDir,
-			LibPath:     cfg.Yzma.LibPath,
-			ContextSize: cfg.Yzma.ContextSize,
-			BatchSize:   cfg.Yzma.BatchSize,
-			UBatchSize:  cfg.Yzma.UBatchSize,
-			Temperature: cfg.Yzma.Temperature,
-			TopK:        cfg.Yzma.TopK,
-			TopP:        cfg.Yzma.TopP,
-			MinP:        cfg.Yzma.MinP,
-			Verbose:     cfg.Yzma.Verbose,
+
+		// Use new Inference.Yzma, fallback to old cfg.Yzma for backward compat
+		yzmaModelsDir := cfg.Inference.Yzma.ModelsDir
+		if yzmaModelsDir == "" {
+			yzmaModelsDir = cfg.Yzma.ModelsDir
 		}
-		
-		yzmaClient, err := yzma.NewClient(yzmaConfig, logger)
+
+		yzmaLibPath := cfg.Inference.Yzma.LibPath
+		if yzmaLibPath == "" {
+			yzmaLibPath = cfg.Yzma.LibPath
+		}
+
+		yzmaContextSize := cfg.Inference.Yzma.ContextSize
+		if yzmaContextSize == 0 {
+			yzmaContextSize = cfg.Yzma.ContextSize
+		}
+
+		yzmaBatchSize := cfg.Inference.Yzma.BatchSize
+		if yzmaBatchSize == 0 {
+			yzmaBatchSize = cfg.Yzma.BatchSize
+		}
+
+		yzmaUBatchSize := cfg.Inference.Yzma.UBatchSize
+		if yzmaUBatchSize == 0 {
+			yzmaUBatchSize = cfg.Yzma.UBatchSize
+		}
+
+		yzmaTemperature := cfg.Inference.Yzma.Temperature
+		if yzmaTemperature == 0 {
+			yzmaTemperature = cfg.Yzma.Temperature
+		}
+
+		yzmaTopK := cfg.Inference.Yzma.TopK
+		if yzmaTopK == 0 {
+			yzmaTopK = cfg.Yzma.TopK
+		}
+
+		yzmaTopP := cfg.Inference.Yzma.TopP
+		if yzmaTopP == 0 {
+			yzmaTopP = cfg.Yzma.TopP
+		}
+
+		yzmaMinP := cfg.Inference.Yzma.MinP
+		if yzmaMinP == 0 {
+			yzmaMinP = cfg.Yzma.MinP
+		}
+
+		// Create separate logger for yzma with dedicated log file
+		yzmaLogger := internalLogger.NewFileLogger("logs/yzma.log", cfg.Logging.Level)
+		yzmaLogger.Info("🦙 yzma logger initialized with separate log file")
+
+		// Create conversation logger for user requests/responses (v3.0.6+)
+		conversationLogger := internalLogger.NewFileLogger("logs/yzma-conversations.log", "info")
+		conversationLogger.Info("💬 Conversation logger initialized for request/response tracking")
+
+		// GPU offloading configuration (v3.0.6+)
+		gpuLayers := int32(cfg.Inference.GPULayers)
+		if gpuLayers == 0 {
+			// Default to -1 (auto-detect GPU) if not explicitly set to 0 (CPU-only)
+			gpuLayers = -1
+		}
+
+		yzmaConfig := yzma.ClientConfig{
+			ModelsDir:   yzmaModelsDir,
+			LibPath:     yzmaLibPath,
+			ContextSize: yzmaContextSize,
+			BatchSize:   yzmaBatchSize,
+			UBatchSize:  yzmaUBatchSize,
+			Temperature: yzmaTemperature,
+			TopK:        yzmaTopK,
+			TopP:        yzmaTopP,
+			MinP:        yzmaMinP,
+			Verbose:     cfg.Inference.Yzma.Verbose || cfg.Yzma.Verbose,
+			NGpuLayers:  gpuLayers, // v3.0.6+: GPU offloading from config
+		}
+
+		yzmaClient, err := yzma.NewClient(yzmaConfig, yzmaLogger)
 		if err != nil {
-			logger.WithError(err).Error("Failed to initialize yzma client - local inference disabled")
+			yzmaLogger.WithError(err).Error("Failed to initialize yzma client - local inference disabled")
 		} else {
+			// Set conversation logger (v3.0.6+)
+			yzmaClient.SetConversationLogger(conversationLogger)
+
 			r.yzmaClient = yzmaClient
-			r.yzmaHandler = handlers.NewYzmaHandler(yzmaClient, logger)
-			
+			r.yzmaHandler = handlers.NewYzmaHandler(yzmaClient, yzmaLogger)
+
 			// Initialize UI handler (YZMA-UI-01)
 			if r.templateRenderer != nil {
-				r.yzmaUIHandler = handlersUI.NewYzmaUIHandler(yzmaClient, r.templateRenderer, logger)
-				logger.Info("✅ yzma UI handler initialized")
+				r.yzmaUIHandler = handlersUI.NewYzmaUIHandler(yzmaClient, r.db, r.templateRenderer, yzmaLogger)
+				yzmaLogger.Info("✅ yzma UI handler initialized")
 			}
-			
-			logger.Info("✅ yzma local inference initialized")
+
+			yzmaLogger.Info("✅ yzma local inference initialized")
+
+			// Set DB for model persistence (v3.0.6+)
+			if r.db != nil {
+				yzmaClient.SetDB(r.db)
+
+				// Auto-load persisted models
+				ctx := context.Background()
+				if err := yzmaClient.LoadPersistedModels(ctx); err != nil {
+					yzmaLogger.WithError(err).Warn("Failed to auto-load persisted models")
+				}
+			}
+
+			// Initialize Agent Service (v2.5.0+, v3.0.6+: restored for YZMA)
+			r.agentService = agentService.NewAgentService(yzmaClient, yzmaLogger)
+			r.agentHandler = handlers.NewAgentHandler(r.agentService, yzmaLogger)
+
+			// Enable agent support in YZMA handler
+			if r.yzmaHandler != nil {
+				r.yzmaHandler.SetAgentService(r.agentService)
+			}
+
+			yzmaLogger.WithField("tools_count", r.agentService.GetToolRegistry().Count()).Info("✅ Agent service initialized")
 		}
 	} else {
 		logger.Info("yzma local inference disabled in config")

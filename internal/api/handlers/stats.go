@@ -125,7 +125,7 @@ type StatsInterface interface {
 type StatsHandler struct {
 	config         *config.Config
 	logger         *logrus.Logger
-	ollamaClient   OllamaClientInterface
+	yzmaClient     YzmaClientInterface     // v3.0.5+: yzma instead of Ollama
 	keyManager     APIKeyManager           // Legacy JSON storage (deprecated)
 	db             storage.Database        // Database for API keys (Version 1.3.0+)
 	stats          StatsInterface          // Поддерживает и Stats, и StatsOptimized
@@ -133,12 +133,19 @@ type StatsHandler struct {
 	metricsStorage MetricsStorageInterface // Для latency данных
 }
 
-// NewStatsHandler создает новый stats handler
-func NewStatsHandler(cfg *config.Config, logger *logrus.Logger, ollamaClient OllamaClientInterface, keyMgr APIKeyManager, version string, metricsStorage MetricsStorageInterface, db storage.Database) *StatsHandler {
+// YzmaClientInterface defines yzma client methods needed by StatsHandler
+type YzmaClientInterface interface {
+	IsModelLoaded(path string) bool
+	ListAvailableModels() ([]string, error)
+	GetStats() (requests int64, tokens int64)
+}
+
+// NewStatsHandler создает новый stats handler (v3.0.5+: yzma client)
+func NewStatsHandler(cfg *config.Config, logger *logrus.Logger, yzmaClient YzmaClientInterface, keyMgr APIKeyManager, version string, metricsStorage MetricsStorageInterface, db storage.Database) *StatsHandler {
 	return &StatsHandler{
 		config:         cfg,
 		logger:         logger,
-		ollamaClient:   ollamaClient,
+		yzmaClient:     yzmaClient,
 		keyManager:     keyMgr,
 		db:             db,
 		stats:          GlobalStats, // GlobalStats теперь *StatsOptimized, реализует StatsInterface
@@ -152,20 +159,19 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 	defer cancel()
 
-	// Проверяем подключение к Ollama
-	ollamaConnected := false
-	if err := h.ollamaClient.Health(ctx); err == nil {
-		ollamaConnected = true
-	}
-
-	// Получаем список моделей от Ollama
+	// Получаем список моделей от yzma (v3.0.5+)
 	var modelsCount int
 	var modelsList []string
-	if ollamaConnected {
-		if models, err := h.ollamaClient.GetModels(ctx); err == nil {
-			modelsCount = len(models.Models)
-			for _, model := range models.Models {
-				modelsList = append(modelsList, model.Name)
+	var loadedCount int
+	
+	if h.yzmaClient != nil {
+		if models, err := h.yzmaClient.ListAvailableModels(); err == nil {
+			modelsCount = len(models)
+			for _, modelPath := range models {
+				modelsList = append(modelsList, modelPath)
+				if h.yzmaClient.IsModelLoaded(modelPath) {
+					loadedCount++
+				}
 			}
 		}
 	}
@@ -262,11 +268,11 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 			"address": h.config.GetServerAddr(),
 			"version": h.version,
 		},
-		"ollama": gin.H{
-			"connected":    ollamaConnected,
-			"url":          h.config.Ollama.URL,
-			"models_count": modelsCount,
-			"models":       modelsList,
+		"yzma": gin.H{
+			"enabled":       h.yzmaClient != nil,
+			"models_total":  modelsCount,
+			"models_loaded": loadedCount,
+			"models":        modelsList,
 		},
 		"stats":    statsData,
 		"latency":  latencyInfo,

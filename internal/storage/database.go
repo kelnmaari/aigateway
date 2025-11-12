@@ -530,6 +530,22 @@ type Database interface {
 	UpdateModelRegistryMetrics(ctx context.Context, id string, latency float64, tokensPerSec float64) error
 	IncrementModelRequests(ctx context.Context, id string) error
 	GetModelRegistryStats(ctx context.Context) (*models.ModelRegistryStats, error)
+	
+	// ========================================
+	// Loaded Models (v3.0.6+: Persistence for yzma loaded models)
+	// ========================================
+	
+	// SaveLoadedModel сохраняет информацию о загруженной модели для persistence
+	SaveLoadedModel(ctx context.Context, model *models.LoadedModel) error
+	
+	// RemoveLoadedModel удаляет информацию о модели из persistence
+	RemoveLoadedModel(ctx context.Context, modelPath string) error
+	
+	// GetLoadedModel получает информацию о загруженной модели
+	GetLoadedModel(ctx context.Context, modelPath string) (*models.LoadedModel, error)
+	
+	// ListLoadedModels возвращает список всех сохраненных моделей
+	ListLoadedModels(ctx context.Context, autoLoadOnly bool) ([]*models.LoadedModel, error)
 }
 
 // AuditFilters фильтры для запроса audit events (Version 1.11.4+)

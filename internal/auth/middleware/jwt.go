@@ -56,10 +56,13 @@ func JWTAuth(jwtManager *jwt.Manager, logger *logrus.Logger) gin.HandlerFunc {
 		c.Set("tenant_ids", claims.TenantIDs)
 		c.Set("jwt_claims", claims)
 
-		logger.WithFields(logrus.Fields{
-			"user_id":  claims.UserID,
-			"username": claims.Username,
-		}).Debug("JWT authentication successful")
+		// Don't spam logs for UI endpoints (v3.0.6+)
+		if !strings.HasPrefix(c.Request.URL.Path, "/api/ui/") {
+			logger.WithFields(logrus.Fields{
+				"user_id":  claims.UserID,
+				"username": claims.Username,
+			}).Debug("JWT authentication successful")
+		}
 
 		c.Next()
 	}
@@ -99,10 +102,13 @@ func OptionalJWTAuth(jwtManager *jwt.Manager, logger *logrus.Logger) gin.Handler
 		c.Set("tenant_ids", claims.TenantIDs)
 		c.Set("jwt_claims", claims)
 
-		logger.WithFields(logrus.Fields{
-			"user_id":  claims.UserID,
-			"username": claims.Username,
-		}).Debug("Optional JWT authentication successful")
+		// Don't spam logs for UI endpoints (v3.0.6+)
+		if !strings.HasPrefix(c.Request.URL.Path, "/api/ui/") {
+			logger.WithFields(logrus.Fields{
+				"user_id":  claims.UserID,
+				"username": claims.Username,
+			}).Debug("Optional JWT authentication successful")
+		}
 
 		c.Next()
 	}

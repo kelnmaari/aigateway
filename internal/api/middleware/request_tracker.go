@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,11 +19,13 @@ import (
 // RequestTracker middleware отслеживает все запросы для monitoring
 func RequestTracker(storage *request.Storage, broadcaster *websocket.EventBroadcaster, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Пропускаем health checks, stats endpoints и статические файлы
+		// Пропускаем health checks, stats endpoints, UI endpoints и статические файлы
 		path := c.Request.URL.Path
 		if path == "/health" || path == "/healthz" || path == "/ready" ||
 			path == "/api/stats" || path == "/api/config" || path == "/metrics" ||
-			path == "/ws" {
+			path == "/ws" || 
+			// Пропускаем UI эндпоинты для уменьшения спама в логах (v3.0.6+)
+			strings.HasPrefix(path, "/api/ui/") {
 			c.Next()
 			return
 		}

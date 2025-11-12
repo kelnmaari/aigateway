@@ -6,7 +6,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = [" -config", "configs/dev.yaml"]
+  args_bin = ["-config", "configs/dev.yaml"]
   bin = "./tmp/server.exe"
   cmd = "go build -o tmp/server.exe ./cmd/server"
   delay = 1000
@@ -27,6 +27,11 @@ tmp_dir = "tmp"
   rerun_delay = 500
   send_interrupt = false
   stop_on_root = false
+
+  # Environment variables for build and run
+  [build.envs]
+    YZMA_LIB = "C:/llama"  # Path to llama.cpp DLLs and backends
+    PATH = "C:/llama;${PATH}"  # Add llama.cpp DLLs to PATH for Windows
 
 [color]
   app = ""

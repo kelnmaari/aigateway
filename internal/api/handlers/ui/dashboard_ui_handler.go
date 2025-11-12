@@ -64,11 +64,19 @@ func (h *DashboardUIHandler) GetAPIKeysStatCard(c *gin.Context) {
 // GetModelsStatCard returns HTML for Total Models stat card
 // GET /api/ui/dashboard/stats/models
 func (h *DashboardUIHandler) GetModelsStatCard(c *gin.Context) {
-	// TODO: Add CountModels method to database interface
-	// For now, return placeholder
+	ctx := c.Request.Context()
+	
+	// Get count of loaded models
+	models, err := h.db.ListLoadedModels(ctx, false)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get loaded models count")
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `<div class="stat-value error">-</div>`)
+		return
+	}
 	
 	c.Header("Content-Type", "text/html")
-	c.String(http.StatusOK, `<div class="stat-value">-</div>`)
+	c.String(http.StatusOK, fmt.Sprintf(`<div class="stat-value">%d</div>`, len(models)))
 }
 
 // GetRequestsStatCard returns HTML for API Requests (30d) stat card

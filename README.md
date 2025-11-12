@@ -1,39 +1,43 @@
-# 🚀 AIGateway Platform
+# 🚀 AIGateway Platform v3.0
 
-> **Universal AI Infrastructure Platform with Multi-Provider Support**  
-> OpenAI-Compatible API • RAG System • Multi-Tenancy • Enterprise Security • GPU Acceleration
+> **Local-First AI Infrastructure with VLM Support**  
+> OpenAI-Compatible API • Pure Go Inference • Vision Models • RAG System • Enterprise Security
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-3.0.5-brightgreen.svg)](VERSION)
 
 ---
 
 ## 📖 What is AIGateway?
 
-**AIGateway** is a production-ready, enterprise-grade AI infrastructure platform that provides a unified **OpenAI-compatible API** for multiple AI model providers. Built with Go 1.25+, it combines local models (Ollama, vLLM), RAG capabilities, and enterprise features in a single platform.
+**AIGateway v3.0** is a production-ready, enterprise-grade AI infrastructure platform with **local-first inference** using `yzma` (pure Go, no CGo). Provides unified **OpenAI-compatible API** for GGUF models from Hugging Face, with Vision Language Model (VLM) support, RAG capabilities, and enterprise features.
 
-### 🎯 Why AIGateway?
+### 🎯 Why AIGateway v3.0?
 
-- **🔀 Multi-Provider**: Unified API для Ollama, vLLM, HuggingFace models (future: OpenAI, Anthropic)
-- **🧠 RAG Built-in**: Retrieval-Augmented Generation with vector search, embeddings, external data sources
+- **🚀 Local-First Inference**: Pure Go with `yzma` (llama.cpp wrapper) - NO external dependencies!
+- **🖼️ VLM Support**: Vision Language Models (Qwen2.5-VL, LLaVA, Gemma Vision) - analyze images with text
+- **📦 GGUF Models**: Direct Hugging Face integration - download & run any GGUF model
+- **🧠 RAG Built-in**: Retrieval-Augmented Generation with vector search, multimodal documents
 - **🏢 Enterprise-Ready**: Multi-tenancy, RBAC, OIDC/LDAP, audit logging, quotas
-- **⚡ GPU Optimized**: Multi-GPU support через vLLM для fast inference
-- **🌐 ChatGPT-like UI**: Полнофункциональный WebUI с RAG integration
+- **⚡ GPU Accelerated**: Automatic GPU offloading (CUDA, Vulkan, Metal) with no configuration
+- **🌐 Modern WebUI**: ChatGPT-like interface with image upload, model management, RAG integration
 - **📊 Observability**: OpenTelemetry, Prometheus, GPU metrics, distributed tracing
 
 ---
 
 ## ✨ Key Features
 
-### 🤖 AI Model Support
+### 🤖 AI Model Support (v3.0+)
 
-- ✅ **Ollama Integration** - Local models с GGUF format
-- ✅ **vLLM Support** - HuggingFace models с GPU acceleration *(v2.2.0)*
-- ✅ **OpenAI-Compatible API** - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`
+- ✅ **yzma Local Inference** - Pure Go inference with llama.cpp (NO CGo!) *(v3.0.0)*
+- ✅ **GGUF Models** - Direct support for Hugging Face GGUF models *(v3.0.0)*
+- 🖼️ **Vision Language Models** - Image + text multimodal inference (Qwen2.5-VL, LLaVA) *(v3.0.4)*
+- 📥 **Hugging Face Integration** - Download models directly from HF Hub *(v3.0.0)*
+- ✅ **OpenAI-Compatible API** - `/v1/chat/completions`, `/v1/models`, `/v1/yzma/*`
 - 🔥 **Real-time Streaming** - Server-Sent Events (SSE) для живых ответов
 - 🛠️ **Function Calling** - Инструменты в стиле OpenAI
-- 🎨 **Vision Support** - Multimodal models (LLaVA, BakLLaVA)
+- 🔄 **Ollama Fallback** - Optional Ollama support as backup backend
 
 ### 🧠 RAG System (v2.0.0)
 

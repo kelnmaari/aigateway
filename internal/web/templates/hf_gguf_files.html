@@ -1,0 +1,248 @@
+{{/* Hugging Face GGUF Files List - HTMX Component */}}
+<div class="gguf-files-list">
+    {{if .Files}}
+    <div class="files-header">
+        <h3>📦 Available GGUF Files ({{len .Files}})</h3>
+        <p class="files-description">Select a GGUF file to download to your local models directory</p>
+    </div>
+
+    <div class="files-table-wrapper">
+        <table class="files-table">
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Size</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Files}}
+                <tr class="file-row">
+                    <td class="filename">
+                        <i class="fas fa-file-archive"></i>
+                        <span>{{.Filename}}</span>
+                    </td>
+                    <td class="filesize">
+                        {{if .LFS}}
+                            {{if gt .LFS.Size 0}}
+                                {{if gt .LFS.Size 1073741824}}
+                                    {{printf "%.2f GB" (divf .LFS.Size 1073741824.0)}}
+                                {{else}}
+                                    {{printf "%.2f MB" (divf .LFS.Size 1048576.0)}}
+                                {{end}}
+                            {{else}}
+                                <span class="text-muted">Size unknown</span>
+                            {{end}}
+                        {{else if gt .Size 0}}
+                            {{if gt .Size 1073741824}}
+                                {{printf "%.2f GB" (divf .Size 1073741824.0)}}
+                            {{else}}
+                                {{printf "%.2f MB" (divf .Size 1048576.0)}}
+                            {{end}}
+                        {{else}}
+                            <span class="text-muted">Size unknown</span>
+                        {{end}}
+                    </td>
+                    <td class="actions text-center">
+                        <form hx-post="/api/ui/huggingface/download"
+                              hx-target="#download-status"
+                              hx-swap="innerHTML"
+                              style="display: inline;">
+                            <input type="hidden" name="model_id" value="{{$.ModelID}}">
+                            <input type="hidden" name="filename" value="{{.Filename}}">
+                            {{if .LFS}}
+                            <input type="hidden" name="total_size" value="{{.LFS.Size}}">
+                            <input type="hidden" name="sha256" value="{{.LFS.OID}}">
+                            {{else}}
+                            <input type="hidden" name="total_size" value="{{.Size}}">
+                            {{end}}
+                            <button type="submit" class="btn btn-sm btn-success download-btn">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="download-status" class="download-status mt-3"></div>
+
+    <div class="files-footer">
+        <p class="text-muted">
+            <i class="fas fa-info-circle"></i>
+            Downloads will appear in the "Active Downloads" section below
+        </p>
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <i class="fas fa-inbox fa-3x mb-3"></i>
+        <h4>No GGUF Files Found</h4>
+        <p>This model doesn't contain any GGUF format files.</p>
+    </div>
+    {{end}}
+</div>
+
+<style>
+.gguf-files-list {
+    padding: 1rem;
+}
+
+.files-header {
+    margin-bottom: 1.5rem;
+}
+
+.files-header h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+    color: #ffffff;
+}
+
+.files-description {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.files-table-wrapper {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #4a4a4a);
+}
+
+.files-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-tertiary, #3a3a3a);
+}
+
+.files-table th {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border-color, #4a4a4a);
+}
+
+.files-table th.text-center {
+    text-align: center;
+}
+
+.files-table tbody tr {
+    transition: background 0.2s;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.files-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.files-table td {
+    padding: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.files-table .filename {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.files-table .filename i {
+    color: rgba(72, 219, 251, 0.7);
+    font-size: 1.1rem;
+}
+
+.files-table .filesize {
+    white-space: nowrap;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.files-table .actions {
+    white-space: nowrap;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-muted {
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+.download-btn {
+    min-width: 120px;
+}
+
+.download-btn i {
+    margin-right: 0.5rem;
+}
+
+.download-status {
+    padding: 0;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+}
+
+.download-status:not(:empty) {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.files-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.files-footer .text-muted {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.empty-state i {
+    opacity: 0.3;
+    margin-bottom: 1rem;
+}
+
+.empty-state h4 {
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0;
+}
+
+.mt-3 {
+    margin-top: 1.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 1.5rem;
+}
+</style>
+

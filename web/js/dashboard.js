@@ -26,7 +26,8 @@ class Dashboard {
             await Promise.all([
                 this.loadStats(),
                 this.loadRecentConversations(),
-                this.loadTenants()
+                this.loadTenants(),
+                this.loadModels()
             ]);
             
             // Setup event listeners
@@ -268,6 +269,101 @@ class Dashboard {
         }
     }
 
+    // Load available models (v3.0.6+)
+    // Shows ONLY loaded models from /v1/models (OpenAI compatible)
+    async loadModels() {
+        const container = document.getElementById('loaded-models-container');
+        if (!container) {
+            console.warn('Models container not found');
+            return;
+        }
+        
+        try {
+            // Fetch ONLY loaded models from /v1/models (OpenAI compatible)
+            // v3.0.6+: This endpoint returns only loaded models, not all available
+            const response = await api.request(`${api.baseURL}/v1/models`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load models');
+            }
+            
+            const data = await response.json();
+            const models = data.data || [];
+            
+            this.renderModels(models, container);
+            
+        } catch (error) {
+            console.error('Failed to load models:', error);
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <p style="color: var(--danger-color);">Failed to load models</p>
+                    <button class="btn btn-secondary" onclick="dashboard.loadModels()" style="margin-top: 12px;">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    // Render models list
+    renderModels(models, container) {
+        if (models.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="opacity: 0.3; margin-bottom: 16px;">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" stroke-width="2"/>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" stroke-width="2"/>
+                    </svg>
+                    <p>No models loaded</p>
+                    <p style="font-size: 0.875rem; margin-top: 8px;">
+                        <a href="/admin.html" style="color: var(--primary-color);">Go to Admin Panel</a> to load models
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        // Create models grid
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;';
+        
+        models.forEach(model => {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            card.style.cssText = 'cursor: pointer; transition: all 0.2s;';
+            card.onclick = () => window.location.href = '/chat.html';
+            
+            // Extract model name (remove path if present)
+            const modelName = model.id.split('/').pop().split('\\').pop();
+            
+            card.innerHTML = `
+                <div style="display: flex; align-items: start; gap: 12px;">
+                    <div style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1.25rem;">
+                        🤖
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h3 style="margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(modelName)}">
+                            ${this.escapeHtml(modelName)}
+                        </h3>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span style="display: inline-flex; align-items: center; padding: 2px 8px; background: rgba(16, 163, 127, 0.1); color: var(--accent-primary); border-radius: 12px; font-size: 0.75rem; font-weight: 500;">
+                                ✓ Loaded
+                            </span>
+                        </div>
+                        <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(model.id)}">
+                            ${this.escapeHtml(model.id)}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            grid.appendChild(card);
+        });
+        
+        container.innerHTML = '';
+        container.appendChild(grid);
+    }
+
     // Setup event listeners
     setupEventListeners() {
         // Navbar component (navbar.js) handles user dropdown and logout now
@@ -304,6 +400,13 @@ class Dashboard {
         return date.toLocaleDateString();
     }
 }
+
+// Global function for refresh button
+window.refreshModels = function() {
+    if (window.dashboard) {
+        window.dashboard.loadModels();
+    }
+};
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

@@ -31,10 +31,13 @@ func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database
 				c.Set("username", claims.Username)
 				c.Set("auth_type", "jwt")
 
-				logger.WithFields(logrus.Fields{
-					"user_id":  claims.UserID,
-					"username": claims.Username,
-				}).Debug("JWT authentication successful")
+				// Don't spam logs for UI endpoints (v3.0.6+)
+				if !strings.HasPrefix(c.Request.URL.Path, "/api/ui/") {
+					logger.WithFields(logrus.Fields{
+						"user_id":  claims.UserID,
+						"username": claims.Username,
+					}).Debug("JWT authentication successful")
+				}
 
 				c.Next()
 				return

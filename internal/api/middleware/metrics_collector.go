@@ -4,6 +4,7 @@ package middleware
 import (
 	"bytes"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,13 +17,14 @@ import (
 // и записывает их в MetricsStorage для historical analysis
 func MetricsCollector(storage *metrics.MetricsStorage, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Пропускаем health checks, stats endpoints и статические файлы
+		// Пропускаем health checks, stats endpoints, UI endpoints и статические файлы
 		path := c.Request.URL.Path
 		if path == "/health" || path == "/healthz" || path == "/ready" ||
 			path == "/api/stats" || path == "/api/config" || path == "/metrics" ||
 			path == "/api/metrics/history" || path == "/api/metrics/recent" ||
 			path == "/api/metrics/stats" || path == "/api/metrics/stats/all" ||
-			path == "/ws" {
+			path == "/ws" ||
+			strings.HasPrefix(path, "/api/ui/") {  // v3.0.6+: Skip UI endpoints
 			c.Next()
 			return
 		}

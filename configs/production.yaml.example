@@ -1,4 +1,4 @@
-# Production Configuration для Ollama-OpenAI Proxy
+# Production Configuration для AIGateway Platform (v3.0.6+)
 # Скопируйте в production.yaml и настройте под вашу среду
 
 server:
@@ -26,25 +26,25 @@ server:
     allowed_headers: ["Authorization", "Content-Type", "X-API-Key"]
     max_age: 3600
 
-ollama:
-  url: "http://ollama:11434"  # Docker service name
-  timeout: "60s"
-  retry_attempts: 5
-  retry_delay: "2s"
-  connection_pool_size: 50
-  keep_alive: true
+# Inference Configuration (v3.0.6+: yzma Backend Only)
+inference:
+  backend: "yzma"  # Only yzma is supported
+  max_loaded_models: 3
+  gpu_layers: -1  # -1=auto (all layers to GPU), 0=CPU only, >0=specific layers count
   
-  # Мониторинг состояния Ollama
-  health_check:
+  # yzma Configuration
+  yzma:
     enabled: true
-    interval: "30s"
-    timeout: "10s"
-    
-  # Circuit breaker настройки
-  circuit_breaker:
-    enabled: true
-    max_failures: 5
-    reset_timeout: "30s"
+    lib_path: "/usr/local/lib/llama"  # Path to llama.cpp DLLs (Linux/Docker)
+    models_dir: "/data/models"  # Models directory
+    context_size: 8192  # Production: larger context
+    batch_size: 4096
+    ubatch_size: 2048
+    temperature: 0.7
+    top_k: 40
+    top_p: 0.9
+    min_p: 0.1
+    verbose: false  # Disable verbose logging in production
 
 auth:
   enabled: true

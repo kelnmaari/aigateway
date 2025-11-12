@@ -211,7 +211,10 @@ class API {
             if (modelParams.rag_rerank !== undefined) requestBody.rag_rerank = modelParams.rag_rerank;
         }
 
-        const response = await this.request(`${this.baseURL}/v1/chat/completions`, {
+        // v3.0.5+: OpenAI-compatible endpoint (alias resolution on backend)
+        const endpoint = `${this.baseURL}/v1/chat/completions`;
+
+        const response = await this.request(endpoint, {
             method: 'POST',
             body: JSON.stringify(requestBody)
         });

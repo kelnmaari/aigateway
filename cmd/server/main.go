@@ -16,14 +16,12 @@ import (
 
 	"aigateway/internal/api/router"
 	"aigateway/internal/auth/jwt"
-	"aigateway/internal/client/ollama"
 	"aigateway/internal/config"
 	"aigateway/internal/dbfactory"
 	"aigateway/internal/debug"
 	"aigateway/internal/logger"
 	"aigateway/internal/metrics"
 	"aigateway/internal/observability"
-	"aigateway/internal/services/model"
 	ragservice "aigateway/internal/services/rag"
 	ragworker "aigateway/internal/rag/worker"
 	ragorchestrator "aigateway/internal/rag/orchestrator"
@@ -473,37 +471,6 @@ func main() {
 	}
 
 	// Инициализация Model Preloader (Version 1.12.1+)
-	var modelPreloader *model.ModelPreloader
-	if cfg.Models.Preload.Enabled {
-		appLogger.Info("Initializing Model Preloader...")
-
-		// Создаем Ollama client для preloader
-		ollamaClient, err := ollama.NewClient(cfg, appLogger)
-		if err != nil {
-			appLogger.WithError(err).Warn("Failed to create Ollama client for preloader, continuing without preloading")
-		} else {
-			modelPreloader = model.NewModelPreloader(
-				ollamaClient,
-				&cfg.Models.Preload,
-				appLogger,
-			)
-
-			// Start preloader (async, non-blocking)
-			preloadCtx := context.Background()
-			if err := modelPreloader.Start(preloadCtx); err != nil {
-				appLogger.WithError(err).Warn("Failed to start model preloader")
-			} else {
-				appLogger.WithFields(map[string]interface{}{
-					"models":                len(cfg.Models.Preload.Models),
-					"on_startup":            cfg.Models.Preload.OnStartup,
-					"keep_warm":             cfg.Models.Preload.KeepWarm,
-					"health_check_interval": cfg.Models.Preload.HealthCheckInterval,
-				}).Info("✅ Model Preloader initialized successfully")
-				fmt.Println("🔥 Model Preloading включен")
-			}
-		}
-	}
-
 	// Создание роутера
 	var appRouter *router.Router
 	// Всегда используем NewWithOptions для передачи database (необходим для MCP и других фич)
@@ -525,7 +492,6 @@ func main() {
 		LeakDetector:         leakDetector,         // Может быть nil если leak detection отключен (v1.6.2+)
 		MonigoPort:           monigoPort,           // Порт на котором запущен MoniGo (0 если отключен) (v1.9.3+)
 		GPUMonitor:           gpuMonitor,           // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
-		ModelPreloader:       modelPreloader,       // Может быть nil если preloading отключен (v1.12.1+)
 		RAGDataSourceService: ragDataSourceService, // Может быть nil если RAG отключен (v1.13.1+)
 		RAGOrchestrator:      ragOrchestrator,      // Может быть nil если RAG отключен (v1.13.1+)
 	})

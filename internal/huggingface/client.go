@@ -22,19 +22,37 @@ const (
 
 // Client represents Hugging Face API client
 type Client struct {
-	baseURL    string
-	apiToken   string // Optional: для private models
-	httpClient *http.Client
-	logger     *logrus.Logger
+	baseURL          string
+	apiToken         string // Optional: для private models
+	httpClient       *http.Client // For API requests (with timeout)
+	downloadClient   *http.Client // For file downloads (without timeout)
+	logger           *logrus.Logger
 }
 
 // NewClient creates a new Hugging Face client
 func NewClient(apiToken string, logger *logrus.Logger) *Client {
+	logger.WithFields(logrus.Fields{
+		"api_timeout":      "30s",
+		"download_timeout": "none (context-controlled)",
+	}).Debug("Hugging Face client initialized with separate HTTP clients")
+	
 	return &Client{
 		baseURL:  DefaultAPIURL,
 		apiToken: apiToken,
+		// HTTP client for API requests - short timeout
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+		},
+		// HTTP client for downloads - no timeout (context controls it)
+		downloadClient: &http.Client{
+			Timeout: 0, // No timeout - use context instead
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+				// Disable compression to accurately track download progress
+				DisableCompression: true,
+			},
 		},
 		logger: logger,
 	}
@@ -108,13 +126,37 @@ type Config struct {
 
 // CardData represents model card metadata
 type CardData struct {
-	Language []string          `json:"language,omitempty"`
-	License  string            `json:"license,omitempty"`
-	Tags     []string          `json:"tags,omitempty"`
-	Datasets []string          `json:"datasets,omitempty"`
-	Metrics  []string          `json:"metrics,omitempty"`
-	BaseModel string           `json:"base_model,omitempty"`
-	ModelIndex []ModelIndexItem `json:"model-index,omitempty"`
+	Language   FlexibleStringArray `json:"language,omitempty"`   // Can be string or []string
+	License    string              `json:"license,omitempty"`
+	Tags       FlexibleStringArray `json:"tags,omitempty"`       // Can be string or []string
+	Datasets   FlexibleStringArray `json:"datasets,omitempty"`   // Can be string or []string
+	Metrics    FlexibleStringArray `json:"metrics,omitempty"`    // Can be string or []string
+	BaseModel  FlexibleStringArray `json:"base_model,omitempty"` // Can be string or []string
+	ModelIndex []ModelIndexItem    `json:"model-index,omitempty"`
+}
+
+// FlexibleStringArray can unmarshal from either a string or []string
+type FlexibleStringArray []string
+
+// UnmarshalJSON implements custom unmarshaling for FlexibleStringArray
+func (f *FlexibleStringArray) UnmarshalJSON(data []byte) error {
+	// Try unmarshaling as array first
+	var arr []string
+	if err := json.Unmarshal(data, &arr); err == nil {
+		*f = FlexibleStringArray(arr)
+		return nil
+	}
+	
+	// Try unmarshaling as single string
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		*f = FlexibleStringArray([]string{str})
+		return nil
+	}
+	
+	// If both fail, return empty array
+	*f = FlexibleStringArray([]string{})
+	return nil
 }
 
 // ModelIndexItem represents model index entry
@@ -233,10 +275,17 @@ func (c *Client) SearchModels(ctx context.Context, filters ModelFilters) ([]Mode
 
 // GetModelInfo retrieves detailed information about a specific model
 func (c *Client) GetModelInfo(ctx context.Context, modelID string) (*ModelInfo, error) {
-	// Build URL
-	reqURL := fmt.Sprintf("%s%s/%s", c.baseURL, APIEndpoint, modelID)
+	// Build URL with query parameters to get full file information
+	params := url.Values{}
+	params.Add("expand[]", "siblings")  // Include full file information with LFS data
+	params.Add("blobs", "true")         // Include blob information
 	
-	c.logger.WithField("model_id", modelID).Debug("Fetching model info")
+	reqURL := fmt.Sprintf("%s%s/%s?%s", c.baseURL, APIEndpoint, modelID, params.Encode())
+	
+	c.logger.WithFields(logrus.Fields{
+		"model_id": modelID,
+		"url":      reqURL,
+	}).Debug("Fetching model info with full file details")
 	
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
@@ -279,7 +328,28 @@ func (c *Client) enrichModelInfo(model *ModelInfo) {
 	ggufFiles := []File{}
 	var totalSize int64
 	
-	for _, file := range model.Siblings {
+	c.logger.WithFields(logrus.Fields{
+		"model_id":      model.ID,
+		"siblings_count": len(model.Siblings),
+	}).Debug("Enriching model info")
+	
+	for i, file := range model.Siblings {
+		// Log file details for debugging
+		c.logger.WithFields(logrus.Fields{
+			"file_index": i,
+			"filename":   file.Filename,
+			"size":       file.Size,
+			"blob_id":    file.BlobID,
+			"has_lfs":    file.LFS != nil,
+		}).Debug("Processing file")
+		
+		if file.LFS != nil {
+			c.logger.WithFields(logrus.Fields{
+				"lfs_size": file.LFS.Size,
+				"lfs_oid":  file.LFS.OID,
+			}).Debug("LFS data present")
+		}
+		
 		// Calculate total size
 		if file.LFS != nil {
 			totalSize += file.LFS.Size

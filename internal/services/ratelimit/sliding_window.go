@@ -15,6 +15,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// RedisRateLimitService interface for Redis rate limiting (v3.0.6+)
+type RedisRateLimitService interface {
+	CheckLimit(ctx context.Context, key string, limit int, window time.Duration) (allowed bool, remaining int, err error)
+	Reset(ctx context.Context, key string) error
+}
+
 // SlidingWindowLimiter реализует sliding window rate limiting
 // Более точный чем fixed window, предотвращает burst attacks на границе окна
 type SlidingWindowLimiter struct {
@@ -24,6 +30,9 @@ type SlidingWindowLimiter struct {
 
 	// In-memory cache для быстрого доступа (key = "rateLimit:windowType:targetID")
 	cache map[string]*windowState
+	
+	// Redis для distributed rate limiting (v3.0.6+)
+	redisService RedisRateLimitService
 }
 
 // windowState состояние sliding window
@@ -41,6 +50,14 @@ func NewSlidingWindowLimiter(db storage.Database, logger *logrus.Logger) *Slidin
 	}
 }
 
+// SetRedisService sets Redis service for distributed rate limiting (v3.0.6+)
+func (l *SlidingWindowLimiter) SetRedisService(redisService RedisRateLimitService) {
+	l.redisService = redisService
+	if redisService != nil {
+		l.logger.Info("Redis rate limiting enabled (distributed mode)")
+	}
+}
+
 // CheckLimit проверяет rate limit с sliding window algorithm
 func (l *SlidingWindowLimiter) CheckLimit(
 	ctx context.Context,
@@ -55,6 +72,24 @@ func (l *SlidingWindowLimiter) CheckLimit(
 
 	// Cache key
 	cacheKey := fmt.Sprintf("%s:%s:%s", rateLimitID, windowType, targetID)
+	
+	// Use Redis if available (v3.0.6+: distributed rate limiting)
+	if l.redisService != nil {
+		allowed, remaining, err := l.redisService.CheckLimit(ctx, cacheKey, limit, window)
+		if err != nil {
+			l.logger.WithError(err).Warn("Redis rate limit check failed, falling back to in-memory")
+			// Fall through to in-memory implementation
+		} else {
+			resetAt = now.Add(window)
+			l.logger.WithFields(logrus.Fields{
+				"key":       cacheKey,
+				"allowed":   allowed,
+				"remaining": remaining,
+				"redis":     true,
+			}).Debug("Rate limit checked (Redis)")
+			return allowed, remaining, resetAt, nil
+		}
+	}
 
 	// Get or create window state
 	l.mu.Lock()

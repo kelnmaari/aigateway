@@ -314,7 +314,7 @@
         // Load available models
         async function loadModels() {
             try {
-                const response = await fetch('/api/v1/models');
+                const response = await fetch('/api/system/models');
                 const data = await response.json();
                 
                 const modelsList = document.getElementById('models-list');

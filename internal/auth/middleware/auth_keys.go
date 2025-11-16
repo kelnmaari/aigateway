@@ -21,11 +21,17 @@ import (
 )
 
 // APIKeyAuthenticator обрабатывает аутентификацию через API ключи
+// APIKeyWorker interface for Redis cache-through pattern (v3.0.6+)
+type APIKeyWorker interface {
+	GetAPIKey(ctx context.Context, keyID string) (interface{}, error)
+}
+
 type APIKeyAuthenticator struct {
-	config     *config.Config
-	logger     *logrus.Logger
-	keyManager *apikey.Manager
-	enabled    bool
+	config       *config.Config
+	logger       *logrus.Logger
+	keyManager   *apikey.Manager
+	apiKeyWorker APIKeyWorker  // v3.0.6+: Redis cache-through
+	enabled      bool
 }
 
 // NewAPIKeyAuthenticator создает новый аутентификатор
@@ -38,6 +44,12 @@ func NewAPIKeyAuthenticator(cfg *config.Config, logger *logrus.Logger, keyManage
 	}
 }
 
+// SetAPIKeyWorker sets the API key worker for Redis caching (v3.0.6+)
+func (a *APIKeyAuthenticator) SetAPIKeyWorker(worker APIKeyWorker) {
+	a.apiKeyWorker = worker
+	a.logger.Info("✅ API Key cache-through enabled (Redis)")
+}
+
 // AuthenticationMiddleware создает middleware для аутентификации API ключей
 func (a *APIKeyAuthenticator) AuthenticationMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -48,42 +60,53 @@ func (a *APIKeyAuthenticator) AuthenticationMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Извлекаем API ключ из заголовков
-		apiKey := a.extractAPIKey(c)
-		if apiKey == "" {
-			a.handleAuthenticationError(c, "missing_api_key", "API key is required")
-			return
-		}
+	// Извлекаем API ключ из заголовков
+	apiKey := a.extractAPIKey(c)
+	if apiKey == "" {
+		a.handleAuthenticationError(c, "missing_api_key", "API key is required")
+		return
+	}
 
-		// Валидируем API ключ
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-		defer cancel()
+	// Валидируем API ключ
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
 
-		validation, err := a.keyManager.ValidateAPIKey(ctx, apiKey)
-		if err != nil {
-			a.logger.WithError(err).Error("Failed to validate API key")
-			a.handleAuthenticationError(c, "validation_error", "Failed to validate API key")
-			return
-		}
+	// v3.0.6+: Try cache-through pattern via APIKeyWorker if available
+	var validation *models.APIKeyValidationResult
+	var err error
 
-		if !validation.Valid {
-			a.logger.WithField("error", validation.Error).Warn("API key validation failed")
-			a.handleAuthenticationError(c, "invalid_api_key", validation.Error)
-			return
-		}
+	if a.apiKeyWorker != nil {
+		// Cache-through: Redis first → DB fallback
+		validation, err = a.validateAPIKeyWithCache(ctx, apiKey)
+	} else {
+		// Fallback: Direct validation (slow - checks all keys!)
+		validation, err = a.keyManager.ValidateAPIKey(ctx, apiKey)
+	}
 
-		// Записываем информацию об аутентификации в контекст
-		c.Set("authenticated", true)
-		c.Set("api_key_id", validation.APIKey.ID)
-		c.Set("api_key_info", validation.APIKey)
+	if err != nil {
+		a.logger.WithError(err).Error("Failed to validate API key")
+		a.handleAuthenticationError(c, "validation_error", "Failed to validate API key")
+		return
+	}
 
-		a.logger.WithFields(logrus.Fields{
-			"key_id":   validation.APIKey.ID,
-			"key_name": validation.APIKey.Name,
-			"endpoint": c.Request.URL.Path,
-		}).Debug("API key authentication successful")
+	if !validation.Valid {
+		a.logger.WithField("error", validation.Error).Warn("API key validation failed")
+		a.handleAuthenticationError(c, "invalid_api_key", validation.Error)
+		return
+	}
 
-		c.Next()
+	// Записываем информацию об аутентификации в контекст
+	c.Set("authenticated", true)
+	c.Set("api_key_id", validation.APIKey.ID)
+	c.Set("api_key_info", validation.APIKey)
+
+	a.logger.WithFields(logrus.Fields{
+		"key_id":   validation.APIKey.ID,
+		"key_name": validation.APIKey.Name,
+		"endpoint": c.Request.URL.Path,
+	}).Debug("API key authentication successful")
+
+	c.Next()
 	}
 }
 
@@ -251,6 +274,132 @@ func (a *APIKeyAuthenticator) hasModelAccess(apiKey *models.APIKeyPublic, model 
 		}
 	}
 	return false
+}
+
+// validateAPIKeyWithCache validates API key using Redis cache-through pattern (v3.0.6+)
+func (a *APIKeyAuthenticator) validateAPIKeyWithCache(ctx context.Context, plainKey string) (*models.APIKeyValidationResult, error) {
+	// Проверка формата ключа
+	if !models.IsValidAPIKeyFormat(plainKey) {
+		return &models.APIKeyValidationResult{
+			Valid: false,
+			Error: "invalid API key format",
+		}, nil
+	}
+
+	// Извлекаем key_id из plain key (формат: sk-proj-<keyid>-<random>)
+	keyID := extractKeyIDFromPlainKey(plainKey)
+	if keyID == "" {
+		return &models.APIKeyValidationResult{
+			Valid: false,
+			Error: "invalid API key format - cannot extract key ID",
+		}, nil
+	}
+
+	// Cache-through: Redis first → DB fallback
+	cachedData, err := a.apiKeyWorker.GetAPIKey(ctx, keyID)
+	if err != nil {
+		a.logger.WithError(err).Warn("Failed to get API key from cache, falling back to direct validation")
+		// Fallback to direct validation
+		return a.keyManager.ValidateAPIKey(ctx, plainKey)
+	}
+
+	// Преобразуем interface{} обратно в *models.APIKey
+	apiKey, ok := cachedData.(*models.APIKey)
+	if !ok {
+		a.logger.Error("Invalid API key type from cache")
+		return &models.APIKeyValidationResult{
+			Valid: false,
+			Error: "internal error - invalid cached key format",
+		}, nil
+	}
+
+	// Verify bcrypt hash
+	if !apiKey.VerifyKey(plainKey) {
+		return &models.APIKeyValidationResult{
+			Valid: false,
+			Error: "invalid API key",
+		}, nil
+	}
+
+	// Проверка статуса
+	if apiKey.Status != models.APIKeyStatusActive {
+		return &models.APIKeyValidationResult{
+			Valid: false,
+			Error: "API key is not active",
+		}, nil
+	}
+
+	// Проверка истечения срока
+	if apiKey.ExpiresAt != nil && time.Now().After(*apiKey.ExpiresAt) {
+		return &models.APIKeyValidationResult{
+			Valid: false,
+			Error: "API key has expired",
+		}, nil
+	}
+
+	// Update last used timestamp
+	apiKey.UpdateLastUsed()
+
+	// Convert to APIKeyPublic
+	publicKey := &models.APIKeyPublic{
+		ID:          apiKey.ID,
+		Name:        apiKey.Name,
+		Description: apiKey.Description,
+		Status:      apiKey.Status,
+		Models:      apiKey.Models,
+		Permissions: apiKey.Permissions,
+		CreatedAt:   apiKey.CreatedAt,
+		ExpiresAt:   apiKey.ExpiresAt,
+		LastUsedAt:  apiKey.LastUsedAt,
+	}
+
+	return &models.APIKeyValidationResult{
+		Valid:  true,
+		APIKey: publicKey,
+	}, nil
+}
+
+// extractKeyIDFromPlainKey извлекает key_id из plain API key
+// Поддерживаемые форматы:
+//   - sk-proj-<keyid>-<random>      (новый формат)
+//   - sk-existing-<keyid>           (device API key, без random)
+//   - sk-<keyid>-<random>           (старый формат с random)
+func extractKeyIDFromPlainKey(plainKey string) string {
+	if !strings.HasPrefix(plainKey, "sk-") {
+		return ""
+	}
+	
+	parts := strings.Split(plainKey, "-")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	// Новый формат: sk-proj-<keyid>-<random>
+	// parts[0] = "sk", parts[1] = "proj", parts[2] = keyid, parts[3+] = random
+	if parts[1] == "proj" && len(parts) >= 4 {
+		return parts[2]
+	}
+	
+	// Device API key: sk-existing-<keyid>
+	// parts[0] = "sk", parts[1] = "existing", parts[2] = keyid (ak_xxx)
+	if parts[1] == "existing" && len(parts) == 3 {
+		return parts[2]
+	}
+	
+	// Старый формат с random: sk-<keyid>-<random>
+	// parts[0] = "sk", parts[1] = keyid, parts[2+] = random
+	if len(parts) >= 3 {
+		// Key ID может содержать underscores (например, ak_1762963462_a44e9a32)
+		// но НЕ содержит дефисы (поэтому это parts[1])
+		return parts[1]
+	}
+	
+	// Fallback: просто второй элемент
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	
+	return ""
 }
 
 // handleAuthenticationError обрабатывает ошибки аутентификации

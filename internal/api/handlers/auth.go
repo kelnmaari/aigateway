@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -10,14 +11,16 @@ import (
 	"aigateway/internal/auth/middleware"
 	"aigateway/internal/auth/password"
 	"aigateway/internal/auth/service"
+	"aigateway/internal/cache/redis"
 	auditService "aigateway/internal/services/audit"
 )
 
 // AuthHandler обрабатывает authentication запросы
 type AuthHandler struct {
-	authService *service.AuthService
-	logger      *logrus.Logger
-	auditLogger *auditService.AuditLogger // Version 1.11.4+: Audit Logging
+	authService  *service.AuthService
+	logger       *logrus.Logger
+	auditLogger  *auditService.AuditLogger // Version 1.11.4+: Audit Logging
+	redisManager *redis.Manager            // v3.0.6+: Redis for JWT sessions
 }
 
 // NewAuthHandler создает новый Auth Handler
@@ -27,6 +30,11 @@ func NewAuthHandler(authService *service.AuthService, logger *logrus.Logger, aud
 		logger:      logger,
 		auditLogger: auditLogger,
 	}
+}
+
+// SetRedisManager sets Redis manager for JWT session storage (v3.0.6+)
+func (h *AuthHandler) SetRedisManager(manager *redis.Manager) {
+	h.redisManager = manager
 }
 
 // Register регистрирует нового пользователя
@@ -115,6 +123,49 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if h.auditLogger != nil {
 		userAgent := c.Request.UserAgent()
 		h.auditLogger.LogLogin(c.Request.Context(), resp.User.ID, c.ClientIP(), userAgent, true, "")
+	}
+
+	// Save JWT session to Redis (v3.0.6+)
+	if h.redisManager != nil && h.redisManager.JWT != nil && resp.TokenPair != nil {
+		// Determine primary tenant (first one or empty)
+		tenantID := ""
+		role := "user"
+		if len(resp.Tenants) > 0 {
+			tenantID = resp.Tenants[0].ID
+		}
+		if resp.User.IsAdmin {
+			role = "admin"
+		}
+
+		jwtSession := &redis.JWTSession{
+			SessionID:     resp.TokenPair.AccessToken, // Use access token as session ID
+			TokenID:       resp.TokenPair.AccessToken,
+			UserID:        resp.User.ID,
+			Username:      resp.User.Username,
+			Email:         resp.User.Email,
+			TenantID:      tenantID,
+			Role:          role,
+			IPAddress:     c.ClientIP(),
+			UserAgent:     c.Request.UserAgent(),
+			DeviceType:    detectDeviceType(c.Request.UserAgent()),
+			DeviceName:    parseDeviceName(c.Request.UserAgent()),
+			IssuedAt:      time.Now(),
+			ActivityCount: 0,
+		}
+
+		// Save with 7 days TTL
+		if err := h.redisManager.JWT.SaveJWTSession(c.Request.Context(), jwtSession); err != nil {
+			h.logger.WithError(err).Warn("Failed to save JWT session to Redis")
+		} else {
+			h.logger.WithFields(logrus.Fields{
+				"user_id":   resp.User.ID,
+				"username":  resp.User.Username,
+				"tenant_id": tenantID,
+				"role":      role,
+				"ip":        c.ClientIP(),
+				"device":    jwtSession.DeviceName,
+			}).Debug("JWT session saved to Redis")
+		}
 	}
 
 	h.logger.WithField("user_id", resp.User.ID).Info("User logged in successfully")
@@ -275,4 +326,3 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
-

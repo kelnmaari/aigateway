@@ -44,9 +44,12 @@ auth:
     
     # Redis для distributed rate limiting (K8S NodePort)
     redis:
-      enabled: true
+      enabled: true                                # Enable Redis (v3.0.6+)
       url: "redis://192.168.1.101:30897"
-      key_prefix: "ollama_proxy_rl:"
+      key_prefix: "aigateway_rl:"                  # Key prefix for rate limiting
+      db: 0                                        # Redis database number
+      max_retries: 3
+      pool_size: 10
   
   # JWT для user authentication (Version 1.3.0+)
   jwt:

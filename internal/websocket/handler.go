@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -215,24 +216,21 @@ func (h *Handler) validateAPIKey(ctx context.Context, plainKey string) (*models.
 		return nil, fmt.Errorf("invalid API key format")
 	}
 
-	// Получаем все ключи и проверяем каждый с помощью bcrypt
-	// (мы не можем искать по хешу, т.к. bcrypt генерирует разные хеши для одного значения)
-	allKeys, err := h.db.ListAPIKeys(ctx)
+	// Извлекаем key_id из plain key (v3.0.6+: поддержка всех форматов)
+	keyID := extractKeyIDFromPlainKey(plainKey)
+	if keyID == "" {
+		return nil, fmt.Errorf("invalid API key format - cannot extract key ID")
+	}
+
+	// Получаем ключ напрямую по ID (быстрее чем проверять все!)
+	matchedKey, err := h.db.GetAPIKey(ctx, keyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get API keys: %w", err)
+		return nil, fmt.Errorf("API key not found: %s", keyID)
 	}
 
-	// Ищем ключ, проверяя plain key против каждого хеша
-	var matchedKey *models.APIKey
-	for _, key := range allKeys {
-		if key.VerifyKey(plainKey) {
-			matchedKey = key
-			break
-		}
-	}
-
-	if matchedKey == nil {
-		return nil, fmt.Errorf("API key not found")
+	// Verify bcrypt hash
+	if !matchedKey.VerifyKey(plainKey) {
+		return nil, fmt.Errorf("invalid API key")
 	}
 
 	// Check status
@@ -246,6 +244,49 @@ func (h *Handler) validateAPIKey(ctx context.Context, plainKey string) (*models.
 	}
 
 	return matchedKey, nil
+}
+
+// extractKeyIDFromPlainKey извлекает key_id из plain API key (v3.0.6+)
+// Поддерживаемые форматы:
+//   - sk-proj-<keyid>-<random>      (новый формат)
+//   - sk-existing-<keyid>           (device API key, без random)
+//   - sk-<keyid>-<random>           (старый формат с random)
+func extractKeyIDFromPlainKey(plainKey string) string {
+	if !strings.HasPrefix(plainKey, "sk-") {
+		return ""
+	}
+	
+	parts := strings.Split(plainKey, "-")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	// Новый формат: sk-proj-<keyid>-<random>
+	// parts[0] = "sk", parts[1] = "proj", parts[2] = keyid, parts[3+] = random
+	if parts[1] == "proj" && len(parts) >= 4 {
+		return parts[2]
+	}
+	
+	// Device API key: sk-existing-<keyid>
+	// parts[0] = "sk", parts[1] = "existing", parts[2] = keyid (ak_xxx)
+	if parts[1] == "existing" && len(parts) == 3 {
+		return parts[2]
+	}
+	
+	// Старый формат с random: sk-<keyid>-<random>
+	// parts[0] = "sk", parts[1] = keyid, parts[2+] = random
+	if len(parts) >= 3 {
+		// Key ID может содержать underscores (например, ak_1762963462_a44e9a32)
+		// но НЕ содержит дефисы (поэтому это parts[1])
+		return parts[1]
+	}
+	
+	// Fallback: просто второй элемент
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	
+	return ""
 }
 
 // updateDeviceLastSeen обновляет last_seen_at для device API key

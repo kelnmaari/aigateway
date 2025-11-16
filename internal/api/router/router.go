@@ -27,6 +27,7 @@ import (
 	authService "aigateway/internal/auth/service"
 
 	// "aigateway/internal/client/ollama" // Removed: v3.0.5+
+	"aigateway/internal/cache/redis"
 	"aigateway/internal/config"
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
@@ -52,6 +53,20 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// apiKeyDatabaseAdapter adapts storage.Database to redis.APIKeyProvider interface (v3.0.6+)
+type apiKeyDatabaseAdapter struct {
+	db storage.Database
+}
+
+// GetAPIKey implements redis.APIKeyProvider by wrapping storage.Database
+func (a *apiKeyDatabaseAdapter) GetAPIKey(ctx context.Context, keyID string) (interface{}, error) {
+	apiKey, err := a.db.GetAPIKey(ctx, keyID)
+	if err != nil {
+		return nil, err
+	}
+	return apiKey, nil
+}
+
 // Router представляет HTTP роутер приложения с опциональным API Key Management
 type Router struct {
 	config  *config.Config
@@ -71,6 +86,9 @@ type Router struct {
 	jwtManager       *jwt.Manager                  // JWT manager для токенов
 	authService      *authService.AuthService      // Auth service
 	bootstrapService *authService.BootstrapService // Bootstrap service для первичной настройки
+	
+	// Redis (v3.0.6+: Distributed caching & session management)
+	redisManager *redis.Manager // Redis manager для всех сервисов
 
 	// Handlers
 	systemHandler             *handlers.SystemHandler             // System endpoints (bootstrap, init-status)
@@ -222,6 +240,11 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		opts.Logger.Info("OpenTelemetry tracer initialized")
 	}
 
+	// Setup Redis (v3.0.6+: Distributed caching & session management)
+	if err := r.setupRedis(opts.Config, opts.Logger); err != nil {
+		opts.Logger.WithError(err).Warn("Redis initialization failed, will use in-memory fallback")
+	}
+
 	// Setup Auth Service если есть database и JWT manager
 	if r.db != nil && r.jwtManager != nil {
 		r.authService = authService.NewAuthService(r.db, r.jwtManager, opts.Config, opts.Logger)
@@ -294,6 +317,13 @@ func (r *Router) Close() error {
 			r.logger.WithError(err).Error("Failed to shutdown yzma client")
 		} else {
 			r.logger.Info("✅ yzma client shut down successfully")
+		}
+	}
+
+	// Close Redis connections (v3.0.6+)
+	if r.redisManager != nil {
+		if err := r.redisManager.Close(); err != nil {
+			r.logger.WithError(err).Error("Failed to close Redis connections")
 		}
 	}
 
@@ -834,6 +864,11 @@ func (r *Router) setupSystemRoutes() {
 			system.GET("/info", r.changelogHandler.GetSystemInfo)
 			system.GET("/changelogs", r.changelogHandler.GetChangelogs)
 			system.GET("/changelogs/:version", r.changelogHandler.GetChangelog)
+		}
+
+		// Public models endpoint for login page (v3.0.7+)
+		if r.yzmaHandler != nil {
+			system.GET("/models", r.yzmaHandler.HandleModels)
 		}
 	}
 
@@ -1460,9 +1495,44 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 
 	// Создаем Rate Limiter
 	rateLimiter := ratelimit.NewLimiter(cfg, logger)
+	
+	// Connect Redis to rate limiter if available (v3.0.6+)
+	if r.redisManager != nil && r.redisManager.RateLimit != nil {
+		rateLimiter.SetRedisService(r.redisManager.RateLimit)
+		logger.Info("Rate limiter connected to Redis (distributed mode)")
+	} else {
+		logger.Info("Rate limiter using in-memory mode (no Redis)")
+	}
 
 	// Создаем Authenticator
 	authenticator := authMiddleware.NewAPIKeyAuthenticator(cfg, logger, keyManager)
+
+	// Connect API Key Worker to authenticator if Redis is available (v3.0.6+)
+	if r.redisManager != nil && r.redisManager.BackgroundSync != nil {
+		// Create API Key Worker if not already initialized
+		apiKeyWorker := r.redisManager.BackgroundSync.APIKeyWorker
+		if apiKeyWorker == nil {
+			// Initialize API Key Worker with Database adapter
+			dbProvider := &apiKeyDatabaseAdapter{db: r.db}
+			apiKeyWorker = redis.NewAPIKeyWorker(
+				r.redisManager,
+				logger,
+				dbProvider,      // Database adapter for cache-through
+				15*time.Minute,  // Cache TTL: 15 минут
+			)
+			r.redisManager.BackgroundSync.APIKeyWorker = apiKeyWorker
+		}
+		
+		// Connect worker to authenticator for cache-through
+		authenticator.SetAPIKeyWorker(apiKeyWorker)
+		
+		// Connect worker to key manager for cache invalidation
+		keyManager.SetCacheInvalidator(apiKeyWorker)
+		
+		logger.Info("✅ API Key cache-through + invalidation connected (Redis)")
+	} else {
+		logger.Debug("API Key cache-through disabled (Redis not available)")
+	}
 
 	// Сохраняем компоненты
 	r.storage = stor
@@ -1471,6 +1541,54 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 	r.authenticator = authenticator
 
 	logger.Info("API Key Management setup completed")
+	return nil
+}
+
+// setupRedis настраивает Redis для distributed caching и session management (v3.0.6+)
+func (r *Router) setupRedis(cfg *config.Config, logger *logrus.Logger) error {
+	// Check if Redis is enabled
+	if !cfg.Auth.RateLimiting.Redis.Enabled {
+		logger.Info("Redis is disabled (using in-memory fallback)")
+		return nil
+	}
+	
+	logger.WithFields(logrus.Fields{
+		"url": cfg.Auth.RateLimiting.Redis.URL,
+		"key_prefix": cfg.Auth.RateLimiting.Redis.KeyPrefix,
+	}).Info("Initializing Redis...")
+	
+	// Create Redis manager
+	redisManager, err := redis.NewManager(redis.ManagerConfig{
+		URL:       cfg.Auth.RateLimiting.Redis.URL,
+		KeyPrefix: cfg.Auth.RateLimiting.Redis.KeyPrefix,
+		DB:        0,  // Default database
+		MaxRetries: 3,
+		PoolSize:  10,
+		Enabled:   true,
+	}, logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Redis: %w", err)
+	}
+	
+	// Test connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	if err := redisManager.Ping(ctx); err != nil {
+		return fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+	
+	// Get initial stats
+	stats, err := redisManager.GetStats(ctx)
+	if err == nil {
+		logger.WithFields(logrus.Fields{
+			"db_size": stats["db_size"],
+		}).Info("Redis connected successfully")
+	}
+	
+	r.redisManager = redisManager
+	
+	logger.Info("✅ Redis initialized successfully")
 	return nil
 }
 
@@ -1603,6 +1721,13 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 	if r.authService != nil && r.db != nil {
 		r.authHandler = handlers.NewAuthHandler(r.authService, logger, r.auditLogger)
+		
+		// Connect Redis to auth handler for JWT session storage (v3.0.6+)
+		if r.redisManager != nil {
+			r.authHandler.SetRedisManager(r.redisManager)
+			logger.Debug("Redis manager connected to auth handler")
+		}
+		
 		r.deviceHandler = handlers.NewDeviceHandler(r.db, logger) // Version 2.4.0+: Device management
 		r.userHandler = handlers.NewUserHandler(r.db, logger, r.auditLogger)
 		r.tenantHandler = handlers.NewTenantHandler(r.db, logger, r.auditLogger)
@@ -2011,6 +2136,36 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 				if err := yzmaClient.LoadPersistedModels(ctx); err != nil {
 					yzmaLogger.WithError(err).Warn("Failed to auto-load persisted models")
 				}
+			}
+			
+			// Start model list background worker (v3.0.6+: background sync)
+			if r.redisManager != nil && r.redisManager.BackgroundSync != nil {
+				// Create model list provider
+				modelProvider := yzma.NewModelListProvider(yzmaClient, yzmaLogger)
+				
+				// Start worker (updates every 30s)
+				modelWorker := r.redisManager.BackgroundSync.ModelListWorker
+				if modelWorker == nil {
+					// Initialize if not already done
+					modelWorker = redis.NewModelListWorker(
+						r.redisManager,
+						yzmaLogger,
+						modelProvider,
+						30*time.Second,
+					)
+					modelWorker.Start()
+					r.redisManager.BackgroundSync.ModelListWorker = modelWorker
+				}
+				
+				// Connect worker to client for cache invalidation
+				yzmaClient.SetModelWorker(modelWorker)
+				
+				// Connect worker to handler for cache reads
+				r.yzmaHandler.SetModelWorker(modelWorker)
+				
+				yzmaLogger.Info("🤖 Model list background worker started (30s interval)")
+			} else {
+				yzmaLogger.Debug("Model list background worker disabled (Redis not available)")
 			}
 
 			// Initialize Agent Service (v2.5.0+, v3.0.6+: restored for YZMA)

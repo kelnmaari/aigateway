@@ -19,10 +19,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// ModelListWorker interface for background model list caching (v3.0.6+)
+type ModelListWorker interface {
+	GetCachedModelList(ctx context.Context) (interface{}, error)
+}
+
 // YzmaHandler handles yzma inference requests with OpenAI compatibility
 type YzmaHandler struct {
 	client       *yzma.Client
 	agentService *agentService.AgentService // v2.5.0+, v3.0.6+: Agent support
+	modelWorker  ModelListWorker            // v3.0.6+: Background model list cache
 	logger       *logrus.Logger
 }
 
@@ -33,6 +39,12 @@ func NewYzmaHandler(client *yzma.Client, logger *logrus.Logger) *YzmaHandler {
 		agentService: nil, // Will be set later if agent service is available
 		logger:       logger,
 	}
+}
+
+// SetModelWorker sets the model list worker for background caching (v3.0.6+)
+func (h *YzmaHandler) SetModelWorker(worker ModelListWorker) {
+	h.modelWorker = worker
+	h.logger.Info("✅ Model list background caching enabled")
 }
 
 // SetAgentService sets the agent service for agent mode support (v2.5.0+, v3.0.6+)
@@ -299,21 +311,50 @@ func (h *YzmaHandler) handleStreamingCompletion(c *gin.Context, req models.ChatC
 
 // HandleModels returns LOADED models (OpenAI compatible)
 // v3.0.6+: Only returns models that are currently loaded in memory
+// v3.0.6+: Uses Redis cache for instant response
 func (h *YzmaHandler) HandleModels(c *gin.Context) {
-	// Get ONLY loaded models (not all available models from disk)
+	ctx := c.Request.Context()
+	
+	// Try Redis cache first (v3.0.6+: background sync)
+	if h.modelWorker != nil {
+		cachedModels, err := h.modelWorker.GetCachedModelList(ctx)
+		if err == nil {
+			h.logger.Debug("✅ Model list served from Redis cache")
+			
+			response := map[string]interface{}{
+				"object": "list",
+				"data":   cachedModels,
+			}
+			
+			c.JSON(http.StatusOK, response)
+			return
+		}
+		
+		// Cache miss - fallback to direct listing
+		h.logger.WithError(err).Debug("⚠️  Model list cache miss, listing directly")
+	}
+	
+	// Fallback: Get ONLY loaded models directly (slower)
 	loadedModels := h.client.ListLoadedModels()
 	
 	// Convert to OpenAI format (v3.0.5+: use aliases)
 	var modelObjects []map[string]interface{}
-	for modelPath, alias := range loadedModels {
-		modelObjects = append(modelObjects, map[string]interface{}{
-			"id":      alias,      // v3.0.5+: Show alias instead of full path
+	for modelPath, modelInfo := range loadedModels {
+		modelObj := map[string]interface{}{
+			"id":      modelInfo["alias"],  // v3.0.5+: Show alias instead of full path
 			"object":  "model",
 			"created": time.Now().Unix(),
 			"owned_by": "local",
 			"loaded":  true,       // Always true since we only return loaded models
 			"path":    modelPath,  // Keep original path for debugging
-		})
+		}
+		
+		// Add size if available
+		if size, ok := modelInfo["size"].(int64); ok && size > 0 {
+			modelObj["size"] = size
+		}
+		
+		modelObjects = append(modelObjects, modelObj)
 	}
 	
 	response := map[string]interface{}{

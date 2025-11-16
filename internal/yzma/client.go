@@ -46,13 +46,19 @@ type StorageInterface interface {
 	ListLoadedModels(ctx context.Context, autoLoadOnly bool) ([]*models.LoadedModel, error)
 }
 
+// ModelListInvalidator interface for cache invalidation (v3.0.6+)
+type ModelListInvalidator interface {
+	InvalidateModelListCache(ctx context.Context) error
+}
+
 // Client wraps yzma for local inference
 type Client struct {
 	modelsDir          string
 	logger             *logrus.Logger
 	conversationLogger *logrus.Logger  // v3.0.6+: for user requests/responses
 	libPath            string
-	db                 StorageInterface  // v3.0.6+: for model persistence
+	db                 StorageInterface       // v3.0.6+: for model persistence
+	modelWorker        ModelListInvalidator  // v3.0.6+: for cache invalidation
 	
 	// Loaded models cache
 	models      map[string]*ModelContext  // path -> ModelContext
@@ -458,6 +464,16 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 		}
 	}
 	
+	// Invalidate model list cache (v3.0.6+: background sync)
+	if c.modelWorker != nil {
+		if err := c.modelWorker.InvalidateModelListCache(ctx); err != nil {
+			c.logger.WithError(err).Warn("Failed to invalidate model list cache")
+			// Don't fail the load, just log the warning
+		} else {
+			c.logger.Debug("✅ Model list cache invalidated after load")
+		}
+	}
+	
 	return nil
 }
 
@@ -513,6 +529,17 @@ func (c *Client) UnloadModel(modelPath string) error {
 		}
 	}
 	
+	// Invalidate model list cache (v3.0.6+: background sync)
+	if c.modelWorker != nil {
+		ctx := context.Background()
+		if err := c.modelWorker.InvalidateModelListCache(ctx); err != nil {
+			c.logger.WithError(err).Warn("Failed to invalidate model list cache")
+			// Don't fail the unload, just log the warning
+		} else {
+			c.logger.Debug("✅ Model list cache invalidated after unload")
+		}
+	}
+	
 	return nil
 }
 
@@ -538,14 +565,24 @@ func (c *Client) GetModelContext(modelPath string) (*ModelContext, error) {
 	return modelCtx, nil
 }
 
-// ListLoadedModels returns all loaded models with their aliases
-func (c *Client) ListLoadedModels() map[string]string {
+// ListLoadedModels returns all loaded models with their aliases and sizes
+func (c *Client) ListLoadedModels() map[string]map[string]interface{} {
 	c.modelsMu.RLock()
 	defer c.modelsMu.RUnlock()
 	
-	models := make(map[string]string, len(c.models))
+	models := make(map[string]map[string]interface{}, len(c.models))
 	for path, ctx := range c.models {
-		models[path] = ctx.Alias
+		// Get file size
+		fullPath := filepath.Join(c.modelsDir, path)
+		var size int64
+		if info, err := os.Stat(fullPath); err == nil {
+			size = info.Size()
+		}
+		
+		models[path] = map[string]interface{}{
+			"alias": ctx.Alias,
+			"size":  size,
+		}
 	}
 	
 	return models
@@ -1186,6 +1223,12 @@ func (c *Client) Shutdown() error {
 func (c *Client) SetDB(db StorageInterface) {
 	c.db = db
 	c.logger.Info("✅ Database set for model persistence")
+}
+
+// SetModelWorker sets the model worker for cache invalidation (v3.0.6+)
+func (c *Client) SetModelWorker(worker ModelListInvalidator) {
+	c.modelWorker = worker
+	c.logger.Info("✅ Model list cache invalidation enabled")
 }
 
 // SetConversationLogger sets the logger for user requests/responses (v3.0.6+)

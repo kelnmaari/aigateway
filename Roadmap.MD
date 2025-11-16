@@ -1,9 +1,9 @@
 # 🗺️ Roadmap: AIGateway Platform
 
-> **Текущая версия:** 3.0.5 ✅  
-> **Статус:** v3.0.0-v3.0.5 Phase 1-5 COMPLETED (yzma + Hugging Face + VLM + Migration)  
-> **Next:** Bonus Features или Production Deployment  
-> **Последнее обновление:** 2025-11-07
+> **Текущая версия:** 3.0.6 ✅  
+> **Статус:** v3.0.0-v3.0.6 Phase 1-5 COMPLETED + Ollama Full Removal + Production Enhancements  
+> **Next:** Agent Mode Completion, Bonus Features, Production Deployment  
+> **Последнее обновление:** 2025-11-12
 
 ---
 
@@ -49,16 +49,21 @@ Client → Proxy → Ollama       Client → Proxy → yzma → GGUF models
 | **v1.13.0** | Advanced RAG | Vector search, Embeddings, Document chunking, Multi-source | ✅ |
 | **v2.0.0-v2.4.0** | Production Ready | MCP protocol, Desktop client, Advanced RAG orchestrator | ✅ |
 | **v2.4.7** | Codebase Quality | PostgreSQL support (142 migrations), Reversible migrations, Code refactoring | ✅ |
-| **v2.6.0** | HTMX Migration | User Management, RBAC UI, Dashboard stats (parallel loading) | ✅ **NEW!** |
+| **v2.6.0** | HTMX Migration | User Management, RBAC UI, Dashboard stats (parallel loading) | ✅ |
+| **v3.0.0-v3.0.5** | yzma Integration | Pure Go inference, VLM support, Hugging Face integration, Ollama migration | ✅ |
+| **v3.0.6** | Production Enhancements | Ollama full removal, Model aliasing, Persistence, Agent mode (partial) | ✅ **NEW!** |
 
 **Итого реализовано:**
-- 🎯 **13 major versions** (v1.2 → v2.6)
-- 📦 **100+ features** implemented
+- 🎯 **15 major versions** (v1.2 → v3.0.6)
+- 📦 **120+ features** implemented
 - 🗄️ **PostgreSQL + SQLite** dual storage
 - 🔐 **Enterprise-grade security** (OIDC, LDAP, RBAC, Audit)
-- 🤖 **Agentic AI** (MCP protocol, tool execution)
+- 🤖 **Agentic AI** (MCP protocol, ReAct loop, tool execution)
+- 🚀 **Pure Go inference** (yzma + llama.cpp, no external dependencies)
+- 🖼️ **VLM support** (Qwen2.5-VL, LLaVA, multimodal AI)
+- 🤗 **Hugging Face integration** (model browser, downloader, GGUF management)
 - 🎨 **Modern UI** (HTMX + Vanilla JS + Svelte desktop)
-- 📊 **Full observability** (OpenTelemetry, metrics, GPU monitoring)
+- 📊 **Full observability** (OpenTelemetry, metrics, GPU monitoring, conversation logs)
 
 Детальная история см. в [CHANGELOG.md](CHANGELOG.md)
 
@@ -375,7 +380,7 @@ Admin Panel → Models → Browse Hugging Face
 
 ### Phase 5: Migration & Cleanup (4-5ч) → v3.0.5 ✅ ЗАВЕРШЕНО
 
-**MIGRATE-01: Configuration Migration** (1-2ч)
+**MIGRATE-01: Configuration Migration** (1-2ч) ✅
 
 - [x] New config structure:
   ```yaml
@@ -395,7 +400,7 @@ Admin Panel → Models → Browse Hugging Face
 - [x] Migration script для existing configs
 - [x] Environment variables mapping
 
-**MIGRATE-02: Database Schema** (1ч)
+**MIGRATE-02: Database Schema** (1ч) ✅
 
 - [x] New tables:
   ```sql
@@ -428,7 +433,7 @@ Admin Panel → Models → Browse Hugging Face
   ```
 - [x] Migrations: 078_gguf_models, 079_model_downloads
 
-**MIGRATE-03: Ollama Cleanup** (2-3ч)
+**MIGRATE-03: Ollama Cleanup** (2-3ч) ✅
 
 - [x] Made Ollama optional in docker-compose.yml
 - [x] Update environment variables (AIGATEWAY_INFERENCE_*)
@@ -436,7 +441,7 @@ Admin Panel → Models → Browse Hugging Face
 - [x] Update README.md (v3.0 architecture)
 - [x] Preserved Ollama code as fallback backend
 
-**MIGRATE-04: Documentation** (1ч)
+**MIGRATE-04: Documentation** (1ч) ✅
 
 - [x] Update README.md - v3.0 architecture
 - [x] Update VERSION → 3.0.5
@@ -458,6 +463,131 @@ Admin Panel → Models → Browse Hugging Face
 - `internal/storage/sqlite/migrations/080_*.sql` - changelog v3.0.5
 - `docker-compose.yml` - Ollama optional, yzma config
 - `README.md` - v3.0 architecture, VLM highlights
+
+---
+
+### Phase 6: Production Enhancements (8-10ч) → v3.0.6 ✅ ЗАВЕРШЕНО
+
+**PROD-01: Ollama Full Removal** (2-3ч) ✅
+
+- [x] Remove all Ollama code from backend:
+  - [x] Delete `internal/client/ollama/` package
+  - [x] Remove Ollama handlers (chat, models, embeddings, completions)
+  - [x] Remove Ollama config structs
+  - [x] Clean up router.go (all Ollama routes)
+  - [x] Remove Ollama tests
+- [x] Remove all Ollama code from frontend:
+  - [x] Remove provider selector from chat.html
+  - [x] Update model-panel.js (yzma only)
+  - [x] Remove Ollama from admin panel tabs
+  - [x] Delete legacy Model Registry section
+- [x] Update configs (dev.yaml, production.yaml.example)
+- [x] **Result:** Pure yzma-based inference, no Ollama dependencies
+
+**PROD-02: Model Management Improvements** (2-3ч) ✅
+
+- [x] Model Aliasing System:
+  - [x] Short names instead of full paths (e.g., `llama-3.2-3b-q8` vs full path)
+  - [x] Auto-generation from filename
+  - [x] Alias persistence in memory
+  - [x] API uses aliases for model selection
+- [x] Model Persistence:
+  - [x] Database storage for loaded models (`loaded_models` table)
+  - [x] Auto-load on server restart
+  - [x] Migration 081: SQLite + PostgreSQL
+  - [x] `auto_load` flag per model
+- [x] `/v1/models` API:
+  - [x] Returns ONLY loaded models (not all .gguf files)
+  - [x] Includes alias as `id` field
+  - [x] OpenAI-compatible format
+
+**PROD-03: Logging & Observability** (1-2ч) ✅
+
+- [x] Separate log files:
+  - [x] `huggingface.log` - HF downloads and API calls
+  - [x] `yzma.log` - Model loading, inference, GPU info
+  - [x] `yzma-conversations.log` - User requests & responses
+- [x] Log spam reduction:
+  - [x] Skip UI endpoints (`/api/ui/*`) in request_tracker
+  - [x] Skip JWT success logs for UI endpoints
+  - [x] Skip metrics collection for UI endpoints
+- [x] Conversation logging:
+  - [x] Log all user messages and model responses
+  - [x] Include `stream=true` flag for streaming requests
+  - [x] Separate from debug logs
+
+**PROD-04: GPU & Performance** (1-2ч) ✅
+
+- [x] GPU Offloading Configuration:
+  - [x] `gpu_layers` in config.yaml (default: -1 = auto)
+  - [x] Apply to `llama.ModelLoadFromFile`
+  - [x] Diagnostic logging for backend loading
+  - [x] Documentation for CUDA setup (missing DLLs)
+- [x] Memory Management:
+  - [x] Explicit GPU cleanup on UnloadModel
+  - [x] `runtime.GC()` calls for thorough cleanup
+  - [x] Shutdown hook in router.Close()
+
+**PROD-05: UI/UX Enhancements** (2-3ч) ✅
+
+- [x] Admin Panel Reorganization:
+  - [x] Models tab: 2 sub-tabs (Local Models, HF Browser)
+  - [x] Removed "Available Models" tab (was for Ollama)
+  - [x] Removed "Model Registry" (legacy)
+  - [x] Consolidated yzma stats + loaded + available in one tab
+- [x] Model List Redesign:
+  - [x] From card layout → simple row list
+  - [x] Full-width display with clear provider/path info
+  - [x] Load/Unload buttons in forms (HTMX compatible)
+- [x] User Dashboard:
+  - [x] "Available Models" section on main page
+  - [x] Grid layout with model cards
+  - [x] Click to navigate to chat
+  - [x] Empty state with link to Admin Panel
+  - [x] Auto-refresh on load
+
+**PROD-06: Agent Mode Support (IN PROGRESS)** 🚧
+
+- [x] Agent Service Integration:
+  - [x] `SetAgentService()` in YzmaHandler
+  - [x] ReAct loop orchestration
+  - [x] Tool execution coordination (client-side)
+- [x] ReAct Response Parsing:
+  - [x] JSON format support
+  - [x] Markdown format support (bold headers)
+  - [x] Extract: thought, action, parameters, final_answer
+- [x] Streaming Agent Support:
+  - [x] `agent_thinking` role for streaming thoughts
+  - [x] `agent_action` role for tool calls
+  - [x] SSE chunks with proper finish_reason
+- [ ] Agent Mode Testing (pending)
+- [ ] Agent UI Integration (pending)
+- [ ] Agent Session Persistence (pending)
+
+**Файлы:**
+- `internal/api/router/router.go` - Ollama cleanup, yzma persistence, GPU offloading
+- `internal/api/handlers/yzma_handler.go` - Agent mode, ReAct parsing, streaming
+- `internal/yzma/client.go` - Model aliasing, persistence, GPU layers, cleanup
+- `internal/storage/sqlite/migrations/081_*.sql` - loaded_models table
+- `internal/storage/postgresql/migrations/081_*.sql` - loaded_models table
+- `internal/models/loaded_model.go` - LoadedModel struct
+- `web/admin.html` - UI reorganization, model list redesign
+- `web/dashboard.html` - Available models section
+- `web/js/dashboard.js` - loadModels(), renderModels()
+- `configs/dev.yaml` - gpu_layers, removed ollama section
+- `.air.toml` - PowerShell compatibility, PATH env for DLLs
+
+**Acceptance Criteria:**
+- ✅ Ollama ПОЛНОСТЬЮ удален (backend + frontend)
+- ✅ Model aliasing работает (короткие имена)
+- ✅ Models auto-load при рестарте
+- ✅ `/v1/models` показывает только loaded models
+- ✅ Conversation logging в отдельный файл
+- ✅ GPU offloading настраивается через config
+- ✅ UI endpoints не спамят логи
+- ✅ Admin panel чистый (только yzma + HF)
+- ✅ User dashboard показывает available models
+- 🚧 Agent mode (частично реализовано)
 
 ---
 

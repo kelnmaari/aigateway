@@ -3,6 +3,7 @@ package ratelimit
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,6 +13,12 @@ import (
 	"aigateway/internal/config"
 	"aigateway/internal/models"
 )
+
+// RedisRateLimitService interface for Redis rate limiting (v3.0.6+)
+type RedisRateLimitService interface {
+	CheckLimit(ctx context.Context, key string, limit int64, window time.Duration) (allowed bool, remaining int64, resetAt time.Time, err error)
+	Reset(ctx context.Context, key string) error
+}
 
 // Limiter управляет rate limiting для API ключей
 type Limiter struct {
@@ -26,6 +33,9 @@ type Limiter struct {
 	// Cleanup ticker
 	cleanupTicker *time.Ticker
 	stopCleanup   chan struct{}
+	
+	// Redis для distributed rate limiting (v3.0.6+)
+	redisService RedisRateLimitService
 }
 
 // KeyLimiter содержит rate limiters для одного API ключа
@@ -72,6 +82,14 @@ type RateLimitResult struct {
 	ResetTime  time.Time     `json:"reset_time,omitempty"`
 }
 
+// SetRedisService sets Redis service for distributed rate limiting (v3.0.6+)
+func (l *Limiter) SetRedisService(redisService RedisRateLimitService) {
+	l.redisService = redisService
+	if redisService != nil {
+		l.logger.Info("✅ Redis rate limiting enabled (distributed mode)")
+	}
+}
+
 // NewLimiter создает новый rate limiter
 func NewLimiter(cfg *config.Config, logger *logrus.Logger) *Limiter {
 	limiter := &Limiter{
@@ -93,7 +111,50 @@ func (l *Limiter) CheckRateLimit(ctx context.Context, keyID string, keyInfo *mod
 	if !l.enabled {
 		return &RateLimitResult{Allowed: true}
 	}
+	
+	// Use Redis if available (v3.0.6+: distributed rate limiting)
+	if l.redisService != nil && keyInfo != nil {
+		// Check per-minute limit in Redis
+		redisKey := fmt.Sprintf("apikey:%s:requests:minute", keyID)
+		
+		// Get limit from config (default or keyInfo override)
+		limit := int64(l.config.Auth.RateLimiting.DefaultRequestsPerMinute)
+		window := time.Minute
+		
+		if limit > 0 {
+			allowed, remaining, resetAt, err := l.redisService.CheckLimit(ctx, redisKey, limit, window)
+			if err != nil {
+				l.logger.WithError(err).Warn("Redis rate limit check failed, falling back to in-memory")
+				// Fall through to in-memory implementation
+			} else {
+				l.logger.WithFields(logrus.Fields{
+					"key_id":    keyID,
+					"allowed":   allowed,
+					"remaining": remaining,
+					"redis":     true,
+					"limit":     limit,
+					"window":    "1m",
+				}).Debug("Rate limit checked (Redis)")
+				
+				if !allowed {
+					return &RateLimitResult{
+						Allowed:    false,
+						Reason:     fmt.Sprintf("Rate limit exceeded: %d requests per minute", limit),
+						RetryAfter: time.Until(resetAt),
+						Remaining:  remaining,
+						ResetTime:  resetAt,
+					}
+				}
+				
+				return &RateLimitResult{
+					Allowed:   true,
+					Remaining: remaining,
+				}
+			}
+		}
+	}
 
+	// Fallback to in-memory rate limiting
 	// Получаем или создаем limiter для ключа
 	keyLimiter := l.getOrCreateKeyLimiter(keyID, keyInfo)
 

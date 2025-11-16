@@ -13,14 +13,26 @@ import (
 	"aigateway/internal/storage"
 )
 
+// APIKeyInvalidator interface for cache invalidation (v3.0.6+)
+type APIKeyInvalidator interface {
+	InvalidateAPIKey(ctx context.Context, keyID string) error
+}
+
 // Manager управляет API ключами
 type Manager struct {
-	config  *config.Config
-	logger  *logrus.Logger
-	storage storage.APIKeyStorage
+	config      *config.Config
+	logger      *logrus.Logger
+	storage     storage.APIKeyStorage
+	invalidator APIKeyInvalidator  // v3.0.6+: Redis cache invalidation
 
 	// Статистика
 	stats ManagerStats
+}
+
+// SetCacheInvalidator sets the cache invalidator for Redis (v3.0.6+)
+func (m *Manager) SetCacheInvalidator(invalidator APIKeyInvalidator) {
+	m.invalidator = invalidator
+	m.logger.Info("✅ API Key cache invalidation enabled")
 }
 
 // ManagerStats статистика API Key Manager
@@ -269,6 +281,13 @@ func (m *Manager) UpdateAPIKey(ctx context.Context, id string, req models.Update
 		return nil, fmt.Errorf("failed to update API key: %w", err)
 	}
 
+	// Invalidate cache (v3.0.6+)
+	if m.invalidator != nil {
+		if err := m.invalidator.InvalidateAPIKey(ctx, id); err != nil {
+			m.logger.WithError(err).Warn("Failed to invalidate API key cache")
+		}
+	}
+
 	m.logger.WithField("key_id", id).Info("API key updated successfully")
 
 	publicKey := apiKey.ToPublic()
@@ -281,6 +300,13 @@ func (m *Manager) DeleteAPIKey(ctx context.Context, id string) error {
 
 	if err := m.storage.DeleteAPIKey(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete API key: %w", err)
+	}
+
+	// Invalidate cache (v3.0.6+)
+	if m.invalidator != nil {
+		if err := m.invalidator.InvalidateAPIKey(ctx, id); err != nil {
+			m.logger.WithError(err).Warn("Failed to invalidate API key cache")
+		}
 	}
 
 	m.stats.TotalKeys--
@@ -301,6 +327,13 @@ func (m *Manager) RevokeAPIKey(ctx context.Context, id string, reason string) er
 		return fmt.Errorf("failed to revoke API key: %w", err)
 	}
 
+	// Invalidate cache (v3.0.6+)
+	if m.invalidator != nil {
+		if err := m.invalidator.InvalidateAPIKey(ctx, id); err != nil {
+			m.logger.WithError(err).Warn("Failed to invalidate API key cache")
+		}
+	}
+
 	m.stats.ActiveKeys--
 
 	return nil
@@ -312,6 +345,13 @@ func (m *Manager) EnableAPIKey(ctx context.Context, id string) error {
 
 	if err := m.storage.EnableAPIKey(ctx, id); err != nil {
 		return fmt.Errorf("failed to enable API key: %w", err)
+	}
+
+	// Invalidate cache (v3.0.6+)
+	if m.invalidator != nil {
+		if err := m.invalidator.InvalidateAPIKey(ctx, id); err != nil {
+			m.logger.WithError(err).Warn("Failed to invalidate API key cache")
+		}
 	}
 
 	m.stats.ActiveKeys++

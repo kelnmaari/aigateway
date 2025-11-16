@@ -1,5 +1,5 @@
 // Package huggingface provides model downloading with resume support
-// Version: v3.0.0 - HF-02: Model Downloader
+// Version: v3.0.8 - Added retry mechanism (avast/retry-go)
 package huggingface
 
 import (
@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	retry "github.com/avast/retry-go/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,7 +23,7 @@ import (
 type DownloadStatus string
 
 const (
-	DownloadStatusPending    DownloadStatus = "pending"
+	DownloadStatusPending     DownloadStatus = "pending"
 	DownloadStatusDownloading DownloadStatus = "downloading"
 	DownloadStatusCompleted   DownloadStatus = "completed"
 	DownloadStatusFailed      DownloadStatus = "failed"
@@ -32,23 +33,23 @@ const (
 
 // Download represents a model file download
 type Download struct {
-	ID              string         `json:"id"`
-	ModelID         string         `json:"model_id"`
-	Filename        string         `json:"filename"`
-	URL             string         `json:"url"`
-	DestPath        string         `json:"dest_path"`
-	TotalSize       int64          `json:"total_size"`
-	DownloadedSize  int64          `json:"downloaded_size"`
-	Status          DownloadStatus `json:"status"`
-	Error           string         `json:"error,omitempty"`
-	Progress        float64        `json:"progress"`         // 0.0 to 100.0
-	Speed           int64          `json:"speed"`            // bytes per second
-	ETA             time.Duration  `json:"eta"`              // estimated time remaining
-	StartedAt       *time.Time     `json:"started_at,omitempty"`
-	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
-	SHA256          string         `json:"sha256,omitempty"` // Expected SHA256
-	VerifiedSHA256  string         `json:"verified_sha256,omitempty"`
-	
+	ID             string         `json:"id"`
+	ModelID        string         `json:"model_id"`
+	Filename       string         `json:"filename"`
+	URL            string         `json:"url"`
+	DestPath       string         `json:"dest_path"`
+	TotalSize      int64          `json:"total_size"`
+	DownloadedSize int64          `json:"downloaded_size"`
+	Status         DownloadStatus `json:"status"`
+	Error          string         `json:"error,omitempty"`
+	Progress       float64        `json:"progress"` // 0.0 to 100.0
+	Speed          int64          `json:"speed"`    // bytes per second
+	ETA            time.Duration  `json:"eta"`      // estimated time remaining
+	StartedAt      *time.Time     `json:"started_at,omitempty"`
+	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
+	SHA256         string         `json:"sha256,omitempty"` // Expected SHA256
+	VerifiedSHA256 string         `json:"verified_sha256,omitempty"`
+
 	// Internal
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -59,20 +60,20 @@ type Download struct {
 
 // Downloader manages model downloads
 type Downloader struct {
-	client            *Client
-	downloadsDir      string
-	maxConcurrent     int
-	autoResume        bool
-	logger            *logrus.Logger
-	
-	downloads         map[string]*Download
-	downloadQueue     chan *Download
-	activeDownloads   int
-	mu                sync.RWMutex
-	
-	ctx               context.Context
-	cancel            context.CancelFunc
-	wg                sync.WaitGroup
+	client        *Client
+	downloadsDir  string
+	maxConcurrent int
+	autoResume    bool
+	logger        *logrus.Logger
+
+	downloads       map[string]*Download
+	downloadQueue   chan *Download
+	activeDownloads int
+	mu              sync.RWMutex
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // NewDownloader creates a new model downloader
@@ -80,33 +81,33 @@ func NewDownloader(client *Client, downloadsDir string, maxConcurrent int, autoR
 	if err := os.MkdirAll(downloadsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create downloads directory: %w", err)
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	d := &Downloader{
-		client:          client,
-		downloadsDir:    downloadsDir,
-		maxConcurrent:   maxConcurrent,
-		autoResume:      autoResume,
-		logger:          logger,
-		downloads:       make(map[string]*Download),
-		downloadQueue:   make(chan *Download, 100),
-		ctx:             ctx,
-		cancel:          cancel,
+		client:        client,
+		downloadsDir:  downloadsDir,
+		maxConcurrent: maxConcurrent,
+		autoResume:    autoResume,
+		logger:        logger,
+		downloads:     make(map[string]*Download),
+		downloadQueue: make(chan *Download, 100),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
-	
+
 	// Start download workers
 	for i := 0; i < maxConcurrent; i++ {
 		d.wg.Add(1)
 		go d.downloadWorker(i)
 	}
-	
+
 	logger.WithFields(logrus.Fields{
-		"downloads_dir":   downloadsDir,
-		"max_concurrent":  maxConcurrent,
-		"auto_resume":     autoResume,
+		"downloads_dir":  downloadsDir,
+		"max_concurrent": maxConcurrent,
+		"auto_resume":    autoResume,
 	}).Info("Download manager initialized")
-	
+
 	return d, nil
 }
 
@@ -114,29 +115,29 @@ func NewDownloader(client *Client, downloadsDir string, maxConcurrent int, autoR
 func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sha256 string) (*Download, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	// Generate download ID
 	downloadID := generateDownloadID(modelID, filename)
-	
+
 	// Check if already downloading
 	if existing, exists := d.downloads[downloadID]; exists {
 		if existing.Status == DownloadStatusDownloading || existing.Status == DownloadStatusPending {
 			return existing, nil
 		}
 	}
-	
+
 	// Prepare destination path
 	destPath := filepath.Join(d.downloadsDir, modelID, filename)
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
-	
+
 	// Check for partial download
 	var downloadedSize int64
 	partPath := destPath + ".part"
 	if info, err := os.Stat(partPath); err == nil {
 		downloadedSize = info.Size()
-		
+
 		// Check if already fully downloaded
 		if downloadedSize >= totalSize {
 			d.logger.WithFields(logrus.Fields{
@@ -144,12 +145,12 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 				"downloaded_size": downloadedSize,
 				"total_size":      totalSize,
 			}).Info("File already fully downloaded, finalizing...")
-			
+
 			// Rename .part to final file
 			if err := os.Rename(partPath, destPath); err != nil {
 				return nil, fmt.Errorf("failed to finalize download: %w", err)
 			}
-			
+
 			// Return completed download
 			now := time.Now()
 			return &Download{
@@ -166,36 +167,36 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 				Mu:             sync.RWMutex{},
 			}, nil
 		}
-		
+
 		d.logger.WithFields(logrus.Fields{
 			"download_id":     downloadID,
 			"downloaded_size": downloadedSize,
 			"total_size":      totalSize,
 		}).Info("Resuming partial download")
 	}
-	
+
 	// Create download context
 	ctx, cancel := context.WithCancel(d.ctx)
-		
-		download := &Download{
-			ID:             downloadID,
-			ModelID:        modelID,
-			Filename:       filename,
-			URL:            d.client.GetFileURL(modelID, filename),
-			DestPath:       destPath,
-			TotalSize:      totalSize,
-			DownloadedSize: downloadedSize,
-			Status:         DownloadStatusPending,
-			SHA256:         sha256,
-			ctx:            ctx,
-			cancel:         cancel,
-			lastUpdate:     time.Now(),
-			lastSize:       downloadedSize,
-			Mu:             sync.RWMutex{},
-		}
-	
+
+	download := &Download{
+		ID:             downloadID,
+		ModelID:        modelID,
+		Filename:       filename,
+		URL:            d.client.GetFileURL(modelID, filename),
+		DestPath:       destPath,
+		TotalSize:      totalSize,
+		DownloadedSize: downloadedSize,
+		Status:         DownloadStatusPending,
+		SHA256:         sha256,
+		ctx:            ctx,
+		cancel:         cancel,
+		lastUpdate:     time.Now(),
+		lastSize:       downloadedSize,
+		Mu:             sync.RWMutex{},
+	}
+
 	d.downloads[downloadID] = download
-	
+
 	// Add to queue
 	select {
 	case d.downloadQueue <- download:
@@ -203,43 +204,43 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 	default:
 		return nil, fmt.Errorf("download queue is full")
 	}
-	
+
 	return download, nil
 }
 
 // downloadWorker processes downloads from queue
 func (d *Downloader) downloadWorker(workerID int) {
 	defer d.wg.Done()
-	
+
 	logger := d.logger.WithField("worker_id", workerID)
 	logger.Debug("Download worker started")
-	
+
 	for {
 		select {
 		case <-d.ctx.Done():
 			logger.Debug("Download worker stopping")
 			return
-			
+
 		case download := <-d.downloadQueue:
 			d.mu.Lock()
 			d.activeDownloads++
 			d.mu.Unlock()
-			
+
 			logger.WithFields(logrus.Fields{
 				"download_id": download.ID,
 				"model_id":    download.ModelID,
 				"filename":    download.Filename,
 			}).Info("Starting download")
-			
+
 			if err := d.performDownload(download); err != nil {
 				download.Mu.Lock()
 				download.Status = DownloadStatusFailed
 				download.Error = err.Error()
 				download.Mu.Unlock()
-				
+
 				logger.WithError(err).Error("Download failed")
 			}
-			
+
 			d.mu.Lock()
 			d.activeDownloads--
 			d.mu.Unlock()
@@ -254,7 +255,7 @@ func (d *Downloader) performDownload(download *Download) error {
 	now := time.Now()
 	download.StartedAt = &now
 	download.Mu.Unlock()
-	
+
 	// Open partial file
 	partPath := download.DestPath + ".part"
 	file, err := os.OpenFile(partPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -262,14 +263,14 @@ func (d *Downloader) performDownload(download *Download) error {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 	// Note: file will be closed manually before rename (not using defer)
-	
+
 	// Create HTTP request with Range header for resume
 	req, err := http.NewRequestWithContext(download.ctx, "GET", download.URL, nil)
 	if err != nil {
 		file.Close()
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	if download.DownloadedSize > 0 {
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", download.DownloadedSize))
 		d.logger.WithFields(logrus.Fields{
@@ -278,35 +279,35 @@ func (d *Downloader) performDownload(download *Download) error {
 			"total_size":      download.TotalSize,
 		}).Debug("Resuming download from byte position")
 	}
-	
+
 	// Execute request using download client (no timeout - context controls it)
 	d.logger.WithFields(logrus.Fields{
 		"download_id": download.ID,
 		"url":         download.URL,
 		"timeout":     "none (context-controlled)",
 	}).Debug("Starting HTTP request for file download")
-	
+
 	resp, err := d.client.downloadClient.Do(req)
 	if err != nil {
 		file.Close()
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
 	// Note: resp.Body will be closed manually before rename (not using defer)
-	
+
 	// Check response
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		file.Close()
 		resp.Body.Close()
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	
+
 	// Download with progress tracking
 	buf := make([]byte, 32*1024) // 32KB buffer
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	hash := sha256.New()
-	
+
 	for {
 		select {
 		case <-download.ctx.Done():
@@ -314,10 +315,10 @@ func (d *Downloader) performDownload(download *Download) error {
 			file.Close()
 			resp.Body.Close()
 			return download.ctx.Err()
-			
+
 		case <-ticker.C:
 			d.updateProgress(download)
-			
+
 		default:
 			n, err := resp.Body.Read(buf)
 			if n > 0 {
@@ -327,71 +328,89 @@ func (d *Downloader) performDownload(download *Download) error {
 					resp.Body.Close()
 					return fmt.Errorf("failed to write to file: %w", writeErr)
 				}
-				
+
 				// Update hash
 				hash.Write(buf[:n])
-				
+
 				// Update progress
 				download.Mu.Lock()
 				download.DownloadedSize += int64(n)
 				download.Mu.Unlock()
 			}
-			
+
 			if err != nil {
 				if err == io.EOF {
 					// Download completed
 					d.updateProgress(download)
-					
+
 					// Verify SHA256 if provided
 					if download.SHA256 != "" {
 						computedHash := hex.EncodeToString(hash.Sum(nil))
 						download.Mu.Lock()
 						download.VerifiedSHA256 = computedHash
 						download.Mu.Unlock()
-						
+
 						if computedHash != download.SHA256 {
 							file.Close()
 							resp.Body.Close()
 							return fmt.Errorf("SHA256 mismatch: expected %s, got %s", download.SHA256, computedHash)
 						}
 					}
-					
+
 					// CRITICAL: Close file handles before rename (Windows requirement)
 					d.logger.WithFields(logrus.Fields{
 						"download_id": download.ID,
 						"part_path":   partPath,
 						"dest_path":   download.DestPath,
 					}).Info("🔒 Closing file handles before rename...")
-					
+
 					if err := file.Close(); err != nil {
 						d.logger.WithError(err).Warn("⚠️ Error closing file handle, continuing anyway")
 					} else {
 						d.logger.Debug("✅ File handle closed successfully")
 					}
-					
+
 					if err := resp.Body.Close(); err != nil {
 						d.logger.WithError(err).Warn("⚠️ Error closing response body, continuing anyway")
 					} else {
 						d.logger.Debug("✅ Response body closed successfully")
 					}
-					
+
 					// Windows-specific: Force garbage collection and wait for file handles to be released
 					d.logger.Info("🔄 Forcing GC and waiting for file handles to release...")
 					runtime.GC()
 					time.Sleep(1 * time.Second) // Increased from 100ms to 1 second
-					runtime.GC() // Second GC pass
-					
+					runtime.GC()                // Second GC pass
+
 					d.logger.WithFields(logrus.Fields{
 						"download_id": download.ID,
 						"max_retries": 10,
 					}).Info("🔄 Attempting file rename with retry mechanism...")
-					
-					// Retry rename with backoff (Windows file locking issue)
-					renameErr := d.retryRename(partPath, download.DestPath, 10) // Increased from 5 to 10 retries
+
+					// Retry rename with exponential backoff using retry-go (v3.0.8)
+					renameErr := retry.Do(
+						func() error {
+							return os.Rename(partPath, download.DestPath)
+						},
+						retry.Attempts(10),
+						retry.Delay(200*time.Millisecond),
+						retry.MaxDelay(5*time.Second),
+						retry.DelayType(retry.BackOffDelay),
+						retry.OnRetry(func(n uint, err error) {
+							// Force GC between retries (Windows file handle issue)
+							runtime.GC()
+							d.logger.WithFields(logrus.Fields{
+								"attempt": n + 1,
+								"error":   err.Error(),
+							}).Warn("⚠️ File rename failed, retrying after backoff")
+						}),
+						retry.LastErrorOnly(true),
+					)
+
 					if renameErr != nil {
 						return fmt.Errorf("failed to rename file after 10 retries: %w", renameErr)
 					}
-					
+
 					download.Mu.Lock()
 					download.Status = DownloadStatusCompleted
 					now := time.Now()
@@ -400,17 +419,17 @@ func (d *Downloader) performDownload(download *Download) error {
 					totalTime := now.Sub(*download.StartedAt)
 					avgSpeed := float64(download.TotalSize) / totalTime.Seconds()
 					download.Mu.Unlock()
-					
+
 					d.logger.WithFields(logrus.Fields{
-						"download_id":      download.ID,
-						"model_id":         download.ModelID,
-						"filename":         download.Filename,
-						"total_size":       download.TotalSize,
-						"total_time":       totalTime.String(),
-						"avg_speed_mb_s":   fmt.Sprintf("%.2f", avgSpeed/1024/1024),
-						"final_path":       download.DestPath,
+						"download_id":    download.ID,
+						"model_id":       download.ModelID,
+						"filename":       download.Filename,
+						"total_size":     download.TotalSize,
+						"total_time":     totalTime.String(),
+						"avg_speed_mb_s": fmt.Sprintf("%.2f", avgSpeed/1024/1024),
+						"final_path":     download.DestPath,
 					}).Info("✅ Download completed successfully")
-					
+
 					d.logger.WithFields(logrus.Fields{
 						"download_id": download.ID,
 						"model_id":    download.ModelID,
@@ -418,10 +437,10 @@ func (d *Downloader) performDownload(download *Download) error {
 						"size":        download.TotalSize,
 						"duration":    time.Since(*download.StartedAt),
 					}).Info("Download completed successfully")
-					
+
 					return nil
 				}
-				
+
 				// Cleanup on read error
 				file.Close()
 				resp.Body.Close()
@@ -435,26 +454,26 @@ func (d *Downloader) performDownload(download *Download) error {
 func (d *Downloader) updateProgress(download *Download) {
 	download.Mu.Lock()
 	defer download.Mu.Unlock()
-	
+
 	now := time.Now()
 	elapsed := now.Sub(download.lastUpdate).Seconds()
-	
+
 	if elapsed > 0 {
 		// Calculate speed (bytes per second)
 		bytesDownloaded := download.DownloadedSize - download.lastSize
 		download.Speed = int64(float64(bytesDownloaded) / elapsed)
-		
+
 		// Calculate progress percentage
 		if download.TotalSize > 0 {
 			download.Progress = float64(download.DownloadedSize) / float64(download.TotalSize) * 100.0
-			
+
 			// Calculate ETA
 			if download.Speed > 0 {
 				remainingBytes := download.TotalSize - download.DownloadedSize
 				download.ETA = time.Duration(float64(remainingBytes)/float64(download.Speed)) * time.Second
 			}
 		}
-		
+
 		download.lastUpdate = now
 		download.lastSize = download.DownloadedSize
 	}
@@ -464,7 +483,7 @@ func (d *Downloader) updateProgress(download *Download) {
 func (d *Downloader) GetDownload(downloadID string) (*Download, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	download, exists := d.downloads[downloadID]
 	return download, exists
 }
@@ -473,12 +492,12 @@ func (d *Downloader) GetDownload(downloadID string) (*Download, bool) {
 func (d *Downloader) ListDownloads() []*Download {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	downloads := make([]*Download, 0, len(d.downloads))
 	for _, download := range d.downloads {
 		downloads = append(downloads, download)
 	}
-	
+
 	return downloads
 }
 
@@ -486,21 +505,21 @@ func (d *Downloader) ListDownloads() []*Download {
 func (d *Downloader) PauseDownload(downloadID string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	download, exists := d.downloads[downloadID]
 	if !exists {
 		return fmt.Errorf("download not found: %s", downloadID)
 	}
-	
+
 	if download.Status != DownloadStatusDownloading {
 		return fmt.Errorf("download is not active")
 	}
-	
+
 	download.cancel()
 	download.Mu.Lock()
 	download.Status = DownloadStatusPaused
 	download.Mu.Unlock()
-	
+
 	return nil
 }
 
@@ -508,22 +527,22 @@ func (d *Downloader) PauseDownload(downloadID string) error {
 func (d *Downloader) CancelDownload(downloadID string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	download, exists := d.downloads[downloadID]
 	if !exists {
 		return fmt.Errorf("download not found: %s", downloadID)
 	}
-	
+
 	download.cancel()
 	download.Mu.Lock()
 	download.Status = DownloadStatusCancelled
 	download.Mu.Unlock()
-	
+
 	// Remove partial file
 	os.Remove(download.DestPath + ".part")
-	
+
 	delete(d.downloads, downloadID)
-	
+
 	return nil
 }
 
@@ -536,72 +555,8 @@ func (d *Downloader) Shutdown() {
 	d.logger.Info("Download manager stopped")
 }
 
-// retryRename attempts to rename a file with exponential backoff
-// This is critical for Windows where file handles may not be released immediately
-func (d *Downloader) retryRename(oldPath, newPath string, maxRetries int) error {
-	var lastErr error
-	
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		d.logger.WithFields(logrus.Fields{
-			"attempt":  attempt + 1,
-			"max":      maxRetries,
-			"old_path": oldPath,
-			"new_path": newPath,
-		}).Debug("🔄 Attempting file rename...")
-		
-		err := os.Rename(oldPath, newPath)
-		if err == nil {
-			if attempt > 0 {
-				d.logger.WithFields(logrus.Fields{
-					"old_path": oldPath,
-					"new_path": newPath,
-					"attempts": attempt + 1,
-				}).Info("✅ File rename succeeded after retries!")
-			} else {
-				d.logger.WithFields(logrus.Fields{
-					"old_path": oldPath,
-					"new_path": newPath,
-				}).Info("✅ File rename succeeded on first attempt")
-			}
-			return nil
-		}
-		
-		lastErr = err
-		
-		// Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms, ...
-		// Max wait time capped at 5 seconds
-		waitTime := time.Duration(200*(1<<uint(attempt))) * time.Millisecond
-		if waitTime > 5*time.Second {
-			waitTime = 5 * time.Second
-		}
-		
-		d.logger.WithFields(logrus.Fields{
-			"old_path":  oldPath,
-			"new_path":  newPath,
-			"attempt":   attempt + 1,
-			"max":       maxRetries,
-			"wait_ms":   waitTime.Milliseconds(),
-			"error":     err.Error(),
-		}).Warn("⚠️ File rename failed, retrying after delay")
-		
-		time.Sleep(waitTime)
-		runtime.GC() // Force GC between retries
-		d.logger.Debug("🔄 GC completed, attempting next retry...")
-	}
-	
-	d.logger.WithFields(logrus.Fields{
-		"old_path":    oldPath,
-		"new_path":    newPath,
-		"max_retries": maxRetries,
-		"final_error": lastErr.Error(),
-	}).Error("❌ All retry attempts failed for file rename")
-	
-	return fmt.Errorf("failed after %d attempts: %w", maxRetries, lastErr)
-}
-
 // generateDownloadID creates unique download identifier
 func generateDownloadID(modelID, filename string) string {
 	hash := sha256.Sum256([]byte(modelID + "/" + filename))
 	return hex.EncodeToString(hash[:8])
 }
-

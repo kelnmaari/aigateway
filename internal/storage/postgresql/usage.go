@@ -747,7 +747,7 @@ func (db *PostgreSQLDB) CountActiveAPIKeys(ctx context.Context) (int, error) {
 	}
 
 	var count int
-	query := `SELECT COUNT(*) FROM api_keys WHERE status = 'active' AND (expires_at IS NULL OR expires_at > datetime('now'))`
+	query := `SELECT COUNT(*) FROM api_keys WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
 	err := db.db.QueryRowContext(ctx, query).Scan(&count)
 	if err != nil {

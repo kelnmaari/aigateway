@@ -3,22 +3,42 @@ package providers
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"aigateway/internal/models"
+	
+	"github.com/sony/gobreaker/v2"
 )
 
 // VLLMProvider реализует Provider interface для vLLM
 // Note: Полная реализация будет в VLLM-01 задаче
+// v3.0.8: Added circuit breaker для future resilience (sony/gobreaker)
 type VLLMProvider struct {
-	name    string
-	baseURL string
+	name           string
+	baseURL        string
+	client         *http.Client
+	circuitBreaker *gobreaker.CircuitBreaker[any]
 }
 
 // NewVLLMProvider создает новый vLLM provider
 func NewVLLMProvider(name, baseURL string) *VLLMProvider {
+	cbSettings := gobreaker.Settings{
+		Name:        "vLLM-" + name,
+		MaxRequests: 2,
+		Timeout:     1 * time.Minute,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			return counts.ConsecutiveFailures >= 3
+		},
+	}
+	
 	return &VLLMProvider{
 		name:    name,
 		baseURL: baseURL,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		circuitBreaker: gobreaker.NewCircuitBreaker[any](cbSettings),
 	}
 }
 
@@ -35,7 +55,12 @@ func (p *VLLMProvider) GetType() models.ModelProviderType {
 // HealthCheck проверяет доступность vLLM server
 // TODO: Implement in VLLM-01
 func (p *VLLMProvider) HealthCheck(ctx context.Context) error {
-	return fmt.Errorf("vLLM health check not implemented yet (VLLM-01)")
+	// v3.0.8: Circuit breaker ready for future implementation
+	_, err := p.circuitBreaker.Execute(func() (any, error) {
+		// TODO: Implement actual health check
+		return nil, fmt.Errorf("vLLM health check not implemented yet (VLLM-01)")
+	})
+	return err
 }
 
 // ListModels возвращает список моделей из vLLM

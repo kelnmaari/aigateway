@@ -32,6 +32,7 @@ import (
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
+	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
 	internalLogger "aigateway/internal/logger"
 	"aigateway/internal/metrics"
@@ -45,6 +46,7 @@ import (
 	"aigateway/internal/services/quota"
 	ragservice "aigateway/internal/services/rag"
 	"aigateway/internal/services/rbac"
+	"aigateway/internal/settings"
 	"aigateway/internal/storage"
 	"aigateway/internal/web/templates"
 	"aigateway/internal/websocket"
@@ -86,7 +88,7 @@ type Router struct {
 	jwtManager       *jwt.Manager                  // JWT manager для токенов
 	authService      *authService.AuthService      // Auth service
 	bootstrapService *authService.BootstrapService // Bootstrap service для первичной настройки
-	
+
 	// Redis (v3.0.6+: Distributed caching & session management)
 	redisManager *redis.Manager // Redis manager для всех сервисов
 
@@ -98,8 +100,13 @@ type Router struct {
 	tenantHandler             *handlers.TenantHandler             // Tenant management
 	conversationHandler       *handlers.ConversationHandler       // Conversation management (Version 1.3.0)
 	conversationExportHandler *handlers.ConversationExportHandler // Conversation export/import (Version 1.12.3+)
-	adminUserHandler          *handlers.AdminUserHandler          // Admin User Management (Version 1.3.0)
-	usageHandler              *handlers.UsageHandler              // Usage Statistics (Version 1.3.0)
+
+	// Health probes (v3.0.8+: Kubernetes support)
+	healthChecker    *health.HealthChecker
+	livenessProbe    *health.LivenessProbe
+	readinessProbe   *health.ReadinessProbe
+	adminUserHandler *handlers.AdminUserHandler // Admin User Management (Version 1.3.0)
+	usageHandler     *handlers.UsageHandler     // Usage Statistics (Version 1.3.0)
 	// Removed: modelsHandler, chatHandler, embeddingsHandler, completionsHandler (Ollama-based, v3.0.5+)
 	adminHandler          *handlers.AdminHandler
 	adminFilesHandler     *handlers.AdminFilesHandler     // Admin files management (v1.10.0)
@@ -178,6 +185,7 @@ type Router struct {
 	usersUIHandler     *handlersUI.UsersUIHandler     // Users UI (HTMX-03)
 	rbacUIHandler      *handlersUI.RBACUIHandler      // RBAC UI (HTMX-03)
 	dashboardUIHandler *handlersUI.DashboardUIHandler // Dashboard UI (HTMX-03)
+	settingsUIHandler  *handlersUI.SettingsHandler    // Settings UI (v3.0.9: Config in DB)
 
 	// Hugging Face Integration (Version 3.0.0+: HF-01)
 	hfClient     *huggingface.Client
@@ -1365,6 +1373,14 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/rbac/users/:id/permissions", r.rbacHandler.GetUserPermissions)
 	}
 
+	// Settings endpoints (v3.0.9: Configuration in DB)
+	if r.settingsUIHandler != nil {
+		r.logger.Info("Admin routes: Registering Settings Management endpoints")
+		admin.GET("/settings", r.settingsUIHandler.GetSettings)
+		admin.GET("/settings/:category", r.settingsUIHandler.GetSettingsByCategory)
+		admin.PUT("/settings/:id", r.settingsUIHandler.UpdateSetting) // Phase 3: Editing (v3.0.9)
+	}
+
 	// Quota endpoints (v1.11.7)
 	if r.quotaHandler != nil {
 		r.logger.Info("Admin routes: Registering Quota Management endpoints")
@@ -1495,7 +1511,7 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 
 	// Создаем Rate Limiter
 	rateLimiter := ratelimit.NewLimiter(cfg, logger)
-	
+
 	// Connect Redis to rate limiter if available (v3.0.6+)
 	if r.redisManager != nil && r.redisManager.RateLimit != nil {
 		rateLimiter.SetRedisService(r.redisManager.RateLimit)
@@ -1517,18 +1533,18 @@ func (r *Router) setupAPIKeyManagement(cfg *config.Config, logger *logrus.Logger
 			apiKeyWorker = redis.NewAPIKeyWorker(
 				r.redisManager,
 				logger,
-				dbProvider,      // Database adapter for cache-through
-				15*time.Minute,  // Cache TTL: 15 минут
+				dbProvider,     // Database adapter for cache-through
+				15*time.Minute, // Cache TTL: 15 минут
 			)
 			r.redisManager.BackgroundSync.APIKeyWorker = apiKeyWorker
 		}
-		
+
 		// Connect worker to authenticator for cache-through
 		authenticator.SetAPIKeyWorker(apiKeyWorker)
-		
+
 		// Connect worker to key manager for cache invalidation
 		keyManager.SetCacheInvalidator(apiKeyWorker)
-		
+
 		logger.Info("✅ API Key cache-through + invalidation connected (Redis)")
 	} else {
 		logger.Debug("API Key cache-through disabled (Redis not available)")
@@ -1551,33 +1567,33 @@ func (r *Router) setupRedis(cfg *config.Config, logger *logrus.Logger) error {
 		logger.Info("Redis is disabled (using in-memory fallback)")
 		return nil
 	}
-	
+
 	logger.WithFields(logrus.Fields{
-		"url": cfg.Auth.RateLimiting.Redis.URL,
+		"url":        cfg.Auth.RateLimiting.Redis.URL,
 		"key_prefix": cfg.Auth.RateLimiting.Redis.KeyPrefix,
 	}).Info("Initializing Redis...")
-	
+
 	// Create Redis manager
 	redisManager, err := redis.NewManager(redis.ManagerConfig{
-		URL:       cfg.Auth.RateLimiting.Redis.URL,
-		KeyPrefix: cfg.Auth.RateLimiting.Redis.KeyPrefix,
-		DB:        0,  // Default database
+		URL:        cfg.Auth.RateLimiting.Redis.URL,
+		KeyPrefix:  cfg.Auth.RateLimiting.Redis.KeyPrefix,
+		DB:         0, // Default database
 		MaxRetries: 3,
-		PoolSize:  10,
-		Enabled:   true,
+		PoolSize:   10,
+		Enabled:    true,
 	}, logger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Redis: %w", err)
 	}
-	
+
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := redisManager.Ping(ctx); err != nil {
 		return fmt.Errorf("failed to connect to Redis: %w", err)
 	}
-	
+
 	// Get initial stats
 	stats, err := redisManager.GetStats(ctx)
 	if err == nil {
@@ -1585,9 +1601,16 @@ func (r *Router) setupRedis(cfg *config.Config, logger *logrus.Logger) error {
 			"db_size": stats["db_size"],
 		}).Info("Redis connected successfully")
 	}
-	
+
+	// Invalidate model list cache on startup (v3.0.7+: ensure fresh data)
+	if err := redisManager.Cache.Delete(ctx, "models:list:yzma"); err != nil {
+		logger.WithError(err).Warn("Failed to invalidate model list cache on startup")
+	} else {
+		logger.Info("✅ Model list cache invalidated on startup")
+	}
+
 	r.redisManager = redisManager
-	
+
 	logger.Info("✅ Redis initialized successfully")
 	return nil
 }
@@ -1721,13 +1744,13 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 	if r.authService != nil && r.db != nil {
 		r.authHandler = handlers.NewAuthHandler(r.authService, logger, r.auditLogger)
-		
+
 		// Connect Redis to auth handler for JWT session storage (v3.0.6+)
 		if r.redisManager != nil {
 			r.authHandler.SetRedisManager(r.redisManager)
 			logger.Debug("Redis manager connected to auth handler")
 		}
-		
+
 		r.deviceHandler = handlers.NewDeviceHandler(r.db, logger) // Version 2.4.0+: Device management
 		r.userHandler = handlers.NewUserHandler(r.db, logger, r.auditLogger)
 		r.tenantHandler = handlers.NewTenantHandler(r.db, logger, r.auditLogger)
@@ -1981,6 +2004,14 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			r.usersUIHandler = handlersUI.NewUsersUIHandler(r.db, r.templateRenderer, logger) // HTMX-03: Users UI
 			r.rbacUIHandler = handlersUI.NewRBACUIHandler(r.db, r.templateRenderer, logger)   // HTMX-03: RBAC UI
 			r.dashboardUIHandler = handlersUI.NewDashboardUIHandler(r.db, logger)             // HTMX-03: Dashboard UI
+
+			// Settings UI (v3.0.9: Configuration in DB)
+			// Temporary: Use fallback storage (empty settings until Phase 2)
+			// TODO: Implement proper DB adapter in Phase 2
+			settingsStorage := settings.NewSQLStorageAdapter(r.db, logger)
+			settingsManager := settings.NewManager(settingsStorage, logger)
+			r.settingsUIHandler = handlersUI.NewSettingsHandler(settingsManager, logger)
+
 			logger.Info("✅ HTMX UI handlers initialized successfully")
 		}
 	}
@@ -2137,12 +2168,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					yzmaLogger.WithError(err).Warn("Failed to auto-load persisted models")
 				}
 			}
-			
+
 			// Start model list background worker (v3.0.6+: background sync)
 			if r.redisManager != nil && r.redisManager.BackgroundSync != nil {
 				// Create model list provider
 				modelProvider := yzma.NewModelListProvider(yzmaClient, yzmaLogger)
-				
+
 				// Start worker (updates every 30s)
 				modelWorker := r.redisManager.BackgroundSync.ModelListWorker
 				if modelWorker == nil {
@@ -2156,13 +2187,13 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					modelWorker.Start()
 					r.redisManager.BackgroundSync.ModelListWorker = modelWorker
 				}
-				
+
 				// Connect worker to client for cache invalidation
 				yzmaClient.SetModelWorker(modelWorker)
-				
+
 				// Connect worker to handler for cache reads
 				r.yzmaHandler.SetModelWorker(modelWorker)
-				
+
 				yzmaLogger.Info("🤖 Model list background worker started (30s interval)")
 			} else {
 				yzmaLogger.Debug("Model list background worker disabled (Redis not available)")
@@ -2333,4 +2364,115 @@ func mapAgentEventToWebSocketType(agentEventType models.AgentEventType) websocke
 		// Unknown event type - не транслируем
 		return ""
 	}
+}
+
+// setupK8sProbes настраивает Kubernetes liveness/readiness probes (v3.0.8+)
+func (r *Router) setupK8sProbes() {
+	// Initialize health checker
+	r.healthChecker = health.NewHealthChecker(r.logger)
+
+	// Register probes for critical dependencies
+
+	// Database probe
+	if r.db != nil {
+		r.healthChecker.RegisterProbe("database", func(ctx context.Context) error {
+			// Check DB availability with simple query
+			_, err := r.db.GetUser(ctx, "health-check-probe")
+			// Ignore "not found" error - DB is responsive
+			if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "no rows") {
+				return err
+			}
+			return nil
+		})
+	}
+
+	// Redis probe
+	if r.redisManager != nil {
+		r.healthChecker.RegisterProbe("redis", func(ctx context.Context) error {
+			// Simple ping via cache set/get
+			testKey := "health:check"
+			err := r.redisManager.Cache.SetJSON(ctx, testKey, "ok", 1*time.Second)
+			if err != nil {
+				return err
+			}
+			var result string
+			return r.redisManager.Cache.GetJSON(ctx, testKey, &result)
+		})
+	}
+
+	// Yzma client probe (local inference)
+	if r.yzmaClient != nil {
+		r.healthChecker.RegisterProbe("yzma", func(ctx context.Context) error {
+			loadedModels := r.yzmaClient.ListLoadedModels()
+			if len(loadedModels) == 0 {
+				return fmt.Errorf("no models loaded")
+			}
+			return nil
+		})
+	}
+
+	// Initialize probes
+	r.livenessProbe = health.NewLivenessProbe()
+	r.readinessProbe = health.NewReadinessProbe(r.healthChecker)
+
+	// K8s liveness probe: /healthz/live
+	r.engine.GET("/healthz/live", func(c *gin.Context) {
+		if err := r.livenessProbe.Check(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unhealthy",
+				"error":  err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+			"uptime": r.livenessProbe.GetUptime().String(),
+		})
+	})
+
+	// K8s readiness probe: /healthz/ready
+	r.engine.GET("/healthz/ready", func(c *gin.Context) {
+		if err := r.readinessProbe.Check(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "not_ready",
+				"error":  err.Error(),
+			})
+			return
+		}
+
+		results := r.healthChecker.CheckAll(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ready",
+			"probes":  results,
+			"version": r.version,
+		})
+	})
+
+	// Detailed health status: /healthz/status
+	r.engine.GET("/healthz/status", func(c *gin.Context) {
+		results := r.healthChecker.CheckAll(c.Request.Context())
+
+		allHealthy := true
+		for _, result := range results {
+			if result.Status != "healthy" {
+				allHealthy = false
+				break
+			}
+		}
+
+		statusCode := http.StatusOK
+		if !allHealthy {
+			statusCode = http.StatusServiceUnavailable
+		}
+
+		c.JSON(statusCode, gin.H{
+			"status":      gin.H{"overall": allHealthy, "uptime": r.livenessProbe.GetUptime().String()},
+			"probes":      results,
+			"check_count": r.healthChecker.GetCheckCount(),
+			"version":     r.version,
+		})
+	})
+
+	r.logger.Info("✅ Kubernetes health probes configured: /healthz/live, /healthz/ready, /healthz/status")
 }

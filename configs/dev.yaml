@@ -8,6 +8,21 @@ server:
   write_timeout: "30m"    # 15 минут - для streaming с большими моделями
   idle_timeout: "120s"    # 2 минуты
   max_header_bytes: 1048576  # 1MB
+  
+  # TLS Configuration (v3.0.8+: Auto-generated self-signed certificates)
+  tls:
+    enabled: true  # Enable HTTPS on port 8485 (HTTP + 400)
+    # Certificate generation settings (если не указаны cert_file/key_file)
+    common_name: "localhost"  # CN для сертификата
+    hosts:  # DNS names и IP адреса для сертификата
+      - "localhost"
+      - "127.0.0.1"
+      - "::1"
+      - "aigateway.local"
+      - "192.168.1.101"  # Ваш локальный IP для доступа из сети
+    valid_days: 365  # Срок действия сертификата (1 год)
+    # cert_file: "server.crt"  # Optional: path to existing certificate
+    # key_file: "server.key"   # Optional: path to existing key
 
 # Inference Configuration (v3.0.5+: Unified Backend)
 inference:

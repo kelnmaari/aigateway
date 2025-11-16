@@ -61,10 +61,14 @@ type ServerConfig struct {
 
 	// TLS настройки
 	TLS struct {
-		Enabled  bool   `mapstructure:"enabled"`
-		CertFile string `mapstructure:"cert_file"`
-		KeyFile  string `mapstructure:"key_file"`
-		AutoCert bool   `mapstructure:"auto_cert"`
+		Enabled     bool     `mapstructure:"enabled"`
+		CertFile    string   `mapstructure:"cert_file"`
+		KeyFile     string   `mapstructure:"key_file"`
+		AutoCert    bool     `mapstructure:"auto_cert"`
+		// Certificate generation settings (v3.0.8+)
+		CommonName  string   `mapstructure:"common_name"`   // CN for certificate (default: "localhost")
+		Hosts       []string `mapstructure:"hosts"`         // DNS names and IPs (default: ["localhost", "127.0.0.1", "::1"])
+		ValidDays   int      `mapstructure:"valid_days"`    // Certificate validity in days (default: 365)
 	} `mapstructure:"tls"`
 
 	// CORS настройки

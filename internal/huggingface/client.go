@@ -1,5 +1,5 @@
 // Package huggingface provides integration with Hugging Face Hub API
-// Version: v3.0.0 - Direct model browsing and downloading
+// Version: v3.0.8 - Added circuit breaker for resilience (sony/gobreaker)
 package huggingface
 
 import (
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/sony/gobreaker/v2"
 )
 
 const (
@@ -26,6 +27,7 @@ type Client struct {
 	apiToken         string // Optional: для private models
 	httpClient       *http.Client // For API requests (with timeout)
 	downloadClient   *http.Client // For file downloads (without timeout)
+	circuitBreaker   *gobreaker.CircuitBreaker[any] // v3.0.8: Circuit breaker for API resilience
 	logger           *logrus.Logger
 }
 
@@ -34,7 +36,27 @@ func NewClient(apiToken string, logger *logrus.Logger) *Client {
 	logger.WithFields(logrus.Fields{
 		"api_timeout":      "30s",
 		"download_timeout": "none (context-controlled)",
-	}).Debug("Hugging Face client initialized with separate HTTP clients")
+		"circuit_breaker":  "5 failures, 2min timeout (sony/gobreaker)",
+	}).Debug("Hugging Face client initialized with separate HTTP clients and circuit breaker")
+	
+	// Circuit breaker settings (v3.0.8)
+	cbSettings := gobreaker.Settings{
+		Name:        "HuggingFaceAPI",
+		MaxRequests: 3,  // Half-open: allow 3 requests to test
+		Interval:    0,  // No automatic state reset (manual timeout only)
+		Timeout:     2 * time.Minute, // Open -> Half-open after 2 minutes
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			// Open circuit after 5 consecutive failures
+			return counts.ConsecutiveFailures >= 5
+		},
+		OnStateChange: func(name string, from, to gobreaker.State) {
+			logger.WithFields(logrus.Fields{
+				"circuit": name,
+				"from":    from.String(),
+				"to":      to.String(),
+			}).Warn("Circuit breaker state changed")
+		},
+	}
 	
 	return &Client{
 		baseURL:  DefaultAPIURL,
@@ -54,6 +76,8 @@ func NewClient(apiToken string, logger *logrus.Logger) *Client {
 				DisableCompression: true,
 			},
 		},
+		// Circuit breaker for API resilience (v3.0.8)
+		circuitBreaker: gobreaker.NewCircuitBreaker[any](cbSettings),
 		logger: logger,
 	}
 }
@@ -234,33 +258,43 @@ func (c *Client) SearchModels(ctx context.Context, filters ModelFilters) ([]Mode
 		"tags":   filters.Tags,
 	}).Debug("Searching Hugging Face models")
 	
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	
-	// Add authorization header if token is provided
-	if c.apiToken != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiToken))
-	}
-	
-	// Execute request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-	
-	// Parse response
 	var models []ModelInfo
-	if err := json.NewDecoder(resp.Body).Decode(&models); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	
+	// Execute request with circuit breaker (v3.0.8)
+	_, err := c.circuitBreaker.Execute(func() (any, error) {
+		// Create request
+		req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		
+		// Add authorization header if token is provided
+		if c.apiToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiToken))
+		}
+		
+		// Execute request
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("HuggingFace API error: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		}
+		
+		// Parse response
+		if err := json.NewDecoder(resp.Body).Decode(&models); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		
+		return nil, nil
+	})
+	
+	if err != nil {
+		return nil, err
 	}
 	
 	// Enrich models with computed fields
@@ -287,33 +321,43 @@ func (c *Client) GetModelInfo(ctx context.Context, modelID string) (*ModelInfo, 
 		"url":      reqURL,
 	}).Debug("Fetching model info with full file details")
 	
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	
-	// Add authorization header if token is provided
-	if c.apiToken != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiToken))
-	}
-	
-	// Execute request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-	
-	// Parse response
 	var model ModelInfo
-	if err := json.NewDecoder(resp.Body).Decode(&model); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	
+	// Execute request with circuit breaker (v3.0.8)
+	_, err := c.circuitBreaker.Execute(func() (any, error) {
+		// Create request
+		req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		
+		// Add authorization header if token is provided
+		if c.apiToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiToken))
+		}
+		
+		// Execute request
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("HuggingFace API error: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		}
+		
+		// Parse response
+		if err := json.NewDecoder(resp.Body).Decode(&model); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		
+		return nil, nil
+	})
+	
+	if err != nil {
+		return nil, err
 	}
 	
 	// Enrich model with computed fields

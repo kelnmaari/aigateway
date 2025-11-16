@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/iyashjayesh/monigo"
+	"github.com/sirupsen/logrus"
 
 	"aigateway/internal/api/router"
 	"aigateway/internal/auth/jwt"
@@ -22,12 +23,14 @@ import (
 	"aigateway/internal/logger"
 	"aigateway/internal/metrics"
 	"aigateway/internal/observability"
-	ragservice "aigateway/internal/services/rag"
-	ragworker "aigateway/internal/rag/worker"
 	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/rag/embeddings"
 	"aigateway/internal/rag/vector"
+	ragworker "aigateway/internal/rag/worker"
+	ragservice "aigateway/internal/services/rag"
+	"aigateway/internal/settings"
 	"aigateway/internal/storage"
+	"aigateway/internal/tls"
 	"aigateway/internal/version"
 )
 
@@ -42,6 +45,12 @@ func main() {
 	showMigrationVersion := flag.Bool("migration-version", false, "Show current migration version")
 	listMigrations := flag.Bool("migrations-list", false, "List all migrations with their status")
 	destroyDatabase := flag.Bool("destroy", false, "DESTROY database - drops ALL tables (requires confirmation)")
+
+	// Settings management flags (Phase 5: v3.0.9)
+	migrateConfig := flag.Bool("migrate-config", false, "Migrate settings from YAML config to database")
+	exportConfig := flag.String("export-config", "", "Export database settings to YAML file")
+	validateConfig := flag.Bool("validate-config", false, "Validate database settings against YAML schema")
+	categoryFilter := flag.String("category", "", "Filter by category (for migrate-config)")
 
 	flag.Parse()
 
@@ -129,6 +138,12 @@ func main() {
 		// Handle migration management commands (REFACTOR-01)
 		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 || *destroyDatabase {
 			handleMigrationCommands(db, appLogger, *showMigrationVersion, *listMigrations, *rollbackCount, *rollbackTo, *destroyDatabase)
+			os.Exit(0)
+		}
+
+		// Handle settings management commands (Phase 5: v3.0.9)
+		if *migrateConfig || *exportConfig != "" || *validateConfig {
+			handleSettingsCommands(ctx, db, cfg, appLogger, *migrateConfig, *exportConfig, *validateConfig, *categoryFilter)
 			os.Exit(0)
 		}
 	} else {
@@ -511,7 +526,28 @@ func main() {
 		log.Fatalf("❌ Не удалось инициализировать роутер: %v", err)
 	}
 
+	// Auto-seed settings from YAML (v3.0.9 Phase 2)
+	if db != nil {
+		appLogger.Info("Checking settings database...")
+		
+		// Create settings storage adapter
+		settingsStorage := settings.NewSQLStorageAdapter(db, appLogger)
+		seeder := settings.NewConfigSeeder(settingsStorage, appLogger)
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		seeded, err := seeder.SeedFromYAML(ctx, cfg)
+		if err != nil {
+			appLogger.WithError(err).Warn("Failed to seed settings from YAML, continuing...")
+		} else if seeded > 0 {
+			appLogger.WithField("count", seeded).Info("✅ Settings seeded from YAML config")
+			fmt.Printf("🌱 Настройки загружены в БД: %d параметров\n", seeded)
+		}
+	}
+
 	// Создание HTTP сервера
+	// HTTP server
 	server := &http.Server{
 		Addr:           cfg.GetServerAddr(),
 		Handler:        appRouter.Engine(),
@@ -520,28 +556,121 @@ func main() {
 		IdleTimeout:    cfg.Server.IdleTimeout,
 		MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
 	}
+	
+	// HTTPS server (v3.0.8+: Auto-generated self-signed certificate)
+	var tlsServer *http.Server
+	if cfg.Server.TLS.Enabled {
+		// Initialize certificate manager
+		certManager := tls.NewCertificateManager("certs", appLogger)
+		
+		// Prepare certificate configuration from config or defaults
+		certConfig := tls.CertificateConfig{
+			CommonName:   cfg.Server.TLS.CommonName,
+			Organization: "AIGateway",
+			ValidFor:     365 * 24 * time.Hour, // Default: 1 year
+			Hosts:        cfg.Server.TLS.Hosts,
+		}
+		
+		// Apply defaults if not configured
+		if certConfig.CommonName == "" {
+			certConfig.CommonName = "localhost"
+		}
+		if len(certConfig.Hosts) == 0 {
+			certConfig.Hosts = []string{"localhost", "127.0.0.1", "::1"}
+		}
+		if cfg.Server.TLS.ValidDays > 0 {
+			certConfig.ValidFor = time.Duration(cfg.Server.TLS.ValidDays) * 24 * time.Hour
+		}
+		
+		// Ensure certificate exists (auto-generate if missing)
+		if err := certManager.EnsureCertificate("server.crt", "server.key", certConfig); err != nil {
+			appLogger.WithError(err).Fatal("Failed to ensure TLS certificate")
+		}
+		
+		certPath, keyPath := certManager.GetCertificatePaths("server.crt", "server.key")
+		
+		// Validate certificate
+		if err := certManager.ValidateCertificate(certPath); err != nil {
+			appLogger.WithError(err).Warn("Certificate validation failed, regenerating...")
+			// Delete old certificate and regenerate
+			os.Remove(certPath)
+			os.Remove(keyPath)
+			if err := certManager.EnsureCertificate("server.crt", "server.key", certConfig); err != nil {
+				appLogger.WithError(err).Fatal("Failed to regenerate TLS certificate")
+			}
+		}
+		
+		// Log certificate info
+		if certInfo, err := certManager.GetCertificateInfo(certPath); err == nil {
+			appLogger.WithFields(map[string]interface{}{
+				"subject":     certInfo["subject"],
+				"issuer":      certInfo["issuer"],
+				"dns_names":   certInfo["dns_names"],
+				"expires_in":  certInfo["expires_in_days"],
+				"self_signed": certInfo["is_self_signed"],
+			}).Info("TLS certificate loaded")
+			
+			fmt.Printf("🔐 TLS Certificate: CN=%s, Hosts=%v, Expires in %d days\n", 
+				certInfo["subject"], certInfo["dns_names"], certInfo["expires_in_days"])
+		}
+		
+		// Calculate TLS port (HTTP port + 400)
+		// Example: :8080 → :8480, :8085 → :8485
+		tlsPort := cfg.Server.Port + 400
+		tlsAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, tlsPort)
+		
+		tlsServer = &http.Server{
+			Addr:           tlsAddr,
+			Handler:        appRouter.Engine(),
+			ReadTimeout:    cfg.Server.ReadTimeout,
+			WriteTimeout:   cfg.Server.WriteTimeout,
+			IdleTimeout:    cfg.Server.IdleTimeout,
+			MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
+		}
+		
+		appLogger.WithFields(map[string]interface{}{
+			"http_addr":  server.Addr,
+			"https_addr": tlsServer.Addr,
+			"cert":       certPath,
+			"hosts":      certConfig.Hosts,
+		}).Info("Dual-listener mode: HTTP + HTTPS")
+	}
 
 	// Graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Запуск сервера в горутине
+	// Запуск HTTP сервера в горутине
 	go func() {
 		appLogger.WithField("addr", server.Addr).Info("Starting HTTP server")
-		fmt.Printf("🌐 Сервер запущен на %s\n", server.Addr)
+		fmt.Printf("🌐 HTTP сервер запущен на %s\n", server.Addr)
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			appLogger.WithError(err).Fatal("Failed to start HTTP server")
 		}
 	}()
+	
+	// Запуск HTTPS сервера в горутине (если включен TLS)
+	if tlsServer != nil {
+		go func() {
+			certPath, keyPath := tls.NewCertificateManager("certs", appLogger).GetCertificatePaths("server.crt", "server.key")
+			
+			appLogger.WithField("addr", tlsServer.Addr).Info("Starting HTTPS server")
+			fmt.Printf("🔐 HTTPS сервер запущен на %s\n", tlsServer.Addr)
+			
+			if err := tlsServer.ListenAndServeTLS(certPath, keyPath); err != nil && err != http.ErrServerClosed {
+				appLogger.WithError(err).Fatal("Failed to start HTTPS server")
+			}
+		}()
+	}
 
 	// Ожидание сигнала остановки
 	<-ctx.Done()
 	stop()
 
-	appLogger.Info("Shutdown signal received, stopping server...")
-	fmt.Println("🛑 Получен сигнал остановки, завершаем сервер...")
+	appLogger.Info("Shutdown signal received, stopping servers...")
+	fmt.Println("🛑 Получен сигнал остановки, завершаем серверы...")
 
 	// Graceful shutdown с таймаутом
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -559,13 +688,26 @@ func main() {
 		}
 	}
 
+	// Shutdown HTTP server
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		appLogger.WithError(err).Error("Error during server shutdown")
-		log.Printf("❌ Ошибка при остановке сервера: %v", err)
+		appLogger.WithError(err).Error("Failed to gracefully shutdown HTTP server")
+		log.Printf("❌ Ошибка при остановке HTTP сервера: %v", err)
+	} else {
+		appLogger.Info("HTTP server stopped gracefully")
+	}
+	
+	// Shutdown HTTPS server (if running)
+	if tlsServer != nil {
+		if err := tlsServer.Shutdown(shutdownCtx); err != nil {
+			appLogger.WithError(err).Error("Failed to gracefully shutdown HTTPS server")
+			log.Printf("❌ Ошибка при остановке HTTPS сервера: %v", err)
+		} else {
+			appLogger.Info("HTTPS server stopped gracefully")
+		}
 	}
 
-	appLogger.Info("Server stopped successfully")
-	fmt.Println("✅ Сервер успешно остановлен")
+	appLogger.Info("All servers stopped successfully")
+	fmt.Println("✅ Все серверы успешно остановлены")
 }
 
 // handleMigrationCommands handles migration management CLI commands (REFACTOR-01)
@@ -701,6 +843,48 @@ func handleMigrationCommands(db storage.Database, appLogger interface{},
 
 		fmt.Println("✅ Database destroyed successfully")
 		fmt.Println("💡 To start fresh, run the server - migrations will be applied automatically")
+		return
+	}
+}
+
+// handleSettingsCommands handles settings management CLI commands (Phase 5: v3.0.9)
+func handleSettingsCommands(
+	ctx context.Context,
+	db storage.Database,
+	cfg *config.Config,
+	logger *logrus.Logger,
+	migrateConfig bool,
+	exportConfig string,
+	validateConfig bool,
+	categoryFilter string,
+) {
+	// Create settings storage adapter
+	settingsStorage := settings.NewSQLStorageAdapter(db, logger)
+
+	// Migrate config
+	if migrateConfig {
+		if err := settings.MigrateCommand(ctx, cfg, settingsStorage, logger, categoryFilter); err != nil {
+			fmt.Printf("❌ Migration failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Export config
+	if exportConfig != "" {
+		if err := settings.ExportCommand(ctx, settingsStorage, logger, exportConfig); err != nil {
+			fmt.Printf("❌ Export failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Validate config
+	if validateConfig {
+		if err := settings.ValidateCommand(ctx, cfg, settingsStorage, logger); err != nil {
+			fmt.Printf("❌ Validation failed: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 }

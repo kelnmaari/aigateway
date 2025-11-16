@@ -95,10 +95,11 @@ func (h *YzmaUIHandler) GetLoadedModelsList(c *gin.Context) {
 	loadedModels := h.client.ListLoadedModels()
 	
 	modelsList := make([]map[string]interface{}, 0, len(loadedModels))
-	for _, modelPath := range loadedModels {
+	for modelPath, modelInfo := range loadedModels {
 		modelsList = append(modelsList, map[string]interface{}{
 			"path": modelPath,
 			"name": filepath.Base(modelPath),
+			"alias": modelInfo["alias"],
 		})
 	}
 	
@@ -255,8 +256,8 @@ func (h *YzmaUIHandler) PostDeleteModel(c *gin.Context) {
 	
 	// Check if model is currently loaded
 	loadedModels := h.client.ListLoadedModels()
-	for _, loaded := range loadedModels {
-		if loaded == modelPath {
+	for loadedPath := range loadedModels {
+		if loadedPath == modelPath {
 			h.logger.WithField("model_path", modelPath).Warn("Cannot delete loaded model")
 			c.Header("HX-Trigger", `{"showNotification": {"message": "Cannot delete model while it is loaded. Unload it first.", "type": "error"}}`)
 			c.String(http.StatusBadRequest, "Model is currently loaded")

@@ -107,7 +107,7 @@ func (h *MonitorUIHandler) renderInlineGPUMetrics(c *gin.Context, metricsData *m
 		powerDraw := fmt.Sprintf("%.1f W", device.PowerUsageW)
 		powerLimit := fmt.Sprintf("%.1f W", device.PowerLimitW)
 
-		fanSpeed := fmt.Sprintf("%.0f%%", device.FanSpeedPercent)
+		fanSpeed := fmt.Sprintf("%d%%", device.FanSpeedPercent)
 
 		html += fmt.Sprintf(`
 <div class="gpu-card">

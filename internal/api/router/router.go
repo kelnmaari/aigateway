@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strings"
 	"time"
 
@@ -48,6 +49,7 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
+	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
 	"aigateway/internal/websocket"
 	"aigateway/internal/yzma"
@@ -128,6 +130,7 @@ type Router struct {
 	agentHandler          *handlers.AgentHandler          // Handler для agent API (v2.5.0+, v3.0.6+)
 	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
 	registryHandler       *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
+	dashboardHandler      *handlers.DashboardHandler      // Handler для batch dashboard API (v3.1.0, AJAX-01)
 
 	// Provider Management (Version 2.3.0+: REGISTRY-01)
 	providerManager *providers.ProviderManager // Model providers manager
@@ -199,6 +202,9 @@ type Router struct {
 
 	// Agent Service (v2.5.0+, v3.0.6+: restored for YZMA)
 	agentService *agentService.AgentService // Conversational agent with tools
+
+	// UI Framework (v3.1.0: Optimized JS+CSS bundling)
+	frameworkHandler *framework.Handler // Framework asset handler
 }
 
 // NewOptions содержит опции для создания роутера
@@ -461,6 +467,8 @@ func (r *Router) setupRoutes() {
 	r.setupStatsRoutes()          // Для TUI
 	r.setupConfigRoutes()         // Для TUI Configuration Viewer
 	r.setupRAGRoutes()            // RAG System (v1.13.1+)
+	r.setupDashboardRoutes()      // Dashboard batch API (v3.1.0, AJAX-01)
+	r.setupFrameworkRoutes()      // UI Framework assets (v3.1.0)
 	r.setupMetricsHistoryRoutes() // Для historical metrics (Phase 12.1)
 	r.setupRequestsRoutes()       // Для request monitoring (TUI-04)
 	r.setupWebSocketRoutes()      // Для real-time updates (Phase 12.2)
@@ -881,6 +889,48 @@ func (r *Router) setupSystemRoutes() {
 	}
 
 	r.logger.Info("System API endpoints configured")
+}
+
+// setupDashboardRoutes настраивает Dashboard batch API endpoints (v3.1.0: AJAX-01)
+func (r *Router) setupDashboardRoutes() {
+	if r.dashboardHandler == nil {
+		r.logger.Info("Dashboard handler not initialized, skipping dashboard batch routes")
+		return
+	}
+
+	// Dashboard routes требуют JWT аутентификации
+	dashboard := r.engine.Group("/api/dashboard")
+	if r.jwtManager != nil {
+		dashboard.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+	{
+		dashboard.GET("/stats", r.dashboardHandler.GetDashboardStats)
+	}
+
+	// Admin summary routes требуют Admin role
+	admin := r.engine.Group("/api/admin")
+	if r.jwtManager != nil {
+		admin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		admin.Use(middleware.RequireAdmin(r.db, r.logger))
+	}
+	{
+		admin.GET("/summary", r.dashboardHandler.GetAdminSummary)
+	}
+
+	r.logger.Info("✅ Dashboard batch API endpoints configured")
+}
+
+// setupFrameworkRoutes настраивает UI Framework asset routes (v3.1.0)
+func (r *Router) setupFrameworkRoutes() {
+	if r.frameworkHandler == nil {
+		r.logger.Info("Framework handler not initialized, skipping framework routes")
+		return
+	}
+
+	// Register framework routes
+	r.frameworkHandler.RegisterRoutes(r.engine)
+	
+	r.logger.Info("✅ UI Framework routes configured")
 }
 
 // setupAuthRoutes настраивает User Authentication endpoints (Version 1.3.0+)
@@ -1842,6 +1892,23 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		if r.providerManager != nil {
 			r.registryHandler = handlers.NewRegistryHandler(r.db, r.providerManager, logger)
 			logger.Info("Model Registry handler initialized successfully")
+		}
+
+		// Dashboard Handler initialization (v3.1.0: AJAX-01)
+		r.dashboardHandler = handlers.NewDashboardHandler(r.db, logger)
+		logger.Info("Dashboard batch handler initialized successfully")
+
+		// UI Framework initialization (v3.1.0: Framework)
+		devMode := os.Getenv("ENV") == "development" || os.Getenv("ENV") == "dev"
+		frameworkBuilder := framework.NewBuilder(logger, !devMode) // minify in production
+		if err := frameworkBuilder.Build(); err != nil {
+			logger.WithError(err).Warn("Failed to build UI framework, continuing without it")
+		} else {
+			r.frameworkHandler = framework.NewHandler(frameworkBuilder, logger, devMode)
+			logger.WithFields(logrus.Fields{
+				"dev_mode": devMode,
+				"minified": !devMode,
+			}).Info("UI Framework initialized successfully")
 		}
 
 		// Quota Middleware initialization

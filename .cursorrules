@@ -2,6 +2,26 @@
 
 This is the main **Ollama-OpenAI Proxy** project - a Go 1.25 application that provides OpenAI-compatible API for local Ollama models.
 
+## ⚠️ ❌ КРИТИЧЕСКОЕ ПРАВИЛО - ЗАПРЕЩЕНО ЗАПУСКАТЬ СЕРВЕР ❌ ⚠️
+
+### 🚫 НИКОГДА НЕ ЗАПУСКАЙ СЕРВЕР АВТОМАТИЧЕСКИ 🚫
+
+**ЗАПРЕЩЕНО:**
+- ❌ `./bin/server.exe` - НИКОГДА
+- ❌ `go run cmd/server/main.go` - НИКОГДА
+- ❌ `Start-Process .\bin\server.exe` - НИКОГДА
+- ❌ Любые другие способы запуска сервера - НИКОГДА
+
+**РАЗРЕШЕНО ТОЛЬКО:**
+- ✅ `go build -o bin/server.exe cmd/server/main.go` - Только компиляция
+- ✅ `go test ./...` - Тестирование
+- ✅ Проверка lint-ошибок
+
+**ЕСЛИ НУЖНО ПРОВЕРИТЬ РАБОТУ:**
+- Сообщи пользователю о завершении задачи
+- Дай инструкции КАК запустить (но НЕ запускай сам)
+- Жди команды пользователя
+
 ## 🏗️ Project Structure
 
 ### Entry Points

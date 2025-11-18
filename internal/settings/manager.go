@@ -16,15 +16,18 @@ import (
 type SettingCategory string
 
 const (
-	CategoryServer      SettingCategory = "server"
-	CategoryInference   SettingCategory = "inference"
-	CategoryAuth        SettingCategory = "auth"
-	CategoryDatabase    SettingCategory = "database"
-	CategoryLogging     SettingCategory = "logging"
-	CategoryMetrics     SettingCategory = "metrics"
-	CategoryTLS         SettingCategory = "tls"
-	CategoryRAG         SettingCategory = "rag"
-	CategoryHuggingFace SettingCategory = "huggingface"
+	CategoryServer        SettingCategory = "server"
+	CategoryInference     SettingCategory = "inference"
+	CategoryAuth          SettingCategory = "auth"
+	CategoryDatabase      SettingCategory = "database"
+	CategoryLogging       SettingCategory = "logging"
+	CategoryMetrics       SettingCategory = "metrics"
+	CategoryTLS           SettingCategory = "tls"
+	CategoryRAG           SettingCategory = "rag"
+	CategoryHuggingFace   SettingCategory = "huggingface"
+	CategoryObservability SettingCategory = "observability" // v3.0.9+: Tracing & Performance
+	CategoryModelRegistry SettingCategory = "model_registry" // v3.0.9+: Model Registry
+	CategoryDevelopment   SettingCategory = "development"    // v3.0.9+: Development settings
 )
 
 // SettingType represents the data type of a setting
@@ -71,11 +74,15 @@ type SettingValue struct {
 
 // Manager manages configuration settings in database
 type Manager struct {
-	storage Storage
-	cache   map[string]*Setting // In-memory cache
-	mu      sync.RWMutex
-	logger  *logrus.Logger
+	storage       Storage
+	cache         map[string]*Setting // In-memory cache
+	mu            sync.RWMutex
+	logger        *logrus.Logger
+	reloadHandlers map[string]ReloadHandler // Live reload callbacks by setting ID
 }
+
+// ReloadHandler is a callback function invoked when a setting changes
+type ReloadHandler func(ctx context.Context, setting *Setting) error
 
 // Storage interface for settings persistence
 type Storage interface {
@@ -108,10 +115,27 @@ func NewManager(storage Storage, logger *logrus.Logger) *Manager {
 	}
 
 	return &Manager{
-		storage: storage,
-		cache:   make(map[string]*Setting),
-		logger:  logger,
+		storage:        storage,
+		cache:          make(map[string]*Setting),
+		logger:         logger,
+		reloadHandlers: make(map[string]ReloadHandler),
 	}
+}
+
+// RegisterReloadHandler registers a callback for live reload when a setting changes
+func (m *Manager) RegisterReloadHandler(settingID string, handler ReloadHandler) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reloadHandlers[settingID] = handler
+	m.logger.WithField("setting_id", settingID).Debug("Registered reload handler")
+}
+
+// UnregisterReloadHandler removes a reload callback
+func (m *Manager) UnregisterReloadHandler(settingID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.reloadHandlers, settingID)
+	m.logger.WithField("setting_id", settingID).Debug("Unregistered reload handler")
 }
 
 // GetString retrieves a string setting value
@@ -193,6 +217,56 @@ func (m *Manager) SetBool(ctx context.Context, id string, value bool, updatedBy 
 	return m.updateValue(ctx, id, fmt.Sprintf("%t", value), updatedBy)
 }
 
+// updateValue is internal helper to update setting value through storage
+func (m *Manager) updateValue(ctx context.Context, id, value, updatedBy string) error {
+	// Validate setting exists and is editable
+	setting, err := m.GetSetting(ctx, id)
+	if err != nil {
+		return fmt.Errorf("setting not found: %w", err)
+	}
+	
+	if !setting.IsEditable {
+		return fmt.Errorf("setting '%s' is not editable (requires server restart)", id)
+	}
+	
+	// Update through storage
+	if err := m.storage.UpdateSettingValue(ctx, id, value, updatedBy); err != nil {
+		return fmt.Errorf("failed to update setting: %w", err)
+	}
+	
+	// Invalidate cache for this setting
+	m.mu.Lock()
+	delete(m.cache, id)
+	m.mu.Unlock()
+	
+	// Phase 4: Trigger live reload hooks for hot-reloadable settings
+	if !setting.RequiresRestart {
+		// Create updated setting object with new value
+		updatedSetting := *setting
+		updatedSetting.Value = value
+		updatedSetting.UpdatedAt = time.Now()
+		updatedSetting.UpdatedBy = updatedBy
+		
+		// Call registered reload handler
+		m.mu.RLock()
+		handler, exists := m.reloadHandlers[id]
+		m.mu.RUnlock()
+		
+		if exists {
+			if err := handler(ctx, &updatedSetting); err != nil {
+				m.logger.WithError(err).
+					WithField("setting_id", id).
+					Warn("Reload handler failed, but update was saved")
+				// Don't fail the update if reload handler fails
+			} else {
+				m.logger.WithField("setting_id", id).Info("Live reload applied successfully")
+			}
+		}
+	}
+	
+	return nil
+}
+
 // GetAllSettings retrieves all settings grouped by category
 func (m *Manager) GetAllSettings(ctx context.Context) (map[SettingCategory][]*Setting, error) {
 	settings, err := m.storage.GetAllSettings(ctx)
@@ -233,34 +307,22 @@ func (m *Manager) GetSetting(ctx context.Context, id string) (*Setting, error) {
 	return setting, nil
 }
 
-// updateValue updates a setting value
-func (m *Manager) updateValue(ctx context.Context, id, value, updatedBy string) error {
-	// Validate setting exists and is editable
-	setting, err := m.GetSetting(ctx, id)
-	if err != nil {
-		return err
+// DeleteSetting deletes a setting from storage and cache
+func (m *Manager) DeleteSetting(ctx context.Context, id string) error {
+	// Delete from storage
+	if err := m.storage.DeleteSetting(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete setting: %w", err)
 	}
-
-	if !setting.IsEditable {
-		return fmt.Errorf("setting %s is not editable", id)
-	}
-
-	// Update in storage
-	if err := m.storage.UpdateSettingValue(ctx, id, value, updatedBy); err != nil {
-		return err
-	}
-
-	// Invalidate cache
+	
+	// Remove from cache
 	m.mu.Lock()
 	delete(m.cache, id)
 	m.mu.Unlock()
-
-	m.logger.WithFields(logrus.Fields{
-		"setting_id": id,
-		"new_value":  value,
-		"updated_by": updatedBy,
-	}).Info("Setting updated")
-
+	
+	// Unregister reload handler if exists
+	m.UnregisterReloadHandler(id)
+	
+	m.logger.WithField("setting_id", id).Info("Setting deleted successfully")
 	return nil
 }
 

@@ -1,0 +1,240 @@
+/**
+ * AIGateway UI Framework v3.1.0
+ * Design System & Core Styles
+ */
+
+/* ===========================
+   CSS Variables (Design Tokens)
+   =========================== */
+:root {
+    /* Colors */
+    --ag-primary: #10a37f;
+    --ag-secondary: #6366f1;
+    --ag-success: #10b981;
+    --ag-warning: #f59e0b;
+    --ag-danger: #ef4444;
+    --ag-info: #3b82f6;
+
+    /* Neutrals */
+    --ag-gray-50: #f9fafb;
+    --ag-gray-100: #f3f4f6;
+    --ag-gray-200: #e5e7eb;
+    --ag-gray-300: #d1d5db;
+    --ag-gray-400: #9ca3af;
+    --ag-gray-500: #6b7280;
+    --ag-gray-600: #4b5563;
+    --ag-gray-700: #374151;
+    --ag-gray-800: #1f2937;
+    --ag-gray-900: #111827;
+
+    /* Dark theme */
+    --ag-bg-primary: #0f0f23;
+    --ag-bg-secondary: #1a1a2e;
+    --ag-bg-tertiary: #16213e;
+    --ag-text-primary: #ffffff;
+    --ag-text-secondary: rgba(255, 255, 255, 0.7);
+    --ag-border-color: rgba(255, 255, 255, 0.1);
+
+    /* Spacing */
+    --ag-spacing-xs: 4px;
+    --ag-spacing-sm: 8px;
+    --ag-spacing-md: 16px;
+    --ag-spacing-lg: 24px;
+    --ag-spacing-xl: 32px;
+    --ag-spacing-2xl: 48px;
+
+    /* Typography */
+    --ag-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --ag-font-mono: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    --ag-font-size-xs: 12px;
+    --ag-font-size-sm: 14px;
+    --ag-font-size-base: 16px;
+    --ag-font-size-lg: 18px;
+    --ag-font-size-xl: 20px;
+    --ag-font-size-2xl: 24px;
+
+    /* Shadows */
+    --ag-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --ag-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --ag-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --ag-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+    /* Border radius */
+    --ag-radius-sm: 4px;
+    --ag-radius-md: 8px;
+    --ag-radius-lg: 12px;
+    --ag-radius-full: 9999px;
+
+    /* Transitions */
+    --ag-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --ag-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --ag-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===========================
+   Reset & Base Styles
+   =========================== */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--ag-font-sans);
+    font-size: var(--ag-font-size-base);
+    line-height: 1.5;
+    color: var(--ag-text-primary);
+    background: var(--ag-bg-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===========================
+   Skeleton Loaders
+   =========================== */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: ag-skeleton-loading 1.5s ease-in-out infinite;
+    border-radius: var(--ag-radius-md);
+}
+
+@keyframes ag-skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ===========================
+   Loading States
+   =========================== */
+.ag-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.ag-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid var(--ag-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: ag-spin 0.6s linear infinite;
+}
+
+@keyframes ag-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===========================
+   Animations
+   =========================== */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* ===========================
+   Utility Classes
+   =========================== */
+
+/* Spacing */
+.ag-p-xs { padding: var(--ag-spacing-xs); }
+.ag-p-sm { padding: var(--ag-spacing-sm); }
+.ag-p-md { padding: var(--ag-spacing-md); }
+.ag-p-lg { padding: var(--ag-spacing-lg); }
+.ag-p-xl { padding: var(--ag-spacing-xl); }
+
+.ag-m-xs { margin: var(--ag-spacing-xs); }
+.ag-m-sm { margin: var(--ag-spacing-sm); }
+.ag-m-md { margin: var(--ag-spacing-md); }
+.ag-m-lg { margin: var(--ag-spacing-lg); }
+.ag-m-xl { margin: var(--ag-spacing-xl); }
+
+/* Text alignment */
+.ag-text-left { text-align: left; }
+.ag-text-center { text-align: center; }
+.ag-text-right { text-align: right; }
+
+/* Display */
+.ag-flex { display: flex; }
+.ag-inline-flex { display: inline-flex; }
+.ag-grid { display: grid; }
+.ag-block { display: block; }
+.ag-inline-block { display: inline-block; }
+.ag-hidden { display: none; }
+
+/* Flex utilities */
+.ag-flex-col { flex-direction: column; }
+.ag-flex-row { flex-direction: row; }
+.ag-items-center { align-items: center; }
+.ag-justify-center { justify-content: center; }
+.ag-justify-between { justify-content: space-between; }
+.ag-gap-sm { gap: var(--ag-spacing-sm); }
+.ag-gap-md { gap: var(--ag-spacing-md); }
+.ag-gap-lg { gap: var(--ag-spacing-lg); }
+
+/* Borders */
+.ag-border { border: 1px solid var(--ag-border-color); }
+.ag-border-radius { border-radius: var(--ag-radius-md); }
+.ag-rounded { border-radius: var(--ag-radius-full); }
+
+/* Shadows */
+.ag-shadow-sm { box-shadow: var(--ag-shadow-sm); }
+.ag-shadow-md { box-shadow: var(--ag-shadow-md); }
+.ag-shadow-lg { box-shadow: var(--ag-shadow-lg); }
+
+/* Transitions */
+.ag-transition { transition: all var(--ag-transition-base); }
+.ag-transition-fast { transition: all var(--ag-transition-fast); }
+
+/* Hover effects */
+.ag-hover-scale:hover {
+    transform: scale(1.02);
+    transition: transform var(--ag-transition-fast);
+}
+
+.ag-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ag-shadow-lg);
+    transition: all var(--ag-transition-base);
+}
+

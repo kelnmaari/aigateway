@@ -4,6 +4,17 @@ class API {
         this.baseURL = window.location.origin;
         this.accessToken = localStorage.getItem('access_token');
         this.refreshToken = localStorage.getItem('refresh_token');
+        
+        // Request cache layer (v3.1.0: AJAX-04)
+        this.cache = new Map();
+        this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
+        this.cacheable = new Set([
+            '/api/system/info',
+            '/api/dashboard/stats',
+            '/api/admin/summary',
+            '/v1/models',
+            '/api/users/me',
+        ]);
     }
 
     // Get auth headers
@@ -100,16 +111,56 @@ class API {
 
     // ==================== HTTP Shorthand Methods ====================
 
-    async get(path) {
+    async get(path, useCache = true) {
+        // Check cache if enabled (v3.1.0: AJAX-04)
+        if (useCache && this.cacheable.has(path)) {
+            const cached = this.cache.get(path);
+            if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+                console.log(`📦 Cache HIT: ${path}`);
+                return cached.data;
+            }
+        }
+
         const response = await this.request(`${this.baseURL}${path}`);
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.error || `GET ${path} failed`);
         }
-        return response.json();
+        
+        const data = await response.json();
+        
+        // Store in cache if path is cacheable
+        if (this.cacheable.has(path)) {
+            this.cache.set(path, {
+                data: data,
+                timestamp: Date.now()
+            });
+            console.log(`💾 Cache SET: ${path}`);
+        }
+        
+        return data;
+    }
+
+    // Invalidate cache for specific path or all cache
+    invalidateCache(path = null) {
+        if (path) {
+            this.cache.delete(path);
+            console.log(`🗑️ Cache INVALIDATE: ${path}`);
+        } else {
+            this.cache.clear();
+            console.log(`🗑️ Cache CLEAR ALL`);
+        }
     }
 
     async post(path, data) {
+        // Invalidate related cache on POST operations (v3.1.0: AJAX-04)
+        if (path.includes('/settings/') || path.includes('/admin/')) {
+            this.invalidateCache('/api/admin/summary');
+        }
+        if (path.includes('/users/') || path.includes('/tenants/')) {
+            this.invalidateCache('/api/dashboard/stats');
+        }
+        
         const response = await this.request(`${this.baseURL}${path}`, {
             method: 'POST',
             body: JSON.stringify(data)
@@ -783,6 +834,16 @@ class API {
 
     async getSystemInfo() {
         return this.get('/api/system/info');
+    }
+
+    // ==================== Dashboard Batch APIs (v3.1.0: AJAX-01) ====================
+
+    async getDashboardStats() {
+        return this.get('/api/dashboard/stats');
+    }
+
+    async getAdminSummary() {
+        return this.get('/api/admin/summary');
     }
 
     // Check if RAG is enabled in system configuration

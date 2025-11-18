@@ -47,8 +47,6 @@ inference:
 
 auth:
   enabled: true   # Включено для тестирования API Key Management
-  storage_type: "json"
-  storage_path: "data/api_keys.json"
   admin_key: "sk-admin-dev-key-12345"
   
   # Rate limiting

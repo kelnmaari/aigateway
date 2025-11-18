@@ -22,11 +22,9 @@ class Dashboard {
             // Load user info
             await this.loadUser();
             
-            // Load dashboard data
+            // Load dashboard data (v3.1.0: loadStats now includes recent data via batch API)
             await Promise.all([
-                this.loadStats(),
-                this.loadRecentConversations(),
-                this.loadTenants(),
+                this.loadStats(),  // Loads stats + recent conversations + recent tenants
                 this.loadModels()
             ]);
             
@@ -97,35 +95,54 @@ class Dashboard {
 
     // Load dashboard stats
     async loadStats() {
-        try {
-            // Load conversations count
-            const conversationsResp = await api.getConversations();
-            this.stats.conversations = conversationsResp.conversations?.length || 0;
+        // Wrap with AG Framework error boundary (v3.1.0: Framework)
+        const loadFn = async () => {
+            // Show skeleton loaders inside stat cards (keeps layout intact)
+            this.showStatsSkeletons();
+
+            // Use new batch API endpoint (v3.1.0: AJAX-01)
+            const data = await AG.http.get('/api/dashboard/stats');
             
-            // Load tenants count
-            const tenantsResp = await api.request(`${api.baseURL}/api/users/me/tenants`);
-            if (tenantsResp.ok) {
-                const tenantsData = await tenantsResp.json();
-                this.stats.tenants = tenantsData.tenants?.length || 0;
-            }
-            
-            // Load API keys count
-            const keysResp = await api.request(`${api.baseURL}/api/users/me/api-keys`);
-            if (keysResp.ok) {
-                const keysData = await keysResp.json();
-                this.stats.apiKeys = keysData.api_keys?.length || 0;
-            }
-            
-            // TODO: Load API requests count from usage stats
-            this.stats.requests = 0;
+            this.stats.conversations = data.conversations || 0;
+            this.stats.tenants = data.tenants || 0;
+            this.stats.apiKeys = data.api_keys || 0;
+            this.stats.requests = data.requests_30d || 0;
             
             // Update UI
             this.renderStats();
             
+            // Load recent data if provided
+            if (data.recent_conversations) {
+                this.renderRecentConversations(data.recent_conversations);
+            }
+            if (data.recent_tenants) {
+                this.renderRecentTenants(data.recent_tenants);
+            }
+        };
+        
+        try {
+            await window.errorBoundary.retry(loadFn, 'Dashboard Stats');
         } catch (error) {
-            console.error('Failed to load stats:', error);
-            this.renderStats(); // Render with defaults
+            // Graceful degradation - render with defaults
+            console.error('Failed to load stats after retries:', error);
+            AG.toast('Failed to load dashboard stats', 'error');
+            this.renderStats();
         }
+    }
+
+    // Show skeleton loaders for stats cards (v3.1.0: AJAX-02)
+    showStatsSkeletons() {
+        const statConv = document.getElementById('stat-conversations');
+        const statTen = document.getElementById('stat-tenants');
+        const statKeys = document.getElementById('stat-api-keys') || document.getElementById('stat-apikeys');
+        const statReq = document.getElementById('stat-requests') || document.getElementById('stat-files');
+        
+        // Replace with skeleton
+        [statConv, statTen, statKeys, statReq].forEach(el => {
+            if (el) {
+                el.innerHTML = '<div class="skeleton" style="width: 60px; height: 32px;"></div>';
+            }
+        });
     }
 
     // Render stats cards
@@ -141,114 +158,109 @@ class Dashboard {
         if (statReq) statReq.textContent = this.stats.requests || 0;
     }
 
-    // Load recent conversations
-    async loadRecentConversations() {
+    // Render recent conversations from batch API (v3.1.0: AJAX-01)
+    renderRecentConversations(conversations) {
         const tbody = document.getElementById('recent-conversations-tbody') || document.getElementById('recent-conversations');
         if (!tbody) {
             console.warn('Recent conversations tbody not found');
             return;
         }
+        
         tbody.innerHTML = '';
         
-        try {
-            const response = await api.getConversations();
-            const conversations = response.conversations || [];
+        if (!conversations || conversations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No conversations yet. <a href="/chat.html">Start chatting!</a></td></tr>';
+            return;
+        }
+        
+        conversations.forEach(conv => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div style="font-weight: 500;">${this.escapeHtml(conv.title)}</div>
+                </td>
+                <td>
+                    <span class="badge badge-info">${this.escapeHtml(conv.model)}</span>
+                </td>
+                <td>${conv.message_count || 0}</td>
+                <td>${this.formatDate(conv.updated_at || conv.created_at)}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="dashboard.openConversation('${conv.id}')">Open</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Render recent tenants from batch API (v3.1.0: AJAX-01)
+    renderRecentTenants(tenants) {
+        // Try table layout first (if present)
+        const tbody = document.getElementById('recent-tenants-tbody') || document.getElementById('recent-tenants');
+        if (tbody) {
+            tbody.innerHTML = '';
             
-            if (conversations.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No conversations yet. <a href="/chat.html">Start chatting!</a></td></tr>';
+            if (!tenants || tenants.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No tenants yet.</td></tr>';
                 return;
             }
             
-            // Show only first 5
-            const recent = conversations.slice(0, 5);
-            
-            recent.forEach(conv => {
+            tenants.forEach(tenant => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>
-                        <div style="font-weight: 500;">${this.escapeHtml(conv.title)}</div>
+                        <div style="font-weight: 500;">${this.escapeHtml(tenant.name)}</div>
                     </td>
+                    <td>${tenant.member_count || 0}</td>
+                    <td>${this.formatDate(tenant.created_at)}</td>
                     <td>
-                        <span class="badge badge-info">${this.escapeHtml(conv.model)}</span>
-                    </td>
-                    <td>${conv.message_count || 0}</td>
-                    <td>${this.formatDate(conv.created_at)}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" onclick="dashboard.openConversation('${conv.id}')">Open</button>
+                        <button class="btn btn-sm btn-primary" onclick="dashboard.viewTenant('${tenant.id}')">View</button>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
-            
-        } catch (error) {
-            console.error('Failed to load conversations:', error);
-            tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Failed to load conversations</td></tr>';
+            return;
         }
-    }
-
-    // Load tenants
-    async loadTenants() {
-        try {
-            const response = await api.request(`${api.baseURL}/api/users/me/tenants`);
+        
+        // Fallback to grid layout (dashboard.html uses this)
+        const grid = document.getElementById('tenants-list') || document.getElementById('tenants-grid');
+        if (grid) {
+            grid.innerHTML = '';
             
-            if (!response.ok) {
-                throw new Error('Failed to load tenants');
-            }
-            
-            const data = await response.json();
-            const tenants = data.tenants || [];
-            
-            const container = document.getElementById('tenants-grid') || document.getElementById('tenants-list');
-            if (!container) {
-                console.warn('Tenants container not found');
-                return;
-            }
-            container.innerHTML = '';
-            
-            if (tenants.length === 0) {
-                container.innerHTML = `
-                    <div class="stat-card">
-                        <h3>No tenants</h3>
-                        <div class="label"><a href="/tenants.html">Create your first tenant</a></div>
+            if (!tenants || tenants.length === 0) {
+                grid.innerHTML = `
+                    <div class="tenant-card">
+                        <h3>No Organizations</h3>
+                        <div class="label"><a href="/tenants.html">Create your first organization</a></div>
                     </div>
                 `;
                 return;
             }
             
             tenants.forEach(tenant => {
-                const card = this.createTenantCard(tenant);
-                container.appendChild(card);
+                const card = document.createElement('div');
+                card.className = 'tenant-card';
+                card.style.cursor = 'pointer';
+                card.onclick = () => this.viewTenant(tenant.id);
+                
+                card.innerHTML = `
+                    <h3>${this.escapeHtml(tenant.name)}</h3>
+                    <div class="value">${tenant.member_count || 0}</div>
+                    <div class="label">members</div>
+                `;
+                
+                grid.appendChild(card);
             });
-            
-        } catch (error) {
-            console.error('Failed to load tenants:', error);
-            const container = document.getElementById('tenants-grid') || document.getElementById('tenants-list');
-            if (container) {
-                container.innerHTML = 
-                    '<div class="stat-card danger"><h3>Error</h3><div class="label">Failed to load tenants</div></div>';
-            }
         }
-    }
-
-    // Create tenant card element
-    createTenantCard(tenant) {
-        const card = document.createElement('div');
-        card.className = 'stat-card';
-        card.style.cursor = 'pointer';
-        card.onclick = () => window.location.href = `/tenants.html?id=${tenant.id}`;
-        
-        card.innerHTML = `
-            <h3>${this.escapeHtml(tenant.name)}</h3>
-            <div class="value">${tenant.member_count || 0}</div>
-            <div class="label">members</div>
-        `;
-        
-        return card;
     }
 
     // Open conversation in chat
     openConversation(id) {
         window.location.href = `/chat.html?conversation=${id}`;
+    }
+
+    // View tenant details
+    viewTenant(id) {
+        window.location.href = `/tenants.html?id=${id}`;
     }
 
     // Delete conversation
@@ -278,9 +290,11 @@ class Dashboard {
             return;
         }
         
+        // Show skeleton loader using AG framework (v3.1.0)
+        AG.skeleton.show(container, 3);
+        
         try {
-            // Fetch ONLY loaded models from /v1/models (OpenAI compatible)
-            // v3.0.6+: This endpoint returns only loaded models, not all available
+            // Fetch models using AG.http
             const response = await api.request(`${api.baseURL}/v1/models`);
             
             if (!response.ok) {
@@ -294,6 +308,7 @@ class Dashboard {
             
         } catch (error) {
             console.error('Failed to load models:', error);
+            AG.toast('Failed to load models', 'error');
             container.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
                     <p style="color: var(--danger-color);">Failed to load models</p>

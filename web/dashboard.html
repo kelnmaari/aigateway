@@ -188,7 +188,14 @@
     <!-- Scripts -->
     <!-- Auth Guard MUST be loaded FIRST to protect the page -->
     <script src="/js/auth-guard.js"></script>
+    
+    <!-- AIGateway UI Framework (v3.1.0) - MUST be before other scripts -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+    
+    <!-- Legacy scripts -->
     <script src="/js/api.js"></script>
+    <script src="/js/utils/error-boundary.js"></script>
     <script src="/js/utils/notifications.js"></script>
     <script src="/js/components/navbar.js"></script>
     <script src="/js/dashboard.js"></script>

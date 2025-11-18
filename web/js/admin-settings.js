@@ -10,7 +10,8 @@ function loadSettings() {
     const contentEl = document.getElementById('settings-content');
     const errorEl = document.getElementById('settings-error');
     
-    // Show loading
+    // Show loading using AG framework
+    AG.loading.show(contentEl);
     loadingEl.style.display = 'block';
     contentEl.style.display = 'none';
     errorEl.style.display = 'none';
@@ -28,21 +29,13 @@ function loadSettings() {
         return;
     }
     
-    fetch('/api/admin/settings', {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-    })
+    // Use AG.http for API call
+    AG.http.get('/api/admin/settings')
     .then(data => {
         renderSettings(data.settings);
         loadingEl.style.display = 'none';
         contentEl.style.display = 'block';
+        AG.loading.hide(contentEl);
     })
     .catch(error => {
         console.error('Failed to load settings:', error);
@@ -317,9 +310,18 @@ function confirmSaveSetting(settingId, newValue) {
         return;
     }
     
-    // Show loading state
     const valueCell = document.getElementById(`value-cell-${settingId}`);
-    valueCell.innerHTML = '<span class="loading-spinner">Saving...</span>';
+    const originalHTML = valueCell.innerHTML;
+    
+    // Optimistic UI update - показываем новое значение сразу (v3.1.0: AJAX-03)
+    valueCell.innerHTML = `
+        <code class="setting-value" style="opacity: 0.6;">
+            ${escapeHtml(newValue)}
+            <span style="margin-left: 8px; font-size: 0.8em; color: var(--text-secondary);">
+                <div class="skeleton" style="width: 50px; height: 12px; display: inline-block;"></div>
+            </span>
+        </code>
+    `;
     
     fetch(`/api/admin/settings/${settingId}`, {
         method: 'PUT',
@@ -338,7 +340,7 @@ function confirmSaveSetting(settingId, newValue) {
         return response.json();
     })
     .then(data => {
-        // Success - update UI with new value
+        // Success - confirm optimistic update with solid state
         valueCell.innerHTML = `<code class="setting-value">${escapeHtml(newValue)}</code>`;
         editingSettingId = null;
         
@@ -349,29 +351,16 @@ function confirmSaveSetting(settingId, newValue) {
             : 'Setting updated and applied successfully';
         const type = requiresRestart ? 'warning' : 'success';
         
-        showNotification(message, type);
+        // Use AG.toast instead of showNotification
+        AG.toast(message, type);
     })
     .catch(error => {
         console.error('Failed to update setting:', error);
         
-        // Restore input for retry
-        valueCell.innerHTML = `
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="text" 
-                       id="edit-input-${settingId}" 
-                       class="setting-edit-input" 
-                       value="${escapeHtml(newValue)}"
-                       style="flex: 1; padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 4px;">
-                <button class="btn-save" onclick="saveSetting('${settingId}')" title="Save changes">
-                    <i class="fas fa-check"></i>
-                </button>
-                <button class="btn-cancel" onclick="cancelEdit('${settingId}', '${escapeHtml(newValue)}')" title="Cancel">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
+        // Rollback optimistic update (v3.1.0: AJAX-03)
+        valueCell.innerHTML = originalHTML;
         
-        showNotification(`Failed to update: ${error.message}`, 'error');
+        AG.toast(`Failed to update: ${error.message}`, 'error');
     });
 }
 

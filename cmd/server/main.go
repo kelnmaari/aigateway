@@ -3,12 +3,14 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -50,7 +52,14 @@ func main() {
 	migrateConfig := flag.Bool("migrate-config", false, "Migrate settings from YAML config to database")
 	exportConfig := flag.String("export-config", "", "Export database settings to YAML file")
 	validateConfig := flag.Bool("validate-config", false, "Validate database settings against YAML schema")
+	importConfig := flag.String("import-config", "", "Import settings from exported YAML/JSON file")
+	deleteSettings := flag.String("delete-settings", "", "Delete settings by ID (comma-separated, e.g. 'old.setting1,deprecated.setting2')")
+	generateBootstrap := flag.String("generate-bootstrap", "", "Generate minimal bootstrap config (v3.1.0)")
 	categoryFilter := flag.String("category", "", "Filter by category (for migrate-config)")
+	dryRun := flag.Bool("dry-run", false, "Preview changes without applying them (for migrate-config)")
+	diffMode := flag.Bool("diff", false, "Show side-by-side comparison (for validate-config)")
+	exportFormat := flag.String("format", "yaml", "Export format: yaml or json (for export-config)")
+	forceDelete := flag.Bool("force", false, "Skip confirmation prompt (for delete-settings)")
 
 	flag.Parse()
 
@@ -63,7 +72,10 @@ func main() {
 
 	fmt.Printf("🚀 Ollama-OpenAI Proxy Server v%s\n", version.Short())
 
-	// Инициализация конфигурации
+	// DEBUG: показать что пришло из флага
+	fmt.Printf("🔧 DEBUG: *configPath from flag = '%s'\n", *configPath)
+
+	// Инициализация конфигурации (v3.1.0: Hybrid Mode Support)
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("❌ Не удалось загрузить конфигурацию: %v", err)
@@ -115,6 +127,10 @@ func main() {
 		appLogger.Info("Prometheus metrics enabled")
 	}
 
+	// v3.1.0: ConfigWrapper для database-first режима (создается позже после БД)
+	var configWrapper *config.ConfigWrapper
+	var settingsManager *settings.Manager
+
 	// Инициализация базы данных (Version 1.3.0+)
 	var db storage.Database
 	if cfg.Database.Type != "" {
@@ -142,12 +158,56 @@ func main() {
 		}
 
 		// Handle settings management commands (Phase 5: v3.0.9)
-		if *migrateConfig || *exportConfig != "" || *validateConfig {
-			handleSettingsCommands(ctx, db, cfg, appLogger, *migrateConfig, *exportConfig, *validateConfig, *categoryFilter)
+		if *migrateConfig || *exportConfig != "" || *validateConfig || *importConfig != "" || *deleteSettings != "" || *generateBootstrap != "" {
+			handleSettingsCommands(ctx, db, cfg, appLogger, *migrateConfig, *exportConfig, *validateConfig, *importConfig, *deleteSettings, *generateBootstrap, *categoryFilter, *dryRun, *diffMode, *exportFormat, *forceDelete)
 			os.Exit(0)
+		}
+		
+		// v3.1.0: Initialize Settings Manager для hybrid config mode
+		settingsStorage := settings.NewSQLStorageAdapter(db, appLogger)
+		settingsManager = settings.NewManager(
+			settingsStorage,
+			appLogger,
+		)
+		
+		// Seed settings из YAML если БД пустая (first run)
+		seeder := settings.NewConfigSeeder(settingsStorage, appLogger)
+		if count, err := seeder.SeedFromYAML(ctx, cfg); err != nil {
+			appLogger.WithError(err).Warn("Failed to seed settings from config, continuing...")
+		} else if count > 0 {
+			appLogger.WithField("count", count).Info("Settings seeded from YAML config")
+		}
+		
+		// Register reload handlers для hot-reload settings
+		rawDB := extractRawDB(db)
+		if rawDB != nil {
+			reloadRegistry := settings.NewReloadHandlerRegistry(settingsManager, appLogger, rawDB)
+			appLogger.Info("Live reload handlers registered successfully")
+			_ = reloadRegistry // Keep reference to prevent GC
+		}
+		
+		// Create HybridConfigSource (v3.1.0)
+		cfgNew, configSource, err := config.LoadWithSettings(*configPath, settingsManager, appLogger)
+		if err != nil {
+			appLogger.WithError(err).Warn("Failed to create hybrid config, using legacy mode")
+			configWrapper = config.NewConfigWrapper(cfg, nil, appLogger)
+		} else {
+			cfg = cfgNew // Replace with new config
+			configWrapper = config.NewConfigWrapper(cfg, configSource, appLogger)
+			
+			if configWrapper.IsBootstrapMode() {
+				appLogger.Info("✨ Running in BOOTSTRAP mode - database-first configuration")
+				fmt.Println("✨ Bootstrap mode active: settings loaded from database")
+			} else {
+				appLogger.Info("✨ Running in HYBRID mode - database + YAML configuration")
+				fmt.Println("✨ Hybrid mode active: database settings override YAML")
+			}
 		}
 	} else {
 		appLogger.Info("Database not configured, skipping initialization")
+		
+		// Legacy mode без БД
+		configWrapper = config.NewConfigWrapper(cfg, nil, appLogger)
 
 		// Cannot use migration commands without database
 		if *showMigrationVersion || *listMigrations || *rollbackCount > 0 || *rollbackTo >= 0 || *destroyDatabase {
@@ -544,6 +604,24 @@ func main() {
 			appLogger.WithField("count", seeded).Info("✅ Settings seeded from YAML config")
 			fmt.Printf("🌱 Настройки загружены в БД: %d параметров\n", seeded)
 		}
+		
+		// Initialize live reload handlers (v3.0.9 Phase 4)
+		settingsManager := settings.NewManager(settingsStorage, appLogger)
+		
+		// Get underlying *sql.DB for connection pool handlers
+		type dbGetter interface {
+			GetDB() *sql.DB
+		}
+		var rawDB *sql.DB
+		if dbg, ok := db.(dbGetter); ok {
+			rawDB = dbg.GetDB()
+		}
+		
+		reloadRegistry := settings.NewReloadHandlerRegistry(settingsManager, appLogger, rawDB)
+		appLogger.Info("✅ Live reload handlers registered")
+		
+		// Store for use in router if needed
+		_ = reloadRegistry // Will be passed to router or middleware in future
 	}
 
 	// Создание HTTP сервера
@@ -856,14 +934,54 @@ func handleSettingsCommands(
 	migrateConfig bool,
 	exportConfig string,
 	validateConfig bool,
+	importConfig string,
+	deleteSettingsStr string,
+	generateBootstrap string,
 	categoryFilter string,
+	dryRun bool,
+	diffMode bool,
+	exportFormat string,
+	forceDelete bool,
 ) {
+	// Generate bootstrap config (can run without DB)
+	if generateBootstrap != "" {
+		if err := settings.GenerateBootstrapCommand(ctx, cfg, logger, generateBootstrap); err != nil {
+			fmt.Printf("❌ Bootstrap generation failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Create settings storage adapter
 	settingsStorage := settings.NewSQLStorageAdapter(db, logger)
 
+	// Import config
+	if importConfig != "" {
+		if err := settings.ImportCommand(ctx, settingsStorage, logger, importConfig); err != nil {
+			fmt.Printf("❌ Import failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Delete settings
+	if deleteSettingsStr != "" {
+		settingIDs := strings.Split(deleteSettingsStr, ",")
+		// Trim whitespace
+		for i := range settingIDs {
+			settingIDs[i] = strings.TrimSpace(settingIDs[i])
+		}
+		
+		if err := settings.DeleteCommand(ctx, settingsStorage, logger, settingIDs, forceDelete); err != nil {
+			fmt.Printf("❌ Deletion failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Migrate config
 	if migrateConfig {
-		if err := settings.MigrateCommand(ctx, cfg, settingsStorage, logger, categoryFilter); err != nil {
+		if err := settings.MigrateCommand(ctx, cfg, settingsStorage, logger, categoryFilter, dryRun); err != nil {
 			fmt.Printf("❌ Migration failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -872,7 +990,7 @@ func handleSettingsCommands(
 
 	// Export config
 	if exportConfig != "" {
-		if err := settings.ExportCommand(ctx, settingsStorage, logger, exportConfig); err != nil {
+		if err := settings.ExportCommand(ctx, settingsStorage, logger, exportConfig, exportFormat); err != nil {
 			fmt.Printf("❌ Export failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -881,10 +999,24 @@ func handleSettingsCommands(
 
 	// Validate config
 	if validateConfig {
-		if err := settings.ValidateCommand(ctx, cfg, settingsStorage, logger); err != nil {
+		if err := settings.ValidateCommand(ctx, cfg, settingsStorage, logger, diffMode); err != nil {
 			fmt.Printf("❌ Validation failed: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
+}
+
+// extractRawDB extracts *sql.DB from storage.Database interface
+// Required for PostgreSQL connection pool live reload
+func extractRawDB(db storage.Database) *sql.DB {
+	type hasGetDB interface {
+		GetDB() *sql.DB
+	}
+	
+	if dbWithRaw, ok := db.(hasGetDB); ok {
+		return dbWithRaw.GetDB()
+	}
+	
+	return nil
 }

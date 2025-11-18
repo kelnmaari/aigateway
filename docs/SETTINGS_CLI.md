@@ -1,6 +1,6 @@
 # Settings CLI Commands
 
-**Version:** v3.0.9 - Phase 5
+**Version:** v3.0.9 - Phase 5 + Optional Features  
 **Status:** ✅ Implemented
 
 ## Overview
@@ -14,7 +14,11 @@ CLI tools для управления настройками, хранящими
 Миграция всех настроек из `configs/dev.yaml` в PostgreSQL:
 
 ```bash
+# Обычная миграция с подтверждением
 ./bin/server.exe -migrate-config
+
+# Preview changes (dry-run) без применения
+./bin/server.exe -migrate-config -dry-run
 ```
 
 **Behavior:**
@@ -24,22 +28,56 @@ CLI tools для управления настройками, хранящими
 - Устанавливает `is_migrated=true` для всех настроек
 - Устанавливает `requires_restart` согласно конфигурации
 
-**Output:**
+**Dry-run mode (`-dry-run`):**
+- Показывает preview изменений без применения
+- Отображает что будет СОЗДАНО, ОБНОВЛЕНО, и что останется без изменений
+- Не требует подтверждения (read-only)
+
+**Output (normal mode):**
 ```
 ⚠️  Warning: Database already contains 42 settings
 Overwrite existing settings? (yes/no): yes
 ✅ Successfully migrated 42 settings from YAML to database
 ```
 
-### 2. Export Settings to YAML
+**Output (dry-run mode):**
+```
+🔍 DRY RUN MODE: Preview only, no changes will be applied
 
-Экспорт всех настроек из БД в YAML файл (для backup или review):
+📊 Migration Preview:
+Total settings in YAML: 42
+Total settings in DB: 42
 
-```bash
-./bin/server.exe -export-config=backup.yaml
+✨ Would CREATE (2):
+  + server.new_feature = 'enabled'
+  + auth.oauth_timeout = '30s'
+
+🔄 Would UPDATE (3):
+  ~ server.port: '8080' → '9000'
+  ~ auth.jwt_expiration: '24h' → '48h'
+  ~ metrics.enabled: 'false' → 'true'
+
+✓ Unchanged (37 settings)
+
+💡 Run without --dry-run to apply these changes
 ```
 
-**Output file structure:**
+### 2. Export Settings to File
+
+Экспорт всех настроек из БД в файл (YAML или JSON):
+
+```bash
+# Export as YAML (default)
+./bin/server.exe -export-config=backup.yaml
+
+# Export as JSON
+./bin/server.exe -export-config=settings.json -format=json
+
+# Explicit YAML format
+./bin/server.exe -export-config=backup.yaml -format=yaml
+```
+
+**Output file structure (YAML):**
 ```yaml
 exported_at: "2025-11-16T15:30:00Z"
 total_settings: 42
@@ -73,10 +111,14 @@ settings:
 Сравнение настроек в БД с YAML конфигом (для диагностики):
 
 ```bash
+# Simple validation report
 ./bin/server.exe -validate-config
+
+# Detailed diff with side-by-side comparison
+./bin/server.exe -validate-config -diff
 ```
 
-**Output:**
+**Output (simple mode):**
 ```
 📊 Validation Report:
 Total in DB: 42
@@ -99,6 +141,12 @@ Total in YAML: 42
 - **Missing in DB** → Нужно добавить в seeder или применить `-migrate-config`
 - **Not in YAML config** → Настройка была добавлена вручную через UI или устарела
 - **Value mismatches** → БД и YAML рассинхронизированы (ожидаемо если редактировали через UI)
+
+**Diff mode (`-diff`):**
+- Side-by-side сравнение значений
+- Подробный вывод с категоризацией изменений
+- Табличное представление для value mismatches
+- Рекомендуемые действия для синхронизации
 
 ### 4. List Settings
 
@@ -214,9 +262,9 @@ cmd/server/main.go
 ### Key Functions
 
 **cli.go:**
-- `MigrateCommand(ctx, cfg, storage, logger, categoryFilter) error`
-- `ExportCommand(ctx, storage, logger, outputPath) error`
-- `ValidateCommand(ctx, cfg, storage, logger) error`
+- `MigrateCommand(ctx, cfg, storage, logger, categoryFilter, dryRun) error`
+- `ExportCommand(ctx, storage, logger, outputPath, format) error`
+- `ValidateCommand(ctx, cfg, storage, logger, diffMode) error`
 - `ListCommand(ctx, storage, categoryFilter) error`
 
 **seeder.go:**
@@ -230,11 +278,15 @@ cmd/server/main.go
 # Run tests
 go test ./internal/settings/... -v
 
-# CLI integration test
-./bin/server.exe -migrate-config
-./bin/server.exe -validate-config
-./bin/server.exe -export-config=test.yaml
-cat test.yaml
+# Test dry-run
+./bin/server.exe -migrate-config -dry-run
+
+# Test diff mode
+./bin/server.exe -validate-config -diff
+
+# Test JSON export
+./bin/server.exe -export-config=settings.json -format=json
+cat settings.json | jq
 ```
 
 ## Error Handling
@@ -265,14 +317,138 @@ cat test.yaml
    ```
    → Database query timeout, check DB load
 
+## Optional Features (v3.0.9+)
+
+### ✅ Dry-Run Mode for Migration
+```bash
+./bin/server.exe -migrate-config -dry-run
+```
+- Preview changes before applying
+- Shows CREATE/UPDATE/Unchanged summary
+- No confirmation required (read-only operation)
+
+### ✅ Diff Mode for Validation
+```bash
+./bin/server.exe -validate-config -diff
+```
+- Side-by-side comparison of DB vs YAML
+- Tabular output for value mismatches
+- Detailed breakdown by change type
+- Recommended actions for sync
+
+### ✅ JSON Export Format
+```bash
+./bin/server.exe -export-config=settings.json -format=json
+```
+- Export as JSON or YAML (default: yaml)
+- Structured data for programmatic access
+- Same metadata as YAML format
+
+### ✅ Import from Exported File
+```bash
+# Import from YAML backup
+./bin/server.exe -import-config=backup.yaml
+
+# Import from JSON
+./bin/server.exe -import-config=settings.json
+```
+- Restore settings from previously exported file
+- Auto-detects YAML or JSON format
+- Confirms before overwriting existing settings
+- Shows import summary with success/failed counts
+
+### ✅ Delete Deprecated Settings
+```bash
+# Delete specific settings by ID
+./bin/server.exe -delete-settings 'old.setting1,deprecated.param2'
+
+# Force delete without confirmation
+./bin/server.exe -delete-settings 'unused.config' -force
+```
+
+**Behavior:**
+- Accepts comma-separated list of setting IDs
+- Shows preview table before deletion
+- Interactive confirmation (unless `--force`)
+- Validates all settings exist before proceeding
+- Removes from storage + cache
+- Auto-unregisters reload handlers
+- Batch deletion with summary report
+
+**Output:**
+```
+📋 Settings to be deleted (2):
+
+ID                  Category    Key           Value         Migrated
+──                  ────────    ───           ─────         ────────
+old.setting1        auth        old_flag      true          Yes
+deprecated.param2   server      old_timeout   30s           Yes
+
+⚠️  Are you sure you want to DELETE these settings? (yes/no): yes
+✅ Deleted: old.setting1
+✅ Deleted: deprecated.param2
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Deletion Summary:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Deleted:  2
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Use Cases:**
+- Remove deprecated settings after refactoring
+- Clean up test/debug settings in production
+- Consolidate duplicate/obsolete configuration
+
+## Live Reload Handlers (Phase 4)
+
+Settings with `requires_restart=false` support hot-reload through registered handlers:
+
+### Supported Hot-Reloadable Settings
+
+| Setting ID | Handler | Description |
+|-----------|---------|-------------|
+| `logging.level` | `logrus.SetLevel()` | Dynamic log level change |
+| `database.postgresql.max_open_conns` | `db.SetMaxOpenConns()` | Connection pool resize |
+| `database.postgresql.max_idle_conns` | `db.SetMaxIdleConns()` | Idle connection limit |
+
+**Example:**
+```bash
+# Change log level via UI
+PUT /api/admin/settings/logging.level
+Body: {"value": "debug"}
+
+# → logrus.SetLevel(debug) applied instantly!
+# → No server restart required
+```
+
+### Extensibility
+
+Reload handlers are registered in `internal/settings/reload_handlers.go`:
+
+```go
+// Register custom handler
+manager.RegisterReloadHandler("inference.yzma.temperature", func(ctx context.Context, setting *Setting) error {
+    temp, err := strconv.ParseFloat(setting.Value, 64)
+    if err != nil {
+        return err
+    }
+    yzmaClient.SetDefaultTemperature(temp)
+    return nil
+})
+```
+
+**Future candidates:**
+- `auth.rate_limiting.default_requests_per_minute`
+- `inference.yzma.temperature/top_k/top_p`
+- `metrics.enabled` (toggle Prometheus)
+
 ## Future Enhancements (v3.1.0+)
 
-- [ ] `--dry-run` flag for migrate-config (preview changes without applying)
-- [ ] `--category` filter for validate and export commands
-- [ ] `--diff` mode for validate (show side-by-side comparison)
-- [ ] `--import-config` command (restore from exported YAML)
 - [ ] Interactive mode with prompts for bulk editing
 - [ ] Web UI for CLI-equivalent operations
+- [ ] `--category` filter for validate and export commands
+- [ ] Soft delete with `deleted_at` timestamp
 
 ## Related Documentation
 

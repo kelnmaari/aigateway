@@ -1,0 +1,508 @@
+// Dashboard Manager
+class Dashboard {
+    constructor() {
+        this.user = null;
+        this.stats = {
+            conversations: 0,
+            tenants: 0,
+            apiKeys: 0,
+            requests: 0
+        };
+    }
+
+    // Initialize dashboard
+    async init() {
+        // Check authentication
+        if (!this.isAuthenticated()) {
+            window.location.href = '/web/login.html';
+            return;
+        }
+
+        try {
+            // Load user info
+            await this.loadUser();
+            
+            // Load dashboard data (v3.1.0: loadStats now includes recent data via batch API)
+            await Promise.all([
+                this.loadStats(),  // Loads stats + recent conversations + recent tenants
+                this.loadModels()
+            ]);
+            
+            // Setup event listeners
+            this.setupEventListeners();
+            
+            console.log('✅ Dashboard initialized');
+            
+        } catch (error) {
+            console.error('Failed to initialize dashboard:', error);
+            if (error.message.includes('401') || error.message.includes('unauthorized')) {
+                this.logout();
+            }
+        }
+    }
+
+    // Check if user is authenticated
+    isAuthenticated() {
+        return !!localStorage.getItem('access_token');
+    }
+
+    // Load current user
+    async loadUser() {
+        try {
+            this.user = await api.getCurrentUser();
+            
+            // Navbar handles user info display now via navbar.js component
+
+            // Update user avatar
+            const avatars = document.querySelectorAll('.user-avatar');
+            avatars.forEach(avatar => {
+                avatar.textContent = (this.user.full_name || this.user.username).charAt(0).toUpperCase();
+            });
+            
+            // Show/hide Admin link based on user role
+            if (this.user.is_admin) {
+                this.showAdminLink();
+            }
+        } catch (error) {
+            console.error('Failed to load user:', error);
+            throw error;
+        }
+    }
+    
+    showAdminLink() {
+        // Check if admin link already exists
+        if (document.querySelector('.nav-link[href="/admin.html"]')) {
+            return;
+        }
+        
+        // Find dashboard link and insert admin link after it
+        const dashboardLink = document.querySelector('.nav-link[href="/dashboard.html"]');
+        if (dashboardLink) {
+            const adminLink = document.createElement('a');
+            adminLink.href = '/admin.html';
+            adminLink.className = 'nav-link';
+            adminLink.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke-width="2"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="2"/>
+                </svg>
+                Admin
+            `;
+            dashboardLink.parentNode.insertBefore(adminLink, dashboardLink.nextSibling);
+            console.log('✅ Admin link added to navigation');
+        }
+    }
+
+    // Load dashboard stats
+    async loadStats() {
+        // Wrap with AG Framework error boundary (v3.1.0: Framework)
+        const loadFn = async () => {
+            // Show skeleton loaders using AG framework
+            AG.skeleton.show('#stats-grid', 4);
+
+            // Use new batch API endpoint (v3.1.0: AJAX-01)
+            const data = await AG.http.get('/api/dashboard/stats');
+            
+            this.stats.conversations = data.conversations || 0;
+            this.stats.tenants = data.tenants || 0;
+            this.stats.apiKeys = data.api_keys || 0;
+            this.stats.requests = data.requests_30d || 0;
+            
+            // Update UI
+            this.renderStats();
+            
+            // Load recent data if provided
+            if (data.recent_conversations) {
+                this.renderRecentConversations(data.recent_conversations);
+            }
+            if (data.recent_tenants) {
+                this.renderRecentTenants(data.recent_tenants);
+            }
+        };
+        
+        try {
+            await window.errorBoundary.retry(loadFn, 'Dashboard Stats');
+        } catch (error) {
+            // Graceful degradation - render with defaults
+            console.error('Failed to load stats after retries:', error);
+            AG.toast('Failed to load dashboard stats', 'error');
+            this.renderStats();
+        }
+    }
+
+    // Show skeleton loaders for stats cards (v3.1.0: AJAX-02)
+    showStatsSkeletons() {
+        const statConv = document.getElementById('stat-conversations');
+        const statTen = document.getElementById('stat-tenants');
+        const statKeys = document.getElementById('stat-api-keys') || document.getElementById('stat-apikeys');
+        const statReq = document.getElementById('stat-requests') || document.getElementById('stat-files');
+        
+        // Replace with skeleton
+        [statConv, statTen, statKeys, statReq].forEach(el => {
+            if (el) {
+                el.innerHTML = '<div class="skeleton" style="width: 60px; height: 32px;"></div>';
+            }
+        });
+    }
+
+    // Render stats cards
+    renderStats() {
+        const statConv = document.getElementById('stat-conversations');
+        const statTen = document.getElementById('stat-tenants');
+        const statKeys = document.getElementById('stat-api-keys') || document.getElementById('stat-apikeys');
+        const statReq = document.getElementById('stat-requests') || document.getElementById('stat-files');
+        
+        if (statConv) statConv.textContent = this.stats.conversations;
+        if (statTen) statTen.textContent = this.stats.tenants;
+        if (statKeys) statKeys.textContent = this.stats.apiKeys;
+        if (statReq) statReq.textContent = this.stats.requests || 0;
+    }
+
+    // Render recent conversations from batch API (v3.1.0: AJAX-01)
+    renderRecentConversations(conversations) {
+        const tbody = document.getElementById('recent-conversations-tbody') || document.getElementById('recent-conversations');
+        if (!tbody) {
+            console.warn('Recent conversations tbody not found');
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        
+        if (!conversations || conversations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No conversations yet. <a href="/chat.html">Start chatting!</a></td></tr>';
+            return;
+        }
+        
+        conversations.forEach(conv => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div style="font-weight: 500;">${this.escapeHtml(conv.title)}</div>
+                </td>
+                <td>
+                    <span class="badge badge-info">${this.escapeHtml(conv.model)}</span>
+                </td>
+                <td>${conv.message_count || 0}</td>
+                <td>${this.formatDate(conv.updated_at || conv.created_at)}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="dashboard.openConversation('${conv.id}')">Open</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Render recent tenants from batch API (v3.1.0: AJAX-01)
+    renderRecentTenants(tenants) {
+        const tbody = document.getElementById('recent-tenants-tbody') || document.getElementById('recent-tenants');
+        if (!tbody) {
+            console.warn('Recent tenants tbody not found');
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        
+        if (!tenants || tenants.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No tenants yet.</td></tr>';
+            return;
+        }
+        
+        tenants.forEach(tenant => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div style="font-weight: 500;">${this.escapeHtml(tenant.name)}</div>
+                </td>
+                <td>${tenant.member_count || 0}</td>
+                <td>${this.formatDate(tenant.created_at)}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="dashboard.viewTenant('${tenant.id}')">View</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Load recent conversations
+    async loadRecentConversations() {
+        const tbody = document.getElementById('recent-conversations-tbody') || document.getElementById('recent-conversations');
+        if (!tbody) {
+            console.warn('Recent conversations tbody not found');
+            return;
+        }
+        tbody.innerHTML = '';
+        
+        try {
+            const response = await api.getConversations();
+            const conversations = response.conversations || [];
+            
+            if (conversations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No conversations yet. <a href="/chat.html">Start chatting!</a></td></tr>';
+                return;
+            }
+            
+            // Show only first 5
+            const recent = conversations.slice(0, 5);
+            
+            recent.forEach(conv => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <div style="font-weight: 500;">${this.escapeHtml(conv.title)}</div>
+                    </td>
+                    <td>
+                        <span class="badge badge-info">${this.escapeHtml(conv.model)}</span>
+                    </td>
+                    <td>${conv.message_count || 0}</td>
+                    <td>${this.formatDate(conv.created_at)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="dashboard.openConversation('${conv.id}')">Open</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+        } catch (error) {
+            console.error('Failed to load conversations:', error);
+            tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Failed to load conversations</td></tr>';
+        }
+    }
+
+    // Load tenants
+    async loadTenants() {
+        try {
+            const response = await api.request(`${api.baseURL}/api/users/me/tenants`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load tenants');
+            }
+            
+            const data = await response.json();
+            const tenants = data.tenants || [];
+            
+            const container = document.getElementById('tenants-grid') || document.getElementById('tenants-list');
+            if (!container) {
+                console.warn('Tenants container not found');
+                return;
+            }
+            container.innerHTML = '';
+            
+            if (tenants.length === 0) {
+                container.innerHTML = `
+                    <div class="stat-card">
+                        <h3>No tenants</h3>
+                        <div class="label"><a href="/tenants.html">Create your first tenant</a></div>
+                    </div>
+                `;
+                return;
+            }
+            
+            tenants.forEach(tenant => {
+                const card = this.createTenantCard(tenant);
+                container.appendChild(card);
+            });
+            
+        } catch (error) {
+            console.error('Failed to load tenants:', error);
+            const container = document.getElementById('tenants-grid') || document.getElementById('tenants-list');
+            if (container) {
+                container.innerHTML = 
+                    '<div class="stat-card danger"><h3>Error</h3><div class="label">Failed to load tenants</div></div>';
+            }
+        }
+    }
+
+    // Create tenant card element
+    createTenantCard(tenant) {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+        card.style.cursor = 'pointer';
+        card.onclick = () => window.location.href = `/tenants.html?id=${tenant.id}`;
+        
+        card.innerHTML = `
+            <h3>${this.escapeHtml(tenant.name)}</h3>
+            <div class="value">${tenant.member_count || 0}</div>
+            <div class="label">members</div>
+        `;
+        
+        return card;
+    }
+
+    // Open conversation in chat
+    openConversation(id) {
+        window.location.href = `/chat.html?conversation=${id}`;
+    }
+
+    // View tenant details
+    viewTenant(id) {
+        window.location.href = `/tenants.html?id=${id}`;
+    }
+
+    // Delete conversation
+    async deleteConversation(id) {
+        const confirmed = await modal.danger(
+            'Are you sure you want to delete this conversation?',
+            'Delete Conversation'
+        );
+        if (!confirmed) return;
+        
+        try {
+            await api.deleteConversation(id);
+            await this.loadRecentConversations();
+            await this.loadStats();
+        } catch (error) {
+            console.error('Failed to delete conversation:', error);
+            toast.error('Failed to delete conversation');
+        }
+    }
+
+    // Load available models (v3.0.6+)
+    // Shows ONLY loaded models from /v1/models (OpenAI compatible)
+    async loadModels() {
+        const container = document.getElementById('loaded-models-container');
+        if (!container) {
+            console.warn('Models container not found');
+            return;
+        }
+        
+        // Show skeleton loader using AG framework (v3.1.0)
+        AG.skeleton.show(container, 3);
+        
+        try {
+            // Fetch models using AG.http
+            const response = await api.request(`${api.baseURL}/v1/models`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load models');
+            }
+            
+            const data = await response.json();
+            const models = data.data || [];
+            
+            this.renderModels(models, container);
+            
+        } catch (error) {
+            console.error('Failed to load models:', error);
+            AG.toast('Failed to load models', 'error');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <p style="color: var(--danger-color);">Failed to load models</p>
+                    <button class="btn btn-secondary" onclick="dashboard.loadModels()" style="margin-top: 12px;">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    // Render models list
+    renderModels(models, container) {
+        if (models.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="opacity: 0.3; margin-bottom: 16px;">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" stroke-width="2"/>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" stroke-width="2"/>
+                    </svg>
+                    <p>No models loaded</p>
+                    <p style="font-size: 0.875rem; margin-top: 8px;">
+                        <a href="/admin.html" style="color: var(--primary-color);">Go to Admin Panel</a> to load models
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        // Create models grid
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;';
+        
+        models.forEach(model => {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            card.style.cssText = 'cursor: pointer; transition: all 0.2s;';
+            card.onclick = () => window.location.href = '/chat.html';
+            
+            // Extract model name (remove path if present)
+            const modelName = model.id.split('/').pop().split('\\').pop();
+            
+            card.innerHTML = `
+                <div style="display: flex; align-items: start; gap: 12px;">
+                    <div style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1.25rem;">
+                        🤖
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h3 style="margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(modelName)}">
+                            ${this.escapeHtml(modelName)}
+                        </h3>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span style="display: inline-flex; align-items: center; padding: 2px 8px; background: rgba(16, 163, 127, 0.1); color: var(--accent-primary); border-radius: 12px; font-size: 0.75rem; font-weight: 500;">
+                                ✓ Loaded
+                            </span>
+                        </div>
+                        <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(model.id)}">
+                            ${this.escapeHtml(model.id)}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            grid.appendChild(card);
+        });
+        
+        container.innerHTML = '';
+        container.appendChild(grid);
+    }
+
+    // Setup event listeners
+    setupEventListeners() {
+        // Navbar component (navbar.js) handles user dropdown and logout now
+        // No need for duplicate event listeners here
+    }
+
+    // Logout
+    logout() {
+        api.logout();
+    }
+
+    // Helper: Escape HTML
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Helper: Format date
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 1) return 'Just now';
+        if (minutes < 60) return `${minutes}m ago`;
+        if (hours < 24) return `${hours}h ago`;
+        if (days < 7) return `${days}d ago`;
+        
+        return date.toLocaleDateString();
+    }
+}
+
+// Global function for refresh button
+window.refreshModels = function() {
+    if (window.dashboard) {
+        window.dashboard.loadModels();
+    }
+};
+
+// Initialize dashboard when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    window.dashboard = new Dashboard();
+    dashboard.init();
+});
+
+
+

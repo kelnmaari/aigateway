@@ -536,10 +536,16 @@ type ExtractorsConfig struct {
 
 // Load загружает конфигурацию из файла и переменных окружения
 func Load(configPath string) (*Config, error) {
+	// DEBUG: показать что пришло в функцию
+	fmt.Printf("🔧 DEBUG: Load() called with configPath = '%s'\n", configPath)
+	
 	viper := viper.New()
 
 	// Настройка поиска конфигурационных файлов
 	if configPath != "" {
+		// Когда путь указан явно, используем SetConfigFile БЕЗ SetConfigType
+		// Viper автоматически определит тип по расширению файла
+		fmt.Printf("🔧 DEBUG: Using SetConfigFile('%s')\n", configPath)
 		viper.SetConfigFile(configPath)
 	} else {
 		// Auto-discover config file: try config.yaml (production) or dev.yaml (development)
@@ -675,7 +681,7 @@ func migrateToInferenceConfig(config *Config) *Config {
 	fmt.Printf("        backend: \"%s\"\n", config.Inference.Backend)
 	fmt.Println("        max_loaded_models: 3")
 	fmt.Println("        gpu_layers: -1")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	return config
 }

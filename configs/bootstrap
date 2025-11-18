@@ -1,0 +1,31 @@
+# AIGateway Bootstrap Configuration
+# Version: v3.1.0
+# 
+# This is a MINIMAL config file containing only database connection info.
+# All other settings are loaded from the database on startup.
+# 
+# After initial migration, this replaces your full dev.yaml/production.yaml.
+# 
+# Environment Variables:
+#   POSTGRES_PASSWORD - Database password (for security)
+#
+# To migrate settings from full config to database:
+#   ./bin/server.exe -migrate-config
+#
+# Full configuration is then managed via:
+#   - Web UI: http://localhost:8085/admin.html → Settings tab
+#   - CLI: ./bin/server.exe -export-config / -import-config
+#
+
+database:
+    type: postgresql
+    postgresql:
+        host: 192.168.1.101
+        port: 32316
+        database: ollama_proxy
+        user: proxy_user
+        password: ${POSTGRES_PASSWORD}
+        ssl_mode: disable
+logging:
+    level: debug
+    format: text

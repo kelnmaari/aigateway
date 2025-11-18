@@ -385,23 +385,102 @@ func TestExportCommand(t *testing.T) {
 		mockStorage.settings[s.ID] = s
 	}
 
-	// Create temp file for export
-	tmpFile := "test_export.yaml"
-	defer os.Remove(tmpFile)
+	t.Run("export as YAML", func(t *testing.T) {
+		tmpFile := "test_export.yaml"
+		defer os.Remove(tmpFile)
 
-	// Test export
-	err := ExportCommand(ctx, mockStorage, logger, tmpFile)
-	require.NoError(t, err)
+		err := ExportCommand(ctx, mockStorage, logger, tmpFile, "yaml")
+		require.NoError(t, err)
 
-	// Verify file exists
-	_, err = os.Stat(tmpFile)
-	assert.NoError(t, err, "Export file should exist")
+		// Verify file exists
+		_, err = os.Stat(tmpFile)
+		assert.NoError(t, err, "Export file should exist")
 
-	// Verify file content
-	content, err := os.ReadFile(tmpFile)
-	require.NoError(t, err)
-	assert.Contains(t, string(content), "server.host")
-	assert.Contains(t, string(content), "0.0.0.0")
+		// Verify file content
+		content, err := os.ReadFile(tmpFile)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "server.host")
+		assert.Contains(t, string(content), "0.0.0.0")
+	})
+
+	t.Run("export as JSON", func(t *testing.T) {
+		tmpFile := "test_export.json"
+		defer os.Remove(tmpFile)
+
+		err := ExportCommand(ctx, mockStorage, logger, tmpFile, "json")
+		require.NoError(t, err)
+
+		// Verify file exists
+		_, err = os.Stat(tmpFile)
+		assert.NoError(t, err, "Export file should exist")
+
+		// Verify file content
+		content, err := os.ReadFile(tmpFile)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "server.host")
+		assert.Contains(t, string(content), "\"format\": \"json\"")
+	})
+
+	t.Run("invalid format", func(t *testing.T) {
+		err := ExportCommand(ctx, mockStorage, logger, "test.txt", "invalid")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported format")
+	})
+}
+
+func TestImportCommand(t *testing.T) {
+	t.Run("import from YAML", func(t *testing.T) {
+		ctx := context.Background()
+		logger := logrus.New()
+		logger.SetLevel(logrus.ErrorLevel)
+		mockStorage := NewMockStorage()
+
+		// Create temp YAML file
+		tmpFile := "test_import.yaml"
+		defer os.Remove(tmpFile)
+
+		yamlContent := `
+exported_at: "2025-11-16T15:00:00Z"
+total_settings: 2
+settings:
+  server:
+    - id: server.host
+      key: host
+      value: "127.0.0.1"
+      type: string
+      default_value: "0.0.0.0"
+      description: "Server host"
+      is_editable: true
+      requires_restart: true
+      validation_rule: ""
+`
+		err := os.WriteFile(tmpFile, []byte(yamlContent), 0644)
+		require.NoError(t, err)
+
+		// Import requires interactive confirmation, skip for now
+		_ = ctx
+		_ = mockStorage
+		t.Skip("Import requires interactive confirmation")
+	})
+
+	t.Run("invalid file format", func(t *testing.T) {
+		ctx := context.Background()
+		logger := logrus.New()
+		logger.SetLevel(logrus.ErrorLevel)
+		mockStorage := NewMockStorage()
+		
+		tmpFile := "test_invalid.txt"
+		defer os.Remove(tmpFile)
+		
+		err := os.WriteFile(tmpFile, []byte("invalid content"), 0644)
+		require.NoError(t, err)
+		
+		// Import requires interactive confirmation, skip for now
+		_ = ctx
+		_ = logger
+		_ = mockStorage
+		t.Skip("Import requires interactive confirmation")
+	})
 }
 
 func TestListCommand_EmptyDatabase(t *testing.T) {

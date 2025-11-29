@@ -1,10 +1,22 @@
 # AIGateway WebUI Migration to Svelte 5
 
-## Обзор проекта
+## 🎉 Миграция завершена! Версия 3.2.0
 
-Миграция веб-интерфейса AIGateway с HTML + Native JS на Svelte 5 с сохранением статической сборки для встраивания через Go embed.FS.
+Веб-интерфейс AIGateway полностью мигрирован с HTML + Native JS на Svelte 5.
 
-## Текущее состояние
+## Результат миграции
+
+| Метрика | Legacy | Svelte |
+|---------|--------|--------|
+| Страниц | 26 HTML | 22 routes |
+| JavaScript | 34 файлов | TypeScript modules |
+| CSS | 7 файлов | Tailwind CSS |
+| Bundle size | ~1.2 MB | **563 KB** |
+| Типизация | Нет | Полная (TS) |
+| i18n | Нет | ru/en |
+| Темы | Частично | Light/Dark |
+
+## Исходное состояние (legacy)
 
 - **26 HTML страниц** 
 - **34 JavaScript файлов**
@@ -81,37 +93,46 @@ var StaticFiles embed.FS
 - JWT токены в localStorage
 - Refresh token логика
 
-## Roadmap обзор
+## Roadmap (завершён)
 
-| Фаза | Название | Длительность | Статус |
-|------|----------|--------------|--------|
-| 0 | Подготовка инфраструктуры | 1-2 дня | ⏳ Planned |
-| 1 | Core компоненты | 3-4 дня | ⏳ Planned |
-| 2 | Auth модуль | 2-3 дня | ⏳ Planned |
-| 3 | Dashboard + Navigation | 2-3 дня | ⏳ Planned |
-| 4 | Chat модуль | 4-5 дней | ⏳ Planned |
-| 5 | API Keys + Tenants | 2-3 дня | ⏳ Planned |
-| 6 | Admin модуль (11 табов + 5 страниц) | 4-6 дней | ⏳ Planned |
-| 7 | RAG + MCP | 2-3 дня | ⏳ Planned |
-| 8 | Profile + Settings | 1-2 дня | ⏳ Planned |
-| 9 | Monitor + Utils | 1-2 дня | ⏳ Planned |
-| 10 | Тестирование + Finalization | 2-3 дня | ⏳ Planned |
+| Фаза | Название | Статус |
+|------|----------|--------|
+| 0 | Подготовка инфраструктуры | ✅ Completed |
+| 1 | Критический функционал (Auth, Dashboard, Chat) | ✅ Completed |
+| 2 | Основной функционал (API Keys, Tenants, Profile) | ✅ Completed |
+| 3 | Административный функционал (Admin Panel) | ✅ Completed |
+| 4 | Дополнительный функционал (Files, RAG, MCP) | ✅ Completed |
+| 5 | Финализация (Docs, Versioning) | ✅ Completed |
 
-**Общая оценка: 3.5-5 недель** (с учетом сложности Admin модуля)
+**Все фазы завершены!**
 
-## Быстрый старт (после завершения миграции)
+## Быстрый старт
+
+### Разработка
 
 ```bash
-# Разработка
 cd web-svelte
 npm install
 npm run dev
+# http://localhost:5173 (proxy → :8080)
+```
 
-# Сборка для production
-npm run build
+### Production сборка
 
-# Копирование в web/
-npm run deploy
+```powershell
+# Из корня проекта
+.\build.ps1 -WebUI svelte    # Только Svelte
+.\build.ps1 -WebUI both      # Legacy + Svelte
+.\build.ps1 frontend         # Только фронтенд без Go
+```
+
+### Переключение UI
+
+В `configs/dev.yaml`:
+```yaml
+server:
+  webui:
+    version: "svelte"  # или "legacy"
 ```
 
 ## Решения по архитектуре

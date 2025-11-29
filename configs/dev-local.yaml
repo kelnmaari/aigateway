@@ -1,0 +1,376 @@
+# Development Configuration for LOCAL Docker Infrastructure
+# Use with: go run cmd/server/main.go -config configs/dev-local.yaml
+# Requires: docker-compose -f infra/docker-compose.yml up -d
+
+server:
+  port: 8085
+  host: "0.0.0.0"
+  read_timeout: "30m"
+  write_timeout: "30m"
+  idle_timeout: "120s"
+  max_header_bytes: 1048576
+  
+  tls:
+    enabled: true
+    common_name: "localhost"
+    hosts:
+      - "localhost"
+      - "127.0.0.1"
+      - "::1"
+    valid_days: 365
+
+  webui:
+    enabled: true
+    version: "svelte"
+
+# Inference Configuration
+inference:
+  backend: "yzma"
+  max_loaded_models: 3
+  gpu_layers: -1
+  
+  yzma:
+    enabled: true
+    lib_path: "C:/llama"
+    models_dir: "./data/models"
+    context_size: 4096
+    batch_size: 2048
+    ubatch_size: 2048
+    temperature: 0.7
+    top_k: 40
+    top_p: 0.9
+    min_p: 0.1
+    verbose: true
+
+auth:
+  enabled: true
+  admin_key: "sk-admin-dev-key-12345"
+  
+  rate_limiting:
+    enabled: true
+    default_requests_per_minute: 60
+    default_requests_per_hour: 1000
+    
+    # LOCAL Redis (Docker)
+    redis:
+      enabled: true
+      url: "redis://localhost:6379"
+      key_prefix: "aigateway_rl:"
+      db: 0
+      max_retries: 3
+      pool_size: 10
+  
+  jwt:
+    secret: "dev-jwt-secret-change-this-in-production-use-at-least-32-chars"
+    access_token_expiry: "15m"
+    refresh_token_expiry: "168h"
+  
+  registration:
+    mode: "open"
+    require_email_verification: false
+    allow_username_login: true
+  
+  invitations:
+    enabled: true
+    default_expiry_days: 7
+    max_uses_default: 1
+    allow_email_restriction: true
+    rate_limit:
+      creation_per_admin_hour: 10
+      validation_per_ip_minute: 10
+
+  oidc:
+    enabled: false
+  
+  ldap:
+    enabled: false
+
+# LOCAL PostgreSQL (Docker)
+database:
+  type: "postgresql"
+  
+  sqlite:
+    path: "data/aigateway.db"
+    journal_mode: "WAL"
+    busy_timeout: 5000
+    cache_size: 10000
+  
+  postgresql:
+    host: "localhost"
+    port: 5432
+    user: "proxy_user"
+    password: "secure_password_change_me"
+    database: "ollama_proxy"
+    sslmode: "disable"
+    max_open_conns: 25
+    max_idle_conns: 5
+    conn_max_lifetime: "5m"
+
+logging:
+  level: "debug"
+  format: "text"
+  output: "both"
+  file_path: "logs/proxy-dev.log"
+  max_size: 100
+  max_backups: 5
+  max_age: 30
+  compress: true
+  error_log_enabled: true
+  error_log_file_path: "logs/proxy-errors.log"
+  error_log_max_size: 50
+  error_log_max_backups: 10
+  error_log_max_age: 90
+  error_log_compress: true
+
+models:
+  default_embedding_model: "mxbai-embed-large:latest"
+  cache:
+    enabled: true
+    ttl: "5m"
+    refresh_interval: "1m"
+  preload:
+    enabled: false
+
+prompts:
+  additional_system_message: |
+    ВАЖНО: Всегда отвечай на русском языке, независимо от языка запроса пользователя.
+  prepend_to_system: false
+
+tools:
+  force_usage: false
+  default_choice: "auto"
+  fallback_model: ""
+  optimizer:
+    enabled: false
+    simplify_system_message: false
+    smart_tool_filtering: false
+    max_tools_per_request: 14
+    preserve_instructions:
+      - "When user asks to find/list/show files, use find_path or list_directory tool."
+      - "When user asks to read a file, use read_file tool."
+      - "When user asks to edit or create a file, use edit_file tool."
+      - "Use grep tool to search code content, not paths."
+
+metrics:
+  enabled: true
+  prometheus_path: "/metrics"
+  collection:
+    enabled: true
+    buffer_size: 1000
+    flush_interval: "10s"
+
+tui:
+  enabled: true
+  refresh_rate: "1s"
+  theme: "default"
+  dashboard:
+    charts_history: 100
+    auto_refresh: true
+  request_monitor:
+    max_requests: 1000
+    auto_scroll: true
+
+development:
+  hot_reload: true
+  debug_mode: true
+  profile_enabled: true
+  pprof_enabled: true
+  race_detection: true
+
+# LOCAL Jaeger (Docker - optional)
+observability:
+  tracing:
+    enabled: false  # Enable if running: docker-compose --profile tracing up
+    provider: "jaeger"
+    service_name: "aigateway"
+    sampling_rate: 1.0
+    jaeger:
+      endpoint: "http://localhost:4318"
+  
+  performance:
+    enabled: true
+    collection_interval: "30s"
+    memory_threshold_mb: 1024
+    goroutine_threshold: 1000
+    slow_request_threshold: "5s"
+    gc_percentage: 100
+    leak_detection: true
+    pprof_enabled: true
+
+# LOCAL MinIO (Docker)
+file_storage:
+  backend: "s3"
+  
+  local:
+    base_path: "./data/files"
+    max_file_size: "100MB"
+    max_total_size: "10GB"
+    allowed_extensions:
+      - ".pdf"
+      - ".docx"
+      - ".doc"
+      - ".txt"
+      - ".csv"
+      - ".xlsx"
+      - ".xls"
+      - ".md"
+      - ".rtf"
+    scan_viruses: false
+    validate_content: true
+  
+  s3:
+    endpoint: "http://localhost:9000"
+    bucket: "user-files"
+    access_key: "minioadmin"
+    secret_key: "minioadmin123"
+    use_ssl: false
+    region: "us-east-1"
+    public_bucket: "public-files"
+    signed_url_expiry: "1h"
+    max_file_size: "500MB"
+
+extractors:
+  pdf:
+    method: "auto"
+    preserve_layout: false
+    extract_images: false
+    ocr_enabled: false
+    max_pages: 1000
+  docx:
+    extract_tables: true
+    extract_images: false
+    extract_comments: false
+  text:
+    max_size: "10MB"
+    encoding: "utf-8"
+    fallback_encodings:
+      - "windows-1251"
+      - "iso-8859-1"
+  csv:
+    delimiter: ","
+    max_rows: 100000
+    encoding: "utf-8"
+    auto_detect_delimiter: true
+  timeout: "30s"
+  parallel_workers: 4
+
+web_fetch:
+  enabled: true
+  timeout: "30s"
+  block_private_ips: true
+  block_localhost: true
+  allowed_domains: []
+  blocked_domains: []
+  rate_limit_enabled: true
+  default_requests_per_min: 10
+  cache_enabled: true
+  cache_ttl: "1h"
+
+# LOCAL PostgreSQL + MinIO for RAG (Docker)
+rag:
+  enabled: true
+  
+  vector_store:
+    type: "pgvector"
+    connection_string: "postgres://proxy_user:secure_password_change_me@localhost:5432/ollama_proxy?sslmode=disable"
+    dimensions: 1024
+    distance_metric: "cosine"
+    hnsw_ef_construction: 200
+    hnsw_m: 16
+  
+  file_storage:
+    type: "s3"
+    s3_endpoint: "http://localhost:9000"
+    s3_bucket: "rag-documents"
+    s3_access_key: "minioadmin"
+    s3_secret_key: "minioadmin123"
+    local_path: "./data/rag_files"
+    max_file_size: "100MB"
+  
+  embeddings:
+    provider: "yzma"
+    model: "mxbai-embed-large"
+    batch_size: 32
+    timeout: "30s"
+  
+  processing:
+    workers: 4
+    queue_size: 100
+    chunk_size: 512
+    chunk_overlap: 50
+    splitter_type: "semantic"
+  
+  retrieval:
+    default_top_k: 5
+    max_top_k: 20
+    min_similarity_score: 0.7
+    rerank_enabled: true
+  
+  queue:
+    type: "postgres"
+    cleanup_interval: "1h"
+    max_retries: 3
+    visibility_timeout: "5m"
+  
+  security:
+    encryption_key: "12345678901234567890123456789012"
+    credentials_encryption_enabled: true
+
+model_registry:
+  enabled: false
+  auto_discovery:
+    enabled: false
+    interval: "30m"
+  health_check:
+    enabled: false
+    interval: "5m"
+
+agent:
+  enabled: true
+  plan_model: "llama3.2:3b"
+  reasoning:
+    max_iterations: 10
+    temperature: 0.3
+    top_p: 0.9
+    num_predict: 512
+    timeout: "120s"
+  tools:
+    enabled: true
+    base_dir: "."
+    file:
+      read_enabled: true
+      write_enabled: true
+      delete_enabled: true
+      list_enabled: true
+      max_file_size: "10MB"
+    terminal:
+      enabled: false
+      allowed_commands: []
+    mcp:
+      enabled: true
+      discovery_interval: "5m"
+  safety:
+    approval_required: true
+    dangerous_operations:
+      - "file.delete"
+      - "file.write"
+      - "terminal.execute"
+    auto_approve_safe: true
+    safe_operations:
+      - "file.read"
+      - "file.list"
+  loop_detection:
+    enabled: true
+    max_identical_actions: 2
+  streaming:
+    enabled: true
+    buffer_size: 100
+
+huggingface:
+  api_token: ""
+  models_dir: "./data/models"
+  cache_dir: "./data/hf_cache"
+  download_timeout: 5m
+  max_concurrent_downloads: 2
+  auto_resume: true
+

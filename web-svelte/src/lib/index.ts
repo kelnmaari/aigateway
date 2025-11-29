@@ -3,6 +3,7 @@
 // Stores
 export { authStore } from './stores/auth.svelte';
 export { themeStore } from './stores/theme.svelte';
+export { chatStore } from './stores/chat.svelte';
 export * from './stores/locale.svelte';
 
 // Utils

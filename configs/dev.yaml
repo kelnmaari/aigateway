@@ -24,6 +24,11 @@ server:
     # cert_file: "server.crt"  # Optional: path to existing certificate
     # key_file: "server.key"   # Optional: path to existing key
 
+  # WebUI Configuration (v3.2.0+: Svelte frontend support)
+  webui:
+    enabled: true
+    version: "legacy"  # "legacy" (HTML/JS) or "svelte" (Svelte 5)
+
 # Inference Configuration (v3.0.5+: Unified Backend)
 inference:
   backend: "yzma"  # Only yzma is supported (v3.0.6+)

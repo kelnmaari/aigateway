@@ -1,99 +1,24 @@
 # Стратегия интернационализации (i18n)
 
-## Требования
+## Выбранное решение: Paraglide JS v2.5.0
 
-- **Языки:** Russian (ru), English (en)
-- **Хранение выбора:** localStorage браузера
-- **Формат файлов:** Удобный для редактирования и просмотра
-- **TypeScript:** Полная типизация ключей
+### Почему Paraglide JS
 
----
-
-## Анализ форматов i18n файлов
-
-| Формат | Плюсы | Минусы | Оценка |
-|--------|-------|--------|--------|
-| **JSON** | Простой, стандартный, IDE поддержка | Нет комментариев | ⭐⭐⭐⭐⭐ |
-| **YAML** | Читаемый, комментарии | Чувствителен к отступам | ⭐⭐⭐⭐ |
-| **TypeScript** | Типизация из коробки | Сложнее для не-разработчиков | ⭐⭐⭐ |
-| **PO/POT** | Стандарт индустрии, Poedit | Избыточен для 2 языков | ⭐⭐⭐ |
-| **TOML** | Читаемый, секции | Менее популярен | ⭐⭐⭐ |
-
-**Рекомендация:** JSON с вложенной структурой по модулям.
-
----
-
-## Анализ библиотек для Svelte
-
-### 1. typesafe-i18n
-- **Репутация:** High
-- **Формат:** TypeScript объекты
-- **Типизация:** Полная, генерируется
-- **Минус:** Файлы в TS, сложнее редактировать
-
-### 2. Paraglide JS (Inlang) ⭐ РЕКОМЕНДУЕТСЯ
-- **Репутация:** High
-- **Формат:** JSON файлы
-- **Типизация:** Полная, генерируется
-- **Плюсы:**
-  - Tree-shakable (только используемые переводы в бандле)
-  - SSG support встроен
-  - VSCode extension (i18n-ally совместим)
-  - Современный подход
-  - Хорошая документация для SvelteKit
-
-### 3. sveltekit-i18n
-- **Репутация:** Medium
-- **Формат:** JSON
-- **Типизация:** Частичная
-
----
-
-## Выбор: Paraglide JS
+1. **Компиляция в функции** — переводы становятся tree-shakable функциями
+2. **Типизация** — полная поддержка TypeScript с автодополнением
+3. **Нет runtime overhead** — нет асинхронных загрузок
+4. **Интеграция с Vite** — плагин с HMR поддержкой
+5. **Малый размер бандла** — только используемые переводы
 
 ### Установка
 
 ```bash
-npm install @inlang/paraglide-js
+npm install @inlang/paraglide-js@latest
 ```
 
-### Структура файлов
+### Конфигурация
 
-```
-web-svelte/
-├── project.inlang/
-│   └── settings.json
-├── messages/
-│   ├── en.json          # English translations
-│   └── ru.json          # Russian translations
-└── src/
-    └── lib/
-        └── paraglide/   # Generated (DO NOT EDIT)
-            ├── messages.js
-            ├── runtime.js
-            └── server.js
-```
-
-### settings.json
-
-```json
-{
-  "$schema": "https://inlang.com/schema/project-settings",
-  "baseLocale": "en",
-  "locales": ["en", "ru"],
-  "modules": [
-    "https://cdn.jsdelivr.net/npm/@inlang/message-lint-rule-empty-pattern@latest/dist/index.js",
-    "https://cdn.jsdelivr.net/npm/@inlang/message-lint-rule-missing-translation@latest/dist/index.js",
-    "https://cdn.jsdelivr.net/npm/@inlang/plugin-message-format@latest/dist/index.js",
-    "https://cdn.jsdelivr.net/npm/@inlang/plugin-m-function-matcher@latest/dist/index.js"
-  ],
-  "plugin.inlang.messageFormat": {
-    "pathPattern": "./messages/{locale}.json"
-  }
-}
-```
-
-### vite.config.ts
+#### vite.config.ts
 
 ```typescript
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -105,74 +30,54 @@ export default defineConfig({
     sveltekit(),
     paraglideVitePlugin({
       project: './project.inlang',
-      outdir: './src/lib/paraglide',
-    }),
-  ],
+      outdir: './src/lib/paraglide'
+    })
+  ]
 });
 ```
 
----
+#### project.inlang/settings.json
 
-## Формат JSON файлов
+```json
+{
+  "baseLocale": "en",
+  "locales": ["en", "ru"],
+  "modules": [
+    "https://cdn.jsdelivr.net/npm/@inlang/plugin-message-format@latest/dist/index.js"
+  ],
+  "plugin.inlang.messageFormat": {
+    "pathPattern": "./messages/{locale}.json"
+  }
+}
+```
+
+## Структура файлов переводов
+
+```
+web-svelte/
+├── messages/
+│   ├── en.json          # Английские переводы
+│   └── ru.json          # Русские переводы
+├── project.inlang/
+│   └── settings.json    # Конфигурация Paraglide
+└── src/lib/paraglide/   # Генерируемые файлы (не редактировать!)
+    ├── messages.js
+    ├── runtime.js
+    └── server.js
+```
+
+## Формат файлов переводов
 
 ### messages/en.json
 
 ```json
 {
-  "common": {
-    "loading": "Loading...",
-    "save": "Save",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "confirm": "Confirm",
-    "error": "Error",
-    "success": "Success"
-  },
-  "auth": {
-    "login": "Login",
-    "logout": "Logout",
-    "register": "Register",
-    "email": "Email",
-    "password": "Password",
-    "username": "Username",
-    "rememberMe": "Remember me",
-    "forgotPassword": "Forgot password?",
-    "noAccount": "Don't have an account?",
-    "hasAccount": "Already have an account?"
-  },
-  "nav": {
-    "dashboard": "Dashboard",
-    "chat": "Chat",
-    "apiKeys": "API Keys",
-    "tenants": "Organizations",
-    "profile": "Profile",
-    "admin": "Admin",
-    "settings": "Settings"
-  },
-  "dashboard": {
-    "title": "Dashboard",
-    "conversations": "Conversations",
-    "apiKeys": "API Keys",
-    "models": "Models",
-    "requests": "Requests"
-  },
-  "chat": {
-    "newChat": "New Chat",
-    "sendMessage": "Send message",
-    "typeMessage": "Type your message...",
-    "model": "Model",
-    "parameters": "Parameters",
-    "temperature": "Temperature",
-    "maxTokens": "Max Tokens"
-  },
-  "admin": {
-    "title": "Administration",
-    "users": "Users",
-    "rbac": "RBAC",
-    "settings": "Settings",
-    "backups": "Backups",
-    "logs": "Logs"
-  }
+  "common_loading": "Loading...",
+  "common_save": "Save",
+  "auth_login": "Login",
+  "auth_welcomeBack": "Welcome back",
+  "nav_dashboard": "Dashboard",
+  "error_invalidCredentials": "Invalid email or password"
 }
 ```
 
@@ -180,64 +85,40 @@ export default defineConfig({
 
 ```json
 {
-  "common": {
-    "loading": "Загрузка...",
-    "save": "Сохранить",
-    "cancel": "Отмена",
-    "delete": "Удалить",
-    "confirm": "Подтвердить",
-    "error": "Ошибка",
-    "success": "Успешно"
-  },
-  "auth": {
-    "login": "Войти",
-    "logout": "Выйти",
-    "register": "Регистрация",
-    "email": "Email",
-    "password": "Пароль",
-    "username": "Имя пользователя",
-    "rememberMe": "Запомнить меня",
-    "forgotPassword": "Забыли пароль?",
-    "noAccount": "Нет аккаунта?",
-    "hasAccount": "Уже есть аккаунт?"
-  },
-  "nav": {
-    "dashboard": "Главная",
-    "chat": "Чат",
-    "apiKeys": "API Ключи",
-    "tenants": "Организации",
-    "profile": "Профиль",
-    "admin": "Администрирование",
-    "settings": "Настройки"
-  },
-  "dashboard": {
-    "title": "Главная панель",
-    "conversations": "Диалоги",
-    "apiKeys": "API Ключи",
-    "models": "Модели",
-    "requests": "Запросы"
-  },
-  "chat": {
-    "newChat": "Новый чат",
-    "sendMessage": "Отправить",
-    "typeMessage": "Введите сообщение...",
-    "model": "Модель",
-    "parameters": "Параметры",
-    "temperature": "Температура",
-    "maxTokens": "Макс. токенов"
-  },
-  "admin": {
-    "title": "Администрирование",
-    "users": "Пользователи",
-    "rbac": "Роли и права",
-    "settings": "Настройки",
-    "backups": "Резервные копии",
-    "logs": "Логи"
-  }
+  "common_loading": "Загрузка...",
+  "common_save": "Сохранить",
+  "auth_login": "Войти",
+  "auth_welcomeBack": "С возвращением",
+  "nav_dashboard": "Панель управления",
+  "error_invalidCredentials": "Неверный email или пароль"
 }
 ```
 
----
+### Правила именования ключей
+
+- **Формат**: `category_keyName` (snake_case + camelCase)
+- **Категории**: `common`, `auth`, `nav`, `dashboard`, `chat`, `admin`, `error`, `success`, `theme`, `language`
+- **Примеры**:
+  - `common_save` — общие элементы
+  - `auth_login` — авторизация
+  - `nav_dashboard` — навигация
+  - `error_notFound` — ошибки
+
+### Параметры в сообщениях
+
+```json
+{
+  "greeting": "Hello, {name}!",
+  "items_count": "You have {count} items"
+}
+```
+
+```typescript
+import * as m from '$lib/paraglide/messages';
+
+m.greeting({ name: 'John' }); // "Hello, John!"
+m.items_count({ count: 5 });  // "You have 5 items"
+```
 
 ## Использование в компонентах
 
@@ -248,181 +129,173 @@ export default defineConfig({
   import * as m from '$lib/paraglide/messages';
 </script>
 
-<h1>{m.dashboard_title()}</h1>
+<h1>{m.auth_welcomeBack()}</h1>
 <button>{m.common_save()}</button>
 ```
 
-### С параметрами
-
-```json
-{
-  "greeting": "Hello, {name}!",
-  "itemCount": "{count, plural, =0 {No items} =1 {1 item} other {# items}}"
-}
-```
-
-```svelte
-<p>{m.greeting({ name: user.name })}</p>
-<p>{m.itemCount({ count: items.length })}</p>
-```
-
----
-
-## Переключение языка
-
-### Svelte store для языка
+### Управление локалью
 
 ```typescript
-// src/lib/stores/locale.ts
-import { browser } from '$app/environment';
-import { setLocale, locale as paraglideLocale } from '$lib/paraglide/runtime';
+import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
 
-const STORAGE_KEY = 'aigateway_locale';
-const DEFAULT_LOCALE = 'en';
+// Получить текущую локаль
+const current = getLocale(); // "en" | "ru"
 
-export function initLocale() {
-  if (browser) {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const locale = saved || navigator.language.split('-')[0] || DEFAULT_LOCALE;
-    
-    if (['en', 'ru'].includes(locale)) {
-      setLocale(locale as 'en' | 'ru');
-    } else {
-      setLocale(DEFAULT_LOCALE);
-    }
-  }
-}
+// Установить локаль
+setLocale('ru');
 
-export function changeLocale(newLocale: 'en' | 'ru') {
-  setLocale(newLocale);
-  if (browser) {
-    localStorage.setItem(STORAGE_KEY, newLocale);
-  }
-}
-
-export { paraglideLocale as locale };
+// Список доступных локалей
+console.log(locales); // ["en", "ru"]
 ```
 
-### Компонент переключателя
+### Сохранение локали в localStorage
 
-```svelte
-<script lang="ts">
-  import { locale, changeLocale } from '$lib/stores/locale';
-  import { Globe } from 'lucide-svelte';
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+```typescript
+const STORAGE_KEY = 'PARAGLIDE_LOCALE';
+
+function toggleLocale() {
+  const current = getLocale();
+  const currentIndex = locales.indexOf(current);
+  const nextIndex = (currentIndex + 1) % locales.length;
+  const newLocale = locales[nextIndex];
   
-  const languages = [
-    { code: 'en', label: 'English', flag: '🇬🇧' },
-    { code: 'ru', label: 'Русский', flag: '🇷🇺' },
-  ] as const;
-</script>
-
-<DropdownMenu.Root>
-  <DropdownMenu.Trigger class="btn btn-ghost">
-    <Globe class="h-5 w-5" />
-  </DropdownMenu.Trigger>
-  <DropdownMenu.Content>
-    {#each languages as lang}
-      <DropdownMenu.Item 
-        onclick={() => changeLocale(lang.code)}
-        class:active={$locale === lang.code}
-      >
-        <span>{lang.flag}</span>
-        <span>{lang.label}</span>
-      </DropdownMenu.Item>
-    {/each}
-  </DropdownMenu.Content>
-</DropdownMenu.Root>
+  setLocale(newLocale);
+  localStorage.setItem(STORAGE_KEY, newLocale);
+  
+  // Перезагрузка для применения новой локали
+  window.location.reload();
+}
 ```
 
----
+## Генерация кода
 
-## Инструменты для редактирования
+При сборке Paraglide генерирует файлы в `src/lib/paraglide/`:
 
-### VSCode Extensions
-
-1. **i18n Ally** - Визуализация переводов прямо в коде
-   - Показывает переводы inline
-   - Подсветка отсутствующих ключей
-   - Автодополнение
-
-2. **JSON Tools** - Форматирование JSON
-
-### Online редакторы
-
-- **Inlang Fink** - Веб-редактор от создателей Paraglide
-- **POEditor** - Профессиональный редактор (поддерживает JSON)
-- **Localize** - Онлайн платформа
-
-### CLI инструменты
-
-```bash
-# Проверка отсутствующих переводов
-npx @inlang/cli lint
-
-# Машинный перевод (опционально)
-npx @inlang/cli machine translate --from en --to ru
+```
+src/lib/paraglide/
+├── messages/
+│   ├── _index.js              # Экспорт всех сообщений
+│   ├── auth_login.js          # Функция для auth_login
+│   ├── common_save.js         # Функция для common_save
+│   └── ...
+├── messages.js                # Публичный API
+├── runtime.js                 # Runtime функции (getLocale, setLocale, etc.)
+├── registry.js                # Внутренний регистр
+└── server.js                  # Server-side функции
 ```
 
----
+### Пример сгенерированной функции
 
-## Миграция существующих текстов
+```javascript
+// messages/auth_login.js
+const en_auth_login = () => `Login`;
+const ru_auth_login = () => `Войти`;
 
-### Шаги
-
-1. **Извлечь все тексты** из HTML/JS файлов
-2. **Структурировать** по модулям (auth, nav, dashboard, chat, admin, etc.)
-3. **Создать en.json** с базовыми ключами
-4. **Перевести ru.json**
-5. **Заменить** хардкод в Svelte компонентах на вызовы m.*()
-
-### Пример миграции
-
-**До (HTML):**
-```html
-<button class="btn btn-primary">Create API Key</button>
-<span class="text-muted">No API keys found</span>
+export const auth_login = (inputs = {}, options = {}) => {
+  const locale = options.locale ?? getLocale();
+  if (locale === "en") return en_auth_login(inputs);
+  return ru_auth_login(inputs);
+};
 ```
 
-**После (Svelte):**
-```svelte
-<script>
-  import * as m from '$lib/paraglide/messages';
-</script>
+## Добавление новых переводов
 
-<Button>{m.apiKeys_create()}</Button>
-<span class="text-muted">{m.apiKeys_empty()}</span>
+1. **Добавьте ключ в `messages/en.json`**:
+   ```json
+   {
+     "new_feature_title": "New Feature"
+   }
+   ```
+
+2. **Добавьте перевод в `messages/ru.json`**:
+   ```json
+   {
+     "new_feature_title": "Новая функция"
+   }
+   ```
+
+3. **Перезапустите dev server** — Paraglide автоматически сгенерирует новые функции
+
+4. **Используйте в коде**:
+   ```svelte
+   <h2>{m.new_feature_title()}</h2>
+   ```
+
+## Добавление новой локали
+
+1. **Обновите `project.inlang/settings.json`**:
+   ```json
+   {
+     "locales": ["en", "ru", "de"]
+   }
+   ```
+
+2. **Создайте файл `messages/de.json`** с переводами
+
+3. **Перезапустите сборку**
+
+## Best Practices
+
+### DO ✅
+
+- Используйте осмысленные ключи (`auth_loginButton`, не `btn1`)
+- Группируйте по категориям (`nav_`, `auth_`, `error_`)
+- Храните все тексты в файлах переводов, не хардкодьте в компонентах
+- Используйте параметры для динамических значений
+
+### DON'T ❌
+
+- Не редактируйте файлы в `src/lib/paraglide/` — они генерируются автоматически
+- Не используйте пробелы в ключах
+- Не смешивайте языки в одном файле переводов
+- Не используйте HTML в переводах (используйте компоненты)
+
+## Интеграция с VS Code
+
+Установите расширение [Sherlock](https://marketplace.visualstudio.com/items?itemName=inlang.vs-code-extension) для:
+
+- Автодополнения ключей переводов
+- Подсветки отсутствующих переводов
+- Inline редактирования переводов
+
+## Миграция с других решений
+
+### С svelte-i18n
+
+```typescript
+// Было (svelte-i18n)
+import { t } from 'svelte-i18n';
+$t('auth.login')
+
+// Стало (Paraglide)
+import * as m from '$lib/paraglide/messages';
+m.auth_login()
 ```
 
----
+### С i18next
 
-## Структура ключей по модулям
+```typescript
+// Было (i18next)
+i18next.t('auth:login')
 
-| Модуль | Префикс | Пример |
-|--------|---------|--------|
-| Общие | `common_` | `common_save`, `common_cancel` |
-| Навигация | `nav_` | `nav_dashboard`, `nav_chat` |
-| Авторизация | `auth_` | `auth_login`, `auth_password` |
-| Dashboard | `dashboard_` | `dashboard_title` |
-| Chat | `chat_` | `chat_newChat`, `chat_send` |
-| API Keys | `apiKeys_` | `apiKeys_create` |
-| Tenants | `tenants_` | `tenants_members` |
-| Admin | `admin_` | `admin_users`, `admin_rbac` |
-| Profile | `profile_` | `profile_settings` |
-| Errors | `error_` | `error_notFound` |
-| Success | `success_` | `success_saved` |
+// Стало (Paraglide)
+import * as m from '$lib/paraglide/messages';
+m.auth_login()
+```
 
----
+## Troubleshooting
 
-## Чек-лист i18n
+### Ошибка "Module has no exported member"
 
-- [ ] Установить Paraglide JS
-- [ ] Создать project.inlang/settings.json
-- [ ] Создать messages/en.json с базовой структурой
-- [ ] Создать messages/ru.json с переводами
-- [ ] Настроить vite.config.ts
-- [ ] Создать locale store
-- [ ] Добавить LanguageSwitcher компонент
-- [ ] Заменить все хардкод тексты на m.*()
-- [ ] Установить i18n Ally в VSCode
+- Убедитесь что ключ существует в файлах переводов
+- Перезапустите dev server для перегенерации
 
+### Переводы не обновляются
+
+- Проверьте что vite plugin настроен правильно
+- Очистите `.svelte-kit` директорию и пересоберите
+
+### Локаль не сохраняется
+
+- Проверьте что `localStorage` доступен
+- Убедитесь что `PARAGLIDE_LOCALE` ключ используется

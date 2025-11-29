@@ -1,11 +1,15 @@
 # Cross-compilation build script для Windows
-# AIGateway Platform v2.1.0
+# AIGateway Platform v3.x
+# Supports Legacy and Svelte WebUI
 
 param(
     [Parameter(Position=0)]
     [string]$Command = "all",
     
-    [string]$Version = ""
+    [string]$Version = "",
+    
+    [ValidateSet("legacy", "svelte", "both")]
+    [string]$WebUI = "both"
 )
 
 # Build configuration
@@ -30,6 +34,10 @@ try {
     $GitCommit = "unknown"
 }
 $OutputDir = "dist"
+$SvelteDir = "web-svelte"
+$SvelteBuildDir = "internal/web/svelte-build"
+$LegacyDir = "web"
+$LegacyEmbedDir = "internal/web/static"
 
 # Colors
 function Write-Info {
@@ -47,6 +55,135 @@ function Write-ErrorMsg {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
+function Write-Step {
+    param([string]$Message)
+    Write-Host ""
+    Write-Host "=== $Message ===" -ForegroundColor Cyan
+}
+
+# Check Node.js installation
+function Test-NodeInstallation {
+    try {
+        $nodeVersion = node --version 2>$null
+        if (-not $nodeVersion) {
+            return $false
+        }
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+# Build Svelte WebUI
+function Build-SvelteUI {
+    Write-Step "Building Svelte WebUI"
+    
+    if (-not (Test-Path $SvelteDir)) {
+        Write-ErrorMsg "Svelte project not found at $SvelteDir"
+        Write-Warn "Run 'npm create svelte@latest web-svelte' to create it"
+        exit 1
+    }
+    
+    if (-not (Test-NodeInstallation)) {
+        Write-ErrorMsg "Node.js is not installed. Please install Node.js 18+ for Svelte build."
+        exit 1
+    }
+    
+    Push-Location $SvelteDir
+    try {
+        # Install dependencies if needed
+        if (-not (Test-Path "node_modules")) {
+            Write-Info "Installing npm dependencies..."
+            npm ci
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "npm ci failed, trying npm install..."
+                npm install
+                if ($LASTEXITCODE -ne 0) {
+                    Write-ErrorMsg "Failed to install dependencies"
+                    exit 1
+                }
+            }
+        }
+        
+        # Build
+        Write-Info "Running npm build..."
+        npm run build
+        if ($LASTEXITCODE -ne 0) {
+            Write-ErrorMsg "Svelte build failed"
+            exit 1
+        }
+        
+        # Verify build output
+        if (-not (Test-Path "build")) {
+            Write-ErrorMsg "Build output not found at $SvelteDir/build"
+            exit 1
+        }
+        
+        Write-Info "Svelte build completed successfully"
+    } finally {
+        Pop-Location
+    }
+    
+    # Copy to embed directory
+    Write-Info "Copying Svelte build to $SvelteBuildDir..."
+    
+    # Remove old build
+    if (Test-Path $SvelteBuildDir) {
+        Remove-Item -Path $SvelteBuildDir -Recurse -Force
+    }
+    
+    # Create directory and copy
+    New-Item -ItemType Directory -Path $SvelteBuildDir -Force | Out-Null
+    Copy-Item -Path "$SvelteDir/build/*" -Destination $SvelteBuildDir -Recurse
+    
+    $fileCount = (Get-ChildItem -Path $SvelteBuildDir -Recurse -File).Count
+    $totalSize = (Get-ChildItem -Path $SvelteBuildDir -Recurse -File | Measure-Object -Property Length -Sum).Sum
+    $sizeMB = [math]::Round($totalSize / 1MB, 2)
+    
+    Write-Info "Copied $fileCount files ($sizeMB MB) to $SvelteBuildDir"
+}
+
+# Copy Legacy WebUI to embed directory
+function Copy-LegacyUI {
+    Write-Step "Preparing Legacy WebUI"
+    
+    if (-not (Test-Path $LegacyDir)) {
+        Write-ErrorMsg "Legacy web directory not found at $LegacyDir"
+        exit 1
+    }
+    
+    # Remove old copy
+    if (Test-Path $LegacyEmbedDir) {
+        Remove-Item -Path $LegacyEmbedDir -Recurse -Force
+    }
+    
+    # Create directory and copy
+    New-Item -ItemType Directory -Path $LegacyEmbedDir -Force | Out-Null
+    Copy-Item -Path "$LegacyDir/*" -Destination $LegacyEmbedDir -Recurse
+    
+    $fileCount = (Get-ChildItem -Path $LegacyEmbedDir -Recurse -File).Count
+    $totalSize = (Get-ChildItem -Path $LegacyEmbedDir -Recurse -File | Measure-Object -Property Length -Sum).Sum
+    $sizeKB = [math]::Round($totalSize / 1KB, 2)
+    
+    Write-Info "Copied $fileCount files ($sizeKB KB) to $LegacyEmbedDir"
+}
+
+# Build WebUI based on selected option
+function Build-WebUI {
+    switch ($WebUI) {
+        "svelte" {
+            Build-SvelteUI
+        }
+        "legacy" {
+            Copy-LegacyUI
+        }
+        "both" {
+            Copy-LegacyUI
+            Build-SvelteUI
+        }
+    }
+}
+
 # Clean previous builds
 function Invoke-Clean {
     Write-Info "Cleaning previous builds..."
@@ -54,6 +191,23 @@ function Invoke-Clean {
         Remove-Item -Path $OutputDir -Recurse -Force
     }
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
+}
+
+# Clean WebUI builds
+function Invoke-CleanWebUI {
+    Write-Info "Cleaning WebUI builds..."
+    if (Test-Path $SvelteBuildDir) {
+        Remove-Item -Path $SvelteBuildDir -Recurse -Force
+        Write-Info "Removed $SvelteBuildDir"
+    }
+    if (Test-Path $LegacyEmbedDir) {
+        Remove-Item -Path $LegacyEmbedDir -Recurse -Force
+        Write-Info "Removed $LegacyEmbedDir"
+    }
+    if (Test-Path "$SvelteDir/build") {
+        Remove-Item -Path "$SvelteDir/build" -Recurse -Force
+        Write-Info "Removed $SvelteDir/build"
+    }
 }
 
 # Build for specific platform
@@ -71,6 +225,7 @@ function Build-Platform {
     $env:GOARCH = $Arch
     $env:CGO_ENABLED = "0"  # Disable CGO for cross-compilation
     $env:GOEXPERIMENT = "greenteagc"
+    
     # Build flags with version information
     $ldflags = "-w -s"
     $ldflags += " -X 'aigateway/internal/version.Version=$Version'"
@@ -109,11 +264,17 @@ function Build-Platform {
 
 # Build all platforms
 function Build-All {
-    Write-Info "Starting build process..."
+    Write-Step "Starting build process"
     Write-Info "Version: $Version"
     Write-Info "Build Date: $BuildDate"
     Write-Info "Git Commit: $GitCommit"
+    Write-Info "WebUI: $WebUI"
     Write-Host ""
+    
+    # Build WebUI first
+    Build-WebUI
+    
+    Write-Step "Building Go binaries"
     
     # Linux AMD64
     Build-Platform -OS "linux" -Arch "amd64" -OutputName "aigateway-linux-amd64"
@@ -134,6 +295,7 @@ function Build-All {
 # Build Linux only
 function Build-Linux {
     Write-Info "Building Linux binaries..."
+    Build-WebUI
     Build-Platform -OS "linux" -Arch "amd64" -OutputName "aigateway-linux-amd64"
     Build-Platform -OS "linux" -Arch "arm64" -OutputName "aigateway-linux-arm64"
     Write-Info "Linux builds completed!"
@@ -142,8 +304,17 @@ function Build-Linux {
 # Build Windows only
 function Build-Windows {
     Write-Info "Building Windows binary..."
+    Build-WebUI
     Build-Platform -OS "windows" -Arch "amd64" -OutputName "aigateway-windows-amd64.exe"
     Write-Info "Windows build completed!"
+}
+
+# Build only Svelte UI (no Go build)
+function Build-FrontendOnly {
+    Write-Step "Building Svelte frontend only"
+    Build-SvelteUI
+    Write-Info "Frontend build completed!"
+    Write-Info "Output: $SvelteBuildDir"
 }
 
 # Package binaries with configs
@@ -152,7 +323,7 @@ function Invoke-Package {
     
     $versionDir = "$OutputDir\aigateway-$Version"
     
-    Get-ChildItem $OutputDir -Filter "aigateway-*" | ForEach-Object {
+    Get-ChildItem $OutputDir -Filter "aigateway-*" | Where-Object { -not $_.Name.EndsWith(".zip") } | ForEach-Object {
         $binary = $_.FullName
         $basename = $_.Name
         $platform = $basename -replace "aigateway-", "" -replace "\.exe$", ""
@@ -165,7 +336,11 @@ function Invoke-Package {
         
         # Copy configs
         Copy-Item -Path "configs" -Destination $pkgDir\ -Recurse
-        Copy-Item -Path "web" -Destination $pkgDir\ -Recurse
+        
+        # Copy legacy web (for external serving if needed)
+        if (Test-Path "web") {
+            Copy-Item -Path "web" -Destination $pkgDir\ -Recurse
+        }
         
         # Copy docs
         if (Test-Path "README.md") { Copy-Item "README.md" $pkgDir\ }
@@ -193,29 +368,50 @@ function Show-Usage {
 Usage: .\build.ps1 [COMMAND] [OPTIONS]
 
 Commands:
-    all         Build for all platforms (default)
-    linux       Build for Linux only (amd64 + arm64)
-    windows     Build for Windows only (amd64)
-    package     Create distribution packages
-    clean       Clean build artifacts
-    help        Display this help message
+    all           Build for all platforms (default)
+    linux         Build for Linux only (amd64 + arm64)
+    windows       Build for Windows only (amd64)
+    frontend      Build Svelte frontend only (no Go build)
+    package       Create distribution packages
+    clean         Clean build artifacts
+    clean-webui   Clean WebUI build artifacts
+    help          Display this help message
 
 Options:
-    -Version <string>   Version tag (default: 1.3.0)
+    -Version <string>   Version tag (default: from VERSION file)
+    -WebUI <string>     WebUI to include: legacy, svelte, or both (default: both)
 
 Examples:
-    # Build all platforms
+    # Build all platforms with both UIs
     .\build.ps1 all
+
+    # Build with only Svelte UI
+    .\build.ps1 all -WebUI svelte
+
+    # Build with only Legacy UI
+    .\build.ps1 all -WebUI legacy
+
+    # Build only the Svelte frontend (no Go compilation)
+    .\build.ps1 frontend
 
     # Build Linux only
     .\build.ps1 linux
 
     # Build with custom version
-    .\build.ps1 all -Version 1.3.1
+    .\build.ps1 all -Version 3.1.0
 
     # Build and package
     .\build.ps1 all
     .\build.ps1 package
+
+    # Clean everything
+    .\build.ps1 clean
+    .\build.ps1 clean-webui
+
+WebUI Modes:
+    legacy    - Only HTML/JS frontend (smaller binary)
+    svelte    - Only Svelte frontend (modern UI)
+    both      - Both frontends embedded (switchable via --webui-version flag)
 
 "@
 }
@@ -236,27 +432,35 @@ function Test-GoInstallation {
 
 # Main execution
 function Main {
-    Test-GoInstallation
-    
     switch ($Command.ToLower()) {
         "all" {
+            Test-GoInstallation
             Invoke-Clean
             Build-All
         }
         "linux" {
+            Test-GoInstallation
             Invoke-Clean
             Build-Linux
         }
         "windows" {
+            Test-GoInstallation
             Invoke-Clean
             Build-Windows
+        }
+        "frontend" {
+            Build-FrontendOnly
         }
         "package" {
             Invoke-Package
         }
         "clean" {
             Invoke-Clean
-            Write-Info "Cleaned!"
+            Write-Info "Cleaned dist/"
+        }
+        "clean-webui" {
+            Invoke-CleanWebUI
+            Write-Info "Cleaned WebUI builds!"
         }
         "help" {
             Show-Usage
@@ -276,4 +480,3 @@ try {
     Write-ErrorMsg "An error occurred: $_"
     exit 1
 }
-

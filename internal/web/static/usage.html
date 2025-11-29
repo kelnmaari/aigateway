@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Statistics - AIGateway</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>Usage Statistics</h1>
+                    <p class="page-description">Monitor your API usage and performance</p>
+                </div>
+                <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Error/Success Messages -->
+                <div id="usage-message" class="error-message" style="display: none;"></div>
+
+                <!-- Time Period Selector -->
+                <div class="usage-controls">
+                <div class="form-group" style="max-width: 300px;">
+                    <label for="time-period">Time Period</label>
+                    <select id="time-period" class="form-control">
+                        <option value="today">Today</option>
+                        <option value="7days" selected>Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                        <option value="90days">Last 90 Days</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="max-width: 300px;">
+                    <label for="scope-selector">Scope</label>
+                    <select id="scope-selector" class="form-control">
+                        <option value="personal">Personal Usage</option>
+                        <option value="tenant">Organization Usage</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="tenant-selector-group" style="max-width: 300px; display: none;">
+                    <label for="tenant-selector">Organization</label>
+                    <select id="tenant-selector" class="form-control">
+                        <option value="">-- Select Organization --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="stats-grid" style="margin-top: 24px;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 163, 127, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Requests</div>
+                        <div class="stat-value" id="stat-total-requests">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6">
+                            <circle cx="12" cy="12" r="10" stroke-width="2"/>
+                            <path d="M12 6v6l4 2" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Response Time</div>
+                        <div class="stat-value" id="stat-avg-response">0ms</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a855f7">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Tokens Used</div>
+                        <div class="stat-value" id="stat-tokens">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-width="2"/>
+                            <line x1="12" y1="9" x2="12" y2="13" stroke-width="2"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Error Rate</div>
+                        <div class="stat-value" id="stat-error-rate">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usage by Model -->
+            <section class="dashboard-section">
+                <h2>Usage by Model</h2>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Requests</th>
+                                <th>Tokens</th>
+                                <th>Avg Response Time</th>
+                                <th>Success Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="model-usage-list">
+                            <tr>
+                                <td colspan="5" class="table-empty">Loading usage data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Usage by API Key -->
+            <section class="dashboard-section">
+                <h2>Usage by API Key</h2>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>API Key</th>
+                                <th>Requests</th>
+                                <th>Tokens</th>
+                                <th>Last Used</th>
+                                <th>Rate Limit Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apikey-usage-list">
+                            <tr>
+                                <td colspan="5" class="table-empty">Loading usage data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Recent Requests -->
+            <section class="dashboard-section">
+                <h2>Recent Requests</h2>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Model</th>
+                                <th>API Key</th>
+                                <th>Tokens</th>
+                                <th>Response Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-requests-list">
+                            <tr>
+                                <td colspan="6" class="table-empty">Loading recent requests...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <!-- Auth Guard MUST be loaded FIRST to protect the page -->
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/usage.js"></script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>
+
+
+

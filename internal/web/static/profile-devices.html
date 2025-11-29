@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Devices - AIGateway</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+    <style>
+        /* Device Cards */
+        .device-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--border-color);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+        }
+        .device-card.current-device {
+            border-left-color: var(--primary-color);
+            background: linear-gradient(to right, rgba(59, 130, 246, 0.1), var(--bg-tertiary));
+        }
+        .device-card.inactive {
+            opacity: 0.6;
+        }
+        .device-card:hover {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            transform: translateY(-4px);
+            border-color: var(--primary-color);
+        }
+        
+        /* Device Icons */
+        .device-icon {
+            font-size: 2.5rem;
+            display: inline-block;
+        }
+        .icon-windows { color: #0078d4; }
+        .icon-apple { color: #a0a0a0; }
+        .icon-linux { color: #f7941e; }
+        .icon-laptop { color: var(--text-secondary); }
+        
+        /* Last Seen */
+        .last-seen {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        .last-seen.recent { color: var(--success-color); }
+        .last-seen.inactive { color: var(--danger-color); }
+        
+        /* Badges */
+        .badge-current {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .badge-active {
+            background-color: var(--success-color);
+            color: white;
+        }
+        .badge-inactive {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+        .empty-state i {
+            font-size: 4rem;
+            opacity: 0.3;
+        }
+        
+        /* Text Colors */
+        .text-muted {
+            color: var(--text-secondary);
+        }
+        
+        .text-success {
+            color: var(--success-color);
+        }
+        
+        .text-primary {
+            color: var(--primary-color);
+        }
+        
+        /* Form Controls */
+        .form-control, select.form-control {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .form-control:focus, select.form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .form-control option {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        
+        /* Buttons */
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            background: transparent;
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-outline-danger {
+            color: var(--danger-color);
+            border-color: var(--danger-color);
+            background: transparent;
+        }
+        .btn-outline-danger:hover {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-outline-secondary {
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+            background: transparent;
+        }
+        .btn-outline-secondary:hover {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        
+        /* DESKTOP-04: Device Details Modal */
+        .device-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .device-details-modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            animation: slideIn 0.3s ease;
+        }
+        
+        .modal-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+        
+        .modal-body {
+            padding: 24px;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translate(-50%, 20px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+    </style>
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>💻 My Devices</h1>
+                    <p class="page-description">Manage devices that have access to your account</p>
+                </div>
+                <button class="btn btn-primary" onclick="refreshDevices()">
+                    ↻ Refresh
+                </button>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Filters -->
+                <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div>
+                            <label for="statusFilter" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">Status</label>
+                            <select id="statusFilter" class="form-control" onchange="deviceManager.loadDevices()">
+                                <option value="active" selected>Active Only</option>
+                                <option value="expired">Expired Only</option>
+                                <option value="all">All Devices</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sortBy" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">Sort By</label>
+                            <select id="sortBy" class="form-control" onchange="deviceManager.loadDevices()">
+                                <option value="last_seen" selected>Last Seen</option>
+                                <option value="created_at">Created Date</option>
+                                <option value="name">Name</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sortOrder" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 500;">Order</label>
+                            <select id="sortOrder" class="form-control" onchange="deviceManager.loadDevices()">
+                                <option value="desc" selected>Newest First</option>
+                                <option value="asc">Oldest First</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+                        <h6 style="color: var(--text-secondary); font-size: 14px; margin: 0 0 8px 0;">Total Devices</h6>
+                        <h3 style="color: var(--text-primary); font-size: 28px; margin: 0;" id="totalDevices">-</h3>
+                    </div>
+                    <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+                        <h6 style="color: var(--text-secondary); font-size: 14px; margin: 0 0 8px 0;">Active Devices</h6>
+                        <h3 style="color: var(--success-color); font-size: 28px; margin: 0;" id="activeDevices">-</h3>
+                    </div>
+                    <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+                        <h6 style="color: var(--text-secondary); font-size: 14px; margin: 0 0 8px 0;">Current Device</h6>
+                        <h3 style="color: var(--primary-color); font-size: 28px; margin: 0;" id="currentDevice">-</h3>
+                    </div>
+                </div>
+
+                <!-- Loading Spinner -->
+                <div id="loadingSpinner" style="display: none; text-align: center; padding: 3rem 1rem;">
+                    <div class="spinner" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 16px; color: var(--text-secondary);">Loading devices...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <div style="font-size: 4rem; opacity: 0.3;">📥</div>
+                    <h4 style="margin-top: 16px; color: var(--text-primary);">No Devices Found</h4>
+                    <p style="color: var(--text-secondary);">You haven't registered any devices yet.</p>
+                </div>
+
+                <!-- Devices List -->
+                <div id="devicesList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 16px;">
+                    <!-- Devices will be loaded here -->
+                </div>
+
+                <!-- DESKTOP-04: Bulk Actions Bar -->
+                <div id="bulkActionsBar" style="display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; background: var(--bg-secondary); border: 2px solid var(--primary-color); border-radius: 12px; padding: 16px 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); animation: slideUp 0.3s ease;">
+                    <div style="display: flex; align-items: center; gap: 24px;">
+                        <span id="selectedCount" style="font-weight: 600; color: var(--text-primary);">0 devices selected</span>
+                        <button class="btn btn-danger" onclick="deviceManager.bulkRevokeDevices()" style="margin: 0;">
+                            🗑️ Revoke Selected
+                        </button>
+                        <button class="btn btn-secondary" onclick="deviceManager.clearSelection()" style="margin: 0;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/profile-devices.js"></script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>

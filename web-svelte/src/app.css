@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	/* Light theme (default) */
+	--color-background: 255 255 255;
+	--color-foreground: 15 23 42;
+	--color-card: 255 255 255;
+	--color-card-foreground: 15 23 42;
+	--color-primary: 16 163 127;
+	--color-primary-foreground: 255 255 255;
+	--color-secondary: 241 245 249;
+	--color-secondary-foreground: 15 23 42;
+	--color-muted: 241 245 249;
+	--color-muted-foreground: 100 116 139;
+	--color-accent: 241 245 249;
+	--color-accent-foreground: 15 23 42;
+	--color-destructive: 239 68 68;
+	--color-destructive-foreground: 255 255 255;
+	--color-border: 226 232 240;
+	--color-input: 226 232 240;
+	--color-ring: 16 163 127;
+
+	--radius: 0.5rem;
+}
+
+.dark {
+	/* Dark theme */
+	--color-background: 15 23 42;
+	--color-foreground: 248 250 252;
+	--color-card: 30 41 59;
+	--color-card-foreground: 248 250 252;
+	--color-primary: 16 163 127;
+	--color-primary-foreground: 255 255 255;
+	--color-secondary: 51 65 85;
+	--color-secondary-foreground: 248 250 252;
+	--color-muted: 51 65 85;
+	--color-muted-foreground: 148 163 184;
+	--color-accent: 51 65 85;
+	--color-accent-foreground: 248 250 252;
+	--color-destructive: 239 68 68;
+	--color-destructive-foreground: 255 255 255;
+	--color-border: 51 65 85;
+	--color-input: 51 65 85;
+	--color-ring: 16 163 127;
+}
+
+/* Base styles */
+* {
+	@apply border-border;
+}
+
+body {
+	@apply bg-background text-foreground;
+	font-feature-settings:
+		'rlig' 1,
+		'calt' 1;
+}
+
+/* Smooth transitions for theme change */
+*,
+*::before,
+*::after {
+	transition:
+		background-color 0.2s ease,
+		border-color 0.2s ease,
+		color 0.1s ease;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	@apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+	@apply bg-muted-foreground/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	@apply bg-muted-foreground/50;
+}
+
+/* Focus styles */
+:focus-visible {
+	@apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+

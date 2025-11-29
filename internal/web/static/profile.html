@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Settings - AIGateway</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>Profile Settings</h1>
+                    <p class="page-description">Manage your account information and preferences</p>
+                </div>
+                <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <div class="form-container">
+                    <!-- Error/Success Messages -->
+                    <div id="profile-message" class="error-message" style="display: none;"></div>
+                    <div id="profile-success" class="success-message" style="display: none;"></div>
+
+                <!-- Profile Information -->
+                <div class="form-section">
+                    <h3>Profile Information</h3>
+                    <form id="profile-form">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input 
+                                type="text" 
+                                id="username" 
+                                disabled
+                                placeholder="Loading..."
+                            >
+                            <small>Username cannot be changed</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input 
+                                type="email" 
+                                id="email" 
+                                placeholder="your@email.com"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="full_name">Full Name</label>
+                            <input 
+                                type="text" 
+                                id="full_name" 
+                                placeholder="Your full name"
+                            >
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="update-profile-btn">
+                                Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Change Password -->
+                <div class="form-section">
+                    <h3>Change Password</h3>
+                    <form id="password-form">
+                        <div class="form-group">
+                            <label for="old_password">Current Password</label>
+                            <input 
+                                type="password" 
+                                id="old_password" 
+                                placeholder="Enter current password"
+                                required
+                                autocomplete="current-password"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="new_password">New Password</label>
+                            <input 
+                                type="password" 
+                                id="new_password" 
+                                placeholder="Enter new password"
+                                required
+                                autocomplete="new-password"
+                                minlength="8"
+                            >
+                            <small>At least 8 characters with uppercase, lowercase, digit, and special character</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="confirm_password">Confirm New Password</label>
+                            <input 
+                                type="password" 
+                                id="confirm_password" 
+                                placeholder="Confirm new password"
+                                required
+                                autocomplete="new-password"
+                            >
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="change-password-btn">
+                                Change Password
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Account Information -->
+                <div class="form-section">
+                    <h3>Account Information</h3>
+                    <div class="form-group">
+                        <label>Account Status</label>
+                        <div>
+                            <span class="badge badge-success" id="account-status">Active</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Member Since</label>
+                        <div id="member-since">Loading...</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Last Login</label>
+                        <div id="last-login">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="form-section" style="border-color: var(--error-color);">
+                    <h3 style="color: var(--error-color);">Danger Zone</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                        Once you delete your account, there is no going back. Please be certain.
+                    </p>
+                    <button class="btn btn-secondary" id="delete-account-btn" style="border-color: var(--error-color); color: var(--error-color);">
+                        Delete Account
+                    </button>
+                </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <!-- Auth Guard MUST be loaded FIRST to protect the page -->
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/profile.js"></script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>
+
+

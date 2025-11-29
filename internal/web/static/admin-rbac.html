@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBAC Management - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <style>
+        .permission-badge {
+            margin: 2px;
+            font-size: 0.85em;
+        }
+        .role-card {
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .role-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .role-card.selected {
+            border: 2px solid var(--primary-color, #007bff) !important;
+            box-shadow: 0 4px 16px rgba(0, 123, 255, 0.3) !important;
+            transform: translateY(-2px) !important;
+            background: linear-gradient(135deg, rgba(0, 123, 255, 0.05), rgba(0, 123, 255, 0.02)) !important;
+        }
+        .permission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .permission-item {
+            border: 1px solid #ddd;
+            padding: 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+        }
+        .permission-item input {
+            margin-right: 8px;
+        }
+        .system-role-badge {
+            background-color: #6c757d;
+        }
+        .custom-role-badge {
+            background-color: #28a745;
+        }
+        
+        /* Override Bootstrap card styles for dark theme */
+        .card {
+            background: var(--bg-tertiary) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .card-header {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            color: #ffffff !important;
+        }
+        
+        .card-body {
+            background: transparent !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        .role-card {
+            background: var(--bg-tertiary) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .permission-item {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        /* Fix text colors */
+        h5, h6, label, .form-label {
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        .text-muted {
+            color: rgba(255, 255, 255, 0.6) !important;
+        }
+    </style>
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>🔐 RBAC Management</h1>
+                    <p class="page-description">Role-Based Access Control configuration</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <a href="/admin.html" class="btn btn-secondary">Back to Admin</a>
+                </div>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Tab Navigation -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="roles">Roles Management</button>
+                    <button class="tab-btn" data-tab="user-roles" data-callback="handleUserRolesTab">User Roles</button>
+                    <button class="tab-btn" data-tab="permissions" data-callback="handlePermissionsTab">Permissions Reference</button>
+                </div>
+
+                <!-- Roles Management Tab -->
+                <div class="tab-content active" id="roles-content">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5>Roles</h5>
+                                <button class="btn btn-primary btn-sm" id="createRoleBtn">
+                                    <i class="fas fa-plus"></i> New Role
+                                </button>
+                            </div>
+                            <div class="card-body" id="rolesListContainer">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card" id="roleDetailsCard" style="display: none;">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 id="roleDetailsTitle">Role Details</h5>
+                                <div>
+                                    <button class="btn btn-warning btn-sm" id="editRoleBtn">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" id="deleteRoleBtn">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body" id="roleDetailsBody">
+                                <!-- Details will be loaded here -->
+                            </div>
+                        </div>
+                        <div class="text-muted text-center" id="roleSelectPrompt">
+                            <i class="fas fa-hand-pointer fa-3x mb-3"></i>
+                            <p>Select a role to view details</p>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- User Roles Tab -->
+                <div class="tab-content" id="user-roles-content" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>User Role Assignments</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-4">
+                                <label for="userSelect" class="form-label">Select User</label>
+                                <select class="form-select" id="userSelect">
+                                    <option value="">-- Select User --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="userRolesContainer" style="display: none;">
+                            <h6>Current Roles</h6>
+                            <div id="currentRolesList" class="mb-3">
+                                <!-- User roles will be displayed here -->
+                            </div>
+                            <h6>Assign New Role</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label for="roleToAssign" class="form-label">Role</label>
+                                    <select class="form-select" id="roleToAssign">
+                                        <option value="">-- Select Role --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="tenantForRole" class="form-label">Tenant (optional)</label>
+                                    <select class="form-select" id="tenantForRole">
+                                        <option value="">-- Global --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button class="btn btn-primary w-100" id="assignRoleBtn">
+                                        <i class="fas fa-plus"></i> Assign Role
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permissions Reference Tab -->
+                <div class="tab-content" id="permissions-content" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>System Permissions Reference</h5>
+                        </div>
+                        <div class="card-body" id="permissionsListContainer">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create/Edit Role Modal -->
+    <div class="modal fade" id="roleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roleModalTitle">Create Role</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="roleForm">
+                        <input type="hidden" id="roleId">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="roleName" class="form-label">Name (identifier)</label>
+                                <input type="text" class="form-control" id="roleName" required>
+                                <small class="text-muted">e.g., content_manager</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="roleDisplayName" class="form-label">Display Name</label>
+                                <input type="text" class="form-control" id="roleDisplayName" required>
+                                <small class="text-muted">e.g., Content Manager</small>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="roleDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="roleDescription" rows="2"></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="roleScope" class="form-label">Scope</label>
+                                <select class="form-select" id="roleScope" required>
+                                    <option value="global">Global</option>
+                                    <option value="tenant">Tenant</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="tenantFieldContainer" style="display: none;">
+                                <label for="roleTenant" class="form-label">Tenant</label>
+                                <select class="form-select" id="roleTenant">
+                                    <option value="">-- Select Tenant --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Permissions</label>
+                            <div class="permission-grid" id="permissionsGrid">
+                                <!-- Permissions checkboxes will be loaded here -->
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveRoleBtn">Save Role</button>
+                </div>
+            </div>
+        </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/admin-rbac.js"></script>
+    
+    <script>
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const targetTab = this.getAttribute('data-tab');
+                    const callback = this.getAttribute('data-callback');
+                    
+                    // Remove active class from all buttons and contents
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabContents.forEach(c => {
+                        c.classList.remove('active');
+                        c.style.display = 'none';
+                    });
+                    
+                    // Add active class to clicked button and show corresponding content
+                    this.classList.add('active');
+                    const targetContent = document.getElementById(targetTab + '-content');
+                    if (targetContent) {
+                        targetContent.style.display = 'block';
+                        targetContent.classList.add('active');
+                    }
+                    
+                    // Trigger tab-specific callback if exists
+                    if (callback && typeof window[callback] === 'function') {
+                        await window[callback]();
+                    }
+                });
+            });
+        });
+    </script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>
+
+
+

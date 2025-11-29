@@ -7,14 +7,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/spf13/viper"
 	ragconfig "aigateway/internal/rag/config"
+
+	"github.com/spf13/viper"
 )
 
 // Config представляет конфигурацию всего приложения
 type Config struct {
 	Server        ServerConfig        `mapstructure:"server"`
-	Inference     InferenceConfig     `mapstructure:"inference"`     // Version 3.0.5+: Unified inference backend (yzma only)
+	Inference     InferenceConfig     `mapstructure:"inference"` // Version 3.0.5+: Unified inference backend (yzma only)
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Database      DatabaseConfig      `mapstructure:"database"` // Version 1.3.0+: Database abstraction
 	Logging       LoggingConfig       `mapstructure:"logging"`
@@ -24,28 +25,28 @@ type Config struct {
 	Metrics       MetricsConfig       `mapstructure:"metrics"`
 	TUI           TUIConfig           `mapstructure:"tui"`
 	Development   DevelopmentConfig   `mapstructure:"development"`
-	Observability ObservabilityConfig `mapstructure:"observability"` // Version 1.6.0+: Tracing and monitoring
-	FileStorage   FileStorageConfig   `mapstructure:"file_storage"`  // Version 1.10.0+: File storage and processing
-	Extractors    ExtractorsConfig    `mapstructure:"extractors"`    // Version 1.10.0+: Document extractors
-	WebFetch      WebFetchConfig           `mapstructure:"web_fetch"`     // Version 1.10.4+: Web content fetching
-	RAG           ragconfig.RAGConfig      `mapstructure:"rag"`           // Version 1.13.0+: RAG system configuration
-	ModelRegistry ModelRegistryConfig      `mapstructure:"model_registry"` // Version 2.3.0+: Model Registry system
-	Agent         AgentConfig              `mapstructure:"agent"`         // Version 2.5.0+: Agentic AI configuration
-	HuggingFace   HuggingFaceConfig        `mapstructure:"huggingface"`   // Version 3.0.0+: Hugging Face integration
-	Yzma          YzmaConfig               `mapstructure:"yzma"`          // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
+	Observability ObservabilityConfig `mapstructure:"observability"`  // Version 1.6.0+: Tracing and monitoring
+	FileStorage   FileStorageConfig   `mapstructure:"file_storage"`   // Version 1.10.0+: File storage and processing
+	Extractors    ExtractorsConfig    `mapstructure:"extractors"`     // Version 1.10.0+: Document extractors
+	WebFetch      WebFetchConfig      `mapstructure:"web_fetch"`      // Version 1.10.4+: Web content fetching
+	RAG           ragconfig.RAGConfig `mapstructure:"rag"`            // Version 1.13.0+: RAG system configuration
+	ModelRegistry ModelRegistryConfig `mapstructure:"model_registry"` // Version 2.3.0+: Model Registry system
+	Agent         AgentConfig         `mapstructure:"agent"`          // Version 2.5.0+: Agentic AI configuration
+	HuggingFace   HuggingFaceConfig   `mapstructure:"huggingface"`    // Version 3.0.0+: Hugging Face integration
+	Yzma          YzmaConfig          `mapstructure:"yzma"`           // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
 }
 
 // InferenceConfig represents unified inference backend configuration (v3.0.6+)
 type InferenceConfig struct {
 	// Backend is always "yzma" (v3.0.6+: Ollama removed)
 	Backend string `mapstructure:"backend"` // "yzma" only
-	
+
 	// MaxLoadedModels limits how many models can be loaded simultaneously
 	MaxLoadedModels int `mapstructure:"max_loaded_models"`
-	
+
 	// GPULayers controls GPU offloading (-1 = auto, 0 = CPU only, >0 = specific layer count)
 	GPULayers int `mapstructure:"gpu_layers"`
-	
+
 	// Yzma configuration (only backend)
 	Yzma YzmaConfig `mapstructure:"yzma"`
 }
@@ -61,14 +62,14 @@ type ServerConfig struct {
 
 	// TLS настройки
 	TLS struct {
-		Enabled     bool     `mapstructure:"enabled"`
-		CertFile    string   `mapstructure:"cert_file"`
-		KeyFile     string   `mapstructure:"key_file"`
-		AutoCert    bool     `mapstructure:"auto_cert"`
+		Enabled  bool   `mapstructure:"enabled"`
+		CertFile string `mapstructure:"cert_file"`
+		KeyFile  string `mapstructure:"key_file"`
+		AutoCert bool   `mapstructure:"auto_cert"`
 		// Certificate generation settings (v3.0.8+)
-		CommonName  string   `mapstructure:"common_name"`   // CN for certificate (default: "localhost")
-		Hosts       []string `mapstructure:"hosts"`         // DNS names and IPs (default: ["localhost", "127.0.0.1", "::1"])
-		ValidDays   int      `mapstructure:"valid_days"`    // Certificate validity in days (default: 365)
+		CommonName string   `mapstructure:"common_name"` // CN for certificate (default: "localhost")
+		Hosts      []string `mapstructure:"hosts"`       // DNS names and IPs (default: ["localhost", "127.0.0.1", "::1"])
+		ValidDays  int      `mapstructure:"valid_days"`  // Certificate validity in days (default: 365)
 	} `mapstructure:"tls"`
 
 	// CORS настройки
@@ -79,6 +80,21 @@ type ServerConfig struct {
 		AllowedHeaders []string `mapstructure:"allowed_headers"`
 		MaxAge         int      `mapstructure:"max_age"`
 	} `mapstructure:"cors"`
+
+	// WebUI настройки (v3.2.0+: Svelte frontend support)
+	WebUI WebUIConfig `mapstructure:"webui"`
+}
+
+// WebUIConfig конфигурация веб-интерфейса
+// Поддерживает переключение между Legacy (HTML/JS) и Svelte frontend
+type WebUIConfig struct {
+	// Enabled включить веб-интерфейс (default: true)
+	Enabled bool `mapstructure:"enabled"`
+
+	// Version версия интерфейса: "legacy" (HTML/JS) или "svelte" (default: "legacy")
+	// - legacy: оригинальный HTML + JavaScript интерфейс
+	// - svelte: новый Svelte 5 интерфейс
+	Version string `mapstructure:"version"`
 }
 
 // AuthConfig конфигурация аутентификации
@@ -235,20 +251,20 @@ type LDAPConfig struct {
 	BindPassword string `mapstructure:"bind_password" validate:"required_if=Enabled true"`
 
 	// User Search настройки
-	UserBaseDN        string `mapstructure:"user_base_dn" validate:"required_if=Enabled true"`
-	UserFilter        string `mapstructure:"user_filter"`        // default: "(uid={username})"
-	UserIDAttribute   string `mapstructure:"user_id_attribute"`  // default: "uid"
+	UserBaseDN         string `mapstructure:"user_base_dn" validate:"required_if=Enabled true"`
+	UserFilter         string `mapstructure:"user_filter"`          // default: "(uid={username})"
+	UserIDAttribute    string `mapstructure:"user_id_attribute"`    // default: "uid"
 	UserEmailAttribute string `mapstructure:"user_email_attribute"` // default: "mail"
-	UserNameAttribute string `mapstructure:"user_name_attribute"` // default: "cn"
+	UserNameAttribute  string `mapstructure:"user_name_attribute"`  // default: "cn"
 
 	// Group Search настройки (optional)
 	GroupBaseDN        string `mapstructure:"group_base_dn"`
-	GroupFilter        string `mapstructure:"group_filter"`        // default: "(member={userdn})"
+	GroupFilter        string `mapstructure:"group_filter"`         // default: "(member={userdn})"
 	GroupNameAttribute string `mapstructure:"group_name_attribute"` // default: "cn"
 
 	// TLS/SSL настройки
-	StartTLS   bool   `mapstructure:"start_tls"`   // Использовать StartTLS
-	SkipVerify bool   `mapstructure:"skip_verify"` // НЕБЕЗОПАСНО: пропустить проверку сертификата
+	StartTLS   bool   `mapstructure:"start_tls"`    // Использовать StartTLS
+	SkipVerify bool   `mapstructure:"skip_verify"`  // НЕБЕЗОПАСНО: пропустить проверку сертификата
 	CACertFile string `mapstructure:"ca_cert_file"` // Путь к CA certificate
 
 	// User provisioning
@@ -274,12 +290,12 @@ type LoggingConfig struct {
 	Compress   bool   `mapstructure:"compress"`
 
 	// Error log file (separate file for errors and warnings)
-	ErrorLogEnabled  bool   `mapstructure:"error_log_enabled"`  // Enable separate error log file
-	ErrorLogFilePath string `mapstructure:"error_log_file_path"` // Path to error log file
-	ErrorLogMaxSize  int    `mapstructure:"error_log_max_size"`  // MB (default: same as MaxSize)
-	ErrorLogMaxBackups int  `mapstructure:"error_log_max_backups"` // (default: same as MaxBackups)
-	ErrorLogMaxAge   int    `mapstructure:"error_log_max_age"`   // days (default: same as MaxAge)
-	ErrorLogCompress bool   `mapstructure:"error_log_compress"`  // (default: same as Compress)
+	ErrorLogEnabled    bool   `mapstructure:"error_log_enabled"`     // Enable separate error log file
+	ErrorLogFilePath   string `mapstructure:"error_log_file_path"`   // Path to error log file
+	ErrorLogMaxSize    int    `mapstructure:"error_log_max_size"`    // MB (default: same as MaxSize)
+	ErrorLogMaxBackups int    `mapstructure:"error_log_max_backups"` // (default: same as MaxBackups)
+	ErrorLogMaxAge     int    `mapstructure:"error_log_max_age"`     // days (default: same as MaxAge)
+	ErrorLogCompress   bool   `mapstructure:"error_log_compress"`    // (default: same as Compress)
 
 	// Structured fields для JSON логирования
 	StructuredFields map[string]string `mapstructure:"structured_fields"`
@@ -429,7 +445,6 @@ type DevelopmentConfig struct {
 	ProfileEnabled bool `mapstructure:"profile_enabled"`
 	PProfEnabled   bool `mapstructure:"pprof_enabled"`
 	RaceDetection  bool `mapstructure:"race_detection"`
-
 }
 
 // ObservabilityConfig настройки для observability и tracing (Version 1.6.0+)
@@ -538,7 +553,7 @@ type ExtractorsConfig struct {
 func Load(configPath string) (*Config, error) {
 	// DEBUG: показать что пришло в функцию
 	fmt.Printf("🔧 DEBUG: Load() called with configPath = '%s'\n", configPath)
-	
+
 	viper := viper.New()
 
 	// Настройка поиска конфигурационных файлов
@@ -696,11 +711,15 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.idle_timeout", "60s")
 	v.SetDefault("server.max_header_bytes", 1048576)
 
+	// WebUI defaults (v3.2.0+)
+	v.SetDefault("server.webui.enabled", true)
+	v.SetDefault("server.webui.version", "legacy") // "legacy" or "svelte"
+
 	// Inference defaults (v3.0.5+)
-	v.SetDefault("inference.backend", "yzma")          // Primary: yzma (local inference)
-	v.SetDefault("inference.max_loaded_models", 3)     // Keep 3 models in memory
-	v.SetDefault("inference.gpu_layers", -1)           // Auto GPU offloading
-	
+	v.SetDefault("inference.backend", "yzma")      // Primary: yzma (local inference)
+	v.SetDefault("inference.max_loaded_models", 3) // Keep 3 models in memory
+	v.SetDefault("inference.gpu_layers", -1)       // Auto GPU offloading
+
 	// Inference > Yzma defaults
 	v.SetDefault("inference.yzma.enabled", true)
 	v.SetDefault("inference.yzma.models_dir", "./data/models")
@@ -816,7 +835,7 @@ type WebFetchConfig struct {
 type RegistrationConfig struct {
 	// Mode: "open" | "invitation_only" | "disabled"
 	Mode string `mapstructure:"mode"`
-	
+
 	// Require email verification after registration
 	RequireEmailVerification bool `mapstructure:"require_email_verification"`
 }
@@ -825,21 +844,21 @@ type RegistrationConfig struct {
 type InvitationsConfig struct {
 	// Enable invitations system
 	Enabled bool `mapstructure:"enabled"`
-	
+
 	// Default expiry in days (0 = never expires)
 	DefaultExpiryDays int `mapstructure:"default_expiry_days"`
-	
+
 	// Default max uses per invitation
 	MaxUsesDefault int `mapstructure:"max_uses_default"`
-	
+
 	// Allow email restriction for invitations
 	AllowEmailRestriction bool `mapstructure:"allow_email_restriction"`
-	
+
 	// Rate limits
 	RateLimit struct {
 		// Max invitations per admin per hour
 		CreationPerAdminHour int `mapstructure:"creation_per_admin_hour"`
-		
+
 		// Max validation requests per IP per minute
 		ValidationPerIPMinute int `mapstructure:"validation_per_ip_minute"`
 	} `mapstructure:"rate_limit"`
@@ -849,13 +868,13 @@ type InvitationsConfig struct {
 type ModelRegistryConfig struct {
 	// Enabled - включить Model Registry систему
 	Enabled bool `mapstructure:"enabled"`
-	
+
 	// AutoDiscovery - автоматическое обнаружение моделей при старте
 	AutoDiscovery struct {
 		Enabled  bool          `mapstructure:"enabled"`
 		Interval time.Duration `mapstructure:"interval"` // Интервал между auto-discovery
 	} `mapstructure:"auto_discovery"`
-	
+
 	// HealthCheck - проверка здоровья providers
 	HealthCheck struct {
 		Enabled  bool          `mapstructure:"enabled"`
@@ -867,24 +886,24 @@ type ModelRegistryConfig struct {
 type AgentConfig struct {
 	// Enabled - включить Agent систему
 	Enabled bool `mapstructure:"enabled"`
-	
+
 	// PlanModel - модель для task planning и reasoning (ВАЖНО: должна поддерживать JSON)
 	PlanModel string `mapstructure:"plan_model"`
-	
+
 	// Reasoning - настройки reasoning процесса
 	Reasoning struct {
-		MaxIterations int     `mapstructure:"max_iterations"` // Максимальное количество ReAct iterations
-		Temperature   float64 `mapstructure:"temperature"`    // Temperature для reasoning (0.0-1.0)
-		TopP          float64 `mapstructure:"top_p"`          // Top-p sampling
-		NumPredict    int     `mapstructure:"num_predict"`    // Ограничение длины response
-		Timeout       time.Duration `mapstructure:"timeout"`  // Таймаут на одну reasoning operation
+		MaxIterations int           `mapstructure:"max_iterations"` // Максимальное количество ReAct iterations
+		Temperature   float64       `mapstructure:"temperature"`    // Temperature для reasoning (0.0-1.0)
+		TopP          float64       `mapstructure:"top_p"`          // Top-p sampling
+		NumPredict    int           `mapstructure:"num_predict"`    // Ограничение длины response
+		Timeout       time.Duration `mapstructure:"timeout"`        // Таймаут на одну reasoning operation
 	} `mapstructure:"reasoning"`
-	
+
 	// Tools - настройки tool system
 	Tools struct {
 		Enabled bool   `mapstructure:"enabled"`
 		BaseDir string `mapstructure:"base_dir"` // Базовая директория для file operations
-		
+
 		// File tools
 		File struct {
 			ReadEnabled   bool   `mapstructure:"read_enabled"`
@@ -893,20 +912,20 @@ type AgentConfig struct {
 			ListEnabled   bool   `mapstructure:"list_enabled"`
 			MaxFileSize   string `mapstructure:"max_file_size"` // e.g., "10MB"
 		} `mapstructure:"file"`
-		
+
 		// Terminal tools
 		Terminal struct {
 			Enabled         bool     `mapstructure:"enabled"`
 			AllowedCommands []string `mapstructure:"allowed_commands"` // Whitelist команд
 		} `mapstructure:"terminal"`
-		
+
 		// MCP tools
 		MCP struct {
 			Enabled           bool          `mapstructure:"enabled"`
 			DiscoveryInterval time.Duration `mapstructure:"discovery_interval"`
 		} `mapstructure:"mcp"`
 	} `mapstructure:"tools"`
-	
+
 	// Safety - настройки безопасности
 	Safety struct {
 		ApprovalRequired    bool     `mapstructure:"approval_required"`
@@ -914,13 +933,13 @@ type AgentConfig struct {
 		AutoApproveSafe     bool     `mapstructure:"auto_approve_safe"`
 		SafeOperations      []string `mapstructure:"safe_operations"`
 	} `mapstructure:"safety"`
-	
+
 	// LoopDetection - обнаружение зацикливания
 	LoopDetection struct {
 		Enabled             bool `mapstructure:"enabled"`
 		MaxIdenticalActions int  `mapstructure:"max_identical_actions"`
 	} `mapstructure:"loop_detection"`
-	
+
 	// Streaming - WebSocket streaming
 	Streaming struct {
 		Enabled    bool `mapstructure:"enabled"`
@@ -928,62 +947,62 @@ type AgentConfig struct {
 	} `mapstructure:"streaming"`
 }
 
-	// HuggingFaceConfig represents Hugging Face integration settings (Version 3.0.0+)
-	type HuggingFaceConfig struct {
-		// APIToken - optional Hugging Face API token for private models
-		APIToken string `mapstructure:"api_token"`
-		
-		// ModelsDir - directory for storing downloaded models
-		ModelsDir string `mapstructure:"models_dir"`
-		
-		// CacheDir - directory for caching model metadata
-		CacheDir string `mapstructure:"cache_dir"`
-		
-		// DefaultDownloadTimeout - timeout for model downloads
-		DefaultDownloadTimeout time.Duration `mapstructure:"download_timeout"`
-		
-		// MaxConcurrentDownloads - maximum number of parallel downloads
-		MaxConcurrentDownloads int `mapstructure:"max_concurrent_downloads"`
-		
-		// AutoResume - automatically resume interrupted downloads
-		AutoResume bool `mapstructure:"auto_resume"`
-	}
-	
-	// YzmaConfig represents yzma local inference settings (Version 3.0.0+)
-	type YzmaConfig struct {
-		// Enabled - enable yzma local inference
-		Enabled bool `mapstructure:"enabled"`
-		
-		// LibPath - path to llama.cpp shared library (can also use YZMA_LIB env var)
-		LibPath string `mapstructure:"lib_path"`
-		
-		// ModelsDir - directory for GGUF models (shared with HuggingFace)
-		ModelsDir string `mapstructure:"models_dir"`
-		
-		// ContextSize - context window size (default: 4096)
-		ContextSize uint32 `mapstructure:"context_size"`
-		
-		// BatchSize - logical batch size (default: 2048)
-		BatchSize uint32 `mapstructure:"batch_size"`
-		
-		// UBatchSize - physical batch size (default: 2048)
-		UBatchSize uint32 `mapstructure:"ubatch_size"`
-		
-		// Temperature - default sampling temperature (default: 0.7)
-		Temperature float32 `mapstructure:"temperature"`
-		
-		// TopK - Top-K sampling (default: 40)
-		TopK int32 `mapstructure:"top_k"`
-		
-		// TopP - Top-P sampling (default: 0.9)
-		TopP float32 `mapstructure:"top_p"`
-		
-		// MinP - Min-P sampling (default: 0.1)
-		MinP float32 `mapstructure:"min_p"`
-		
-		// Verbose - enable llama.cpp logging
-		Verbose bool `mapstructure:"verbose"`
-	}
+// HuggingFaceConfig represents Hugging Face integration settings (Version 3.0.0+)
+type HuggingFaceConfig struct {
+	// APIToken - optional Hugging Face API token for private models
+	APIToken string `mapstructure:"api_token"`
+
+	// ModelsDir - directory for storing downloaded models
+	ModelsDir string `mapstructure:"models_dir"`
+
+	// CacheDir - directory for caching model metadata
+	CacheDir string `mapstructure:"cache_dir"`
+
+	// DefaultDownloadTimeout - timeout for model downloads
+	DefaultDownloadTimeout time.Duration `mapstructure:"download_timeout"`
+
+	// MaxConcurrentDownloads - maximum number of parallel downloads
+	MaxConcurrentDownloads int `mapstructure:"max_concurrent_downloads"`
+
+	// AutoResume - automatically resume interrupted downloads
+	AutoResume bool `mapstructure:"auto_resume"`
+}
+
+// YzmaConfig represents yzma local inference settings (Version 3.0.0+)
+type YzmaConfig struct {
+	// Enabled - enable yzma local inference
+	Enabled bool `mapstructure:"enabled"`
+
+	// LibPath - path to llama.cpp shared library (can also use YZMA_LIB env var)
+	LibPath string `mapstructure:"lib_path"`
+
+	// ModelsDir - directory for GGUF models (shared with HuggingFace)
+	ModelsDir string `mapstructure:"models_dir"`
+
+	// ContextSize - context window size (default: 4096)
+	ContextSize uint32 `mapstructure:"context_size"`
+
+	// BatchSize - logical batch size (default: 2048)
+	BatchSize uint32 `mapstructure:"batch_size"`
+
+	// UBatchSize - physical batch size (default: 2048)
+	UBatchSize uint32 `mapstructure:"ubatch_size"`
+
+	// Temperature - default sampling temperature (default: 0.7)
+	Temperature float32 `mapstructure:"temperature"`
+
+	// TopK - Top-K sampling (default: 40)
+	TopK int32 `mapstructure:"top_k"`
+
+	// TopP - Top-P sampling (default: 0.9)
+	TopP float32 `mapstructure:"top_p"`
+
+	// MinP - Min-P sampling (default: 0.1)
+	MinP float32 `mapstructure:"min_p"`
+
+	// Verbose - enable llama.cpp logging
+	Verbose bool `mapstructure:"verbose"`
+}
 
 // GetServerAddr возвращает адрес сервера в формате host:port
 func (c *Config) GetServerAddr() string {
@@ -994,4 +1013,3 @@ func (c *Config) GetServerAddr() string {
 func (c *Config) IsDevelopment() bool {
 	return c.Development.DebugMode || c.Logging.Level == "debug"
 }
-

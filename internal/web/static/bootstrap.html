@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Setup - AIGateway</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <h1>🚀 System Setup</h1>
+                <p>Create the first administrator account</p>
+            </div>
+
+            <div id="error-message" class="error-message" style="display: none;"></div>
+
+            <form id="bootstrap-form" class="auth-form">
+                <div class="form-group">
+                    <label for="admin_token">Bootstrap Token</label>
+                    <input 
+                        type="password" 
+                        id="admin_token" 
+                        name="admin_token" 
+                        placeholder="Enter bootstrap token from configuration"
+                        required
+                        autocomplete="off"
+                    >
+                    <small>This token is defined in your server configuration (auth.admin_key)</small>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
+
+                <div class="form-group">
+                    <label for="username">Administrator Username</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        placeholder="Choose a username"
+                        required
+                        autocomplete="username"
+                        minlength="3"
+                        maxlength="32"
+                        pattern="[a-zA-Z0-9_\-]+"
+                        title="Only alphanumeric characters, underscores, and hyphens"
+                    >
+                    <small>3-32 characters, alphanumeric, _ and -</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        placeholder="admin@example.com"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="display_name">Display Name</label>
+                    <input 
+                        type="text" 
+                        id="display_name" 
+                        name="display_name" 
+                        placeholder="Administrator"
+                        autocomplete="name"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="Choose a strong password"
+                        required
+                        autocomplete="new-password"
+                        minlength="8"
+                    >
+                    <small>At least 8 characters with uppercase, lowercase, digit, and special character</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input 
+                        type="password" 
+                        id="confirm_password" 
+                        name="confirm_password" 
+                        placeholder="Confirm your password"
+                        required
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" id="bootstrap-btn">
+                    Initialize System
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Bootstrap form handler
+        document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const errorDiv = document.getElementById('error-message');
+            const bootstrapBtn = document.getElementById('bootstrap-btn');
+            
+            errorDiv.style.display = 'none';
+            
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            if (password !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            bootstrapBtn.disabled = true;
+            bootstrapBtn.textContent = 'Initializing...';
+            
+            try {
+                const admin_token = document.getElementById('admin_token').value;
+                const username = document.getElementById('username').value;
+                const email = document.getElementById('email').value;
+                const display_name = document.getElementById('display_name').value;
+                
+                const response = await fetch('/api/system/bootstrap', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        admin_token,
+                        username,
+                        email,
+                        password,
+                        display_name: display_name || username
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Bootstrap failed');
+                }
+                
+                alert('✅ System initialized successfully!\n\nYou can now login with your administrator account.');
+                
+                // Redirect to login
+                window.location.href = '/login.html';
+                
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                bootstrapBtn.disabled = false;
+                bootstrapBtn.textContent = 'Initialize System';
+            }
+        });
+    </script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>
+
+
+

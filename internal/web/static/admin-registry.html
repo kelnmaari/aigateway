@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Registry - AIGateway Platform Admin</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+</head>
+<body class="dashboard-page">
+    <!-- Top Navigation inserted by navbar.js -->
+    <div id="navigation-placeholder"></div>
+
+    <!-- Main Content -->
+    <main class="dashboard-main">
+        <div class="dashboard-container">
+            <!-- Page Header -->
+            <header class="page-header">
+                <div>
+                    <h1>🗄️ Model Registry</h1>
+                    <p class="page-description">Manage AI model providers and model registry. Monitor health, discover models, and configure routing.</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn-discover" onclick="runDiscovery()" id="btn-discover">
+                        🔍 Discover Models
+                    </button>
+                    <button class="btn btn-secondary" onclick="refreshAll()">
+                        🔄 Refresh
+                    </button>
+                    <a href="/admin.html" class="btn btn-secondary">Back to Admin</a>
+                </div>
+            </header>
+
+            <!-- Content Area with Background -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; min-height: calc(100vh - 280px);">
+                <!-- Statistics -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Models</div>
+                        <div class="stat-value" id="stat-total-models">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Models</div>
+                        <div class="stat-value" id="stat-active-models">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Providers</div>
+                        <div class="stat-value" id="stat-providers">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Healthy Providers</div>
+                        <div class="stat-value" id="stat-healthy-providers">-</div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="providers">Model Providers</button>
+                    <button class="tab-btn" data-tab="models">Registered Models</button>
+                </div>
+
+                <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Providers Tab -->
+                <div id="providers-tab" class="tab-pane active">
+                    <section class="content-section">
+                        <div class="section-header-inline">
+                            <h2>Model Providers</h2>
+                            <button class="btn btn-primary" onclick="showCreateProviderModal()">
+                                ➕ Add Provider
+                            </button>
+                        </div>
+
+                        <div class="providers-grid" id="providers-container">
+                            <p style="color: var(--text-secondary);">Loading providers...</p>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Models Tab -->
+                <div id="models-tab" class="tab-pane">
+                    <section class="content-section">
+                        <div class="section-header-inline">
+                            <h2>Registered Models</h2>
+                            <button class="btn btn-primary" onclick="showCreateModelModal()">
+                                ➕ Register Model
+                            </button>
+                        </div>
+
+                        <!-- Filters -->
+                        <div class="filters-row">
+                            <div class="filter-group">
+                                <label>Search</label>
+                                <input type="text" id="filter-search" placeholder="Search by model name or ID..." oninput="filterModels()">
+                            </div>
+                            <div class="filter-group">
+                                <label>Provider</label>
+                                <select id="filter-provider" onchange="filterModels()">
+                                    <option value="">All Providers</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Status</label>
+                                <select id="filter-status" onchange="filterModels()">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Health</label>
+                                <select id="filter-health" onchange="filterModels()">
+                                    <option value="">All Health</option>
+                                    <option value="healthy">Healthy</option>
+                                    <option value="unhealthy">Unhealthy</option>
+                                    <option value="unknown">Unknown</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Models Table -->
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Model ID</th>
+                                        <th>Name</th>
+                                        <th>Provider</th>
+                                        <th>Capabilities</th>
+                                        <th>Status</th>
+                                        <th>Health</th>
+                                        <th>Requests</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="models-table-body">
+                                    <tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">Loading models...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create Provider Modal -->
+    <div id="create-provider-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Model Provider</h3>
+                <span class="modal-close" onclick="closeCreateProviderModal()">×</span>
+            </div>
+            <form id="create-provider-form" onsubmit="createProvider(event)">
+                <div class="form-group">
+                    <label>Provider Name *</label>
+                    <input type="text" name="name" required placeholder="e.g., provider-gpu1">
+                </div>
+                <div class="form-group">
+                    <label>Provider Type *</label>
+                    <select name="provider_type" required>
+                        <option value="ollama">Ollama (deprecated - use yzma)</option>
+                        <option value="vllm">vLLM</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Base URL *</label>
+                    <input type="text" name="base_url" required placeholder="http://localhost:11434">
+                </div>
+                <div class="form-group">
+                    <label>API Key (optional)</label>
+                    <input type="password" name="api_key" placeholder="Leave empty for local providers">
+                </div>
+                <div class="form-group">
+                    <label>Priority</label>
+                    <input type="number" name="priority" value="100" min="0" max="1000">
+                    <small style="color: var(--text-secondary);">Higher priority providers are preferred (0-1000)</small>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="enabled" checked> Enabled
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateProviderModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Provider</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Model Modal -->
+    <div id="create-model-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Register Model</h3>
+                <span class="modal-close" onclick="closeCreateModelModal()">×</span>
+            </div>
+            <form id="create-model-form" onsubmit="createModel(event)">
+                <div class="form-group">
+                    <label>Model ID *</label>
+                    <input type="text" name="model_id" required placeholder="e.g., llama2:7b">
+                </div>
+                <div class="form-group">
+                    <label>Model Name *</label>
+                    <input type="text" name="model_name" required placeholder="e.g., Llama 2 7B">
+                </div>
+                <div class="form-group">
+                    <label>Provider *</label>
+                    <select name="provider_id" id="model-provider-select" required>
+                        <option value="">Select Provider...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" rows="3" placeholder="Model description..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Capabilities (comma-separated)</label>
+                    <input type="text" name="capabilities" placeholder="chat,embeddings,vision">
+                    <small style="color: var(--text-secondary);">Options: chat, embeddings, vision, function-calling, code-completion</small>
+                </div>
+                <div class="form-group">
+                    <label>Tags (comma-separated)</label>
+                    <input type="text" name="tags" placeholder="opensource,7b,instruct">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModelModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Register Model</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth-guard.js"></script>
+    <script src="/js/components/navbar.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/admin-registry.js"></script>
+
+    <style>
+        /* Provider Cards */
+        .providers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .provider-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .provider-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .provider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .provider-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .provider-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .provider-type.ollama {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .provider-type.vllm {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .provider-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-indicator.healthy {
+            background: var(--success-color);
+            box-shadow: 0 0 10px var(--success-color);
+        }
+
+        .status-indicator.unhealthy {
+            background: var(--error-color);
+            box-shadow: 0 0 10px var(--error-color);
+        }
+
+        .status-indicator.unknown {
+            background: var(--warning-color);
+            box-shadow: 0 0 10px var(--warning-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .provider-info {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .provider-info-label {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .provider-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .provider-actions button {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+        }
+
+        /* Filters */
+        .filters-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        /* Capability Badges */
+        .capability-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* Model Status */
+        .model-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .model-status.active {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+        }
+
+        .model-status.inactive {
+            background: rgba(244, 67, 54, 0.2);
+            color: var(--error-color);
+        }
+
+        /* Discover Button */
+        .btn-discover {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-discover:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-discover:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <script>
+        // Tab switching
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabName = btn.getAttribute('data-tab');
+                    
+                    // Remove active class from all buttons and panes
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabPanes.forEach(p => p.classList.remove('active'));
+                    
+                    // Add active class to clicked button and corresponding pane
+                    btn.classList.add('active');
+                    document.getElementById(`${tabName}-tab`).classList.add('active');
+                });
+            });
+        });
+
+        // Refresh all data
+        function refreshAll() {
+            loadStats();
+            loadProviders();
+            loadModels();
+        }
+    </script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>

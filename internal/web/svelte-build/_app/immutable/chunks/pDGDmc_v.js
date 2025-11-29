@@ -1,0 +1,1 @@
+import{k as u,d as o,H as _,h as t,l as g,C as m,m as a,q as i,v as d,w as p}from"./Cd32IJRE.js";function E(n,r){let s=null,f=t;var l;if(t){s=p;for(var e=g(document.head);e!==null&&(e.nodeType!==m||e.data!==n);)e=a(e);if(e===null)i(!1);else{var y=a(e);e.remove(),d(y)}}t||(l=document.head.appendChild(u()));try{o(()=>r(l),_)}finally{f&&(i(!0),d(s))}}export{E as h};

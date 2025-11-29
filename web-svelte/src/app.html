@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="%lang%">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#0f172a" />
+		<title>AIGateway</title>
+
+		<!-- Prevent flash of wrong theme -->
+		<script>
+			(function () {
+				const theme = localStorage.getItem('aigateway_theme') || 'system';
+				let resolved;
+
+				if (theme === 'system') {
+					resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+				} else {
+					resolved = theme;
+				}
+
+				if (resolved === 'dark') {
+					document.documentElement.classList.add('dark');
+				}
+
+				document.querySelector('meta[name="theme-color"]')?.setAttribute(
+					'content',
+					resolved === 'dark' ? '#0f172a' : '#ffffff'
+				);
+			})();
+		</script>
+
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
+

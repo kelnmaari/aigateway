@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hugging Face Model Browser - AI Gateway</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            background: var(--bg-primary);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-size: 2rem;
+        }
+        
+        .header p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+        
+        .search-bar {
+            background: var(--bg-primary);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .search-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .search-input-group {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .search-btn {
+            padding: 0.75rem 2rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        
+        .search-btn:hover {
+            background: #0056b3;
+        }
+        
+        .search-filters {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .filter-group label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .filter-select {
+            padding: 0.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: var(--bg-primary);
+        }
+        
+        .quick-filters {
+            background: var(--bg-primary);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .quick-filters h3 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .quick-filter-buttons {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        
+        .quick-filter-btn {
+            padding: 0.5rem 1.25rem;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-filter-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .results-container {
+            background: var(--bg-primary);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            min-height: 400px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+        
+        .loading::after {
+            content: "⏳ Loading models...";
+            font-size: 1.2rem;
+        }
+        
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 1200px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            background: #c82333;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .back-btn:hover {
+            background: var(--border-color);
+        }
+        
+        /* HTMX loading indicator */
+        .htmx-indicator {
+            display: inline-block;
+            margin-left: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .htmx-request .htmx-indicator {
+            opacity: 1;
+        }
+        
+        .htmx-request.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/admin" class="back-btn">← Back to Admin</a>
+            <h1>🤗 Hugging Face Model Browser</h1>
+            <p>Browse and download GGUF models from Hugging Face Hub for local inference with yzma</p>
+        </div>
+        
+        <div class="search-bar">
+            <form class="search-form" 
+                  hx-get="/api/ui/huggingface/search" 
+                  hx-target="#models-results"
+                  hx-indicator=".loading"
+                  hx-trigger="submit">
+                
+                <div class="search-input-group">
+                    <input type="text" 
+                           name="search" 
+                           class="search-input" 
+                           placeholder="Search models... (e.g., llama, mistral, phi)"
+                           id="search-input">
+                    
+                    <input type="text" 
+                           name="author" 
+                           class="search-input" 
+                           placeholder="Author (e.g., TheBloke)"
+                           style="max-width: 200px;">
+                </div>
+                
+                <button type="submit" class="search-btn">
+                    Search
+                    <span class="htmx-indicator">⏳</span>
+                </button>
+            </form>
+            
+            <div class="search-filters">
+                <div class="filter-group">
+                    <label for="sort">Sort by:</label>
+                    <select name="sort" id="sort" class="filter-select">
+                        <option value="downloads">Most Downloads</option>
+                        <option value="likes">Most Likes</option>
+                        <option value="trending">Trending</option>
+                        <option value="createdAt">Recently Added</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="limit">Results:</label>
+                    <select name="limit" id="limit" class="filter-select">
+                        <option value="20">20</option>
+                        <option value="30" selected>30</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="quick-filters">
+            <h3>Quick Filters:</h3>
+            <div class="quick-filter-buttons">
+                <button class="quick-filter-btn"
+                        hx-get="/api/ui/huggingface/popular?category=all"
+                        hx-target="#models-results"
+                        hx-indicator=".loading">
+                    🔥 All Popular
+                </button>
+                
+                <button class="quick-filter-btn"
+                        hx-get="/api/ui/huggingface/popular?category=llama"
+                        hx-target="#models-results"
+                        hx-indicator=".loading">
+                    🦙 Llama Models
+                </button>
+                
+                <button class="quick-filter-btn"
+                        hx-get="/api/ui/huggingface/popular?category=mistral"
+                        hx-target="#models-results"
+                        hx-indicator=".loading">
+                    🌪️ Mistral Models
+                </button>
+                
+                <button class="quick-filter-btn"
+                        hx-get="/api/ui/huggingface/popular?category=phi"
+                        hx-target="#models-results"
+                        hx-indicator=".loading">
+                    φ Phi Models
+                </button>
+                
+                <button class="quick-filter-btn"
+                        hx-get="/api/ui/huggingface/popular?category=gemma"
+                        hx-target="#models-results"
+                        hx-indicator=".loading">
+                    💎 Gemma Models
+                </button>
+                
+                <button class="quick-filter-btn"
+                        hx-get="/api/ui/huggingface/popular?category=vision"
+                        hx-target="#models-results"
+                        hx-indicator=".loading">
+                    👁️ Vision Models
+                </button>
+            </div>
+        </div>
+        
+        <div class="results-container">
+            <div id="models-results" class="loading">
+                <!-- Models will be loaded here via HTMX -->
+                <p style="text-align: center; color: var(--text-secondary); padding: 3rem;">
+                    Use search or quick filters above to browse models
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Model Details Modal -->
+    <div id="model-details-modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeHFModal('model-details-modal')">×</button>
+            <div id="model-details-modal-content">
+                <!-- Model details will be loaded here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Download Modal -->
+    <div id="download-modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeHFModal('download-modal')">×</button>
+            <div id="download-modal-content">
+                <!-- Download UI will be loaded here -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Modal management
+        function showHFModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('active');
+            }
+        }
+        
+        function closeHFModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+        
+        // Close modal on background click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeHFModal(this.id);
+                }
+            });
+        });
+        
+        // Load popular models on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            htmx.ajax('GET', '/api/ui/huggingface/popular?category=all', {
+                target: '#models-results'
+            });
+        });
+        
+        // Handle search form with filters
+        document.querySelector('.search-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const search = document.getElementById('search-input').value;
+            const author = document.querySelector('input[name="author"]').value;
+            const sort = document.getElementById('sort').value;
+            const limit = document.getElementById('limit').value;
+            
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (author) params.append('author', author);
+            params.append('sort', sort);
+            params.append('limit', limit);
+            params.append('tags', 'gguf');
+            
+            htmx.ajax('GET', `/api/ui/huggingface/search?${params.toString()}`, {
+                target: '#models-results'
+            });
+        });
+    </script>
+    <!-- AIGateway UI Framework (v3.1.0) -->
+    <script src="/framework/framework.js"></script>
+    <link rel="stylesheet" href="/framework/framework.css">
+</body>
+</html>
+

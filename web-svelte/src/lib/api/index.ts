@@ -1,5 +1,11 @@
 export { api } from './client';
 export { authApi } from './auth';
 export { chatApi } from './chat';
+export { apiKeysApi } from './apikeys';
+export { tenantsApi } from './tenants';
+export { profileApi } from './profile';
 export type { LoginRequest, LoginResponse, RegisterRequest, BootstrapRequest, InitStatus } from './auth';
 export type { ConversationsResponse, MessagesResponse, CreateConversationRequest, ChatCompletionRequest, Model, ModelsResponse } from './chat';
+export type { APIKey, APIKeysResponse, CreateAPIKeyRequest, CreateAPIKeyResponse } from './apikeys';
+export type { Tenant, TenantMember, TenantsResponse, TenantMembersResponse, CreateTenantRequest } from './tenants';
+export type { UserProfile, UpdateProfileRequest, ChangePasswordRequest, Device, DevicesResponse } from './profile';

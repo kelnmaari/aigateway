@@ -41,6 +41,12 @@ Thumbs.db
 /logs/
 *.log
 
+# Svelte WebUI builds
+internal/web/svelte-build/
+web-svelte/build/
+web-svelte/.svelte-kit/
+web-svelte/node_modules/
+
 # Config files with secrets
 *.env
 *.env.local

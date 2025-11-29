@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2025-11-29
+
+### Added
+
+- **🎨 Svelte WebUI Migration** (v3.2.0: SVELTE-01):
+  - **Complete frontend rewrite** from vanilla HTML/JS to SvelteKit 2.x
+  - **22+ pages migrated** with full TypeScript support
+  - **Technology Stack**:
+    - Svelte 5 with Runes API
+    - SvelteKit 2.x with adapter-static (SSG)
+    - shadcn-svelte UI components
+    - Tailwind CSS 4.x with dark/light theming
+    - Paraglide JS for i18n (en/ru)
+    - lucide-svelte icons
+    - svelte-sonner toast notifications
+    
+  - **Pages Implemented**:
+    - Auth: Login, Register, Bootstrap
+    - Main: Dashboard, Chat (streaming), Settings
+    - User: API Keys, Tenants, Profile, Usage Statistics
+    - Data: Files Manager, RAG Sources, MCP Servers, Downloads
+    - Admin: Dashboard, Users, Invitations, API Keys, Models, Settings, Backups, Logs
+    - System: Monitor (real-time metrics), About
+    
+  - **Features**:
+    - Real-time chat with streaming responses
+    - File upload with drag-and-drop
+    - Dark/Light theme with localStorage persistence
+    - Internationalization (en/ru) with JSON files
+    - Protected routes with AuthGuard
+    - Toast notifications for all actions
+    - Error page (404/500) handling
+    
+  - **API Integration**:
+    - 12 API modules with full TypeScript types
+    - Centralized API client with auth token handling
+    - Automatic 401 redirect to login
+
+- **🔧 Build System Enhancement**:
+  - `build.ps1 frontend` - Build Svelte UI only
+  - `-WebUI` parameter: `legacy`, `svelte`, or `both`
+  - Automatic copy to `internal/web/svelte-build/`
+  - 147 static files (0.55 MB total)
+
+- **⚙️ Configuration**:
+  - `server.webui.version` - Switch between `legacy` and `svelte`
+  - `server.webui.enabled` - Enable/disable WebUI
+
+### Changed
+
+- **📦 Project Structure**:
+  - New `web-svelte/` directory for Svelte project
+  - `internal/web/embed.go` updated for dual UI support
+  - `internal/config/config.go` extended with WebUI config
+
+### Technical
+
+- `web-svelte/` - Complete SvelteKit project
+  - `src/lib/api/` - 12 API modules
+  - `src/lib/stores/` - Svelte 5 stores (auth, theme, chat, etc.)
+  - `src/lib/components/` - Reusable UI components
+  - `src/routes/` - 22+ pages with layouts
+  - `messages/` - i18n JSON files (en.json, ru.json)
+  
+- `web-migration/docs/` - Migration documentation
+  - Architecture analysis
+  - Feature inventory
+  - Migration roadmap
+  - API integration guide
+
+### Migration Notes
+
+To use new Svelte UI:
+1. Set `server.webui.version: "svelte"` in config
+2. Rebuild: `.\build.ps1 -WebUI svelte`
+3. Restart server
+
+To keep legacy UI:
+- Set `server.webui.version: "legacy"` (default)
+
+---
+
 ## [3.1.0] - 2025-11-16
 
 ### Added

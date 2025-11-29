@@ -154,22 +154,25 @@ export const adminApi = {
 		api.post(`/api/admin/users/${id}/reset-password`, { password: newPassword }),
 
 	toggleUserStatus: (id: string, enabled: boolean) =>
-		api.put(`/api/admin/users/${id}`, { status: enabled ? 'active' : 'disabled' }),
+		enabled
+			? api.patch(`/api/admin/users/${id}/enable`, {})
+			: api.patch(`/api/admin/users/${id}/disable`, {}),
+
+	// API Keys (admin)
+	getAPIKeys: () => api.get<{ api_keys: Array<{ id: string; name: string; key_prefix: string; user_id?: string; username?: string; tenant_id?: string; tenant_name?: string; status: string; all_models: boolean; models?: string[]; created_at: string; last_used_at?: string }> }>('/api/admin/keys'),
+
+	revokeAPIKey: (id: string) => api.patch(`/api/admin/keys/${id}/revoke`, {}),
 
 	// Settings
 	getSettings: () => api.get<SettingsResponse>('/api/admin/settings'),
 
-	updateSetting: (key: string, value: string) =>
-		api.put(`/api/admin/settings/${key}`, { value }),
+	updateSetting: (id: string, value: string) =>
+		api.put(`/api/admin/settings/${id}`, { value }),
 
 	// Logs
-	getLogs: (file = 'app', level?: string, limit = 100) => {
-		const params = new URLSearchParams({ file, limit: String(limit) });
-		if (level) params.set('level', level);
-		return api.get<LogsResponse>(`/api/admin/logs?${params}`);
-	},
+	getLogs: (filename = 'app') => api.get<LogsResponse>(`/api/admin/logs/${filename}`),
 
-	getLogFiles: () => api.get<{ files: string[] }>('/api/admin/logs/files'),
+	getLogFiles: () => api.get<{ files: Array<{ name: string; size: number; modified: string }> }>('/api/admin/logs'),
 
 	// Audit
 	getAuditLogs: (page = 1, perPage = 50, filters?: { action?: string; user_id?: string }) => {
@@ -180,7 +183,7 @@ export const adminApi = {
 	},
 
 	// Performance
-	getMetrics: () => api.get<SystemMetrics>('/api/admin/metrics'),
+	getMetrics: () => api.get<SystemMetrics>('/api/admin/performance/metrics'),
 
 	// Invitations
 	getInvitations: () => api.get<InvitationsResponse>('/api/admin/invitations'),

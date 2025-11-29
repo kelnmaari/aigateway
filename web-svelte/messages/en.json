@@ -55,6 +55,8 @@
 	"nav_usage": "Usage",
 	"nav_files": "Files",
 	"nav_rag": "RAG",
+	"nav_mcp": "MCP",
+	"nav_downloads": "Downloads",
 
 	"dashboard_title": "Dashboard",
 	"dashboard_conversations": "Conversations",

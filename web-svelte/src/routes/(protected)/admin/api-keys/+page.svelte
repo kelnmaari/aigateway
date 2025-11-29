@@ -35,7 +35,7 @@
 		try {
 			const params = new URLSearchParams();
 			if (search) params.set('search', search);
-			const response = await api.get<{ api_keys: AdminAPIKey[] }>(`/api/admin/api-keys?${params}`);
+			const response = await api.get<{ api_keys: AdminAPIKey[] }>(`/api/admin/keys?${params}`);
 			keys = response.api_keys || [];
 		} catch (error) {
 			console.error('Failed to load API keys:', error);
@@ -52,7 +52,7 @@
 		if (!confirm(`Revoke API key "${key.name}"?`)) return;
 
 		try {
-			await api.delete(`/api/admin/api-keys/${key.id}`);
+			await api.patch(`/api/admin/keys/${key.id}/revoke`, {});
 			keys = keys.filter((k) => k.id !== key.id);
 		} catch (error) {
 			console.error('Failed to revoke key:', error);

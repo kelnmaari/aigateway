@@ -9,6 +9,7 @@ export { filesApi } from './files';
 export { ragApi } from './rag';
 export { mcpApi } from './mcp';
 export { downloadsApi } from './downloads';
+export { usageApi } from './usage';
 export type { LoginRequest, LoginResponse, RegisterRequest, BootstrapRequest, InitStatus } from './auth';
 export type { ConversationsResponse, MessagesResponse, CreateConversationRequest, ChatCompletionRequest, Model, ModelsResponse } from './chat';
 export type { APIKey, APIKeysResponse, CreateAPIKeyRequest, CreateAPIKeyResponse } from './apikeys';

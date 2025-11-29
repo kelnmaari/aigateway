@@ -13,7 +13,8 @@
 		Shield,
 		Database,
 		Download,
-		Server
+		Server,
+		Mail
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
@@ -23,6 +24,7 @@
 	const tabs = [
 		{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
 		{ id: 'users', label: m.admin_users, icon: Users, href: '/admin/users' },
+		{ id: 'invitations', label: 'Invitations', icon: Mail, href: '/admin/invitations' },
 		{ id: 'api-keys', label: 'API Keys', icon: Key, href: '/admin/api-keys' },
 		{ id: 'models', label: m.admin_models, icon: Server, href: '/admin/models' },
 		{ id: 'settings', label: m.admin_settings, icon: Settings, href: '/admin/settings' },

@@ -45,24 +45,25 @@ export interface CreateMCPServerRequest {
 }
 
 export const mcpApi = {
-	// Servers
+	// Public Servers (read-only)
 	getServers: () => api.get<MCPServersResponse>('/api/mcp/servers'),
 
 	getServer: (id: string) => api.get<MCPServer>(`/api/mcp/servers/${id}`),
 
-	createServer: (data: CreateMCPServerRequest) => api.post<MCPServer>('/api/mcp/servers', data),
+	// Admin Servers (requires admin)
+	createServer: (data: CreateMCPServerRequest) => api.post<MCPServer>('/api/admin/mcp/servers', data),
 
 	updateServer: (id: string, data: Partial<CreateMCPServerRequest>) =>
-		api.put<MCPServer>(`/api/mcp/servers/${id}`, data),
+		api.put<MCPServer>(`/api/admin/mcp/servers/${id}`, data),
 
-	deleteServer: (id: string) => api.delete(`/api/mcp/servers/${id}`),
+	deleteServer: (id: string) => api.delete(`/api/admin/mcp/servers/${id}`),
 
-	// Control
-	startServer: (id: string) => api.post(`/api/mcp/servers/${id}/start`, {}),
+	// Control (admin)
+	startServer: (id: string) => api.post(`/api/admin/mcp/servers/${id}/start`, {}),
 
-	stopServer: (id: string) => api.post(`/api/mcp/servers/${id}/stop`, {}),
+	stopServer: (id: string) => api.post(`/api/admin/mcp/servers/${id}/stop`, {}),
 
-	restartServer: (id: string) => api.post(`/api/mcp/servers/${id}/restart`, {}),
+	restartServer: (id: string) => api.post(`/api/admin/mcp/servers/${id}/restart`, {}),
 
 	// Tools & Resources
 	getTools: (id: string) => api.get<{ tools: MCPTool[] }>(`/api/mcp/servers/${id}/tools`),
@@ -72,6 +73,6 @@ export const mcpApi = {
 
 	// Test connection
 	testConnection: (data: CreateMCPServerRequest) =>
-		api.post<{ success: boolean; message?: string }>('/api/mcp/test', data)
+		api.post<{ success: boolean; message?: string }>('/api/admin/mcp/test', data)
 };
 

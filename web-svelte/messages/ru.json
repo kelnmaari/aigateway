@@ -55,6 +55,8 @@
 	"nav_usage": "Использование",
 	"nav_files": "Файлы",
 	"nav_rag": "RAG",
+	"nav_mcp": "MCP",
+	"nav_downloads": "Загрузки",
 
 	"dashboard_title": "Панель управления",
 	"dashboard_conversations": "Диалоги",

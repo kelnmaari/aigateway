@@ -25,6 +25,7 @@
 	// Modal
 	let showAddModal = $state(false);
 	let modelName = $state('');
+	let downloadSource = $state<'ollama' | 'huggingface'>('ollama');
 	let isStarting = $state(false);
 	let addError = $state('');
 
@@ -65,11 +66,16 @@
 		addError = '';
 
 		try {
-			const newDownload = await downloadsApi.startDownload({
-				model_name: modelName.trim()
-			});
-			downloads = [newDownload, ...downloads];
+			if (downloadSource === 'ollama') {
+				// Pull via Ollama/Yzma
+				await downloadsApi.pullOllamaModel(modelName.trim());
+			} else {
+				// Download from HuggingFace
+				await downloadsApi.startDownload(modelName.trim());
+			}
+			await loadDownloads();
 			showAddModal = false;
+			modelName = '';
 		} catch (error) {
 			addError = error instanceof Error ? error.message : 'Failed to start download';
 		} finally {
@@ -86,23 +92,12 @@
 		}
 	}
 
-	async function handleRetry(download: DownloadItem) {
+	async function handlePause(download: DownloadItem) {
 		try {
-			await downloadsApi.retryDownload(download.id);
+			await downloadsApi.pauseDownload(download.id);
 			downloads = downloads.map((d) => (d.id === download.id ? { ...d, status: 'pending' } : d));
 		} catch (error) {
-			console.error('Failed to retry:', error);
-		}
-	}
-
-	async function handleDelete(download: DownloadItem) {
-		if (!confirm('Delete this download?')) return;
-
-		try {
-			await downloadsApi.deleteDownload(download.id);
-			downloads = downloads.filter((d) => d.id !== download.id);
-		} catch (error) {
-			console.error('Failed to delete:', error);
+			console.error('Failed to pause:', error);
 		}
 	}
 
@@ -289,17 +284,45 @@
 				{/if}
 
 				<div class="space-y-2">
-					<label for="model-name" class="text-sm font-medium">Model Name *</label>
+					<label class="text-sm font-medium">Source</label>
+					<div class="flex gap-2">
+						<button
+							type="button"
+							onclick={() => (downloadSource = 'ollama')}
+							class={cn(
+								'flex-1 rounded-lg border px-3 py-2 text-sm transition-colors',
+								downloadSource === 'ollama' ? 'border-primary bg-primary/10 text-primary' : 'border-input'
+							)}
+						>
+							Ollama
+						</button>
+						<button
+							type="button"
+							onclick={() => (downloadSource = 'huggingface')}
+							class={cn(
+								'flex-1 rounded-lg border px-3 py-2 text-sm transition-colors',
+								downloadSource === 'huggingface' ? 'border-primary bg-primary/10 text-primary' : 'border-input'
+							)}
+						>
+							Hugging Face
+						</button>
+					</div>
+				</div>
+
+				<div class="space-y-2">
+					<label for="model-name" class="text-sm font-medium">Model {downloadSource === 'ollama' ? 'Name' : 'ID'} *</label>
 					<input
 						id="model-name"
 						type="text"
 						bind:value={modelName}
-						placeholder="llama3.2:latest"
+						placeholder={downloadSource === 'ollama' ? 'llama3.2:latest' : 'TheBloke/Llama-2-7B-GGUF'}
 						required
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					/>
 					<p class="text-xs text-muted-foreground">
-						Enter an Ollama model name (e.g., llama3.2, mistral, codellama)
+						{downloadSource === 'ollama'
+							? 'Enter an Ollama model name (e.g., llama3.2, mistral, codellama)'
+							: 'Enter a Hugging Face model ID (e.g., TheBloke/Llama-2-7B-GGUF)'}
 					</p>
 				</div>
 
@@ -311,7 +334,7 @@
 						{#if isStarting}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
-						Start Download
+						{downloadSource === 'ollama' ? 'Pull Model' : 'Start Download'}
 					</Button>
 				</div>
 			</form>

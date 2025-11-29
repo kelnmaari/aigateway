@@ -48,7 +48,7 @@
 	async function createBackup() {
 		isCreating = true;
 		try {
-			const newBackup = await api.post<Backup>('/api/admin/backups', {});
+			const newBackup = await api.post<Backup>('/api/admin/backup', {});
 			backups = [newBackup, ...backups];
 		} catch (error) {
 			console.error('Failed to create backup:', error);
@@ -60,7 +60,7 @@
 
 	async function downloadBackup(backup: Backup) {
 		try {
-			window.open(`/api/admin/backups/${backup.id}/download`, '_blank');
+			window.open(`/api/admin/backup/${backup.filename}`, '_blank');
 		} catch (error) {
 			console.error('Failed to download backup:', error);
 		}
@@ -70,7 +70,7 @@
 		if (!confirm(`Delete backup "${backup.filename}"?`)) return;
 
 		try {
-			await api.delete(`/api/admin/backups/${backup.id}`);
+			await api.delete(`/api/admin/backup/${backup.filename}`);
 			backups = backups.filter((b) => b.id !== backup.id);
 		} catch (error) {
 			console.error('Failed to delete backup:', error);
@@ -82,7 +82,7 @@
 		if (!confirm(`Restore from backup "${backup.filename}"? Current data will be replaced.`)) return;
 
 		try {
-			await api.post(`/api/admin/backups/${backup.id}/restore`, {});
+			await api.post(`/api/admin/restore/${backup.filename}`, {});
 			alert('Backup restored successfully. Please restart the server.');
 		} catch (error) {
 			console.error('Failed to restore backup:', error);

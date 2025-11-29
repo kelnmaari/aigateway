@@ -43,31 +43,26 @@ export interface HuggingFaceSearchResponse {
 }
 
 export const downloadsApi = {
-	// Downloads
-	getDownloads: () => api.get<DownloadsResponse>('/api/downloads'),
+	// Downloads (HuggingFace UI API)
+	getDownloads: () => api.get<DownloadsResponse>('/api/ui/hf/downloads'),
 
-	startDownload: (data: StartDownloadRequest) => api.post<Download>('/api/downloads', data),
+	startDownload: (modelId: string) => api.post<Download>('/api/ui/hf/download', { model_id: modelId }),
 
-	cancelDownload: (id: string) => api.post(`/api/downloads/${id}/cancel`, {}),
+	cancelDownload: (id: string) => api.post(`/api/ui/hf/downloads/${id}/cancel`, {}),
 
-	retryDownload: (id: string) => api.post(`/api/downloads/${id}/retry`, {}),
+	pauseDownload: (id: string) => api.post(`/api/ui/hf/downloads/${id}/pause`, {}),
 
-	deleteDownload: (id: string) => api.delete(`/api/downloads/${id}`),
+	getDownloadProgress: (id: string) => api.get<Download>(`/api/ui/hf/downloads/${id}/progress`),
 
-	// Hugging Face
-	searchHuggingFace: (query: string, page = 1, limit = 20) => {
-		const params = new URLSearchParams({
-			q: query,
-			page: String(page),
-			limit: String(limit)
-		});
-		return api.get<HuggingFaceSearchResponse>(`/api/huggingface/search?${params}`);
+	// Hugging Face search
+	searchHuggingFace: (query: string) => {
+		const params = new URLSearchParams({ q: query });
+		return api.get<HuggingFaceSearchResponse>(`/api/ui/hf/search?${params}`);
 	},
 
-	// Ollama library
-	getOllamaModels: () =>
-		api.get<{ models: Array<{ name: string; description: string; tags: string[] }> }>(
-			'/api/ollama/library'
-		)
+	getPopularModels: () => api.get<HuggingFaceSearchResponse>('/api/ui/hf/popular'),
+
+	// Ollama pull (via yzma)
+	pullOllamaModel: (model: string) => api.post('/v1/yzma/models/load', { name: model })
 };
 

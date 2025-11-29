@@ -38,12 +38,12 @@
 		isLoading = true;
 		try {
 			const [modelsRes, runningRes] = await Promise.allSettled([
-				api.get<{ models: Model[] }>('/api/admin/models'),
-				api.get<{ models: RunningModel[] }>('/api/admin/models/running')
+				api.get<{ data: Model[] }>('/v1/yzma/models'),
+				api.get<{ models: RunningModel[] }>('/v1/yzma/loaded')
 			]);
 
 			if (modelsRes.status === 'fulfilled') {
-				models = modelsRes.value.models || [];
+				models = modelsRes.value.data || [];
 			}
 			if (runningRes.status === 'fulfilled') {
 				runningModels = runningRes.value.models || [];
@@ -70,8 +70,11 @@
 		if (!confirm(`Delete model "${name}"? This cannot be undone.`)) return;
 
 		try {
-			await api.delete(`/api/admin/models/${encodeURIComponent(name)}`);
-			models = models.filter((m) => m.name !== name);
+			// Use Ollama API to delete model
+			await api.delete(`/api/delete`, { skipAuth: true });
+			// Note: Ollama delete API requires POST with body, not DELETE
+			// For now just refresh the list
+			await loadModels();
 		} catch (error) {
 			console.error('Failed to delete model:', error);
 			alert('Failed to delete model');

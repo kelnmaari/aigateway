@@ -19,7 +19,11 @@
 		Globe,
 		Menu,
 		X,
-		ChevronDown
+		ChevronDown,
+		FolderOpen,
+		Database,
+		Server,
+		Download
 	} from 'lucide-svelte';
 
 	const STORAGE_KEY = 'PARAGLIDE_LOCALE';
@@ -31,7 +35,11 @@
 		{ href: '/dashboard', label: () => m.nav_dashboard(), icon: Home },
 		{ href: '/chat', label: () => m.nav_chat(), icon: MessageSquare },
 		{ href: '/api-keys', label: () => m.nav_apiKeys(), icon: Key },
-		{ href: '/tenants', label: () => m.nav_tenants(), icon: Building2 }
+		{ href: '/tenants', label: () => m.nav_tenants(), icon: Building2 },
+		{ href: '/files', label: () => m.nav_files(), icon: FolderOpen },
+		{ href: '/rag', label: () => m.nav_rag(), icon: Database },
+		{ href: '/mcp', label: () => m.nav_mcp(), icon: Server },
+		{ href: '/downloads', label: () => m.nav_downloads(), icon: Download }
 	];
 
 	const adminItems = [{ href: '/admin', label: () => m.nav_admin(), icon: Shield }];

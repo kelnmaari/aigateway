@@ -22,7 +22,7 @@
 	async function loadLogFiles() {
 		try {
 			const response = await adminApi.getLogFiles();
-			logFiles = response.files || ['app'];
+			logFiles = response.files?.map(f => f.name) || ['app'];
 		} catch {
 			logFiles = ['app'];
 		}
@@ -31,7 +31,7 @@
 	async function loadLogs() {
 		isLoading = true;
 		try {
-			const response = await adminApi.getLogs(selectedFile, selectedLevel || undefined, 200);
+			const response = await adminApi.getLogs(selectedFile);
 			logs = response.logs || [];
 		} catch (error) {
 			console.error('Failed to load logs:', error);

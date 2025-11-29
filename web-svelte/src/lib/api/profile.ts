@@ -48,11 +48,11 @@ export const profileApi = {
 	changePassword: (data: ChangePasswordRequest) =>
 		api.post('/api/users/me/password', data),
 
-	// Devices / Sessions
-	getDevices: () => api.get<DevicesResponse>('/api/users/me/devices'),
+	// Devices / Sessions (API: /api/auth/devices)
+	getDevices: () => api.get<DevicesResponse>('/api/auth/devices'),
 
-	revokeDevice: (deviceId: string) => api.delete(`/api/users/me/devices/${deviceId}`),
+	revokeDevice: (deviceId: string) => api.delete(`/api/auth/devices/${deviceId}`),
 
-	revokeAllDevices: () => api.delete('/api/users/me/devices')
+	revokeAllDevices: () => api.delete('/api/auth/devices')
 };
 

@@ -351,7 +351,7 @@
 				</div>
 				<div class="flex items-center gap-2">
 					<button
-						onclick={() => handleDeleteTenant(selectedTenant)}
+						onclick={() => selectedTenant && handleDeleteTenant(selectedTenant)}
 						class="rounded p-2 text-destructive hover:bg-destructive/10"
 						title="Delete organization"
 					>

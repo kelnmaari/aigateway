@@ -55,13 +55,20 @@
 		showCreateModal = true;
 	}
 
+	function getExpiresAt(expiresIn: string): string {
+		const days = parseInt(expiresIn.replace('d', ''));
+		const date = new Date();
+		date.setDate(date.getDate() + days);
+		return date.toISOString();
+	}
+
 	async function handleCreate() {
 		isCreating = true;
 		try {
 			const invitation = await adminApi.createInvitation({
 				email: newEmail || undefined,
-				role: newRole,
-				expires_in: newExpiresIn
+				expires_at: getExpiresAt(newExpiresIn),
+				max_uses: 1
 			});
 			invitations = [invitation, ...invitations];
 			showCreateModal = false;

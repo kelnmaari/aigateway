@@ -35,7 +35,7 @@
 
 	let downloads = $state<DownloadItem[]>([]);
 	let isLoading = $state(true);
-	let refreshInterval: number | null = null;
+	let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
 	onMount(async () => {
 		await loadDownloads();

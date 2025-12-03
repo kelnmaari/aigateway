@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		File,
+		File as FileIcon,
 		FileText,
 		Upload,
 		Download,
@@ -52,8 +52,8 @@
 	// Drag & Drop
 	let isDragging = $state(false);
 
-	onMount(async () => {
-		await loadFiles();
+	onMount(() => {
+		loadFiles();
 
 		// Close dropdown when clicking outside
 		const handleClickOutside = (e: MouseEvent) => {
@@ -221,7 +221,7 @@
 		if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) {
 			return FileText;
 		}
-		return File;
+		return FileIcon;
 	}
 
 	function getStatusBadge(status: string) {
@@ -354,7 +354,7 @@
 			ondrop={handleDrop}
 			role="region"
 		>
-			<File class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FileIcon class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-muted-foreground">No files uploaded yet</p>
 			<p class="mt-2 text-sm text-muted-foreground">Drag & drop files here or click to upload</p>
 			<Button variant="outline" class="mt-4" onclick={() => (showUploadModal = true)}>
@@ -521,7 +521,7 @@
 				<div class="mb-4 max-h-48 space-y-2 overflow-y-auto">
 					{#each uploadingFiles as file, idx}
 						<div class="flex items-center gap-2 rounded bg-muted px-3 py-2 text-sm">
-							<File class="h-4 w-4 shrink-0" />
+							<FileIcon class="h-4 w-4 shrink-0" />
 							<span class="truncate">{file.name}</span>
 							<span class="ml-auto shrink-0 text-muted-foreground">{formatSize(file.size)}</span>
 							<button

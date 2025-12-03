@@ -134,8 +134,8 @@ export interface InvitationsResponse {
 
 export interface CreateInvitationRequest {
 	email?: string;
-	role?: string;
-	expires_in_days?: number;
+	expires_at?: string;  // ISO date string
+	max_uses?: number;
 }
 
 // ==================== API ====================

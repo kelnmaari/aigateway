@@ -56,18 +56,10 @@
 
 	function handleThemeChange(newTheme: 'light' | 'dark' | 'system') {
 		theme = newTheme;
-		if (newTheme === 'light') {
-			themeStore.setLight();
-		} else if (newTheme === 'dark') {
-			themeStore.setDark();
-		} else {
-			// System preference
-			const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-			prefersDark ? themeStore.setDark() : themeStore.setLight();
-		}
+		themeStore.set(newTheme);
 	}
 
-	function handleLocaleChange(newLocale: string) {
+	function handleLocaleChange(newLocale: 'en' | 'ru') {
 		locale = newLocale;
 		setLocale(newLocale);
 		localStorage.setItem(STORAGE_KEY, newLocale);

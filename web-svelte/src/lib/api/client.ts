@@ -87,7 +87,8 @@ class ApiClient {
 
 		// Add auth token (fallback to localStorage if store not initialized)
 		if (!skipAuth) {
-			const token = authStore.accessToken || (browser ? localStorage.getItem('access_token') : null);
+			const token =
+				authStore.accessToken || (browser ? localStorage.getItem('access_token') : null);
 			if (token) {
 				requestHeaders['Authorization'] = `Bearer ${token}`;
 			}
@@ -186,4 +187,3 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
-

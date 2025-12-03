@@ -367,10 +367,10 @@ agent:
     buffer_size: 100
 
 huggingface:
-  api_token: ""
-  models_dir: "./data/models"
-  cache_dir: "./data/hf_cache"
-  download_timeout: 5m
-  max_concurrent_downloads: 2
-  auto_resume: true
+  api_token: "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" # Optional Hugging Face API token for private models
+  models_dir: "./data/models" # Directory for storing downloaded models
+  cache_dir: "./data/hf_cache" # Directory for caching model metadata
+  download_timeout: 5m # Default timeout for model downloads
+  max_concurrent_downloads: 2 # Maximum number of parallel downloads
+  auto_resume: true # Automatically resume interrupted downloads
 

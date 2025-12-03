@@ -102,10 +102,13 @@ func NewDownloader(client *Client, downloadsDir string, maxConcurrent int, autoR
 		go d.downloadWorker(i)
 	}
 
+	// Log absolute path for debugging
+	absPath, _ := filepath.Abs(downloadsDir)
 	logger.WithFields(logrus.Fields{
-		"downloads_dir":  downloadsDir,
-		"max_concurrent": maxConcurrent,
-		"auto_resume":    autoResume,
+		"downloads_dir":     downloadsDir,
+		"downloads_dir_abs": absPath,
+		"max_concurrent":    maxConcurrent,
+		"auto_resume":       autoResume,
 	}).Info("Download manager initialized")
 
 	return d, nil
@@ -128,9 +131,17 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 
 	// Prepare destination path
 	destPath := filepath.Join(d.downloadsDir, modelID, filename)
+	absDestPath, _ := filepath.Abs(destPath)
+	d.logger.WithFields(logrus.Fields{
+		"download_id":   downloadID,
+		"dest_path":     destPath,
+		"dest_path_abs": absDestPath,
+	}).Info("📁 Preparing download destination")
+	
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
+	d.logger.WithField("dir", filepath.Dir(absDestPath)).Info("📂 Directory created/verified")
 
 	// Check for partial download
 	var downloadedSize int64
@@ -409,6 +420,22 @@ func (d *Downloader) performDownload(download *Download) error {
 
 					if renameErr != nil {
 						return fmt.Errorf("failed to rename file after 10 retries: %w", renameErr)
+					}
+
+					// Verify file exists after rename
+					absPath, _ := filepath.Abs(download.DestPath)
+					if info, err := os.Stat(download.DestPath); err != nil {
+						d.logger.WithFields(logrus.Fields{
+							"dest_path":     download.DestPath,
+							"dest_path_abs": absPath,
+							"error":         err.Error(),
+						}).Error("❌ File NOT found after rename!")
+					} else {
+						d.logger.WithFields(logrus.Fields{
+							"dest_path":     download.DestPath,
+							"dest_path_abs": absPath,
+							"size":          info.Size(),
+						}).Info("✅ File verified after rename")
 					}
 
 					download.Mu.Lock()

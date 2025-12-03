@@ -68,10 +68,18 @@ func (h *YzmaUIHandler) GetModelsList(c *gin.Context) {
 	for _, modelPath := range models {
 		isPartialDownload := strings.HasSuffix(modelPath, ".part")
 		
-		// Get file info for size
-		var size int64
-		if info, err := os.Stat(modelPath); err == nil {
-			size = info.Size()
+		// Get full path for file operations
+		fullPath := h.client.GetFullModelPath(modelPath)
+		
+		// Get file info for size - skip if file doesn't exist
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			h.logger.WithFields(logrus.Fields{
+				"model_path": modelPath,
+				"full_path":  fullPath,
+				"error":      err.Error(),
+			}).Warn("Model file not found, skipping")
+			continue // Skip files that don't exist
 		}
 		
 		modelsList = append(modelsList, map[string]interface{}{
@@ -80,7 +88,7 @@ func (h *YzmaUIHandler) GetModelsList(c *gin.Context) {
 			"loaded":            loadedMap[modelPath],
 			"provider":          "yzma",
 			"is_partial":        isPartialDownload,
-			"size":              size,
+			"size":              info.Size(),
 		})
 	}
 	
@@ -370,16 +378,22 @@ func (h *YzmaUIHandler) PostDeleteModel(c *gin.Context) {
 		"full_path":  fullPath,
 	}).Info("Resolved full path for deletion")
 	
-	// Delete the file from disk
+	// Delete the file from disk (if it exists)
 	if err := os.Remove(fullPath); err != nil {
-		h.logger.WithError(err).WithField("full_path", fullPath).Error("Failed to delete model file")
-		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if os.IsNotExist(err) {
+			// File doesn't exist - that's OK, DB record was already removed
+			h.logger.WithField("full_path", fullPath).Info("Model file not found, but DB record removed - considering as success")
+		} else {
+			// Real error (permissions, etc.)
+			h.logger.WithError(err).WithField("full_path", fullPath).Error("Failed to delete model file")
+			if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.Header("HX-Trigger", `{"showNotification": {"message": "Failed to delete model file: `+err.Error()+`", "type": "error"}}`)
+			c.String(http.StatusInternalServerError, "Failed to delete model file")
 			return
 		}
-		c.Header("HX-Trigger", `{"showNotification": {"message": "Failed to delete model file: `+err.Error()+`", "type": "error"}}`)
-		c.String(http.StatusInternalServerError, "Failed to delete model file")
-		return
 	}
 	
 	// Check if JSON response is requested (SvelteKit frontend)

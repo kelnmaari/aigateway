@@ -21,9 +21,11 @@
 	// Types
 	interface YzmaModel {
 		name: string;
-		modified_at: string;
-		size: number;
-		digest: string;
+		path?: string;
+		modified_at?: string;
+		size?: number;
+		digest?: string;
+		loaded?: boolean;
 		details?: {
 			family?: string;
 			parameter_size?: string;
@@ -59,9 +61,13 @@
 	}
 
 	interface HFFile {
-		filename: string;
+		rfilename: string; // Backend uses rfilename (relative filename)
 		size: number;
-		download_url: string;
+		download_url?: string;
+		lfs?: {
+			size: number;
+			oid: string;
+		};
 	}
 
 	// State
@@ -118,12 +124,15 @@
 		}
 	}
 
-	function formatSize(bytes: number): string {
-		if (bytes === 0) return '0 B';
+	function formatSize(bytes: number | undefined | null): string {
+		if (!bytes || bytes === 0 || isNaN(bytes)) return '0 B';
 		const gb = bytes / (1024 * 1024 * 1024);
 		if (gb >= 1) return `${gb.toFixed(1)} GB`;
 		const mb = bytes / (1024 * 1024);
-		return `${mb.toFixed(0)} MB`;
+		if (mb >= 1) return `${mb.toFixed(0)} MB`;
+		const kb = bytes / 1024;
+		if (kb >= 1) return `${kb.toFixed(0)} KB`;
+		return `${bytes} B`;
 	}
 
 	function isModelRunning(name: string): boolean {
@@ -211,14 +220,15 @@
 	}
 
 	async function downloadFile(model: HFModel, file: HFFile) {
-		const key = `${model.id}/${file.filename}`;
+		const key = `${model.id}/${file.rfilename}`;
 		downloadingFiles.add(key);
 		downloadingFiles = new Set(downloadingFiles);
 
 		try {
 			await api.post('/api/ui/huggingface/download', {
 				model_id: model.id,
-				filename: file.filename
+				filename: file.rfilename,
+				total_size: file.lfs?.size || file.size
 			});
 			alert('Download started! Check the Downloads tab for progress.');
 		} catch (error) {
@@ -323,7 +333,7 @@
 								<Cpu class="h-5 w-5" />
 							</div>
 							<div>
-								<p class="text-2xl font-bold">{formatSize(yzmaStats.memory_used)}</p>
+								<p class="text-2xl font-bold">{yzmaStats.memory_used ? formatSize(yzmaStats.memory_used) : '0 B'}</p>
 								<p class="text-xs text-muted-foreground">Memory Used</p>
 							</div>
 						</div>
@@ -399,7 +409,7 @@
 										{/if}
 									</td>
 									<td class="px-4 py-3 text-sm text-muted-foreground">
-										{formatRelativeTime(model.modified_at)}
+										{model.modified_at ? formatRelativeTime(model.modified_at) : '-'}
 									</td>
 									<td class="px-4 py-3">
 										{#if running}
@@ -615,12 +625,13 @@
 				{:else}
 					<div class="space-y-2">
 						{#each hfFiles as file}
-							{@const key = `${selectedHFModel.id}/${file.filename}`}
+							{@const key = `${selectedHFModel.id}/${file.rfilename}`}
 							{@const isDownloading = downloadingFiles.has(key)}
+							{@const fileSize = file.lfs?.size || file.size}
 							<div class="flex items-center justify-between rounded-lg border border-border p-3">
-								<div>
-									<p class="font-medium">{file.filename}</p>
-									<p class="text-sm text-muted-foreground">{formatSize(file.size)}</p>
+								<div class="min-w-0 flex-1 pr-4">
+									<p class="truncate font-medium" title={file.rfilename}>{file.rfilename}</p>
+									<p class="text-sm text-muted-foreground">{formatSize(fileSize)}</p>
 								</div>
 								<Button
 									size="sm"

@@ -17,18 +17,19 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 
+	// Backend Download struct mapping
 	interface DownloadItem {
 		id: string;
-		model_name: string;
-		file_name: string;
-		status: 'pending' | 'downloading' | 'completed' | 'failed' | 'paused';
-		progress: number;
-		downloaded_bytes: number;
-		total_bytes: number;
-		speed: number;
-		eta: number;
+		model_id: string;          // HuggingFace model ID (e.g. "TheBloke/Llama-2-7B-GGUF")
+		filename: string;          // File being downloaded
+		status: 'pending' | 'downloading' | 'completed' | 'failed' | 'paused' | 'cancelled';
+		progress: number;          // 0.0 to 100.0
+		downloaded_size: number;   // bytes downloaded
+		total_size: number;        // total bytes
+		speed: number;             // bytes per second
+		eta: number;               // nanoseconds (Go time.Duration)
 		error?: string;
-		started_at: string;
+		started_at?: string;
 		completed_at?: string;
 	}
 
@@ -52,7 +53,8 @@
 		try {
 			const response = await fetch('/api/ui/huggingface/downloads', {
 				headers: {
-					Authorization: `Bearer ${localStorage.getItem('access_token')}`
+					Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+					Accept: 'application/json'
 				}
 			});
 			if (response.ok) {
@@ -71,7 +73,8 @@
 			await fetch(`/api/ui/huggingface/downloads/${id}/cancel`, {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${localStorage.getItem('access_token')}`
+					Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+					Accept: 'application/json'
 				}
 			});
 			await loadDownloads();
@@ -85,23 +88,29 @@
 		downloads = downloads.filter((d) => d.status === 'downloading' || d.status === 'pending');
 	}
 
-	function formatBytes(bytes: number): string {
-		if (bytes === 0) return '0 B';
+	function formatBytes(bytes: number | undefined): string {
+		if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return '0 B';
 		const k = 1024;
 		const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		if (i < 0 || i >= sizes.length) return '0 B';
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 	}
 
-	function formatSpeed(bytesPerSecond: number): string {
+	function formatSpeed(bytesPerSecond: number | undefined): string {
+		if (!bytesPerSecond || isNaN(bytesPerSecond)) return '0 B/s';
 		return formatBytes(bytesPerSecond) + '/s';
 	}
 
-	function formatETA(seconds: number): string {
-		if (seconds <= 0) return '--';
+	function formatETA(nanoseconds: number): string {
+		// Go time.Duration is in nanoseconds
+		const seconds = nanoseconds / 1_000_000_000;
+		if (!seconds || seconds <= 0 || !isFinite(seconds)) return '--';
 		if (seconds < 60) return `${Math.round(seconds)}s`;
 		if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-		return `${Math.round(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
+		const hours = Math.floor(seconds / 3600);
+		const mins = Math.round((seconds % 3600) / 60);
+		return `${hours}h ${mins}m`;
 	}
 
 	function getStatusIcon(status: string) {
@@ -238,8 +247,8 @@
 								{/if}
 							</div>
 							<div>
-								<h3 class="font-medium text-foreground">{download.model_name}</h3>
-								<p class="text-sm text-muted-foreground">{download.file_name}</p>
+								<h3 class="font-medium text-foreground">{download.model_id}</h3>
+								<p class="text-sm text-muted-foreground">{download.filename}</p>
 								{#if download.error}
 									<p class="mt-1 flex items-center gap-1 text-sm text-red-500">
 										<AlertTriangle class="h-3.5 w-3.5" />
@@ -262,7 +271,7 @@
 						<div class="mt-4">
 							<div class="mb-2 flex items-center justify-between text-sm">
 								<span class="text-muted-foreground">
-									{formatBytes(download.downloaded_bytes)} / {formatBytes(download.total_bytes)}
+									{formatBytes(download.downloaded_size)} / {formatBytes(download.total_size)}
 								</span>
 								<span class="font-medium text-foreground">{download.progress.toFixed(1)}%</span>
 							</div>
@@ -281,7 +290,7 @@
 						<div class="mt-3 text-sm text-muted-foreground">
 							<span class="flex items-center gap-1">
 								<HardDrive class="h-3.5 w-3.5" />
-								{formatBytes(download.total_bytes)}
+								{formatBytes(download.total_size)}
 							</span>
 						</div>
 					{/if}

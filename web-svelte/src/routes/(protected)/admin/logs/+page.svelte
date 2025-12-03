@@ -12,30 +12,50 @@
 	let auditLogs = $state<AuditEntry[]>([]);
 	let isLoading = $state(true);
 	let logFiles = $state<string[]>([]);
-	let selectedFile = $state('app');
+	let selectedFile = $state('');
 	let selectedLevel = $state('');
+	let logsError = $state('');
 
 	onMount(async () => {
-		await Promise.all([loadLogFiles(), loadLogs()]);
+		await loadLogFiles();
 	});
 
 	async function loadLogFiles() {
+		isLoading = true;
 		try {
 			const response = await adminApi.getLogFiles();
-			logFiles = response.files?.map(f => f.name) || ['app'];
-		} catch {
-			logFiles = ['app'];
+			const files = response.files?.map(f => f.name) || [];
+			logFiles = files;
+			// Select first available file
+			if (files.length > 0 && !selectedFile) {
+				selectedFile = files[0];
+				await loadLogs();
+			} else {
+				isLoading = false;
+				logsError = 'No log files found. File-based logging may not be configured.';
+			}
+		} catch (error) {
+			logFiles = [];
+			isLoading = false;
+			logsError = 'Failed to load log files. File-based logging may not be configured.';
+			console.error('Failed to load log files:', error);
 		}
 	}
 
 	async function loadLogs() {
+		if (!selectedFile) {
+			logs = [];
+			return;
+		}
 		isLoading = true;
+		logsError = '';
 		try {
 			const response = await adminApi.getLogs(selectedFile);
 			logs = response.logs || [];
 		} catch (error) {
 			console.error('Failed to load logs:', error);
 			logs = [];
+			logsError = 'Failed to load logs from file';
 		} finally {
 			isLoading = false;
 		}
@@ -170,10 +190,18 @@
 			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if activeTab === 'logs'}
-		{#if logs.length === 0}
+		{#if logsError}
+			<div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-8 text-center">
+				<AlertTriangle class="mx-auto h-10 w-10 text-amber-500" />
+				<p class="mt-3 font-medium text-amber-600 dark:text-amber-400">{logsError}</p>
+				<p class="mt-1 text-sm text-muted-foreground">
+					Application logs are available via stdout/stderr or your log aggregation system.
+				</p>
+			</div>
+		{:else if logs.length === 0}
 			<div class="rounded-lg border border-dashed border-border py-16 text-center">
 				<FileText class="mx-auto h-12 w-12 text-muted-foreground/40" />
-				<p class="mt-4 text-muted-foreground">No logs found</p>
+				<p class="mt-4 text-muted-foreground">No logs found in selected file</p>
 			</div>
 		{:else}
 			<div class="space-y-1 rounded-lg border border-border bg-card p-2">

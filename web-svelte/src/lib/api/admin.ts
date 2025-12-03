@@ -49,17 +49,25 @@ export interface UpdateUserRequest {
 
 // ==================== Settings ====================
 export interface Setting {
+	id: string;
+	category: string;
 	key: string;
 	value: string;
-	category: string;
+	type: string;
+	default_value?: string;
 	description?: string;
-	type: 'string' | 'number' | 'boolean' | 'json';
-	storage: 'database' | 'yaml';
+	is_editable: boolean;
+	is_required: boolean;
+	is_migrated: boolean;
 	requires_restart: boolean;
+	validation_rule?: string;
+	updated_at?: string;
+	updated_by?: string;
 }
 
 export interface SettingsResponse {
-	settings: Setting[];
+	// Backend returns settings grouped by category
+	settings: Record<string, Setting[]>;
 }
 
 // ==================== Logs ====================

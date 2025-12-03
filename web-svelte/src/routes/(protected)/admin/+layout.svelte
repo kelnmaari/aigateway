@@ -9,10 +9,7 @@
 		Key,
 		Settings,
 		FileText,
-		Activity,
 		Shield,
-		Database,
-		Download,
 		Server,
 		Mail
 	} from 'lucide-svelte';
@@ -28,7 +25,6 @@
 		{ id: 'api-keys', label: 'API Keys', icon: Key, href: '/admin/api-keys' },
 		{ id: 'models', label: m.admin_models, icon: Server, href: '/admin/models' },
 		{ id: 'settings', label: m.admin_settings, icon: Settings, href: '/admin/settings' },
-		{ id: 'backups', label: m.admin_backups, icon: Database, href: '/admin/backups' },
 		{ id: 'logs', label: m.admin_logs, icon: FileText, href: '/admin/logs' }
 	];
 

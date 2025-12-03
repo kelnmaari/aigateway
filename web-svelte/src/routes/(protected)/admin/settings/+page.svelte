@@ -6,24 +6,12 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 
-	let settings = $state<Setting[]>([]);
+	// Backend returns settings grouped by category: { settings: { category: Setting[] } }
+	let groupedSettings = $state<Record<string, Setting[]>>({});
 	let isLoading = $state(true);
 	let editedValues = $state<Record<string, string>>({});
 	let savingKeys = $state<Set<string>>(new Set());
 	let savedKeys = $state<Set<string>>(new Set());
-
-	// Group settings by category
-	function getGroupedSettings(): Record<string, Setting[]> {
-		const groups: Record<string, Setting[]> = {};
-		for (const setting of settings) {
-			const category = setting.category || 'general';
-			if (!groups[category]) groups[category] = [];
-			groups[category].push(setting);
-		}
-		return groups;
-	}
-
-	let groupedSettings = $derived(getGroupedSettings());
 
 	onMount(async () => {
 		await loadSettings();
@@ -33,11 +21,14 @@
 		isLoading = true;
 		try {
 			const response = await adminApi.getSettings();
-			settings = response.settings || [];
-			// Initialize edited values
+			// Backend returns { settings: { category: Setting[] } }
+			groupedSettings = response.settings || {};
+			// Initialize edited values from all settings
 			editedValues = {};
-			for (const s of settings) {
-				editedValues[s.key] = s.value;
+			for (const categorySettings of Object.values(groupedSettings)) {
+				for (const s of categorySettings) {
+					editedValues[s.key] = s.value;
+				}
 			}
 		} catch (error) {
 			console.error('Failed to load settings:', error);
@@ -47,8 +38,14 @@
 	}
 
 	function hasChanges(key: string): boolean {
-		const original = settings.find((s) => s.key === key);
-		return original ? editedValues[key] !== original.value : false;
+		// Search across all categories for the original setting
+		for (const categorySettings of Object.values(groupedSettings)) {
+			const original = categorySettings.find((s) => s.key === key);
+			if (original) {
+				return editedValues[key] !== original.value;
+			}
+		}
+		return false;
 	}
 
 	async function saveSetting(key: string) {
@@ -57,8 +54,14 @@
 
 		try {
 			await adminApi.updateSetting(key, editedValues[key]);
-			// Update original value
-			settings = settings.map((s) => (s.key === key ? { ...s, value: editedValues[key] } : s));
+			// Update original value in the grouped structure
+			const newGrouped = { ...groupedSettings };
+			for (const [category, categorySettings] of Object.entries(newGrouped)) {
+				newGrouped[category] = categorySettings.map((s) =>
+					s.key === key ? { ...s, value: editedValues[key] } : s
+				);
+			}
+			groupedSettings = newGrouped;
 			// Show saved indicator
 			savedKeys.add(key);
 			savedKeys = new Set(savedKeys);
@@ -132,7 +135,7 @@
 		<div class="flex items-center justify-center py-20">
 			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
-	{:else if settings.length === 0}
+	{:else if Object.keys(groupedSettings).length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
 			<Settings class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-muted-foreground">No settings available</p>
@@ -159,11 +162,11 @@
 												Restart required
 											</span>
 										{/if}
-										{#if setting.storage === 'yaml'}
-											<span class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-												YAML
-											</span>
-										{/if}
+									{#if !setting.is_editable}
+										<span class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+											Read-only
+										</span>
+									{/if}
 									</div>
 									{#if setting.description}
 										<p class="mt-1 text-sm text-muted-foreground">{setting.description}</p>

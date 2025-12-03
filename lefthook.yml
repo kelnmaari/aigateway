@@ -66,11 +66,9 @@ pre-push:
       glob: "*.{ts,svelte}"
       run: npm run build
 
-commit-msg:
-  commands:
-    # Validate commit message format (simplified for cross-platform)
-    check-message-length:
-      run: node -e "const fs=require('fs');const msg=fs.readFileSync(process.env.LEFTHOOK_COMMIT_MSG_PATH||'.git/COMMIT_EDITMSG','utf8').split('\n')[0];if(msg.length>100){console.error('Commit message too long (>100 chars)');process.exit(1)}"
+# commit-msg:
+#   Disabled - complex validation doesn't work well cross-platform
+#   Use commitlint separately if needed: https://commitlint.js.org/
 
 # Post-merge hook for dependency updates
 post-merge:

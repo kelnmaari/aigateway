@@ -22,8 +22,7 @@
 		ChevronDown,
 		FolderOpen,
 		Database,
-		Server,
-		Download
+		Server
 	} from 'lucide-svelte';
 
 	const STORAGE_KEY = 'PARAGLIDE_LOCALE';
@@ -37,14 +36,13 @@
 		{ href: '/api-keys', label: () => m.nav_apiKeys(), icon: Key },
 		{ href: '/tenants', label: () => m.nav_tenants(), icon: Building2 },
 		{ href: '/files', label: () => m.nav_files(), icon: FolderOpen },
-		{ href: '/rag', label: () => m.nav_rag(), icon: Database }
+		{ href: '/rag', label: () => m.nav_rag(), icon: Database },
+		{ href: '/mcp', label: () => m.nav_mcp(), icon: Server } // Read-only catalog for users
 	];
 
 	// Admin-only menu items
 	const adminItems = [
-		{ href: '/admin', label: () => m.nav_admin(), icon: Shield },
-		{ href: '/mcp', label: () => m.nav_mcp(), icon: Server },
-		{ href: '/downloads', label: () => m.nav_downloads(), icon: Download }
+		{ href: '/admin', label: () => m.nav_admin(), icon: Shield }
 	];
 
 	function isActive(href: string): boolean {

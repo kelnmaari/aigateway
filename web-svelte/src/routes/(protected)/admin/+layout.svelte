@@ -11,7 +11,9 @@
 		FileText,
 		Shield,
 		Server,
-		Mail
+		Mail,
+		Download,
+		Cpu
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
@@ -23,7 +25,9 @@
 		{ id: 'users', label: m.admin_users, icon: Users, href: '/admin/users' },
 		{ id: 'invitations', label: 'Invitations', icon: Mail, href: '/admin/invitations' },
 		{ id: 'api-keys', label: 'API Keys', icon: Key, href: '/admin/api-keys' },
-		{ id: 'models', label: m.admin_models, icon: Server, href: '/admin/models' },
+		{ id: 'models', label: m.admin_models, icon: Cpu, href: '/admin/models' },
+		{ id: 'downloads', label: 'Downloads', icon: Download, href: '/admin/downloads' },
+		{ id: 'mcp', label: 'MCP', icon: Server, href: '/admin/mcp' },
 		{ id: 'settings', label: m.admin_settings, icon: Settings, href: '/admin/settings' },
 		{ id: 'logs', label: m.admin_logs, icon: FileText, href: '/admin/logs' }
 	];

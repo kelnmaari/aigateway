@@ -75,6 +75,7 @@ export interface LogEntry {
 	timestamp: string;
 	level: string;
 	message: string;
+	raw?: string;
 	fields?: Record<string, unknown>;
 }
 
@@ -177,10 +178,18 @@ export const adminApi = {
 	updateSetting: (id: string, value: string) =>
 		api.put(`/api/admin/settings/${id}`, { value }),
 
-	// Logs
-	getLogs: (filename = 'app') => api.get<LogsResponse>(`/api/admin/logs/${filename}`),
+	// Logs - API returns { entries: LogEntry[], total: number, returned: number }
+	getLogs: async (filename: string) => {
+		const response = await api.get<{ entries: LogEntry[]; total: number; returned: number }>(
+			`/api/admin/logs/${filename}`
+		);
+		return { logs: response.entries || [], total: response.total || 0 };
+	},
 
-	getLogFiles: () => api.get<{ files: Array<{ name: string; size: number; modified: string }> }>('/api/admin/logs'),
+	getLogFiles: () =>
+		api.get<{ files: Array<{ name: string; size: number; modified: string; is_current: boolean }> }>(
+			'/api/admin/logs'
+		),
 
 	// Audit
 	getAuditLogs: (page = 1, perPage = 50, filters?: { action?: string; user_id?: string }) => {

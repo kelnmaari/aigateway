@@ -239,15 +239,17 @@ func (h *LogsHandler) StreamLogs(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Переходим в конец файла
-	file.Seek(0, io.SeekEnd)
+	// Переходим в конец файла и запоминаем позицию
+	offset, _ := file.Seek(0, io.SeekEnd)
 
 	// Context для отслеживания отключения клиента
 	ctx := c.Request.Context()
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	scanner := bufio.NewScanner(file)
+	// Буфер для чтения строк
+	buf := make([]byte, 4096)
+	var partial string
 
 	for {
 		select {
@@ -256,20 +258,52 @@ func (h *LogsHandler) StreamLogs(c *gin.Context) {
 			return
 
 		case <-ticker.C:
-			// Проверяем новые строки
-			for scanner.Scan() {
-				line := scanner.Text()
-				entry := h.parseLogLine(line)
-
-				// Отправляем событие
-				c.SSEvent("log", entry)
-				c.Writer.Flush()
+			// Получаем текущий размер файла
+			info, err := file.Stat()
+			if err != nil {
+				continue
 			}
 
-			if err := scanner.Err(); err != nil {
-				h.logger.WithError(err).Error("Error reading log stream")
-				c.SSEvent("error", gin.H{"message": "Error reading logs"})
-				return
+			// Если файл вырос - читаем новые данные
+			if info.Size() > offset {
+				// Устанавливаем позицию на последнюю прочитанную
+				file.Seek(offset, io.SeekStart)
+
+				// Читаем новые данные
+				n, err := file.Read(buf)
+				if err != nil && err != io.EOF {
+					h.logger.WithError(err).Error("Error reading log stream")
+					continue
+				}
+
+				if n > 0 {
+					offset += int64(n)
+
+					// Обрабатываем прочитанные данные построчно
+					data := partial + string(buf[:n])
+					lines := strings.Split(data, "\n")
+
+					// Последняя строка может быть неполной
+					for i, line := range lines {
+						if i == len(lines)-1 {
+							partial = line // Сохраняем неполную строку
+							continue
+						}
+
+						if line == "" {
+							continue
+						}
+
+						entry := h.parseLogLine(line)
+						c.SSEvent("log", entry)
+					}
+
+					c.Writer.Flush()
+				}
+			} else if info.Size() < offset {
+				// Файл был ротирован (стал меньше) - начинаем сначала
+				offset = 0
+				partial = ""
 			}
 		}
 	}

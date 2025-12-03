@@ -1,6 +1,18 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { FileText, RefreshCw, Loader2, AlertCircle, Info, AlertTriangle, Bug } from 'lucide-svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import {
+		FileText,
+		RefreshCw,
+		Loader2,
+		AlertCircle,
+		Info,
+		AlertTriangle,
+		Bug,
+		Download,
+		Play,
+		Square,
+		Radio
+	} from 'lucide-svelte';
 	import { adminApi, type LogEntry, type AuditEntry } from '$lib/api/admin';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -11,24 +23,45 @@
 	let logs = $state<LogEntry[]>([]);
 	let auditLogs = $state<AuditEntry[]>([]);
 	let isLoading = $state(true);
-	let logFiles = $state<string[]>([]);
+	let logFiles = $state<Array<{ name: string; size: number; modified: string; is_current: boolean }>>([]);
 	let selectedFile = $state('');
 	let selectedLevel = $state('');
 	let logsError = $state('');
 
+	// Real-time SSE
+	let eventSource: EventSource | null = null;
+	let isRealtime = $state(false);
+	let logsContainer: HTMLDivElement | null = null;
+
+	// Filter levels
+	const levels = ['', 'debug', 'info', 'warn', 'error'] as const;
+
+	// Filtered logs
+	let filteredLogs = $derived(
+		selectedLevel ? logs.filter((log) => log.level.toLowerCase() === selectedLevel) : logs
+	);
+
 	onMount(async () => {
 		await loadLogFiles();
+	});
+
+	onDestroy(() => {
+		stopRealtime();
 	});
 
 	async function loadLogFiles() {
 		isLoading = true;
 		try {
 			const response = await adminApi.getLogFiles();
-			const files = response.files?.map(f => f.name) || [];
-			logFiles = files;
-			// Select first available file
-			if (files.length > 0 && !selectedFile) {
-				selectedFile = files[0];
+			logFiles = response.files || [];
+			// Select current log or first file
+			const currentLog = logFiles.find((f) => f.is_current);
+			if (currentLog) {
+				selectedFile = currentLog.name;
+			} else if (logFiles.length > 0) {
+				selectedFile = logFiles[0].name;
+			}
+			if (selectedFile) {
 				await loadLogs();
 			} else {
 				isLoading = false;
@@ -49,9 +82,12 @@
 		}
 		isLoading = true;
 		logsError = '';
+		stopRealtime();
 		try {
 			const response = await adminApi.getLogs(selectedFile);
 			logs = response.logs || [];
+			// Auto-scroll to bottom
+			setTimeout(() => scrollToBottom(), 100);
 		} catch (error) {
 			console.error('Failed to load logs:', error);
 			logs = [];
@@ -78,6 +114,75 @@
 		activeTab = tab;
 		if (tab === 'audit' && auditLogs.length === 0) {
 			loadAuditLogs();
+		}
+		if (tab === 'logs') {
+			stopRealtime();
+		}
+	}
+
+	// Real-time SSE
+	function toggleRealtime() {
+		if (isRealtime) {
+			stopRealtime();
+		} else {
+			startRealtime();
+		}
+	}
+
+	function startRealtime() {
+		if (!selectedFile) {
+			alert('Please select a log file first');
+			return;
+		}
+
+		if (eventSource) {
+			eventSource.close();
+		}
+
+		const token = localStorage.getItem('access_token');
+		if (!token) {
+			alert('Authentication required. Please login again.');
+			return;
+		}
+
+		const url = `/api/admin/logs/stream?token=${encodeURIComponent(token)}&file=${encodeURIComponent(selectedFile)}`;
+		eventSource = new EventSource(url);
+
+		eventSource.addEventListener('log', (e) => {
+			const entry = JSON.parse(e.data) as LogEntry;
+			logs = [...logs, entry];
+			// Keep only last 1000 entries
+			if (logs.length > 1000) {
+				logs = logs.slice(-1000);
+			}
+			setTimeout(() => scrollToBottom(), 50);
+		});
+
+		eventSource.addEventListener('error', () => {
+			console.error('SSE error');
+			stopRealtime();
+		});
+
+		isRealtime = true;
+	}
+
+	function stopRealtime() {
+		if (eventSource) {
+			eventSource.close();
+			eventSource = null;
+		}
+		isRealtime = false;
+	}
+
+	function scrollToBottom() {
+		if (logsContainer) {
+			logsContainer.scrollTop = logsContainer.scrollHeight;
+		}
+	}
+
+	function downloadLog() {
+		if (selectedFile) {
+			window.open(`/api/admin/logs/${selectedFile}/download`, '_blank');
 		}
 	}
 
@@ -115,14 +220,65 @@
 
 	function formatTimestamp(ts: string): string {
 		try {
-			return new Date(ts).toLocaleString();
+			const date = new Date(ts);
+			const hours = String(date.getHours()).padStart(2, '0');
+			const minutes = String(date.getMinutes()).padStart(2, '0');
+			const seconds = String(date.getSeconds()).padStart(2, '0');
+			const ms = String(date.getMilliseconds()).padStart(3, '0');
+			return `${hours}:${minutes}:${seconds}.${ms}`;
 		} catch {
 			return ts;
 		}
 	}
+
+	// Parse and format log message - split by | and highlight key=value
+	function formatMessage(message: string): { main: string; context: Array<{ key: string; value: string }> } {
+		if (!message.includes(' | ')) {
+			// Try to parse key=value pairs from the whole message
+			const fields = parseKeyValuePairs(message);
+			if (fields.length > 0) {
+				return { main: '', context: fields };
+			}
+			return { main: message, context: [] };
+		}
+
+		const parts = message.split(' | ');
+		const mainMsg = parts[0];
+		const contextStr = parts.slice(1).join(' | ');
+		const context = parseKeyValuePairs(contextStr);
+
+		return { main: mainMsg, context };
+	}
+
+	function parseKeyValuePairs(text: string): Array<{ key: string; value: string }> {
+		const result: Array<{ key: string; value: string }> = [];
+		const regex = /(\w+)=([^\s]+)/g;
+		let match;
+		while ((match = regex.exec(text)) !== null) {
+			result.push({ key: match[1], value: match[2] });
+		}
+		return result;
+	}
+
+	function getLevelLabel(level: string): string {
+		switch (level) {
+			case '':
+				return 'All';
+			case 'debug':
+				return 'Debug';
+			case 'info':
+				return 'Info';
+			case 'warn':
+				return 'Warn';
+			case 'error':
+				return 'Error';
+			default:
+				return level;
+		}
+	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-4">
 	<!-- Tabs -->
 	<div class="flex items-center justify-between">
 		<div class="flex gap-2 border-b border-border">
@@ -151,38 +307,85 @@
 		</div>
 
 		{#if activeTab === 'logs'}
-			<div class="flex gap-3">
+			<div class="flex items-center gap-2">
+				<!-- File selector -->
 				<select
 					bind:value={selectedFile}
 					onchange={loadLogs}
-					class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+					class="rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 				>
 					{#each logFiles as file}
-						<option value={file}>{file}</option>
+						<option value={file.name}>
+							{file.name}
+							{file.is_current ? ' (current)' : ''}
+						</option>
 					{/each}
 				</select>
-				<select
-					bind:value={selectedLevel}
-					onchange={loadLogs}
-					class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+
+				<!-- Real-time toggle -->
+				<Button
+					variant={isRealtime ? 'destructive' : 'outline'}
+					size="sm"
+					onclick={toggleRealtime}
+					class="gap-1.5"
 				>
-					<option value="">All Levels</option>
-					<option value="debug">Debug</option>
-					<option value="info">Info</option>
-					<option value="warn">Warning</option>
-					<option value="error">Error</option>
-				</select>
-				<Button variant="outline" onclick={loadLogs} disabled={isLoading}>
+					{#if isRealtime}
+						<Radio class="h-3.5 w-3.5 animate-pulse" />
+						<Square class="h-3.5 w-3.5" />
+						Stop
+					{:else}
+						<Play class="h-3.5 w-3.5" />
+						Live
+					{/if}
+				</Button>
+
+				<!-- Download -->
+				<Button variant="outline" size="sm" onclick={downloadLog} disabled={!selectedFile}>
+					<Download class="h-4 w-4" />
+				</Button>
+
+				<!-- Refresh -->
+				<Button variant="outline" size="sm" onclick={loadLogs} disabled={isLoading || isRealtime}>
 					<RefreshCw class={cn('h-4 w-4', isLoading && 'animate-spin')} />
 				</Button>
 			</div>
 		{:else}
-			<Button variant="outline" onclick={loadAuditLogs} disabled={isLoading}>
+			<Button variant="outline" size="sm" onclick={loadAuditLogs} disabled={isLoading}>
 				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				{m.common_refresh()}
 			</Button>
 		{/if}
 	</div>
+
+	<!-- Level filter buttons (for logs tab) -->
+	{#if activeTab === 'logs' && !logsError}
+		<div class="flex items-center gap-1">
+			{#each levels as level}
+				<button
+					onclick={() => (selectedLevel = level)}
+					class={cn(
+						'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+						selectedLevel === level
+							? level === ''
+								? 'bg-primary text-primary-foreground'
+								: level === 'error'
+									? 'bg-red-500 text-white'
+									: level === 'warn'
+										? 'bg-amber-500 text-white'
+										: level === 'info'
+											? 'bg-blue-500 text-white'
+											: 'bg-purple-500 text-white'
+							: 'bg-muted text-muted-foreground hover:bg-muted/80'
+					)}
+				>
+					{getLevelLabel(level)}
+				</button>
+			{/each}
+			<span class="ml-2 text-xs text-muted-foreground">
+				{filteredLogs.length} / {logs.length} entries
+			</span>
+		</div>
+	{/if}
 
 	<!-- Content -->
 	{#if isLoading}
@@ -198,41 +401,50 @@
 					Application logs are available via stdout/stderr or your log aggregation system.
 				</p>
 			</div>
-		{:else if logs.length === 0}
+		{:else if filteredLogs.length === 0}
 			<div class="rounded-lg border border-dashed border-border py-16 text-center">
 				<FileText class="mx-auto h-12 w-12 text-muted-foreground/40" />
-				<p class="mt-4 text-muted-foreground">No logs found in selected file</p>
+				<p class="mt-4 text-muted-foreground">
+					{logs.length === 0 ? 'No logs found in selected file' : 'No logs match selected filter'}
+				</p>
 			</div>
 		{:else}
-			<div class="space-y-1 rounded-lg border border-border bg-card p-2">
-				{#each logs as log, i (i)}
+			<div
+				bind:this={logsContainer}
+				class="max-h-[calc(100vh-320px)] space-y-0.5 overflow-y-auto rounded-lg border border-border bg-card p-2 font-mono text-xs"
+			>
+				{#each filteredLogs as log, i (i)}
 					{@const LevelIcon = getLevelIcon(log.level)}
-					<div class="flex items-start gap-3 rounded px-3 py-2 hover:bg-muted/50">
+					{@const parsed = formatMessage(log.message)}
+					<div
+						class={cn(
+							'flex items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/50',
+							log.level.toLowerCase() === 'error' && 'bg-red-500/5'
+						)}
+					>
+						<!-- Timestamp -->
+						<span class="shrink-0 text-muted-foreground">{formatTimestamp(log.timestamp)}</span>
+
+						<!-- Level badge -->
 						<span
-							class={cn(
-								'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded',
-								getLevelClass(log.level)
-							)}
+							class={cn('shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase', getLevelClass(log.level))}
 						>
-							<LevelIcon class="h-3 w-3" />
+							{log.level}
 						</span>
+
+						<!-- Message -->
 						<div class="min-w-0 flex-1">
-							<div class="flex items-center gap-2">
-								<span class="text-xs text-muted-foreground">
-									{formatTimestamp(log.timestamp)}
+							{#if parsed.main}
+								<span class="text-foreground">{parsed.main}</span>
+							{/if}
+							{#if parsed.context.length > 0}
+								<span class="ml-1 text-muted-foreground">
+									{#each parsed.context as field, idx}
+										<span class="text-blue-400">{field.key}</span>=<span class="text-orange-400"
+											>{field.value}</span
+										>{idx < parsed.context.length - 1 ? ' ' : ''}
+									{/each}
 								</span>
-								<span
-									class={cn(
-										'rounded px-1 py-0.5 text-xs font-medium uppercase',
-										getLevelClass(log.level)
-									)}
-								>
-									{log.level}
-								</span>
-							</div>
-							<p class="mt-0.5 break-words text-sm">{log.message}</p>
-							{#if log.fields && Object.keys(log.fields).length > 0}
-								<pre class="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">{JSON.stringify(log.fields, null, 2)}</pre>
 							{/if}
 						</div>
 					</div>
@@ -312,4 +524,3 @@
 		{/if}
 	{/if}
 </div>
-

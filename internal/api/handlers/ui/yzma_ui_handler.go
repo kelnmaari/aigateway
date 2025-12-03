@@ -37,6 +37,7 @@ func NewYzmaUIHandler(client *yzma.Client, db storage.Database, renderer *templa
 }
 
 // GetModelsList returns HTMX fragment with available GGUF models
+// Also supports JSON response for SvelteKit frontend (Accept: application/json)
 func (h *YzmaUIHandler) GetModelsList(c *gin.Context) {
 	ctx := c.Request.Context()
 	
@@ -66,15 +67,33 @@ func (h *YzmaUIHandler) GetModelsList(c *gin.Context) {
 	modelsList := make([]map[string]interface{}, 0, len(models))
 	for _, modelPath := range models {
 		isPartialDownload := strings.HasSuffix(modelPath, ".part")
+		
+		// Get file info for size
+		var size int64
+		if info, err := os.Stat(modelPath); err == nil {
+			size = info.Size()
+		}
+		
 		modelsList = append(modelsList, map[string]interface{}{
 			"path":              modelPath,
 			"name":              filepath.Base(modelPath),
 			"loaded":            loadedMap[modelPath],
 			"provider":          "yzma",
 			"is_partial":        isPartialDownload,
+			"size":              size,
 		})
 	}
 	
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"models": modelsList,
+			"count":  len(modelsList),
+		})
+		return
+	}
+	
+	// Render HTML (HTMX)
 	data := map[string]interface{}{
 		"models": modelsList,
 		"count":  len(modelsList),
@@ -91,18 +110,29 @@ func (h *YzmaUIHandler) GetModelsList(c *gin.Context) {
 }
 
 // GetLoadedModelsList returns HTMX fragment with loaded models
+// Also supports JSON response for SvelteKit frontend
 func (h *YzmaUIHandler) GetLoadedModelsList(c *gin.Context) {
 	loadedModels := h.client.ListLoadedModels()
 	
 	modelsList := make([]map[string]interface{}, 0, len(loadedModels))
 	for modelPath, modelInfo := range loadedModels {
 		modelsList = append(modelsList, map[string]interface{}{
-			"path": modelPath,
-			"name": filepath.Base(modelPath),
+			"path":  modelPath,
+			"name":  filepath.Base(modelPath),
 			"alias": modelInfo["alias"],
 		})
 	}
 	
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"models": modelsList,
+			"count":  len(modelsList),
+		})
+		return
+	}
+	
+	// Render HTML (HTMX)
 	data := map[string]interface{}{
 		"models": modelsList,
 		"count":  len(modelsList),
@@ -119,25 +149,35 @@ func (h *YzmaUIHandler) GetLoadedModelsList(c *gin.Context) {
 }
 
 // PostLoadModel loads a model into memory (HTMX action)
+// Also supports JSON response for SvelteKit frontend
 func (h *YzmaUIHandler) PostLoadModel(c *gin.Context) {
-	// Try to get model_path from form data or JSON
+	// Try to get model from form data or JSON
 	var modelPath string
+	var modelName string
+	isJSONRequest := c.ContentType() == "application/json"
 	
-	// First try form data
-	modelPath = c.PostForm("model_path")
-	
-	// If not found, try JSON body
-	if modelPath == "" {
+	if isJSONRequest {
 		var req struct {
+			Model     string `json:"model"`
 			ModelPath string `json:"model_path"`
 		}
 		if err := c.ShouldBindJSON(&req); err == nil {
 			modelPath = req.ModelPath
+			modelName = req.Model
+			if modelPath == "" && modelName != "" {
+				modelPath = modelName
+			}
 		}
+	} else {
+		modelPath = c.PostForm("model_path")
 	}
 	
 	if modelPath == "" {
 		h.logger.Error("model_path is required but not provided")
+		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "model_path is required"})
+			return
+		}
 		c.String(http.StatusBadRequest, "model_path is required")
 		return
 	}
@@ -148,12 +188,26 @@ func (h *YzmaUIHandler) PostLoadModel(c *gin.Context) {
 	err := h.client.LoadModel(c.Request.Context(), modelPath)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to load model")
+		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.Header("HX-Trigger", `{"showNotification": {"message": "Failed to load model: `+err.Error()+`", "type": "error"}}`)
 		c.String(http.StatusInternalServerError, "Failed to load model")
 		return
 	}
 	
-	// Success notification
+	// Check if JSON response is requested (SvelteKit frontend)
+	if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Model loaded successfully",
+			"path":    modelPath,
+			"name":    filepath.Base(modelPath),
+		})
+		return
+	}
+	
+	// Success notification (HTMX)
 	c.Header("HX-Trigger", `{"showNotification": {"message": "Model loaded successfully", "type": "success"}, "refreshModels": true}`)
 	
 	// Return updated model card
@@ -174,25 +228,34 @@ func (h *YzmaUIHandler) PostLoadModel(c *gin.Context) {
 }
 
 // PostUnloadModel unloads a model from memory (HTMX action)
+// Also supports JSON response for SvelteKit frontend
 func (h *YzmaUIHandler) PostUnloadModel(c *gin.Context) {
-	// Try to get model_path from form data or JSON
 	var modelPath string
+	var modelName string
+	isJSONRequest := c.ContentType() == "application/json"
 	
-	// First try form data
-	modelPath = c.PostForm("model_path")
-	
-	// If not found, try JSON body
-	if modelPath == "" {
+	if isJSONRequest {
 		var req struct {
+			Model     string `json:"model"`
 			ModelPath string `json:"model_path"`
 		}
 		if err := c.ShouldBindJSON(&req); err == nil {
 			modelPath = req.ModelPath
+			modelName = req.Model
+			if modelPath == "" && modelName != "" {
+				modelPath = modelName
+			}
 		}
+	} else {
+		modelPath = c.PostForm("model_path")
 	}
 	
 	if modelPath == "" {
 		h.logger.Error("model_path is required but not provided")
+		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "model_path is required"})
+			return
+		}
 		c.String(http.StatusBadRequest, "model_path is required")
 		return
 	}
@@ -203,12 +266,26 @@ func (h *YzmaUIHandler) PostUnloadModel(c *gin.Context) {
 	err := h.client.UnloadModel(modelPath)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to unload model")
+		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.Header("HX-Trigger", `{"showNotification": {"message": "Failed to unload model: `+err.Error()+`", "type": "error"}}`)
 		c.String(http.StatusInternalServerError, "Failed to unload model")
 		return
 	}
 	
-	// Success notification
+	// Check if JSON response is requested (SvelteKit frontend)
+	if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Model unloaded successfully",
+			"path":    modelPath,
+			"name":    filepath.Base(modelPath),
+		})
+		return
+	}
+	
+	// Success notification (HTMX)
 	c.Header("HX-Trigger", `{"showNotification": {"message": "Model unloaded successfully", "type": "success"}, "refreshModels": true}`)
 	
 	// Return updated model card
@@ -229,25 +306,34 @@ func (h *YzmaUIHandler) PostUnloadModel(c *gin.Context) {
 }
 
 // PostDeleteModel permanently deletes a model file from disk (HTMX action)
+// Also supports JSON response for SvelteKit frontend
 func (h *YzmaUIHandler) PostDeleteModel(c *gin.Context) {
-	// Try to get model_path from form data or JSON
 	var modelPath string
+	var modelName string
+	isJSONRequest := c.ContentType() == "application/json"
 	
-	// First try form data
-	modelPath = c.PostForm("model_path")
-	
-	// If not found, try JSON body
-	if modelPath == "" {
+	if isJSONRequest {
 		var req struct {
+			Model     string `json:"model"`
 			ModelPath string `json:"model_path"`
 		}
 		if err := c.ShouldBindJSON(&req); err == nil {
 			modelPath = req.ModelPath
+			modelName = req.Model
+			if modelPath == "" && modelName != "" {
+				modelPath = modelName
+			}
 		}
+	} else {
+		modelPath = c.PostForm("model_path")
 	}
 	
 	if modelPath == "" {
 		h.logger.Error("model_path is required but not provided")
+		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "model_path is required"})
+			return
+		}
 		c.String(http.StatusBadRequest, "model_path is required")
 		return
 	}
@@ -259,6 +345,10 @@ func (h *YzmaUIHandler) PostDeleteModel(c *gin.Context) {
 	for loadedPath := range loadedModels {
 		if loadedPath == modelPath {
 			h.logger.WithField("model_path", modelPath).Warn("Cannot delete loaded model")
+			if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete model while it is loaded. Unload it first."})
+				return
+			}
 			c.Header("HX-Trigger", `{"showNotification": {"message": "Cannot delete model while it is loaded. Unload it first.", "type": "error"}}`)
 			c.String(http.StatusBadRequest, "Model is currently loaded")
 			return
@@ -283,13 +373,26 @@ func (h *YzmaUIHandler) PostDeleteModel(c *gin.Context) {
 	// Delete the file from disk
 	if err := os.Remove(fullPath); err != nil {
 		h.logger.WithError(err).WithField("full_path", fullPath).Error("Failed to delete model file")
+		if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		c.Header("HX-Trigger", `{"showNotification": {"message": "Failed to delete model file: `+err.Error()+`", "type": "error"}}`)
 		c.String(http.StatusInternalServerError, "Failed to delete model file")
 		return
 	}
 	
-	// Success notification
+	// Check if JSON response is requested (SvelteKit frontend)
 	fileName := filepath.Base(modelPath)
+	if isJSONRequest || strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Model deleted successfully",
+			"name":    fileName,
+		})
+		return
+	}
+	
+	// Success notification (HTMX)
 	c.Header("HX-Trigger", `{"showNotification": {"message": "Model '`+fileName+`' deleted successfully", "type": "success"}, "refreshModels": true}`)
 	
 	// Return empty HTML to remove the card from UI
@@ -297,17 +400,36 @@ func (h *YzmaUIHandler) PostDeleteModel(c *gin.Context) {
 }
 
 // GetStats returns HTMX fragment with yzma statistics
+// Also supports JSON response for SvelteKit frontend
 func (h *YzmaUIHandler) GetStats(c *gin.Context) {
 	requests, tokens := h.client.GetStats()
 	loadedModels := h.client.ListLoadedModels()
+	
+	// Calculate total models and total size
+	models, _ := h.client.ListAvailableModels()
+	var totalSize int64
+	for _, modelPath := range models {
+		if info, err := os.Stat(modelPath); err == nil {
+			totalSize += info.Size()
+		}
+	}
 	
 	data := map[string]interface{}{
 		"total_requests": requests,
 		"total_tokens":   tokens,
 		"loaded_count":   len(loadedModels),
+		"models_count":   len(models),
+		"total_size":     totalSize,
 		"timestamp":      time.Now().Format("15:04:05"),
 	}
 	
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, data)
+		return
+	}
+	
+	// Render HTML (HTMX)
 	var buf bytes.Buffer
 	if err := h.renderer.RenderInlineTemplate(&buf, "yzma_stats", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render stats")
@@ -333,4 +455,5 @@ func (h *YzmaUIHandler) GetProviderModels(c *gin.Context) {
 		"models":   models,
 	})
 }
+
 

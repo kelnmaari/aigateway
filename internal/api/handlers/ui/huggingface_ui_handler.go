@@ -36,6 +36,7 @@ func NewHuggingFaceUIHandler(hfClient *huggingface.Client, downloader *huggingfa
 }
 
 // GetModelsSearch handles HTMX search for models
+// Also supports JSON response for SvelteKit frontend (Accept: application/json)
 func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
@@ -85,11 +86,25 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	models, err := h.hfClient.SearchModels(ctx, filters)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to search models")
+		// Check if JSON response is requested
+		if strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		h.renderError(c, "Failed to search models: "+err.Error())
 		return
 	}
 	
-	// Render results
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"models": models,
+			"count":  len(models),
+		})
+		return
+	}
+	
+	// Render HTML results (HTMX)
 	data := map[string]interface{}{
 		"Models": models,
 		"Count":  len(models),
@@ -198,7 +213,16 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 		}
 	}
 	
-	// Render GGUF files list
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"model_id": model.ID,
+			"files":    model.GGUFFiles,
+		})
+		return
+	}
+	
+	// Render GGUF files list (HTMX)
 	data := map[string]interface{}{
 		"ModelID": model.ID,
 		"Files":   model.GGUFFiles,
@@ -273,6 +297,7 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 }
 
 // PostDownloadModel handles HTMX request to start model download
+// Also supports JSON response for SvelteKit frontend
 func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 	type DownloadRequest struct {
 		ModelID   string `json:"model_id" form:"model_id" binding:"required"`
@@ -282,9 +307,15 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 	}
 	
 	var req DownloadRequest
+	isJSONRequest := c.ContentType() == "application/json"
+	
 	// Support both JSON and form data for HTMX compatibility
-	if c.ContentType() == "application/json" {
+	if isJSONRequest {
 		if err := c.ShouldBindJSON(&req); err != nil {
+			if strings.Contains(c.GetHeader("Accept"), "application/json") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 			h.renderError(c, "Invalid request: "+err.Error())
 			return
 		}
@@ -305,11 +336,24 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 	download, err := h.downloader.StartDownload(req.ModelID, req.Filename, req.TotalSize, req.SHA256)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to start download")
+		if strings.Contains(c.GetHeader("Accept"), "application/json") || isJSONRequest {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		h.renderError(c, "Failed to start download: "+err.Error())
 		return
 	}
 	
-	// Return download started response with progress
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") || isJSONRequest {
+		c.JSON(http.StatusOK, gin.H{
+			"download": download,
+			"message":  "Download started",
+		})
+		return
+	}
+	
+	// Return download started response with progress (HTMX)
 	data := map[string]interface{}{
 		"Download": download,
 	}
@@ -408,6 +452,16 @@ func (h *HuggingFaceUIHandler) PostCancelDownload(c *gin.Context) {
 func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
 	downloads := h.downloader.ListDownloads()
 	
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"downloads": downloads,
+			"count":     len(downloads),
+		})
+		return
+	}
+	
+	// Render HTML (HTMX)
 	data := map[string]interface{}{
 		"Downloads": downloads,
 		"Count":     len(downloads),

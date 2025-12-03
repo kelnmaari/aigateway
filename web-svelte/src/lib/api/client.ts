@@ -24,12 +24,16 @@ class ApiClient {
 		// Build headers
 		const requestHeaders: Record<string, string> = {
 			'Content-Type': 'application/json',
+			Accept: 'application/json',
 			...headers
 		};
 
-		// Add auth token
-		if (!skipAuth && authStore.accessToken) {
-			requestHeaders['Authorization'] = `Bearer ${authStore.accessToken}`;
+		// Add auth token (fallback to localStorage if store not initialized)
+		if (!skipAuth) {
+			const token = authStore.accessToken || (browser ? localStorage.getItem('access_token') : null);
+			if (token) {
+				requestHeaders['Authorization'] = `Bearer ${token}`;
+			}
 		}
 
 		// Build request

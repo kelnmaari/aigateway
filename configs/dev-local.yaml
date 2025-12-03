@@ -62,8 +62,8 @@ auth:
   
   jwt:
     secret: "dev-jwt-secret-change-this-in-production-use-at-least-32-chars"
-    access_token_expiry: "15m"
-    refresh_token_expiry: "168h"
+    access_token_expiry: "168h"   # 7 дней
+    refresh_token_expiry: "720h"  # 30 дней
   
   registration:
     mode: "open"

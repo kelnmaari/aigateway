@@ -72,8 +72,8 @@ auth:
   # JWT для user authentication (Version 1.3.0+)
   jwt:
     secret: "dev-jwt-secret-change-this-in-production-use-at-least-32-chars"
-    access_token_expiry: "15m"    # Access token живет 15 минут
-    refresh_token_expiry: "168h"  # Refresh token живет 7 дней
+    access_token_expiry: "168h"   # Access token живет 7 дней
+    refresh_token_expiry: "720h"  # Refresh token живет 30 дней
   
   # User Registration (Version 2.3.0+: Invitation System)
   registration:

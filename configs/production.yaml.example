@@ -69,8 +69,8 @@ auth:
   # JWT settings для внутренних токенов
   jwt:
     secret: "CHANGE_ME_JWT_SECRET_KEY_456"
-    access_token_expiry: "15m"
-    refresh_token_expiry: "168h"
+    access_token_expiry: "168h"   # 7 дней
+    refresh_token_expiry: "720h"  # 30 дней
   
   # User Registration (Version 2.3.0+: Invitation System)
   registration:

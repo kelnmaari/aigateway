@@ -34,11 +34,11 @@
 	}
 
 	interface RunningModel {
-		name: string;
-		model: string;
-		size: number;
+		path: string;    // Full relative path
+		name: string;    // Basename
+		alias?: string;
+		size?: number;
 		vram?: number;
-		expires_at?: string;
 	}
 
 	interface YzmaStats {
@@ -135,13 +135,13 @@
 		return `${bytes} B`;
 	}
 
-	function isModelRunning(name: string): boolean {
-		return runningModels.some((m) => m.name === name || m.model === name);
+	function isModelRunning(path: string): boolean {
+		return runningModels.some((m) => m.path === path || m.name === path);
 	}
 
-	async function loadModel(name: string) {
+	async function loadModel(path: string) {
 		try {
-			await api.post('/api/ui/yzma/load', { model: name });
+			await api.post('/api/ui/yzma/load', { model_path: path });
 			await loadLocalModels();
 		} catch (error) {
 			console.error('Failed to load model:', error);
@@ -149,9 +149,9 @@
 		}
 	}
 
-	async function unloadModel(name: string) {
+	async function unloadModel(path: string) {
 		try {
-			await api.post('/api/ui/yzma/unload', { model: name });
+			await api.post('/api/ui/yzma/unload', { model_path: path });
 			await loadLocalModels();
 		} catch (error) {
 			console.error('Failed to unload model:', error);
@@ -159,10 +159,10 @@
 		}
 	}
 
-	async function deleteModel(name: string) {
+	async function deleteModel(path: string, name: string) {
 		if (!confirm(`Delete model "${name}"? This cannot be undone.`)) return;
 		try {
-			await api.post('/api/ui/yzma/delete', { model: name });
+			await api.post('/api/ui/yzma/delete', { model_path: path });
 			await loadLocalModels();
 		} catch (error) {
 			console.error('Failed to delete model:', error);
@@ -361,7 +361,7 @@
 											{/if}
 										</p>
 									</div>
-									<Button variant="ghost" size="sm" onclick={() => unloadModel(model.name)}>
+									<Button variant="ghost" size="sm" onclick={() => unloadModel(model.path)}>
 										Unload
 									</Button>
 								</div>
@@ -392,8 +392,8 @@
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-border">
-							{#each yzmaModels as model (model.digest)}
-								{@const running = isModelRunning(model.name)}
+							{#each yzmaModels as model (model.path || model.name)}
+								{@const running = isModelRunning(model.path || model.name)}
 								<tr class="hover:bg-muted/30">
 									<td class="px-4 py-3">
 										<div class="flex items-center gap-2">
@@ -423,18 +423,18 @@
 									</td>
 									<td class="px-4 py-3 text-right">
 										<div class="flex items-center justify-end gap-1">
-											{#if !running}
-												<button
-													onclick={() => loadModel(model.name)}
-													class="rounded p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-													title="Load model"
-												>
-													<Play class="h-4 w-4" />
-												</button>
-											{/if}
+										{#if !running}
 											<button
-												onclick={() => deleteModel(model.name)}
-												disabled={running}
+												onclick={() => loadModel(model.path || model.name)}
+												class="rounded p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+												title="Load model"
+											>
+												<Play class="h-4 w-4" />
+											</button>
+										{/if}
+										<button
+											onclick={() => deleteModel(model.path || model.name, model.name)}
+											disabled={running}
 												class={cn(
 													'rounded p-1.5',
 													running

@@ -62,13 +62,24 @@ class ApiClient {
 				throw new Error(errorData.error || 'Request failed');
 			}
 
-			// Handle empty responses
+			// Handle empty responses (204 No Content)
+			if (response.status === 204) {
+				return {} as T;
+			}
+
+			// Handle non-JSON responses
 			const contentType = response.headers.get('Content-Type');
 			if (!contentType || !contentType.includes('application/json')) {
 				return {} as T;
 			}
 
-			return await response.json();
+			// Handle empty body
+			const text = await response.text();
+			if (!text) {
+				return {} as T;
+			}
+
+			return JSON.parse(text);
 		} catch (error) {
 			if (error instanceof Error) {
 				throw error;

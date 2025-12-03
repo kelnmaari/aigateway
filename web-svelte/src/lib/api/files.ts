@@ -3,35 +3,45 @@ import { api } from './client';
 export interface FileItem {
 	id: string;
 	name: string;
-	path: string;
+	filename: string;
+	original_name: string;
 	size: number;
 	mime_type: string;
-	is_directory: boolean;
+	extraction_status: string;
 	created_at: string;
-	modified_at: string;
-	owner_id?: string;
-	owner_name?: string;
+	updated_at: string;
+	user_id?: string;
 	metadata?: Record<string, unknown>;
 }
 
 export interface FilesResponse {
 	files: FileItem[];
 	total: number;
-	path: string;
 }
 
 export interface UploadResponse {
 	file: FileItem;
 }
 
+export interface ListFilesOptions {
+	limit?: number;
+	offset?: number;
+	sort?: string;
+	order?: 'asc' | 'desc';
+	mimeType?: string;
+	extractionStatus?: string;
+}
+
 export const filesApi = {
 	// List files
-	list: (path = '/', page = 1, perPage = 50) => {
-		const params = new URLSearchParams({
-			path,
-			page: String(page),
-			per_page: String(perPage)
-		});
+	list: (options: ListFilesOptions = {}) => {
+		const params = new URLSearchParams();
+		params.set('limit', String(options.limit ?? 50));
+		params.set('offset', String(options.offset ?? 0));
+		params.set('sort', options.sort ?? 'created_at');
+		params.set('order', options.order ?? 'desc');
+		if (options.mimeType) params.set('mime_type', options.mimeType);
+		if (options.extractionStatus) params.set('extraction_status', options.extractionStatus);
 		return api.get<FilesResponse>(`/api/files?${params}`);
 	},
 
@@ -39,10 +49,9 @@ export const filesApi = {
 	get: (id: string) => api.get<FileItem>(`/api/files/${id}`),
 
 	// Upload file
-	upload: async (file: File, path = '/') => {
+	upload: async (file: File) => {
 		const formData = new FormData();
 		formData.append('file', file);
-		formData.append('path', path);
 
 		const response = await fetch('/api/files/upload', {
 			method: 'POST',
@@ -60,11 +69,7 @@ export const filesApi = {
 		return response.json() as Promise<UploadResponse>;
 	},
 
-	// Create directory
-	createDirectory: (name: string, path = '/') =>
-		api.post<FileItem>('/api/files/directory', { name, path }),
-
-	// Delete file/directory
+	// Delete file
 	delete: (id: string) => api.delete(`/api/files/${id}`),
 
 	// Download file
@@ -72,7 +77,10 @@ export const filesApi = {
 		window.open(`/api/files/${id}/download`, '_blank');
 	},
 
-	// Rename
-	rename: (id: string, newName: string) => api.put<FileItem>(`/api/files/${id}`, { name: newName })
+	// Get file text content
+	getText: (id: string) => api.get<{ text: string }>(`/api/files/${id}/text`),
+
+	// Search files
+	search: (query: string) => api.post<FilesResponse>('/api/files/search', { query })
 };
 

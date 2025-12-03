@@ -6,17 +6,32 @@ export interface LoginRequest {
 	remember_me?: boolean;
 }
 
-export interface LoginResponse {
+export interface TokenPair {
 	access_token: string;
 	refresh_token: string;
-	expires_at: number;
-	user: {
-		id: string;
-		username: string;
-		email: string;
-		full_name?: string;
-		is_admin: boolean;
-	};
+	expires_at: string; // ISO timestamp
+	token_type: string;
+}
+
+export interface UserInfo {
+	id: string;
+	username: string;
+	email: string;
+	full_name?: string;
+	is_admin: boolean;
+	role?: string;
+}
+
+export interface TenantInfo {
+	id: string;
+	name: string;
+	role: string;
+}
+
+export interface LoginResponse {
+	user: UserInfo;
+	token: TokenPair;
+	tenants: TenantInfo[];
 }
 
 export interface RegisterRequest {
@@ -57,7 +72,7 @@ export const authApi = {
 	getInitStatus: () => api.get<InitStatus>('/api/system/init-status', { skipAuth: true }),
 
 	getCurrentUser: () =>
-		api.get<LoginResponse['user']>('/api/users/me'),
+		api.get<UserInfo>('/api/users/me'),
 
 	validateInvitation: (token: string) =>
 		api.get<{ valid: boolean; email?: string }>(`/api/invitations/${token}/validate`, {

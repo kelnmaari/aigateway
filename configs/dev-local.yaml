@@ -219,7 +219,7 @@ file_storage:
     validate_content: true
   
   s3:
-    endpoint: "http://localhost:9000"
+    endpoint: "localhost:9000"
     bucket: "user-files"
     access_key: "minioadmin"
     secret_key: "minioadmin123"

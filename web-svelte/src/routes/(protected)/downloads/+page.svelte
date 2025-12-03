@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import {
 		Download,
 		Plus,
@@ -16,6 +17,7 @@
 	import { downloadsApi, type Download as DownloadItem } from '$lib/api/downloads';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { authStore } from '$lib';
 	import * as m from '$lib/paraglide/messages';
 
 	let downloads = $state<DownloadItem[]>([]);
@@ -30,6 +32,11 @@
 	let addError = $state('');
 
 	onMount(async () => {
+		// Admin-only page
+		if (!authStore.isAdmin) {
+			goto('/dashboard');
+			return;
+		}
 		await loadDownloads();
 		// Poll for updates
 		pollInterval = setInterval(loadDownloads, 3000);

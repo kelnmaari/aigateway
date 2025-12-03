@@ -931,7 +931,7 @@ func (r *Router) setupFrameworkRoutes() {
 
 	// Register framework routes
 	r.frameworkHandler.RegisterRoutes(r.engine)
-	
+
 	r.logger.Info("✅ UI Framework routes configured")
 }
 
@@ -2026,16 +2026,21 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		logger.Info("Dashboard batch handler initialized successfully")
 
 		// UI Framework initialization (v3.1.0: Framework)
-		devMode := os.Getenv("ENV") == "development" || os.Getenv("ENV") == "dev"
-		frameworkBuilder := framework.NewBuilder(logger, !devMode) // minify in production
-		if err := frameworkBuilder.Build(); err != nil {
-			logger.WithError(err).Warn("Failed to build UI framework, continuing without it")
+		// Skip for Svelte UI - legacy framework is not needed
+		if cfg.Server.WebUI.Version != "svelte" {
+			devMode := os.Getenv("ENV") == "development" || os.Getenv("ENV") == "dev"
+			frameworkBuilder := framework.NewBuilder(logger, !devMode) // minify in production
+			if err := frameworkBuilder.Build(); err != nil {
+				logger.WithError(err).Warn("Failed to build UI framework, continuing without it")
+			} else {
+				r.frameworkHandler = framework.NewHandler(frameworkBuilder, logger, devMode)
+				logger.WithFields(logrus.Fields{
+					"dev_mode": devMode,
+					"minified": !devMode,
+				}).Info("UI Framework initialized successfully")
+			}
 		} else {
-			r.frameworkHandler = framework.NewHandler(frameworkBuilder, logger, devMode)
-			logger.WithFields(logrus.Fields{
-				"dev_mode": devMode,
-				"minified": !devMode,
-			}).Info("UI Framework initialized successfully")
+			logger.Info("UI Framework skipped (Svelte UI mode)")
 		}
 
 		// Quota Middleware initialization

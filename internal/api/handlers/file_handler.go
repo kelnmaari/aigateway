@@ -460,7 +460,7 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		"user_id": userID,
 	}).Info("File deleted successfully")
 
-	c.JSON(http.StatusNoContent, nil)
+	c.Status(http.StatusNoContent)
 }
 
 // SearchFiles ищет файлы по содержимому (для будущей реализации с full-text search)

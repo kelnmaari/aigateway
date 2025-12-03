@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,7 +99,8 @@ func (s *S3Storage) Store(ctx context.Context, file io.Reader, opts filestorage.
 	fileID := uuid.New().String()
 
 	// Формируем object key: userID/fileID_filename
-	objectKey := filepath.Join(opts.UserID, fileID+"_"+opts.Filename)
+	// Используем "/" вместо filepath.Join чтобы избежать Windows backslashes
+	objectKey := opts.UserID + "/" + fileID + "_" + opts.Filename
 
 	// Выбираем bucket
 	bucket := s.bucket
@@ -256,18 +258,19 @@ func (s *S3Storage) parsePath(path string) (bucket, objectKey string, err error)
 	// Путь должен быть в формате: bucket/userID/fileID_filename
 	// Например: user-files/user123/abc-def-ghi_document.pdf
 
-	// Простой парсинг: ищем первый слеш
-	parts := filepath.SplitList(filepath.ToSlash(path))
-	if len(parts) < 2 {
-		// Если нет bucket в пути, используем дефолтный
+	// Нормализуем слэши и разбиваем по "/"
+	normalizedPath := filepath.ToSlash(path)
+	idx := strings.Index(normalizedPath, "/")
+	if idx == -1 {
+		// Если нет слэша, используем дефолтный bucket
 		bucket = s.bucket
 		objectKey = path
 		return bucket, objectKey, nil
 	}
 
-	// Иначе первая часть - bucket, остальное - object key
-	bucket = parts[0]
-	objectKey = filepath.Join(parts[1:]...)
+	// Первая часть - bucket, остальное - object key
+	bucket = normalizedPath[:idx]
+	objectKey = normalizedPath[idx+1:]
 
 	return bucket, objectKey, nil
 }

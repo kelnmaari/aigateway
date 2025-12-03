@@ -13,7 +13,7 @@
 	let savedKeys = $state<Set<string>>(new Set());
 
 	// Group settings by category
-	let groupedSettings = $derived(() => {
+	function getGroupedSettings(): Record<string, Setting[]> {
 		const groups: Record<string, Setting[]> = {};
 		for (const setting of settings) {
 			const category = setting.category || 'general';
@@ -21,7 +21,9 @@
 			groups[category].push(setting);
 		}
 		return groups;
-	});
+	}
+
+	let groupedSettings = $derived(getGroupedSettings());
 
 	onMount(async () => {
 		await loadSettings();
@@ -137,7 +139,7 @@
 		</div>
 	{:else}
 		<div class="space-y-8">
-			{#each Object.entries(groupedSettings()) as [category, categorySettings]}
+			{#each Object.entries(groupedSettings) as [category, categorySettings]}
 				<section class="rounded-xl border border-border bg-card">
 					<div class="border-b border-border px-6 py-4">
 						<h3 class="font-semibold">{getCategoryLabel(category)}</h3>

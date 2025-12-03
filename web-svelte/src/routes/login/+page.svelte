@@ -22,9 +22,9 @@
 			const response = await authApi.login({ username, password });
 			authStore.login(
 				{
-					access_token: response.access_token,
-					refresh_token: response.refresh_token,
-					expires_at: response.expires_at
+					access_token: response.token.access_token,
+					refresh_token: response.token.refresh_token,
+					expires_at: new Date(response.token.expires_at).getTime()
 				},
 				response.user
 			);

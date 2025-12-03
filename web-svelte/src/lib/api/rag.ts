@@ -3,15 +3,18 @@ import { api } from './client';
 export interface RAGSource {
 	id: string;
 	name: string;
-	type: 'file' | 'url' | 'database' | 'api';
-	status: 'active' | 'indexing' | 'error' | 'disabled';
+	description?: string;
+	type: 'file' | 'url' | 'database' | 'api' | 'web';
+	status: 'active' | 'indexing' | 'error' | 'disabled' | 'pending';
 	config: Record<string, unknown>;
 	document_count: number;
 	chunk_count: number;
+	token_count?: number;
 	last_indexed_at?: string;
 	created_at: string;
 	updated_at: string;
 	error_message?: string;
+	shared?: boolean;
 }
 
 export interface RAGSourcesResponse {
@@ -21,8 +24,20 @@ export interface RAGSourcesResponse {
 
 export interface CreateRAGSourceRequest {
 	name: string;
-	type: 'file' | 'url' | 'database' | 'api';
+	description?: string;
+	type: 'file' | 'url' | 'database' | 'api' | 'web';
 	config: Record<string, unknown>;
+	shared?: boolean;
+}
+
+export interface TestConnectionRequest {
+	type: string;
+	config: Record<string, unknown>;
+}
+
+export interface TestConnectionResponse {
+	success: boolean;
+	message: string;
 }
 
 export interface RAGDocument {
@@ -53,8 +68,15 @@ export const ragApi = {
 
 	deleteSource: (id: string) => api.delete(`/api/rag/sources/${id}`),
 
+	// Test connection before creating
+	testConnection: (data: TestConnectionRequest) =>
+		api.post<TestConnectionResponse>('/api/rag/test-connection', data),
+
 	// Indexing
 	reindexSource: (id: string) => api.post(`/api/rag/sources/${id}/reindex`, {}),
+
+	// Sync (alias for reindex)
+	syncSource: (id: string) => api.post(`/api/rag/sources/${id}/sync`, {}),
 
 	// Documents
 	getDocuments: (sourceId: string, page = 1, perPage = 20) => {
@@ -72,4 +94,3 @@ export const ragApi = {
 			{ query, source_ids: sourceIds, limit }
 		)
 };
-

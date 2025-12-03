@@ -43,7 +43,8 @@
 		}
 	}
 
-	function formatUptime(seconds: number): string {
+	function formatUptime(seconds: number | undefined): string {
+		if (seconds == null) return '—';
 		const days = Math.floor(seconds / 86400);
 		const hours = Math.floor((seconds % 86400) / 3600);
 		const mins = Math.floor((seconds % 3600) / 60);
@@ -52,12 +53,27 @@
 		return `${mins}m`;
 	}
 
-	function formatBytes(bytes: number): string {
+	function formatBytes(bytes: number | undefined): string {
+		if (bytes == null) return '—';
 		const gb = bytes / (1024 * 1024 * 1024);
 		if (gb >= 1) return `${gb.toFixed(1)} GB`;
 		const mb = bytes / (1024 * 1024);
 		return `${mb.toFixed(0)} MB`;
 	}
+
+	function formatPercent(value: number | undefined): string {
+		if (value == null) return '0';
+		return value.toFixed(1);
+	}
+
+	function getPercentValue(value: number | undefined): number {
+		return value ?? 0;
+	}
+
+	// Derived memory percentage
+	const memPercent = $derived(
+		metrics?.memory_total ? ((metrics.memory_used ?? 0) / metrics.memory_total) * 100 : 0
+	);
 </script>
 
 {#if isLoading}
@@ -128,20 +144,20 @@
 								<Cpu class="h-4 w-4" />
 								CPU
 							</span>
-							<span class="text-sm font-medium">{metrics.cpu_percent.toFixed(1)}%</span>
+							<span class="text-sm font-medium">{formatPercent(metrics.cpu_percent)}%</span>
 						</div>
 						<div class="h-2 overflow-hidden rounded-full bg-muted">
 							<div
 								class={cn(
 									'h-full transition-all',
-									metrics.cpu_percent > 80 ? 'bg-red-500' : metrics.cpu_percent > 50 ? 'bg-amber-500' : 'bg-green-500'
+									getPercentValue(metrics.cpu_percent) > 80 ? 'bg-red-500' : getPercentValue(metrics.cpu_percent) > 50 ? 'bg-amber-500' : 'bg-green-500'
 								)}
-								style="width: {Math.min(metrics.cpu_percent, 100)}%"
+								style="width: {Math.min(getPercentValue(metrics.cpu_percent), 100)}%"
 							></div>
 						</div>
 					</div>
 
-						<div>
+					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
 								<HardDrive class="h-4 w-4" />
@@ -155,13 +171,9 @@
 							<div
 								class={cn(
 									'h-full transition-all',
-									(metrics.memory_used / metrics.memory_total) * 100 > 80
-										? 'bg-red-500'
-										: (metrics.memory_used / metrics.memory_total) * 100 > 50
-											? 'bg-amber-500'
-											: 'bg-green-500'
+									memPercent > 80 ? 'bg-red-500' : memPercent > 50 ? 'bg-amber-500' : 'bg-green-500'
 								)}
-								style="width: {Math.min((metrics.memory_used / metrics.memory_total) * 100, 100)}%"
+								style="width: {Math.min(memPercent, 100)}%"
 							></div>
 						</div>
 					</div>
@@ -179,7 +191,7 @@
 							<TrendingUp class="h-4 w-4" />
 							Requests/sec
 						</div>
-						<p class="text-xl font-semibold">{metrics.requests_per_second.toFixed(1)}</p>
+						<p class="text-xl font-semibold">{formatPercent(metrics.requests_per_second)}</p>
 					</div>
 				</div>
 			</div>

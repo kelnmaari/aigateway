@@ -34,13 +34,13 @@
 	async function loadDashboardData() {
 		loading = true;
 		try {
-			// Load dashboard stats
+			// Load dashboard stats - use batch API endpoint
 			const [statsRes, conversationsRes, modelsRes, tenantsRes] = await Promise.allSettled([
-				api.get<{ conversations: number; api_keys: number; requests: number }>('/api/users/me/stats'),
+				api.get<{ conversations: number; api_keys: number; requests: number }>('/api/dashboard/stats'),
 				api.get<{ conversations: Array<{ id: string; title: string; updated_at: string }> }>(
 					'/api/conversations?limit=5'
 				),
-				api.get<{ models: Array<{ id: string; name?: string }> }>('/api/models'),
+				api.get<{ object: string; data: Array<{ id: string; owned_by?: string }> }>('/v1/models'),
 				api.get<{ tenants: Array<{ id: string; name: string; role: string }> }>('/api/users/me/tenants')
 			]);
 
@@ -55,8 +55,10 @@
 			}
 
 			if (modelsRes.status === 'fulfilled') {
-				availableModels = (modelsRes.value.models || []).slice(0, 6);
-				stats.models = modelsRes.value.models?.length || 0;
+				// OpenAI format: { object: "list", data: [...] }
+				const modelData = modelsRes.value.data || [];
+				availableModels = modelData.slice(0, 6).map((m) => ({ id: m.id, name: m.id }));
+				stats.models = modelData.length;
 			}
 
 			if (tenantsRes.status === 'fulfilled') {

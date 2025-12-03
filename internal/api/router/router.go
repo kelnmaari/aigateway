@@ -4,6 +4,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -49,6 +50,7 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
+	"aigateway/internal/web"
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
 	"aigateway/internal/websocket"
@@ -1094,8 +1096,133 @@ func (r *Router) setupUsageRoutes() {
 	r.logger.Info("Usage Statistics API endpoints configured")
 }
 
-// setupWebUIRoutes настраивает static file serving для WebUI (Version 1.3.0+)
+// setupWebUIRoutes настраивает static file serving для WebUI (Version 1.3.0+, v3.2.0: Svelte support)
 func (r *Router) setupWebUIRoutes() {
+	webUIVersion := r.config.Server.WebUI.Version
+	r.logger.WithField("version", webUIVersion).Info("Setting up WebUI routes")
+
+	// Check which UI version to use
+	if webUIVersion == "svelte" {
+		r.setupSvelteUIRoutes()
+	} else {
+		r.setupLegacyUIRoutes()
+	}
+}
+
+// setupSvelteUIRoutes serves the Svelte SPA from embedded files (v3.2.0+)
+func (r *Router) setupSvelteUIRoutes() {
+	staticFS, err := web.GetStaticFS("svelte")
+	if err != nil {
+		r.logger.WithError(err).Error("Failed to get Svelte static FS, falling back to legacy")
+		r.setupLegacyUIRoutes()
+		return
+	}
+
+	// Check if Svelte UI is available
+	if !web.HasSvelteUI() {
+		r.logger.Warn("Svelte UI not available, falling back to legacy")
+		r.setupLegacyUIRoutes()
+		return
+	}
+
+	// Read index.html content once for SPA fallback
+	indexHTML, err := fs.ReadFile(staticFS, "index.html")
+	if err != nil {
+		r.logger.WithError(err).Error("Failed to read index.html, falling back to legacy")
+		r.setupLegacyUIRoutes()
+		return
+	}
+
+	// Create file server for static assets
+	fileServer := http.FileServer(http.FS(staticFS))
+
+	// Helper to serve index.html for SPA routes
+	serveIndex := func(c *gin.Context) {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+	}
+
+	// Helper to serve static files
+	serveStatic := func(c *gin.Context) {
+		// Check if file exists
+		path := strings.TrimPrefix(c.Request.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+
+		f, err := staticFS.Open(path)
+		if err != nil {
+			// File not found - serve index.html for SPA routing
+			serveIndex(c)
+			return
+		}
+		f.Close()
+
+		// Serve actual file
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	}
+
+	// Serve static assets (JS, CSS, images, etc.)
+	r.engine.GET("/_app/*filepath", serveStatic)
+
+	// Serve favicon
+	r.engine.GET("/favicon.png", serveStatic)
+
+	// Root path - serve index.html
+	r.engine.GET("/", serveIndex)
+
+	// All SvelteKit routes (must be registered explicitly for Gin)
+	svelteRoutes := []string{
+		"/login",
+		"/register",
+		"/bootstrap",
+		"/dashboard",
+		"/chat",
+		"/api-keys",
+		"/tenants",
+		"/profile",
+		"/settings",
+		"/files",
+		"/rag",
+		"/mcp",
+		"/downloads",
+		"/usage",
+		"/monitor",
+		"/about",
+		"/admin",
+		"/admin/users",
+		"/admin/invitations",
+		"/admin/api-keys",
+		"/admin/models",
+		"/admin/settings",
+		"/admin/backups",
+		"/admin/logs",
+	}
+
+	for _, route := range svelteRoutes {
+		r.engine.GET(route, serveIndex)
+	}
+
+	// Catch-all for any other paths (SPA fallback)
+	r.engine.NoRoute(func(c *gin.Context) {
+		// Don't intercept API routes
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") ||
+			strings.HasPrefix(c.Request.URL.Path, "/v1/") ||
+			strings.HasPrefix(c.Request.URL.Path, "/framework/") ||
+			strings.HasPrefix(c.Request.URL.Path, "/metrics") ||
+			strings.HasPrefix(c.Request.URL.Path, "/health") ||
+			strings.HasPrefix(c.Request.URL.Path, "/debug/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "endpoint not found"})
+			return
+		}
+		serveStatic(c)
+	})
+
+	r.logger.Info("Svelte WebUI configured (SPA mode)")
+}
+
+// setupLegacyUIRoutes serves the legacy HTML/JS frontend (v1.3.0+)
+func (r *Router) setupLegacyUIRoutes() {
 	// Smart root handler - redirect based on auth status
 	r.engine.GET("/", func(c *gin.Context) {
 		// Check for JWT token in Authorization header or cookie
@@ -1143,7 +1270,7 @@ func (r *Router) setupWebUIRoutes() {
 	// Legacy /web/* routes for backward compatibility
 	r.engine.Static("/web", "./web")
 
-	r.logger.Info("WebUI static file serving configured at root path")
+	r.logger.Info("Legacy WebUI static file serving configured at root path")
 }
 
 // setupOpenAIRoutes настраивает OpenAI-совместимые API эндпоинты

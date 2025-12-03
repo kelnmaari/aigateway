@@ -909,16 +909,6 @@ func (r *Router) setupDashboardRoutes() {
 		dashboard.GET("/stats", r.dashboardHandler.GetDashboardStats)
 	}
 
-	// Admin summary routes требуют Admin role
-	admin := r.engine.Group("/api/admin")
-	if r.jwtManager != nil {
-		admin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
-		admin.Use(middleware.RequireAdmin(r.db, r.logger))
-	}
-	{
-		admin.GET("/summary", r.dashboardHandler.GetAdminSummary)
-	}
-
 	r.logger.Info("✅ Dashboard batch API endpoints configured")
 }
 
@@ -1452,6 +1442,12 @@ func (r *Router) setupAdminRoutes() {
 		admin.Use(r.authenticator.PermissionMiddleware("admin"))
 	} else {
 		r.logger.Warn("Admin routes: No authentication enabled")
+	}
+
+	// Admin Dashboard Summary (moved from setupDashboardRoutes)
+	if r.dashboardHandler != nil {
+		admin.GET("/summary", r.dashboardHandler.GetAdminSummary)
+		r.logger.Info("Admin routes: Registered /summary endpoint")
 	}
 
 	// User Management endpoints (Version 1.3.0+)

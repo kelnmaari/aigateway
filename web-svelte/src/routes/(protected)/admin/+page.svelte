@@ -3,13 +3,15 @@
 	import {
 		Users,
 		Key,
-		Server,
 		Activity,
 		TrendingUp,
 		Clock,
 		Cpu,
 		HardDrive,
-		Loader2
+		Loader2,
+		Building2,
+		Server,
+		Database
 	} from 'lucide-svelte';
 	import { adminApi, type AdminStats, type SystemMetrics } from '$lib/api/admin';
 	import { cn } from '$lib/utils';
@@ -43,36 +45,38 @@
 		}
 	}
 
+	function formatBytes(bytes: number | undefined): string {
+		if (bytes == null || bytes === 0) return '0 B';
+		const k = 1024;
+		const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+	}
+
 	function formatUptime(seconds: number | undefined): string {
-		if (seconds == null) return '—';
+		if (seconds == null || seconds === 0) return '—';
 		const days = Math.floor(seconds / 86400);
 		const hours = Math.floor((seconds % 86400) / 3600);
 		const mins = Math.floor((seconds % 3600) / 60);
-		if (days > 0) return `${days}d ${hours}h ${mins}m`;
+		if (days > 0) return `${days}d ${hours}h`;
 		if (hours > 0) return `${hours}h ${mins}m`;
 		return `${mins}m`;
 	}
 
-	function formatBytes(bytes: number | undefined): string {
-		if (bytes == null) return '—';
-		const gb = bytes / (1024 * 1024 * 1024);
-		if (gb >= 1) return `${gb.toFixed(1)} GB`;
-		const mb = bytes / (1024 * 1024);
+	function formatMB(mb: number | undefined): string {
+		if (mb == null) return '—';
+		if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
 		return `${mb.toFixed(0)} MB`;
 	}
 
-	function formatPercent(value: number | undefined): string {
-		if (value == null) return '0';
-		return value.toFixed(1);
-	}
-
-	function getPercentValue(value: number | undefined): number {
-		return value ?? 0;
-	}
-
-	// Derived memory percentage
-	const memPercent = $derived(
-		metrics?.memory_total ? ((metrics.memory_used ?? 0) / metrics.memory_total) * 100 : 0
+	// Derived values for progress bars
+	const cpuPercent = $derived(metrics?.system?.cpu_percent ?? 0);
+	const memPercent = $derived(metrics?.system?.memory_percent ?? 0);
+	const diskPercent = $derived(metrics?.system?.disk_percent ?? 0);
+	const appMemPercent = $derived(
+		metrics?.app?.heap_sys_mb
+			? ((metrics.app.heap_alloc_mb ?? 0) / metrics.app.heap_sys_mb) * 100
+			: 0
 	);
 </script>
 
@@ -91,7 +95,7 @@
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Total Users</p>
-						<p class="text-2xl font-bold">{stats?.users ?? 0}</p>
+						<p class="text-2xl font-bold">{stats?.total_users ?? 0}</p>
 					</div>
 				</div>
 			</div>
@@ -103,7 +107,7 @@
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">API Keys</p>
-						<p class="text-2xl font-bold">{stats?.api_keys ?? 0}</p>
+						<p class="text-2xl font-bold">{stats?.total_api_keys ?? 0}</p>
 					</div>
 				</div>
 			</div>
@@ -111,11 +115,11 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
-						<Server class="h-5 w-5" />
+						<Building2 class="h-5 w-5" />
 					</div>
 					<div>
-						<p class="text-sm text-muted-foreground">Models</p>
-						<p class="text-2xl font-bold">{stats?.models ?? 0}</p>
+						<p class="text-sm text-muted-foreground">Tenants</p>
+						<p class="text-2xl font-bold">{stats?.total_tenants ?? 0}</p>
 					</div>
 				</div>
 			</div>
@@ -126,37 +130,39 @@
 						<Activity class="h-5 w-5" />
 					</div>
 					<div>
-						<p class="text-sm text-muted-foreground">Requests Today</p>
-						<p class="text-2xl font-bold">{stats?.requests_today ?? 0}</p>
+						<p class="text-sm text-muted-foreground">Total Requests</p>
+						<p class="text-2xl font-bold">{stats?.total_requests ?? 0}</p>
 					</div>
 				</div>
 			</div>
 		</div>
 
 		<!-- System Metrics -->
-		{#if metrics}
+		{#if metrics?.system}
 			<div class="rounded-xl border border-border bg-card p-6">
-				<h2 class="mb-4 text-lg font-semibold">System Health</h2>
+				<h2 class="mb-4 text-lg font-semibold">System Resources</h2>
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+					<!-- CPU -->
 					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
 								<Cpu class="h-4 w-4" />
-								CPU
+								CPU ({metrics.system.cpu_cores} cores)
 							</span>
-							<span class="text-sm font-medium">{formatPercent(metrics.cpu_percent)}%</span>
+							<span class="text-sm font-medium">{cpuPercent.toFixed(1)}%</span>
 						</div>
 						<div class="h-2 overflow-hidden rounded-full bg-muted">
 							<div
 								class={cn(
 									'h-full transition-all',
-									getPercentValue(metrics.cpu_percent) > 80 ? 'bg-red-500' : getPercentValue(metrics.cpu_percent) > 50 ? 'bg-amber-500' : 'bg-green-500'
+									cpuPercent > 80 ? 'bg-red-500' : cpuPercent > 50 ? 'bg-amber-500' : 'bg-green-500'
 								)}
-								style="width: {Math.min(getPercentValue(metrics.cpu_percent), 100)}%"
+								style="width: {Math.min(cpuPercent, 100)}%"
 							></div>
 						</div>
 					</div>
 
+					<!-- Memory -->
 					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -164,7 +170,7 @@
 								Memory
 							</span>
 							<span class="text-sm font-medium">
-								{formatBytes(metrics.memory_used)} / {formatBytes(metrics.memory_total)}
+								{formatBytes(metrics.system.memory_used)} / {formatBytes(metrics.system.memory_total)}
 							</span>
 						</div>
 						<div class="h-2 overflow-hidden rounded-full bg-muted">
@@ -178,20 +184,95 @@
 						</div>
 					</div>
 
+					<!-- Disk -->
+					<div>
+						<div class="mb-2 flex items-center justify-between">
+							<span class="flex items-center gap-2 text-sm text-muted-foreground">
+								<Database class="h-4 w-4" />
+								Disk
+							</span>
+							<span class="text-sm font-medium">
+								{formatBytes(metrics.system.disk_used)} / {formatBytes(metrics.system.disk_total)}
+							</span>
+						</div>
+						<div class="h-2 overflow-hidden rounded-full bg-muted">
+							<div
+								class={cn(
+									'h-full transition-all',
+									diskPercent > 80 ? 'bg-red-500' : diskPercent > 50 ? 'bg-amber-500' : 'bg-green-500'
+								)}
+								style="width: {Math.min(diskPercent, 100)}%"
+							></div>
+						</div>
+					</div>
+
+					<!-- Uptime -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
 							<Clock class="h-4 w-4" />
 							Uptime
 						</div>
-						<p class="text-xl font-semibold">{formatUptime(metrics.uptime)}</p>
+						<div class="space-y-1">
+							<p class="text-lg font-semibold">{formatUptime(metrics.system.uptime)}</p>
+							<p class="text-xs text-muted-foreground">App: {formatUptime(metrics.system.app_uptime)}</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- App Metrics (Go Runtime) -->
+		{#if metrics?.app}
+			<div class="rounded-xl border border-border bg-card p-6">
+				<h2 class="mb-4 text-lg font-semibold">Application Runtime</h2>
+				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+					<!-- Go Heap -->
+					<div>
+						<div class="mb-2 flex items-center justify-between">
+							<span class="flex items-center gap-2 text-sm text-muted-foreground">
+								<Server class="h-4 w-4" />
+								Go Heap
+							</span>
+							<span class="text-sm font-medium">
+								{formatMB(metrics.app.heap_alloc_mb)} / {formatMB(metrics.app.heap_sys_mb)}
+							</span>
+						</div>
+						<div class="h-2 overflow-hidden rounded-full bg-muted">
+							<div
+								class={cn(
+									'h-full transition-all',
+									appMemPercent > 80 ? 'bg-red-500' : appMemPercent > 50 ? 'bg-amber-500' : 'bg-cyan-500'
+								)}
+								style="width: {Math.min(appMemPercent, 100)}%"
+							></div>
+						</div>
 					</div>
 
+					<!-- Goroutines -->
+					<div>
+						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+							<Activity class="h-4 w-4" />
+							Goroutines
+						</div>
+						<p class="text-xl font-semibold">{metrics.app.num_goroutines}</p>
+					</div>
+
+					<!-- GC Runs -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
 							<TrendingUp class="h-4 w-4" />
-							Requests/sec
+							GC Runs
 						</div>
-						<p class="text-xl font-semibold">{formatPercent(metrics.requests_per_second)}</p>
+						<p class="text-xl font-semibold">{metrics.app.num_gc}</p>
+					</div>
+
+					<!-- Alloc Rate -->
+					<div>
+						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+							<TrendingUp class="h-4 w-4" />
+							Alloc Rate
+						</div>
+						<p class="text-xl font-semibold">{metrics.app.alloc_rate_mb_s?.toFixed(2) ?? '0'} MB/s</p>
 					</div>
 				</div>
 			</div>
@@ -233,4 +314,3 @@
 		</div>
 	</div>
 {/if}
-

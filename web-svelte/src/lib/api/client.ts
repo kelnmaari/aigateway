@@ -19,6 +19,8 @@ interface RequestOptions {
 // Refresh token lock to prevent multiple concurrent refresh requests
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
+// Track if we've already decided to logout (prevent multiple redirects)
+let isLoggingOut = false;
 
 class ApiClient {
 	private baseUrl = '';
@@ -28,6 +30,11 @@ class ApiClient {
 	 * Returns true if successful, false otherwise.
 	 */
 	private async tryRefreshToken(): Promise<boolean> {
+		// If already logging out, don't try to refresh
+		if (isLoggingOut) {
+			return false;
+		}
+
 		// If already refreshing, wait for that request
 		if (isRefreshing && refreshPromise) {
 			return refreshPromise;
@@ -61,6 +68,11 @@ class ApiClient {
 						refresh_token: data.token.refresh_token || refreshToken,
 						expires_at: new Date(data.token.expires_at).getTime()
 					});
+					// Also update localStorage immediately (belt and suspenders)
+					if (browser) {
+						localStorage.setItem('access_token', data.token.access_token);
+						localStorage.setItem('refresh_token', data.token.refresh_token || refreshToken);
+					}
 					return true;
 				}
 				return false;
@@ -73,6 +85,25 @@ class ApiClient {
 		})();
 
 		return refreshPromise;
+	}
+
+	/**
+	 * Perform logout and redirect to login page.
+	 * Only executes once to prevent multiple redirects.
+	 */
+	private doLogout() {
+		if (isLoggingOut) return;
+		isLoggingOut = true;
+
+		authStore.logout();
+		if (browser) {
+			goto('/login');
+		}
+
+		// Reset after a short delay to allow re-login
+		setTimeout(() => {
+			isLoggingOut = false;
+		}, 1000);
 	}
 
 	async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -114,20 +145,14 @@ class ApiClient {
 					// Retry the original request with new token
 					return this.request<T>(endpoint, { ...options, _isRetry: true });
 				}
-				// Refresh failed - logout
-				authStore.logout();
-				if (browser) {
-					goto('/login');
-				}
+				// Refresh failed - logout (only once)
+				this.doLogout();
 				throw new Error('Session expired');
 			}
 
 			// Handle 401 on retry - definitely logout
 			if (response.status === 401 && !skipAuth) {
-				authStore.logout();
-				if (browser) {
-					goto('/login');
-				}
+				this.doLogout();
 				throw new Error('Unauthorized');
 			}
 

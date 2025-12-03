@@ -2,11 +2,11 @@ import { api } from './client';
 
 // ==================== Stats ====================
 export interface AdminStats {
-	users: number;
-	api_keys: number;
-	models: number;
-	requests_today: number;
-	requests_total: number;
+	total_users: number;
+	total_tenants: number;
+	total_api_keys: number;
+	total_requests: number;
+	loaded_at: string;
 }
 
 // ==================== Users ====================
@@ -104,13 +104,37 @@ export interface AuditResponse {
 }
 
 // ==================== Performance ====================
-export interface SystemMetrics {
+// Go runtime metrics
+export interface AppMetrics {
+	timestamp: string;
+	heap_alloc_mb: number;
+	heap_sys_mb: number;
+	num_gc: number;
+	num_goroutines: number;
+	num_cpu: number;
+	gc_pause_ms: number;
+	alloc_rate_mb_s: number;
+}
+
+// System-level metrics (gopsutil)
+export interface SystemInfo {
 	cpu_percent: number;
+	cpu_cores: number;
 	memory_used: number;
 	memory_total: number;
-	goroutines: number;
+	memory_percent: number;
+	disk_used: number;
+	disk_total: number;
+	disk_percent: number;
 	uptime: number;
-	requests_per_second: number;
+	app_uptime: number;
+}
+
+export interface SystemMetrics {
+	status: string;
+	system: SystemInfo;
+	app?: AppMetrics | null;
+	baseline?: AppMetrics | null;
 }
 
 // ==================== Invitations ====================
@@ -141,7 +165,7 @@ export interface CreateInvitationRequest {
 // ==================== API ====================
 export const adminApi = {
 	// Stats
-	getStats: () => api.get<AdminStats>('/api/admin/stats'),
+	getStats: () => api.get<AdminStats>('/api/admin/summary'),
 
 	// Users
 	getUsers: (page = 1, perPage = 20, search?: string) => {

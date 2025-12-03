@@ -49,7 +49,9 @@ func RequireAdmin(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 			return
 		}
 
-		// User is admin - allow request
+		// User is admin - set flag and allow request
+		c.Set("is_admin", true)
+		
 		logger.WithFields(logrus.Fields{
 			"user_id":  user.ID,
 			"username": user.Username,

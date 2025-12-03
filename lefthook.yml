@@ -1,0 +1,83 @@
+# Lefthook configuration for AI Gateway
+# https://github.com/evilmartians/lefthook
+
+# Skip hooks in CI environment
+skip_in_ci: true
+
+pre-commit:
+  parallel: true
+  commands:
+    # ==================== Go Checks ====================
+    go-fmt:
+      glob: "*.go"
+      run: gofmt -l -w {staged_files}
+      stage_fixed: true
+      
+    go-imports:
+      glob: "*.go"
+      run: goimports -w {staged_files}
+      stage_fixed: true
+
+    go-vet:
+      glob: "*.go"
+      run: go vet ./...
+
+    golangci-lint:
+      glob: "*.go"
+      run: golangci-lint run --fix --new-from-rev=HEAD~1
+      stage_fixed: true
+
+    go-mod-tidy:
+      glob: "go.{mod,sum}"
+      run: go mod tidy
+      stage_fixed: true
+
+    # ==================== Svelte/Frontend Checks ====================
+    svelte-lint:
+      root: "web-svelte/"
+      glob: "*.{ts,svelte,js}"
+      run: npm run lint
+
+    svelte-format:
+      root: "web-svelte/"
+      glob: "*.{ts,svelte,js,css,json}"
+      run: npx prettier --write {staged_files}
+      stage_fixed: true
+
+    svelte-check:
+      root: "web-svelte/"
+      glob: "*.{ts,svelte}"
+      run: npm run check
+
+pre-push:
+  parallel: false
+  commands:
+    # ==================== Go Tests & Build ====================
+    go-test:
+      glob: "*.go"
+      run: go test -race -short ./...
+
+    go-build:
+      run: go build -o bin/test-build.exe ./cmd/server/main.go
+
+    # ==================== Svelte Build ====================
+    svelte-build:
+      root: "web-svelte/"
+      glob: "*.{ts,svelte}"
+      run: npm run build
+
+commit-msg:
+  commands:
+    # Validate commit message format (simplified for cross-platform)
+    check-message-length:
+      run: node -e "const fs=require('fs');const msg=fs.readFileSync(process.env.LEFTHOOK_COMMIT_MSG_PATH||'.git/COMMIT_EDITMSG','utf8').split('\n')[0];if(msg.length>100){console.error('Commit message too long (>100 chars)');process.exit(1)}"
+
+# Post-merge hook for dependency updates
+post-merge:
+  commands:
+    go-mod-download:
+      run: go mod download
+
+    npm-install:
+      root: "web-svelte/"
+      run: npm install

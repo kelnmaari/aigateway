@@ -152,15 +152,51 @@ PUT    /api/admin/gitlab/projects/:project_id               # Update project
 DELETE /api/admin/gitlab/projects/:project_id               # Delete project
 POST   /api/admin/gitlab/projects/:project_id/webhook       # Setup webhook
 
-# MR Reviews
+# MR Reviews (with pagination)
 GET    /api/admin/gitlab/reviews                   # List all reviews
 GET    /api/admin/gitlab/projects/:id/reviews      # List project reviews
 GET    /api/admin/gitlab/reviews/:id               # Get review details
 POST   /api/admin/gitlab/reviews/:id/retry         # Retry failed review
 
+# Queue Management
+GET    /api/admin/gitlab/queue/status              # Queue stats & worker status
+GET    /api/admin/gitlab/queue/jobs                # List pending/processing jobs
+POST   /api/admin/gitlab/queue/jobs/:id/cancel     # Cancel pending job
+POST   /api/admin/gitlab/queue/jobs/:id/retry      # Retry failed job
+DELETE /api/admin/gitlab/queue/jobs/:id            # Delete job
+
 # Webhook (public, verified by secret)
 POST   /api/webhooks/gitlab/:integration_id        # Receive GitLab webhooks
 ```
+
+### API Pagination
+
+All list endpoints support pagination:
+
+```
+GET /api/admin/gitlab/reviews?page=1&limit=20&sort=created_at&order=desc
+
+Response:
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 156,
+    "total_pages": 8,
+    "has_next": true,
+    "has_prev": false
+  }
+}
+```
+
+Query parameters:
+- `page` - Page number (default: 1)
+- `limit` - Items per page (default: 20, max: 100)
+- `sort` - Sort field (default: created_at)
+- `order` - Sort order: asc/desc (default: desc)
+- `status` - Filter by status (for reviews/jobs)
+- `project_id` - Filter by project
 
 ### 3. GitLab API Client
 
@@ -267,8 +303,579 @@ type MRChunkPayload struct {
     ChunkIndex  int    `json:"chunk_index"`
 }
 
-// Cleanup after analysis
+// ⚠️ ВАЖНО: Очистка перед новым анализом
+func (s *Service) prepareCollection(ctx context.Context, collectionName string) error {
+    // 1. Проверяем существует ли коллекция
+    exists, err := s.qdrant.CollectionExists(ctx, collectionName)
+    if err != nil {
+        return err
+    }
+    
+    // 2. Если существует - удаляем (новый анализ = чистые данные)
+    if exists {
+        s.logger.Info("Clearing existing collection for re-analysis", 
+            "collection", collectionName)
+        if err := s.qdrant.DeleteCollection(ctx, collectionName); err != nil {
+            return fmt.Errorf("failed to clear collection: %w", err)
+        }
+    }
+    
+    // 3. Создаём новую коллекцию
+    return s.qdrant.CreateCollection(ctx, collectionName, s.embeddingDimensions)
+}
+
+// Cleanup after analysis (или по TTL)
 func (s *Service) cleanupMRCollection(collectionName string) error
+```
+
+### 7. Webhook Deduplication & Rate Limiting
+
+GitLab может отправлять несколько webhook'ов подряд для одного MR:
+- Push нескольких коммитов
+- Обновление MR (rebase, force push)
+- Изменение описания/labels
+- CI pipeline events
+
+```go
+// Дедупликация через Redis/in-memory с debounce
+type WebhookDeduplicator struct {
+    cache      cache.Cache           // Redis или in-memory
+    debounce   time.Duration         // Время ожидания перед обработкой (e.g., 10s)
+    processing sync.Map              // Активные обработки: key -> cancelFunc
+}
+
+// Ключ для дедупликации
+func dedupKey(projectID int, mrIID int) string {
+    return fmt.Sprintf("gitlab:mr:processing:%d:%d", projectID, mrIID)
+}
+
+// HandleWebhook с дедупликацией и debounce
+func (d *WebhookDeduplicator) HandleWebhook(ctx context.Context, event MREvent) error {
+    key := dedupKey(event.Project.ID, event.MergeRequest.IID)
+    
+    // 1. Проверяем, не обрабатывается ли уже этот MR
+    if _, processing := d.processing.Load(key); processing {
+        d.logger.Debug("MR already being processed, skipping duplicate webhook",
+            "project_id", event.Project.ID,
+            "mr_iid", event.MergeRequest.IID)
+        return nil // Игнорируем дубликат
+    }
+    
+    // 2. Проверяем debounce - был ли недавно webhook для этого MR
+    lastWebhook, exists := d.cache.Get(ctx, key)
+    if exists {
+        // Отменяем предыдущий отложенный анализ
+        if cancel, ok := d.processing.Load(key + ":cancel"); ok {
+            cancel.(context.CancelFunc)()
+        }
+    }
+    
+    // 3. Сохраняем timestamp последнего webhook
+    d.cache.Set(ctx, key, time.Now(), d.debounce*2)
+    
+    // 4. Запускаем отложенную обработку (debounce)
+    ctx, cancel := context.WithCancel(ctx)
+    d.processing.Store(key+":cancel", cancel)
+    
+    go func() {
+        select {
+        case <-time.After(d.debounce):
+            // Debounce прошёл, начинаем анализ
+            d.processing.Store(key, true)
+            defer d.processing.Delete(key)
+            defer d.processing.Delete(key + ":cancel")
+            
+            if err := d.processReview(ctx, event); err != nil {
+                d.logger.Error("MR review failed", "error", err)
+            }
+            
+        case <-ctx.Done():
+            // Отменено из-за нового webhook
+            d.logger.Debug("Review cancelled due to newer webhook")
+        }
+    }()
+    
+    return nil
+}
+
+// Статусы обработки для предотвращения дубликатов
+type ReviewStatus string
+const (
+    ReviewStatusPending    ReviewStatus = "pending"     // В очереди
+    ReviewStatusDebouncing ReviewStatus = "debouncing"  // Ожидает debounce
+    ReviewStatusAnalyzing  ReviewStatus = "analyzing"   // Идёт анализ
+    ReviewStatusCompleted  ReviewStatus = "completed"   // Завершён
+    ReviewStatusFailed     ReviewStatus = "failed"      // Ошибка
+)
+
+// Проверка перед началом анализа
+func (s *Service) canStartReview(ctx context.Context, projectID, mrIID int) (bool, string) {
+    key := dedupKey(projectID, mrIID)
+    
+    status, exists := s.cache.Get(ctx, key+":status")
+    if !exists {
+        return true, ""
+    }
+    
+    switch ReviewStatus(status.(string)) {
+    case ReviewStatusAnalyzing:
+        return false, "Analysis already in progress"
+    case ReviewStatusDebouncing:
+        return false, "Waiting for debounce"
+    default:
+        return true, ""
+    }
+}
+```
+
+### Webhook Flow с Deduplication
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     WEBHOOK PROCESSING FLOW                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Webhook #1 (push commit A)                                     │
+│       │                                                         │
+│       ▼                                                         │
+│  ┌─────────────┐                                                │
+│  │  Debounce   │◄─── Start 10s timer                            │
+│  │   Timer     │                                                │
+│  └──────┬──────┘                                                │
+│         │                                                       │
+│         │  Webhook #2 (push commit B) - 3s later                │
+│         │       │                                               │
+│         │       ▼                                               │
+│         │  ┌─────────────┐                                      │
+│         └──│  Cancel #1  │                                      │
+│            │  Restart    │◄─── Reset timer to 10s               │
+│            └──────┬──────┘                                      │
+│                   │                                             │
+│                   │  Webhook #3 (update title) - 2s later       │
+│                   │       │                                     │
+│                   │       ▼                                     │
+│                   │  ┌─────────────┐                            │
+│                   └──│  Cancel #2  │                            │
+│                      │  Restart    │◄─── Reset timer to 10s     │
+│                      └──────┬──────┘                            │
+│                             │                                   │
+│                             │  ... 10 seconds pass ...          │
+│                             │                                   │
+│                             ▼                                   │
+│                      ┌─────────────┐                            │
+│                      │   ENQUEUE   │◄─── Add to analysis queue  │
+│                      │   JOB       │     (only ONE job per MR)  │
+│                      └──────┬──────┘                            │
+│                             │                                   │
+│                             ▼                                   │
+│               ┌─────────────────────────────┐                   │
+│               │      ANALYSIS QUEUE         │                   │
+│               │  (Redis/PostgreSQL/Memory)  │                   │
+│               │                             │                   │
+│               │  ┌─────────────────────┐   │                   │
+│               │  │ Workers pick jobs   │   │                   │
+│               │  │ and process them    │   │                   │
+│               │  └─────────────────────┘   │                   │
+│               └─────────────────────────────┘                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Complete Flow: Webhook → Debounce → Queue → Worker
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    COMPLETE PROCESSING FLOW                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. WEBHOOK RECEIVED                                            │
+│     │                                                           │
+│     ▼                                                           │
+│  ┌─────────────────┐                                            │
+│  │ Signature Check │──── Invalid ──► 401 Unauthorized           │
+│  └────────┬────────┘                                            │
+│           │ Valid                                               │
+│           ▼                                                     │
+│  2. DEDUPLICATION CHECK                                         │
+│     │                                                           │
+│     ├── MR already in queue? ──► Cancel old job, continue       │
+│     │                                                           │
+│     ▼                                                           │
+│  3. DEBOUNCE (10s)                                              │
+│     │                                                           │
+│     ├── New webhook for same MR? ──► Reset timer, go to step 2  │
+│     │                                                           │
+│     ▼ (timer expires)                                           │
+│  4. CREATE JOB                                                  │
+│     │                                                           │
+│     │  AnalysisJob {                                            │
+│     │    project_id, mr_iid,                                    │
+│     │    embedding_model, analysis_model,                       │
+│     │    priority, status: "pending"                            │
+│     │  }                                                        │
+│     │                                                           │
+│     ▼                                                           │
+│  5. ENQUEUE (Redis/PostgreSQL/Memory)                           │
+│     │                                                           │
+│     │  queue.Enqueue(ctx, job)                                  │
+│     │                                                           │
+│     ▼                                                           │
+│  6. WORKER PICKS JOB                                            │
+│     │                                                           │
+│     │  job = queue.Dequeue(ctx)                                 │
+│     │  job.status = "processing"                                │
+│     │  job.worker_id = "worker-1"                               │
+│     │                                                           │
+│     ▼                                                           │
+│  7. ANALYSIS PIPELINE                                           │
+│     │                                                           │
+│     ├── Fetch MR changes from GitLab                            │
+│     ├── Chunk code                                              │
+│     ├── Clear & create Qdrant collection                        │
+│     ├── Embed chunks                                            │
+│     ├── Run LLM analysis                                        │
+│     ├── Build markdown comment                                  │
+│     └── Post to GitLab MR                                       │
+│           │                                                     │
+│           ▼                                                     │
+│  8. COMPLETE                                                    │
+│     │                                                           │
+│     ├── Success: job.status = "completed"                       │
+│     │            cleanup Qdrant collection                      │
+│     │                                                           │
+│     └── Failure: job.retry_count++                              │
+│                  if retry_count < max_retries:                  │
+│                      job.status = "pending" (retry)             │
+│                  else:                                          │
+│                      job.status = "failed"                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 8. Analysis Queue Architecture
+
+Для обработки множества MR из разных проектов параллельно:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ANALYSIS QUEUE ARCHITECTURE                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Webhooks from different projects:                              │
+│                                                                 │
+│  Project A (MR #1) ──┐                                          │
+│  Project A (MR #2) ──┤                                          │
+│  Project B (MR #5) ──┼──►  ┌─────────────────────────────────┐  │
+│  Project C (MR #3) ──┤     │                                 │  │
+│  Project B (MR #6) ──┘     │     ANALYSIS JOB QUEUE          │  │
+│                            │     (Redis / PostgreSQL)        │  │
+│                            │                                 │  │
+│  After deduplication:      │  ┌───┬───┬───┬───┬───┬───┐     │  │
+│                            │  │ 1 │ 2 │ 5 │ 3 │ 6 │...│     │  │
+│                            │  └───┴───┴───┴───┴───┴───┘     │  │
+│                            │     ↑                           │  │
+│                            │     Priority queue (FIFO)       │  │
+│                            └─────────────────────────────────┘  │
+│                                          │                      │
+│                                          │                      │
+│                            ┌─────────────┴─────────────┐        │
+│                            │                           │        │
+│                            ▼                           ▼        │
+│                   ┌─────────────┐             ┌─────────────┐   │
+│                   │  Worker 1   │             │  Worker 2   │   │
+│                   │  (busy)     │             │  (idle)     │   │
+│                   │  MR #1      │             │  → takes    │   │
+│                   │  Project A  │             │    MR #2    │   │
+│                   └─────────────┘             └─────────────┘   │
+│                                                                 │
+│  Worker Pool: Configurable (default: 3 concurrent workers)      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+```go
+// AnalysisJob представляет задачу на анализ MR
+type AnalysisJob struct {
+    ID            string           `json:"id"`
+    IntegrationID string           `json:"integration_id"`
+    ProjectID     int              `json:"project_id"`
+    MRIID         int              `json:"mr_iid"`
+    MRTitle       string           `json:"mr_title"`
+    SourceBranch  string           `json:"source_branch"`
+    TargetBranch  string           `json:"target_branch"`
+    AuthorName    string           `json:"author_name"`
+    
+    // Configuration (из GitLabProject)
+    EmbeddingModel string          `json:"embedding_model"`
+    AnalysisModel  string          `json:"analysis_model"`
+    ReviewPrompt   string          `json:"review_prompt,omitempty"`
+    FileFilters    []string        `json:"file_filters,omitempty"`
+    
+    // Queue metadata
+    Status         JobStatus       `json:"status"`
+    Priority       int             `json:"priority"`      // Higher = more urgent
+    CreatedAt      time.Time       `json:"created_at"`
+    StartedAt      *time.Time      `json:"started_at,omitempty"`
+    CompletedAt    *time.Time      `json:"completed_at,omitempty"`
+    WorkerID       string          `json:"worker_id,omitempty"`
+    RetryCount     int             `json:"retry_count"`
+    MaxRetries     int             `json:"max_retries"`
+    Error          string          `json:"error,omitempty"`
+}
+
+type JobStatus string
+const (
+    JobStatusPending    JobStatus = "pending"
+    JobStatusProcessing JobStatus = "processing"
+    JobStatusCompleted  JobStatus = "completed"
+    JobStatusFailed     JobStatus = "failed"
+    JobStatusCancelled  JobStatus = "cancelled"
+)
+
+// AnalysisQueue интерфейс очереди
+type AnalysisQueue interface {
+    // Enqueue добавляет job в очередь
+    Enqueue(ctx context.Context, job *AnalysisJob) error
+    
+    // Dequeue получает следующий job (блокирующий)
+    Dequeue(ctx context.Context) (*AnalysisJob, error)
+    
+    // DequeueNonBlocking получает job без ожидания
+    DequeueNonBlocking(ctx context.Context) (*AnalysisJob, error)
+    
+    // UpdateStatus обновляет статус job
+    UpdateStatus(ctx context.Context, jobID string, status JobStatus, err error) error
+    
+    // GetJobsByMR получает все jobs для конкретного MR
+    GetJobsByMR(ctx context.Context, projectID, mrIID int) ([]*AnalysisJob, error)
+    
+    // GetPendingCount возвращает количество pending jobs
+    GetPendingCount(ctx context.Context) (int64, error)
+    
+    // CancelJobsForMR отменяет pending jobs для MR (при новом webhook)
+    CancelJobsForMR(ctx context.Context, projectID, mrIID int) error
+    
+    // CleanupOld удаляет старые completed/failed jobs
+    CleanupOld(ctx context.Context, olderThan time.Duration) error
+}
+
+// WorkerPool управляет воркерами
+type WorkerPool struct {
+    queue       AnalysisQueue
+    analyzer    *Analyzer
+    workers     int
+    wg          sync.WaitGroup
+    ctx         context.Context
+    cancel      context.CancelFunc
+    logger      *logrus.Logger
+}
+
+// NewWorkerPool создаёт пул воркеров
+func NewWorkerPool(queue AnalysisQueue, analyzer *Analyzer, workers int, logger *logrus.Logger) *WorkerPool {
+    ctx, cancel := context.WithCancel(context.Background())
+    return &WorkerPool{
+        queue:    queue,
+        analyzer: analyzer,
+        workers:  workers,
+        ctx:      ctx,
+        cancel:   cancel,
+        logger:   logger,
+    }
+}
+
+// Start запускает воркеры
+func (p *WorkerPool) Start() {
+    p.logger.WithField("workers", p.workers).Info("Starting analysis worker pool")
+    
+    for i := 0; i < p.workers; i++ {
+        p.wg.Add(1)
+        go p.runWorker(fmt.Sprintf("worker-%d", i))
+    }
+}
+
+// Stop gracefully останавливает воркеры
+func (p *WorkerPool) Stop() {
+    p.logger.Info("Stopping analysis worker pool")
+    p.cancel()
+    p.wg.Wait()
+    p.logger.Info("All workers stopped")
+}
+
+// runWorker основной цикл воркера
+func (p *WorkerPool) runWorker(workerID string) {
+    defer p.wg.Done()
+    
+    logger := p.logger.WithField("worker_id", workerID)
+    logger.Info("Worker started")
+    
+    for {
+        select {
+        case <-p.ctx.Done():
+            logger.Info("Worker shutting down")
+            return
+        default:
+            // Получаем следующую задачу
+            job, err := p.queue.Dequeue(p.ctx)
+            if err != nil {
+                if p.ctx.Err() != nil {
+                    return // Context cancelled
+                }
+                logger.WithError(err).Error("Failed to dequeue job")
+                time.Sleep(time.Second) // Backoff on error
+                continue
+            }
+            
+            if job == nil {
+                time.Sleep(100 * time.Millisecond) // No jobs, wait a bit
+                continue
+            }
+            
+            // Обрабатываем задачу
+            p.processJob(logger, job)
+        }
+    }
+}
+
+// processJob обрабатывает одну задачу
+func (p *WorkerPool) processJob(logger *logrus.Entry, job *AnalysisJob) {
+    logger = logger.WithFields(logrus.Fields{
+        "job_id":     job.ID,
+        "project_id": job.ProjectID,
+        "mr_iid":     job.MRIID,
+    })
+    
+    logger.Info("Processing analysis job")
+    startTime := time.Now()
+    
+    // Обновляем статус на processing
+    job.Status = JobStatusProcessing
+    now := time.Now()
+    job.StartedAt = &now
+    if err := p.queue.UpdateStatus(p.ctx, job.ID, JobStatusProcessing, nil); err != nil {
+        logger.WithError(err).Error("Failed to update job status")
+    }
+    
+    // Выполняем анализ
+    err := p.analyzer.AnalyzeMR(p.ctx, job)
+    
+    duration := time.Since(startTime)
+    completedAt := time.Now()
+    job.CompletedAt = &completedAt
+    
+    if err != nil {
+        job.Error = err.Error()
+        job.RetryCount++
+        
+        if job.RetryCount < job.MaxRetries {
+            // Retry
+            logger.WithError(err).WithField("retry", job.RetryCount).Warn("Job failed, will retry")
+            job.Status = JobStatusPending
+            p.queue.UpdateStatus(p.ctx, job.ID, JobStatusPending, err)
+        } else {
+            // Max retries exceeded
+            logger.WithError(err).Error("Job failed permanently")
+            job.Status = JobStatusFailed
+            p.queue.UpdateStatus(p.ctx, job.ID, JobStatusFailed, err)
+        }
+    } else {
+        logger.WithField("duration", duration).Info("Job completed successfully")
+        job.Status = JobStatusCompleted
+        p.queue.UpdateStatus(p.ctx, job.ID, JobStatusCompleted, nil)
+    }
+}
+```
+
+### Queue Storage Options
+
+```go
+// Option 1: Redis Queue (рекомендуется для distributed setup)
+type RedisAnalysisQueue struct {
+    client    *redis.Client
+    queueKey  string // "gitlab:analysis:queue"
+    jobsKey   string // "gitlab:analysis:jobs:{id}"
+    logger    *logrus.Logger
+}
+
+// Option 2: PostgreSQL Queue (если Redis недоступен)
+type PostgresAnalysisQueue struct {
+    db     *sqlx.DB
+    logger *logrus.Logger
+}
+
+// CREATE TABLE analysis_jobs (
+//     id VARCHAR(36) PRIMARY KEY,
+//     integration_id VARCHAR(36) NOT NULL,
+//     project_id INTEGER NOT NULL,
+//     mr_iid INTEGER NOT NULL,
+//     status VARCHAR(20) NOT NULL DEFAULT 'pending',
+//     priority INTEGER NOT NULL DEFAULT 0,
+//     payload JSONB NOT NULL,
+//     worker_id VARCHAR(50),
+//     retry_count INTEGER DEFAULT 0,
+//     max_retries INTEGER DEFAULT 3,
+//     error TEXT,
+//     created_at TIMESTAMP DEFAULT NOW(),
+//     started_at TIMESTAMP,
+//     completed_at TIMESTAMP,
+//     UNIQUE(project_id, mr_iid, status) WHERE status = 'pending'
+// );
+// CREATE INDEX idx_analysis_jobs_pending ON analysis_jobs(status, priority DESC, created_at ASC) 
+//     WHERE status = 'pending';
+
+// Option 3: In-Memory Queue (для development/single instance)
+type MemoryAnalysisQueue struct {
+    jobs     []*AnalysisJob
+    jobsMap  map[string]*AnalysisJob
+    mu       sync.RWMutex
+    cond     *sync.Cond
+    logger   *logrus.Logger
+}
+```
+
+### Queue Configuration
+
+```yaml
+# config.yaml
+gitlab:
+  queue:
+    type: "redis"      # redis | postgres | memory
+    workers: 3         # Concurrent analysis workers
+    max_retries: 3     # Max retry attempts per job
+    job_timeout: "30m" # Max time per job
+    cleanup_interval: "1h"
+    cleanup_older_than: "7d"
+    
+  analysis:
+    default_priority: 0
+    urgent_priority: 10  # For force push to main branch
+```
+
+### Queue Metrics
+
+```go
+// Prometheus metrics
+var (
+    queueSize = prometheus.NewGauge(prometheus.GaugeOpts{
+        Name: "gitlab_analysis_queue_size",
+        Help: "Current number of pending jobs in queue",
+    })
+    
+    jobsProcessed = prometheus.NewCounterVec(prometheus.CounterOpts{
+        Name: "gitlab_analysis_jobs_processed_total",
+        Help: "Total number of processed jobs",
+    }, []string{"status"}) // completed, failed, cancelled
+    
+    jobDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+        Name:    "gitlab_analysis_job_duration_seconds",
+        Help:    "Time spent processing a job",
+        Buckets: []float64{10, 30, 60, 120, 300, 600, 1800},
+    })
+    
+    activeWorkers = prometheus.NewGauge(prometheus.GaugeOpts{
+        Name: "gitlab_analysis_active_workers",
+        Help: "Number of workers currently processing jobs",
+    })
+)
 ```
 
 ## 🎨 UI Design (Admin Panel)
@@ -424,6 +1031,46 @@ func (s *Service) cleanupMRCollection(collectionName string) error
 │  └───────────────────┘   └───────────────────┘                 │
 │                                                                 │
 │                                    [Cancel]  [Save Changes]     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Queue Monitor (Admin Dashboard)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  GitLab Analysis Queue                            [⟳ Refresh]   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Workers Status                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  Worker 1   │  │  Worker 2   │  │  Worker 3   │              │
+│  │  🟢 Active  │  │  🟢 Active  │  │  ⚪ Idle    │              │
+│  │  MR #142    │  │  MR #89     │  │             │              │
+│  │  2m 15s     │  │  45s        │  │             │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│                                                                 │
+│  Queue Statistics                                               │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  📊 Pending: 5  │  ⚙️ Processing: 2  │  ✅ Today: 47     │  │
+│  │  ❌ Failed: 1   │  ⏱️ Avg time: 2m   │  📈 Total: 1,234  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  Pending Jobs                                                   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ #  │ Project           │ MR    │ Priority │ Queued     │  │  │
+│  ├────┼───────────────────┼───────┼──────────┼────────────┤  │  │
+│  │ 1  │ backend/api       │ #156  │ 🔴 High  │ 30s ago    │  │  │
+│  │ 2  │ frontend/web      │ #89   │ ⚪ Normal │ 1m ago     │  │  │
+│  │ 3  │ backend/api       │ #155  │ ⚪ Normal │ 2m ago     │  │  │
+│  │ 4  │ infra/terraform   │ #23   │ ⚪ Normal │ 3m ago     │  │  │
+│  │ 5  │ mobile/ios        │ #67   │ ⚪ Normal │ 5m ago     │  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  Failed Jobs (retry exhausted)                    [Clear All]   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ backend/api #148 │ "Timeout after 30m" │ [Retry] [Delete] │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -616,68 +1263,94 @@ Provide your review as JSON:
 - [ ] **GITLAB-024**: Реализовать semantic search по чанкам
 - [ ] **GITLAB-025**: Реализовать cleanup коллекции после анализа
 - [ ] **GITLAB-026**: Добавить TTL для автоматической очистки старых коллекций
+- [ ] **GITLAB-027**: ⚠️ Очистка существующей коллекции перед повторным анализом MR
+
+### Phase 5.1: Webhook Deduplication
+- [ ] **GITLAB-028**: Создать `internal/gitlab/dedup/deduplicator.go`
+- [ ] **GITLAB-029**: Реализовать debounce timer (10s default) для группировки webhook'ов
+- [ ] **GITLAB-030**: Реализовать отмену pending анализа при новом webhook
+- [ ] **GITLAB-031**: Добавить Redis/memory кэш для статусов обработки
+- [ ] **GITLAB-032**: Добавить защиту от concurrent analysis одного MR
 
 ### Phase 6: AI Analysis Pipeline
-- [ ] **GITLAB-027**: Создать `internal/gitlab/analyzer/analyzer.go`
-- [ ] **GITLAB-028**: Реализовать структурированный промпт для code review
-- [ ] **GITLAB-029**: Реализовать парсинг JSON response от LLM
-- [ ] **GITLAB-030**: Реализовать per-file analysis с контекстом из Qdrant
-- [ ] **GITLAB-031**: Реализовать aggregation результатов
-- [ ] **GITLAB-032**: Написать unit тесты для analyzer
+- [ ] **GITLAB-033**: Создать `internal/gitlab/analyzer/analyzer.go`
+- [ ] **GITLAB-034**: Реализовать структурированный промпт для code review
+- [ ] **GITLAB-035**: Реализовать парсинг JSON response от LLM
+- [ ] **GITLAB-036**: Реализовать per-file analysis с контекстом из Qdrant
+- [ ] **GITLAB-037**: Реализовать aggregation результатов
+- [ ] **GITLAB-038**: Написать unit тесты для analyzer
 
 ### Phase 7: Comment Builder
-- [ ] **GITLAB-033**: Создать `internal/gitlab/comment/builder.go`
-- [ ] **GITLAB-034**: Реализовать форматирование результата в Markdown
-- [ ] **GITLAB-035**: Реализовать inline comments для конкретных строк
-- [ ] **GITLAB-036**: Добавить collapsible sections для длинных ревью
-- [ ] **GITLAB-037**: Добавить emoji и визуальные индикаторы
+- [ ] **GITLAB-039**: Создать `internal/gitlab/comment/builder.go`
+- [ ] **GITLAB-040**: Реализовать форматирование результата в Markdown
+- [ ] **GITLAB-041**: Реализовать inline comments для конкретных строк
+- [ ] **GITLAB-042**: Добавить collapsible sections для длинных ревью
+- [ ] **GITLAB-043**: Добавить emoji и визуальные индикаторы
 
 ### Phase 8: Admin API
-- [ ] **GITLAB-038**: Создать `internal/api/handlers/gitlab_admin.go`
-- [ ] **GITLAB-039**: CRUD для integrations
-- [ ] **GITLAB-040**: CRUD для projects
-- [ ] **GITLAB-041**: Endpoint для test connection
-- [ ] **GITLAB-042**: Endpoint для manual webhook setup
-- [ ] **GITLAB-043**: Endpoints для reviews (list, details, retry)
-- [ ] **GITLAB-044**: Добавить роуты в router.go
+- [ ] **GITLAB-044**: Создать `internal/api/handlers/gitlab_admin.go`
+- [ ] **GITLAB-045**: CRUD для integrations
+- [ ] **GITLAB-046**: CRUD для projects
+- [ ] **GITLAB-047**: Endpoint для test connection
+- [ ] **GITLAB-048**: Endpoint для manual webhook setup
+- [ ] **GITLAB-049**: Endpoints для reviews (list, details, retry)
+- [ ] **GITLAB-050**: Добавить роуты в router.go
 
 ### Phase 9: Admin UI (Svelte)
-- [ ] **GITLAB-045**: Создать страницу `/admin/gitlab` - список интеграций
-- [ ] **GITLAB-046**: Создать модалку добавления/редактирования интеграции
-- [ ] **GITLAB-047**: Создать страницу `/admin/gitlab/:id/projects` - список проектов
-- [ ] **GITLAB-048**: Создать модалку настройки проекта:
-  - [ ] **GITLAB-048a**: Выпадающий список Analysis Model (LLM для ревью)
-  - [ ] **GITLAB-048b**: Выпадающий список Embedding Model (для чанкинизации)
-  - [ ] **GITLAB-048c**: Поля Include/Exclude patterns
-  - [ ] **GITLAB-048d**: Textarea для custom prompt
-  - [ ] **GITLAB-048e**: Advanced settings (chunk size, overlap, max files)
-- [ ] **GITLAB-049**: Создать страницу `/admin/gitlab/reviews` - список ревью
-- [ ] **GITLAB-050**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью
-- [ ] **GITLAB-051**: Добавить в sidebar меню "GitLab" (admin only)
-- [ ] **GITLAB-052**: API endpoint для получения списка доступных моделей (LLM + Embedding)
+- [ ] **GITLAB-051**: Создать страницу `/admin/gitlab` - список интеграций
+- [ ] **GITLAB-052**: Создать модалку добавления/редактирования интеграции
+- [ ] **GITLAB-053**: Создать страницу `/admin/gitlab/:id/projects` - список проектов
+- [ ] **GITLAB-054**: Создать модалку настройки проекта:
+  - [ ] **GITLAB-054a**: Выпадающий список Analysis Model (LLM для ревью)
+  - [ ] **GITLAB-054b**: Выпадающий список Embedding Model (для чанкинизации)
+  - [ ] **GITLAB-054c**: Поля Include/Exclude patterns
+  - [ ] **GITLAB-054d**: Textarea для custom prompt
+  - [ ] **GITLAB-054e**: Advanced settings (chunk size, overlap, max files)
+- [ ] **GITLAB-055**: Создать страницу `/admin/gitlab/reviews` - список ревью с пагинацией
+- [ ] **GITLAB-056**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью
+- [ ] **GITLAB-057**: Добавить в sidebar меню "GitLab" (admin only)
+- [ ] **GITLAB-058**: API endpoint для получения списка доступных моделей (LLM + Embedding)
 
-### Phase 10: Background Processing
-- [ ] **GITLAB-053**: Создать `internal/gitlab/worker/worker.go`
-- [ ] **GITLAB-054**: Реализовать job queue (in-memory или Redis)
-- [ ] **GITLAB-055**: Реализовать graceful shutdown
-- [ ] **GITLAB-056**: Добавить retry logic для failed jobs
-- [ ] **GITLAB-057**: Добавить metrics и logging
+### Phase 9.1: Queue Monitor UI
+- [ ] **GITLAB-059**: Создать компонент `/admin/gitlab/queue` - мониторинг очереди
+- [ ] **GITLAB-060**: Отображение статуса воркеров (active/idle, current job, duration)
+- [ ] **GITLAB-061**: Отображение статистики очереди (pending, processing, completed, failed)
+- [ ] **GITLAB-062**: Таблица pending jobs с возможностью отмены
+- [ ] **GITLAB-063**: Таблица failed jobs с retry/delete
+- [ ] **GITLAB-064**: Auto-refresh каждые 5 секунд (или WebSocket)
+
+### Phase 10: Analysis Queue & Workers
+- [ ] **GITLAB-065**: Создать `internal/gitlab/queue/interface.go` - AnalysisQueue interface
+- [ ] **GITLAB-066**: Создать `internal/gitlab/queue/redis.go` - Redis implementation
+- [ ] **GITLAB-067**: Создать `internal/gitlab/queue/postgres.go` - PostgreSQL implementation
+- [ ] **GITLAB-068**: Создать `internal/gitlab/queue/memory.go` - In-memory implementation
+- [ ] **GITLAB-069**: Создать `internal/gitlab/worker/pool.go` - WorkerPool
+- [ ] **GITLAB-070**: Реализовать configurable worker count (default: 3)
+- [ ] **GITLAB-071**: Реализовать graceful shutdown с drain queue
+- [ ] **GITLAB-072**: Реализовать retry logic с exponential backoff
+- [ ] **GITLAB-073**: Добавить job priority (urgent for main branch)
+- [ ] **GITLAB-074**: Добавить job timeout handling
+- [ ] **GITLAB-075**: Добавить queue cleanup (старые completed/failed jobs)
+- [ ] **GITLAB-076**: Добавить Prometheus metrics для очереди
 
 ### Phase 11: Testing & Documentation
-- [ ] **GITLAB-058**: Integration тесты с mock GitLab server
-- [ ] **GITLAB-059**: E2E тест полного flow: webhook → analysis → comment
-- [ ] **GITLAB-060**: Документация API endpoints
-- [ ] **GITLAB-061**: Документация по настройке GitLab webhook
-- [ ] **GITLAB-062**: README с примерами использования
+- [ ] **GITLAB-077**: Integration тесты с mock GitLab server
+- [ ] **GITLAB-078**: E2E тест полного flow: webhook → queue → analysis → comment
+- [ ] **GITLAB-079**: Load test очереди (100+ concurrent webhooks)
+- [ ] **GITLAB-080**: Документация API endpoints (с пагинацией)
+- [ ] **GITLAB-081**: Документация по настройке GitLab webhook
+- [ ] **GITLAB-082**: README с примерами использования
 
 ### Phase 12: Enhancements (Future)
-- [ ] **GITLAB-063**: Поддержка GitHub (дополнительно к GitLab)
-- [ ] **GITLAB-064**: Поддержка Bitbucket
-- [ ] **GITLAB-065**: Custom prompts per language
-- [ ] **GITLAB-066**: Integration с Slack/Teams для нотификаций
-- [ ] **GITLAB-067**: Статистика и аналитика по ревью
-- [ ] **GITLAB-068**: Обучение на feedback (approve/reject комментариев)
-- [ ] **GITLAB-069**: Auto-suggest optimal models based on codebase language
+- [ ] **GITLAB-083**: Поддержка GitHub (дополнительно к GitLab)
+- [ ] **GITLAB-084**: Поддержка Bitbucket
+- [ ] **GITLAB-085**: Custom prompts per language
+- [ ] **GITLAB-086**: Integration с Slack/Teams для нотификаций
+- [ ] **GITLAB-087**: Статистика и аналитика по ревью
+- [ ] **GITLAB-088**: Обучение на feedback (approve/reject комментариев)
+- [ ] **GITLAB-089**: Auto-suggest optimal models based on codebase language
+- [ ] **GITLAB-090**: Priority queue для main/release branches
+- [ ] **GITLAB-091**: WebSocket для real-time queue updates
 
 ---
 
@@ -699,6 +1372,36 @@ Provide your review as JSON:
 
 ---
 
+## 📋 Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Tasks** | 91 + 5 subtasks = **96 tasks** |
+| **Phases** | 13 (including Phase 5.1 and 9.1) |
+| **Estimated Time** | 120-160 hours |
+| **Priority** | Medium-High |
+| **Dependencies** | Qdrant, Redis/PostgreSQL, Embedding Service |
+
+### Key Features
+- ✅ Webhook deduplication с debounce
+- ✅ Очистка Qdrant перед повторным анализом
+- ✅ **Analysis Queue** с configurable workers
+- ✅ **Parallel processing** нескольких MR
+- ✅ **Redis/PostgreSQL/Memory** queue backends
+- ✅ Выбор Analysis Model (LLM) per project
+- ✅ Выбор Embedding Model per project
+- ✅ Custom review prompts
+- ✅ File filters (include/exclude patterns)
+- ✅ Inline comments на строки кода
+- ✅ GitLab native discussions API
+- ✅ **Priority queue** для urgent branches
+- ✅ **Retry logic** с exponential backoff
+- ✅ **Queue Monitor UI** со статусом воркеров
+- ✅ **API Pagination** для всех списков
+- ✅ **Complete Flow диаграмма** (Webhook → Queue → Worker)
+
+---
+
 ## 🚀 Quick Start (после реализации)
 
 1. **Добавить интеграцию** в Admin → GitLab → Add Integration
@@ -709,5 +1412,6 @@ Provide your review as JSON:
 ---
 
 *Документ создан: 2025-12-04*
-*Версия: 1.0.0*
+*Версия: 1.1.0*
+*Изменения: добавлены Queue Monitor UI, API Pagination, Complete Flow диаграмма*
 

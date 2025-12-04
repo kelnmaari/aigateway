@@ -11,13 +11,18 @@
 		Loader2,
 		Building2,
 		Server,
-		Database
+		Database,
+		BrainCircuit,
+		CheckCircle,
+		XCircle,
+		AlertCircle
 	} from 'lucide-svelte';
-	import { adminApi, type AdminStats, type SystemMetrics } from '$lib/api/admin';
+	import { adminApi, type AdminStats, type SystemMetrics, type RAGStats } from '$lib/api/admin';
 	import { cn } from '$lib/utils';
 
 	let stats = $state<AdminStats | null>(null);
 	let metrics = $state<SystemMetrics | null>(null);
+	let ragStats = $state<RAGStats | null>(null);
 	let isLoading = $state(true);
 
 	onMount(async () => {
@@ -27,9 +32,10 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			const [statsRes, metricsRes] = await Promise.allSettled([
+			const [statsRes, metricsRes, ragRes] = await Promise.allSettled([
 				adminApi.getStats(),
-				adminApi.getMetrics()
+				adminApi.getMetrics(),
+				adminApi.getRAGStats()
 			]);
 
 			if (statsRes.status === 'fulfilled') {
@@ -37,6 +43,9 @@
 			}
 			if (metricsRes.status === 'fulfilled') {
 				metrics = metricsRes.value;
+			}
+			if (ragRes.status === 'fulfilled') {
+				ragStats = ragRes.value;
 			}
 		} catch (error) {
 			console.error('Failed to load admin data:', error);
@@ -273,6 +282,66 @@
 							Alloc Rate
 						</div>
 						<p class="text-xl font-semibold">{metrics.app.alloc_rate_mb_s?.toFixed(2) ?? '0'} MB/s</p>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- RAG / Vector Store Stats -->
+		{#if ragStats}
+			<div class="rounded-xl border border-border bg-card p-6">
+				<h2 class="mb-4 text-lg font-semibold flex items-center gap-2">
+					<BrainCircuit class="h-5 w-5" />
+					RAG / Vector Store
+				</h2>
+				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+					<!-- Status -->
+					<div>
+						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+							{#if ragStats.health_status === 'healthy'}
+								<CheckCircle class="h-4 w-4 text-green-500" />
+							{:else if ragStats.health_status === 'unhealthy'}
+								<XCircle class="h-4 w-4 text-red-500" />
+							{:else}
+								<AlertCircle class="h-4 w-4 text-amber-500" />
+							{/if}
+							Status
+						</div>
+						<p class="text-xl font-semibold capitalize">{ragStats.health_status}</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							{ragStats.enabled ? 'Enabled' : 'Disabled'}
+						</p>
+					</div>
+
+					<!-- Provider -->
+					<div>
+						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+							<Database class="h-4 w-4" />
+							Provider
+						</div>
+						<p class="text-xl font-semibold capitalize">{ragStats.provider || '—'}</p>
+					</div>
+
+					<!-- Total Vectors -->
+					<div>
+						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+							<Activity class="h-4 w-4" />
+							Total Vectors
+						</div>
+						<p class="text-xl font-semibold">
+							{ragStats.vector_stats?.total_vectors?.toLocaleString() ?? '0'}
+						</p>
+					</div>
+
+					<!-- Dimensions -->
+					<div>
+						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+							<TrendingUp class="h-4 w-4" />
+							Dimensions
+						</div>
+						<p class="text-xl font-semibold">
+							{ragStats.vector_stats?.dimensions ?? '—'}
+						</p>
 					</div>
 				</div>
 			</div>

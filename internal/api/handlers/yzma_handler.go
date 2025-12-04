@@ -26,19 +26,27 @@ type ModelListWorker interface {
 
 // YzmaHandler handles yzma inference requests with OpenAI compatibility
 type YzmaHandler struct {
-	client       *yzma.Client
-	agentService *agentService.AgentService // v2.5.0+, v3.0.6+: Agent support
-	modelWorker  ModelListWorker            // v3.0.6+: Background model list cache
-	logger       *logrus.Logger
+	client         *yzma.Client
+	agentService   *agentService.AgentService // v2.5.0+, v3.0.6+: Agent support
+	modelWorker    ModelListWorker            // v3.0.6+: Background model list cache
+	requestTimeout time.Duration              // v3.0.9+: Configurable request timeout
+	logger         *logrus.Logger
 }
 
 // NewYzmaHandler creates a new yzma handler
 func NewYzmaHandler(client *yzma.Client, logger *logrus.Logger) *YzmaHandler {
 	return &YzmaHandler{
-		client:       client,
-		agentService: nil, // Will be set later if agent service is available
-		logger:       logger,
+		client:         client,
+		agentService:   nil, // Will be set later if agent service is available
+		requestTimeout: 30 * time.Minute, // Default: 30 minutes (thinking models need more time)
+		logger:         logger,
 	}
+}
+
+// SetRequestTimeout sets the maximum request timeout (0 = no timeout)
+func (h *YzmaHandler) SetRequestTimeout(timeout time.Duration) {
+	h.requestTimeout = timeout
+	h.logger.WithField("timeout", timeout).Info("Yzma request timeout configured")
 }
 
 // SetModelWorker sets the model list worker for background caching (v3.0.6+)
@@ -153,8 +161,13 @@ func (h *YzmaHandler) HandleChatCompletion(c *gin.Context) {
 
 // handleNonStreamingCompletion handles regular chat completion
 func (h *YzmaHandler) handleNonStreamingCompletion(c *gin.Context, req models.ChatCompletionRequest, yzmaReq yzma.GenerateRequest) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
-	defer cancel()
+	// Use configurable timeout (default 30m, 0 = no timeout)
+	ctx := c.Request.Context()
+	var cancel context.CancelFunc
+	if h.requestTimeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, h.requestTimeout)
+		defer cancel()
+	}
 	
 	// Generate with yzma
 	resp, err := h.client.Generate(ctx, yzmaReq)
@@ -215,8 +228,13 @@ func (h *YzmaHandler) handleStreamingCompletion(c *gin.Context, req models.ChatC
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
-	defer cancel()
+	// Use configurable timeout (default 30m, 0 = no timeout)
+	ctx := c.Request.Context()
+	var cancel context.CancelFunc
+	if h.requestTimeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, h.requestTimeout)
+		defer cancel()
+	}
 	
 	// Create flusher
 	flusher, ok := c.Writer.(http.Flusher)

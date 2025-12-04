@@ -1002,6 +1002,10 @@ type YzmaConfig struct {
 
 	// Verbose - enable llama.cpp logging
 	Verbose bool `mapstructure:"verbose"`
+
+	// RequestTimeout - maximum time for a single generation request (default: 30m)
+	// Set to 0 for no timeout (use with caution)
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

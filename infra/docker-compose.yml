@@ -3,10 +3,10 @@
 
 services:
   # ═══════════════════════════════════════════════════════════════════════════
-  # PostgreSQL with pgvector extension (for RAG)
+  # PostgreSQL (main database)
   # ═══════════════════════════════════════════════════════════════════════════
   postgres:
-    image: pgvector/pgvector:pg16
+    image: postgres:16-alpine
     container_name: aigateway-postgres
     restart: unless-stopped
     environment:
@@ -111,6 +111,36 @@ services:
       - aigateway
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # Qdrant Vector Database (for RAG)
+  # ═══════════════════════════════════════════════════════════════════════════
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: aigateway-qdrant
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
+      QDRANT__STORAGE__SNAPSHOTS_PATH: /qdrant/snapshots
+      QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB: 20000
+      QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD_KB: 50000
+      QDRANT__LOG_LEVEL: INFO
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"   # REST API
+      - "${QDRANT_GRPC_PORT:-6334}:6334"   # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - qdrant_snapshots:/qdrant/snapshots
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aigateway
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # Keycloak for OIDC/SSO (Optional)
   # ═══════════════════════════════════════════════════════════════════════════
   keycloak:
@@ -142,6 +172,10 @@ volumes:
     name: aigateway_redis_data
   minio_data:
     name: aigateway_minio_data
+  qdrant_data:
+    name: aigateway_qdrant_data
+  qdrant_snapshots:
+    name: aigateway_qdrant_snapshots
 
 networks:
   aigateway:

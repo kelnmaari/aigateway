@@ -579,8 +579,22 @@ func (c *Client) IsModelLoaded(modelPath string) bool {
 	c.modelsMu.RLock()
 	defer c.modelsMu.RUnlock()
 
-	_, exists := c.models[modelPath]
-	return exists
+	// Normalize path separators for cross-platform compatibility
+	normalizedPath := filepath.ToSlash(modelPath)
+	
+	// Try direct lookup first
+	if _, exists := c.models[modelPath]; exists {
+		return true
+	}
+	
+	// Try with normalized path
+	for storedPath := range c.models {
+		if filepath.ToSlash(storedPath) == normalizedPath {
+			return true
+		}
+	}
+	
+	return false
 }
 
 // GetModelContext retrieves loaded model context
@@ -594,6 +608,154 @@ func (c *Client) GetModelContext(modelPath string) (*ModelContext, error) {
 	}
 
 	return modelCtx, nil
+}
+
+// ModelMetadata holds extracted model information from GGUF
+type ModelMetadata struct {
+	// Basic info
+	Description string `json:"description"`
+	
+	// Architecture
+	Architecture    string `json:"architecture,omitempty"`
+	ContextLength   int32  `json:"context_length"`
+	EmbeddingSize   int32  `json:"embedding_size"`
+	NumLayers       int32  `json:"num_layers"`
+	NumHeads        int32  `json:"num_heads"`
+	NumKVHeads      int32  `json:"num_kv_heads"`
+	VocabSize       int32  `json:"vocab_size"`
+	
+	// Size
+	ModelSize       uint64 `json:"model_size"`
+	FileSizeBytes   int64  `json:"file_size_bytes"`
+	
+	// Quantization (from GGUF metadata)
+	Quantization    string `json:"quantization,omitempty"`
+	FileType        string `json:"file_type,omitempty"`
+	
+	// Additional GGUF metadata
+	GeneralName     string `json:"general_name,omitempty"`
+	GeneralAuthor   string `json:"general_author,omitempty"`
+	GeneralBaseName string `json:"general_base_model,omitempty"`
+	License         string `json:"license,omitempty"`
+	
+	// Raw metadata (all GGUF keys)
+	RawMetadata     map[string]string `json:"raw_metadata,omitempty"`
+}
+
+// GetModelMetadata extracts metadata from a loaded model
+func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
+	c.modelsMu.RLock()
+	defer c.modelsMu.RUnlock()
+	
+	// Normalize path separators for cross-platform compatibility
+	normalizedPath := filepath.ToSlash(modelPath)
+	
+	// Find the model with normalized path comparison
+	var modelCtx *ModelContext
+	var actualPath string
+	for storedPath, ctx := range c.models {
+		if filepath.ToSlash(storedPath) == normalizedPath || storedPath == modelPath {
+			modelCtx = ctx
+			actualPath = storedPath
+			break
+		}
+	}
+	
+	if modelCtx == nil {
+		return nil, fmt.Errorf("model not loaded: %s", modelPath)
+	}
+	
+	// Use actual stored path for file operations
+	modelPath = actualPath
+	
+	meta := &ModelMetadata{
+		Description:   llama.ModelDesc(modelCtx.Model),
+		ContextLength: llama.ModelNCtxTrain(modelCtx.Model),
+		EmbeddingSize: llama.ModelNEmbd(modelCtx.Model),
+		NumLayers:     llama.ModelNLayer(modelCtx.Model),
+		NumHeads:      llama.ModelNHead(modelCtx.Model),
+		NumKVHeads:    llama.ModelNHeadKV(modelCtx.Model),
+		VocabSize:     llama.VocabNTokens(modelCtx.Vocab),
+		ModelSize:     llama.ModelSize(modelCtx.Model),
+		RawMetadata:   make(map[string]string),
+	}
+	
+	// Get file size
+	fullPath := filepath.Join(c.modelsDir, modelPath)
+	if info, err := os.Stat(fullPath); err == nil {
+		meta.FileSizeBytes = info.Size()
+	}
+	
+	// Extract all GGUF metadata
+	metaCount := llama.ModelMetaCount(modelCtx.Model)
+	for i := int32(0); i < metaCount; i++ {
+		key, keyOk := llama.ModelMetaKeyByIndex(modelCtx.Model, i)
+		val, valOk := llama.ModelMetaValStrByIndex(modelCtx.Model, i)
+		if keyOk && valOk {
+			meta.RawMetadata[key] = val
+			
+			// Extract specific known fields
+			switch key {
+			case "general.architecture":
+				meta.Architecture = val
+			case "general.name":
+				meta.GeneralName = val
+			case "general.author":
+				meta.GeneralAuthor = val
+			case "general.basename", "general.base_model":
+				meta.GeneralBaseName = val
+			case "general.license":
+				meta.License = val
+			case "general.quantization_version":
+				meta.Quantization = val
+			case "general.file_type":
+				meta.FileType = val
+			}
+		}
+	}
+	
+	// Try to extract quantization from filename if not in metadata
+	if meta.Quantization == "" {
+		meta.Quantization = extractQuantFromPath(modelPath)
+	}
+	
+	c.logger.WithFields(logrus.Fields{
+		"model_path":     modelPath,
+		"description":    meta.Description,
+		"context_length": meta.ContextLength,
+		"num_layers":     meta.NumLayers,
+		"vocab_size":     meta.VocabSize,
+		"meta_count":     metaCount,
+	}).Debug("Model metadata extracted")
+	
+	return meta, nil
+}
+
+// extractQuantFromPath extracts quantization level from file path (e.g., Q4_K_M from name)
+func extractQuantFromPath(path string) string {
+	base := filepath.Base(path)
+	base = strings.TrimSuffix(base, ".gguf")
+	
+	// Common patterns: Q4_K_M, Q8_0, IQ4_XS, etc.
+	patterns := []string{
+		"Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L",
+		"Q4_0", "Q4_1", "Q4_K_S", "Q4_K_M", "Q4_K_L",
+		"Q5_0", "Q5_1", "Q5_K_S", "Q5_K_M", "Q5_K_L",
+		"Q6_K", "Q8_0",
+		"IQ1_S", "IQ1_M", "IQ2_XXS", "IQ2_XS", "IQ2_S", "IQ2_M",
+		"IQ3_XXS", "IQ3_XS", "IQ3_S", "IQ3_M",
+		"IQ4_NL", "IQ4_XS",
+		"F16", "F32", "BF16",
+	}
+	
+	upper := strings.ToUpper(base)
+	for _, pattern := range patterns {
+		if strings.Contains(upper, pattern) {
+			return pattern
+		}
+	}
+	
+	return ""
 }
 
 // ListLoadedModels returns all loaded models with their aliases and sizes

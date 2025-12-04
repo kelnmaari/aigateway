@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { User, Bot, Copy, Check } from 'lucide-svelte';
+	import { User, Bot, Copy, Check, Brain, ChevronDown, ChevronRight } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import type { Message } from '$lib/stores/chat.svelte';
 
@@ -14,6 +14,63 @@
 
 	let container: HTMLDivElement;
 	let copiedId: string | null = $state(null);
+	let expandedThinking = $state<Set<string>>(new Set());
+
+	// Toggle thinking block visibility
+	function toggleThinking(id: string) {
+		const newSet = new Set(expandedThinking);
+		if (newSet.has(id)) {
+			newSet.delete(id);
+		} else {
+			newSet.add(id);
+		}
+		expandedThinking = newSet;
+	}
+
+	// Parse thinking blocks from content
+	// Supports: ◁think▷...◁/think▷, <think>...</think>, [thinking]...[/thinking]
+	interface ParsedContent {
+		thinking: string | null;
+		response: string;
+		isThinking: boolean; // Currently in thinking phase (no closing tag)
+	}
+
+	function parseThinkingContent(content: string): ParsedContent {
+		if (!content) return { thinking: null, response: '', isThinking: false };
+
+		// Pattern variations for thinking tags
+		const patterns = [
+			{ open: '◁think▷', close: '◁/think▷' },
+			{ open: '<think>', close: '</think>' },
+			{ open: '[thinking]', close: '[/thinking]' },
+			{ open: '<|thinking|>', close: '<|/thinking|>' },
+		];
+
+		for (const pattern of patterns) {
+			const openIdx = content.indexOf(pattern.open);
+			if (openIdx !== -1) {
+				const closeIdx = content.indexOf(pattern.close, openIdx);
+				
+				if (closeIdx !== -1) {
+					// Complete thinking block
+					const thinking = content.slice(openIdx + pattern.open.length, closeIdx).trim();
+					const beforeThink = content.slice(0, openIdx).trim();
+					const afterThink = content.slice(closeIdx + pattern.close.length).trim();
+					const response = (beforeThink + ' ' + afterThink).trim();
+					
+					return { thinking, response, isThinking: false };
+				} else {
+					// Still thinking (no closing tag yet)
+					const thinking = content.slice(openIdx + pattern.open.length).trim();
+					const beforeThink = content.slice(0, openIdx).trim();
+					
+					return { thinking, response: beforeThink, isThinking: true };
+				}
+			}
+		}
+
+		return { thinking: null, response: content, isThinking: false };
+	}
 
 	// Auto-scroll to bottom on new messages
 	$effect(() => {
@@ -108,13 +165,49 @@
 							: 'bg-muted text-foreground'
 					)}
 				>
-					<div class="prose prose-sm dark:prose-invert max-w-none">
-						{#if message.role === 'user'}
+					{#if message.role === 'user'}
+						<div class="prose prose-sm dark:prose-invert max-w-none">
 							<p class="m-0 whitespace-pre-wrap">{message.content}</p>
-						{:else}
-							{@html renderMarkdown(message.content)}
+						</div>
+					{:else}
+						{@const parsed = parseThinkingContent(message.content)}
+						
+						<!-- Thinking Block (collapsible) -->
+						{#if parsed.thinking}
+							<div class="mb-3">
+								<button
+									onclick={() => toggleThinking(message.id)}
+									class="flex w-full items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-left text-sm transition-colors hover:bg-purple-500/20"
+								>
+									<Brain class="h-4 w-4 text-purple-500" />
+									<span class="font-medium text-purple-500">Thinking</span>
+									{#if expandedThinking.has(message.id)}
+										<ChevronDown class="ml-auto h-4 w-4 text-purple-500" />
+									{:else}
+										<ChevronRight class="ml-auto h-4 w-4 text-purple-500" />
+									{/if}
+								</button>
+								
+								{#if expandedThinking.has(message.id)}
+									<div class="mt-2 max-h-64 overflow-y-auto rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-muted-foreground">
+										<pre class="whitespace-pre-wrap font-sans">{parsed.thinking}</pre>
+									</div>
+								{/if}
+							</div>
 						{/if}
-					</div>
+						
+						<!-- Response -->
+						{#if parsed.response}
+							<div class="prose prose-sm dark:prose-invert max-w-none">
+								{@html renderMarkdown(parsed.response)}
+							</div>
+						{:else if parsed.isThinking}
+							<div class="flex items-center gap-2 text-sm text-muted-foreground">
+								<Brain class="h-4 w-4 animate-pulse text-purple-500" />
+								<span>Thinking...</span>
+							</div>
+						{/if}
+					{/if}
 
 					<!-- Copy Button -->
 					<button
@@ -137,14 +230,46 @@
 
 		<!-- Streaming Message -->
 		{#if isStreaming && streamingContent}
+			{@const streamParsed = parseThinkingContent(streamingContent)}
 			<div class="flex gap-4">
 				<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-					<Bot class="h-4 w-4" />
+					{#if streamParsed.isThinking}
+						<Brain class="h-4 w-4 animate-pulse text-purple-500" />
+					{:else}
+						<Bot class="h-4 w-4" />
+					{/if}
 				</div>
 				<div class="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
-					<div class="prose prose-sm dark:prose-invert max-w-none">
-						{@html renderMarkdown(streamingContent)}
-					</div>
+					<!-- Thinking indicator while streaming -->
+					{#if streamParsed.isThinking}
+						<div class="mb-3">
+							<div class="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-sm">
+								<Brain class="h-4 w-4 animate-pulse text-purple-500" />
+								<span class="font-medium text-purple-500">Thinking...</span>
+							</div>
+							<div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-muted-foreground">
+								<pre class="whitespace-pre-wrap font-sans">{streamParsed.thinking}</pre>
+							</div>
+						</div>
+					{/if}
+					
+					<!-- Completed thinking + response -->
+					{#if streamParsed.thinking && !streamParsed.isThinking}
+						<div class="mb-3">
+							<div class="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm">
+								<Brain class="h-4 w-4 text-green-500" />
+								<span class="font-medium text-green-500">Thought complete</span>
+							</div>
+						</div>
+					{/if}
+					
+					<!-- Response content -->
+					{#if streamParsed.response}
+						<div class="prose prose-sm dark:prose-invert max-w-none">
+							{@html renderMarkdown(streamParsed.response)}
+						</div>
+					{/if}
+					
 					<span class="ml-1 inline-block h-4 w-1 animate-pulse bg-foreground"></span>
 				</div>
 			</div>

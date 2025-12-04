@@ -421,6 +421,7 @@ func main() {
 	// Инициализация RAG Data Source Service (Version 1.13.1+)
 	var ragDataSourceService *ragservice.DataSourceService
 	var ragOrchestrator *ragorchestrator.RAGOrchestrator
+	var vectorStore vector.VectorStore // Объявляем на верхнем уровне для передачи в роутер
 	if cfg.RAG.Enabled && db != nil {
 		appLogger.Info("Initializing RAG Data Source Service...")
 
@@ -448,7 +449,6 @@ func main() {
 			
 			// Инициализация Embeddings (Version 1.14.0+)
 			var embedder embeddings.Embedder
-			var vectorStore vector.VectorStore
 			
 			if cfg.RAG.Embeddings.Provider != "" {
 				appLogger.Info("Initializing Embeddings...")
@@ -472,8 +472,9 @@ func main() {
 				}).Info("✅ Embeddings initialized")
 				fmt.Printf("🧮 Embeddings: %s (%s, %d dims)\n", embedConfig.Provider, embedConfig.Model, embedConfig.Dimensions)
 				
-				// Инициализация Vector Store (pgvector)
-				if cfg.RAG.VectorStore.Type == "pgvector" {
+				// Инициализация Vector Store
+				switch cfg.RAG.VectorStore.Type {
+				case "pgvector":
 					appLogger.Info("Initializing pgvector store...")
 					
 					// Извлекаем параметры подключения из connection string
@@ -498,6 +499,32 @@ func main() {
 						}).Info("✅ pgvector store initialized")
 						fmt.Printf("🔍 Vector Store: pgvector (%d dims, %s metric)\n", pgConfig.Dimensions, pgConfig.DistanceMetric)
 					}
+					
+				case "qdrant":
+					appLogger.Info("Initializing Qdrant vector store...")
+					
+					qdrantConfig := vector.QdrantStoreConfig{
+						URL:        cfg.RAG.VectorStore.Qdrant.URL,
+						Collection: cfg.RAG.VectorStore.Qdrant.Collection,
+						Dimensions: cfg.RAG.VectorStore.Dimensions,
+						Timeout:    cfg.RAG.VectorStore.Qdrant.Timeout,
+					}
+					
+					vs, err := vector.NewQdrantStore(qdrantConfig, appLogger)
+					if err != nil {
+						appLogger.WithError(err).Warn("Failed to initialize Qdrant store, continuing without vector search")
+					} else {
+						vectorStore = vs
+						appLogger.WithFields(map[string]interface{}{
+							"url":        qdrantConfig.URL,
+							"collection": qdrantConfig.Collection,
+							"dims":       qdrantConfig.Dimensions,
+						}).Info("✅ Qdrant vector store initialized")
+						fmt.Printf("🔍 Vector Store: Qdrant (%s, collection: %s, %d dims)\n", qdrantConfig.URL, qdrantConfig.Collection, qdrantConfig.Dimensions)
+					}
+					
+				default:
+					appLogger.WithField("type", cfg.RAG.VectorStore.Type).Warn("Unknown vector store type, continuing without vector search")
 				}
 			} else {
 				appLogger.Warn("Embeddings not configured, RAG will work in simple mode without similarity search")
@@ -569,6 +596,7 @@ func main() {
 		GPUMonitor:           gpuMonitor,           // Может быть nil если NVIDIA GPU не обнаружены (v1.9.3+)
 		RAGDataSourceService: ragDataSourceService, // Может быть nil если RAG отключен (v1.13.1+)
 		RAGOrchestrator:      ragOrchestrator,      // Может быть nil если RAG отключен (v1.13.1+)
+		VectorStore:          vectorStore,          // Может быть nil если vector store не настроен (v3.2.0+)
 	})
 
 	if err != nil {

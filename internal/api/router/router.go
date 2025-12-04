@@ -42,6 +42,7 @@ import (
 	"aigateway/internal/observability"
 	"aigateway/internal/providers"
 	ragorchestrator "aigateway/internal/rag/orchestrator"
+	"aigateway/internal/rag/vector"
 	"aigateway/internal/request"
 	agentService "aigateway/internal/services/agent"
 	"aigateway/internal/services/audit"
@@ -131,6 +132,7 @@ type Router struct {
 	invitationHandler     *handlers.InvitationHandler     // Handler для invitation system (AUTH-03, v2.2.0)
 	agentHandler          *handlers.AgentHandler          // Handler для agent API (v2.5.0+, v3.0.6+)
 	ragDataSourcesHandler *handlers.RAGDataSourcesHandler // Handler для RAG data sources (v1.13.1)
+	ragStatsHandler       *handlers.RAGStatsHandler       // Handler для RAG statistics (v3.2.0)
 	registryHandler       *handlers.RegistryHandler       // Handler для model registry (REGISTRY-01, v2.3.0)
 	dashboardHandler      *handlers.DashboardHandler      // Handler для batch dashboard API (v3.1.0, AJAX-01)
 
@@ -181,6 +183,9 @@ type Router struct {
 	// RAG Orchestrator
 	ragOrchestrator *ragorchestrator.RAGOrchestrator
 
+	// Vector Store for RAG (v3.2.0+)
+	vectorStore vector.VectorStore
+
 	// HTMX UI Handlers (Version 2.6.0+: HTMX-01)
 	templateRenderer   *templates.Renderer
 	registryUIHandler  *handlersUI.RegistryUIHandler
@@ -223,6 +228,7 @@ type NewOptions struct {
 	GPUMonitor           *metrics.GPUMonitor               // Опциональный GPU monitor (v1.9.3+)
 	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
 	RAGOrchestrator      *ragorchestrator.RAGOrchestrator  // Опциональный RAG Orchestrator (v1.13.1+)
+	VectorStore          vector.VectorStore                // Опциональный Vector Store для RAG (v3.2.0+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -248,6 +254,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 		gpuMonitor:           opts.GPUMonitor,
 		ragDataSourceService: opts.RAGDataSourceService,
 		ragOrchestrator:      opts.RAGOrchestrator,
+		vectorStore:          opts.VectorStore,
 	}
 
 	// Setup tracer if provided
@@ -727,8 +734,9 @@ func (r *Router) setupUIRoutes() {
 			hf.GET("/search", r.hfUIHandler.GetModelsSearch)
 			hf.GET("/popular", r.hfUIHandler.GetPopularModels)
 
-			// Model details
+			// Model details (support both /models/ and /model/ paths)
 			hf.GET("/models/*model_id", r.hfUIHandler.GetModelDetails)
+			hf.GET("/model/*model_id", r.hfUIHandler.GetModelDetails)
 			hf.GET("/gguf-files/*model_id", r.hfUIHandler.GetGGUFFilesList)
 
 			// Downloads (HF-02: Download Manager)
@@ -754,6 +762,9 @@ func (r *Router) setupUIRoutes() {
 
 			// Statistics
 			yzma.GET("/stats", r.yzmaUIHandler.GetStats)
+			
+			// Model metadata (v3.2.0+)
+			yzma.GET("/metadata/*model_path", r.yzmaUIHandler.GetModelMetadata)
 
 			// Provider integration for chat
 			yzma.GET("/provider/models", r.yzmaUIHandler.GetProviderModels)
@@ -1450,6 +1461,12 @@ func (r *Router) setupAdminRoutes() {
 		r.logger.Info("Admin routes: Registered /summary endpoint")
 	}
 
+	// RAG Statistics (v3.2.0+)
+	if r.ragStatsHandler != nil {
+		admin.GET("/rag/stats", r.ragStatsHandler.GetRAGStats)
+		r.logger.Info("Admin routes: Registered /rag/stats endpoint")
+	}
+
 	// User Management endpoints (Version 1.3.0+)
 	if r.adminUserHandler != nil {
 		r.logger.Info("Admin routes: Registering User Management endpoints")
@@ -1887,6 +1904,9 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	if r.ragDataSourceService != nil {
 		r.ragDataSourcesHandler = handlers.NewRAGDataSourcesHandler(r.ragDataSourceService, logger)
 	}
+
+	// RAG Stats handler (v3.2.0+)
+	r.ragStatsHandler = handlers.NewRAGStatsHandler(r.vectorStore, logger)
 
 	// v3.0.5+: Chat, Embeddings, Completions handlers removed (Ollama-based)
 	// Use yzma endpoints: /v1/yzma/chat/completions
@@ -2344,6 +2364,15 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 			r.yzmaClient = yzmaClient
 			r.yzmaHandler = handlers.NewYzmaHandler(yzmaClient, yzmaLogger)
+
+			// Configure request timeout from config (v3.0.9+)
+			if r.config.Yzma.RequestTimeout > 0 {
+				r.yzmaHandler.SetRequestTimeout(r.config.Yzma.RequestTimeout)
+			} else if r.config.Yzma.RequestTimeout == 0 {
+				// Explicit 0 = no timeout (for very long thinking operations)
+				r.yzmaHandler.SetRequestTimeout(0)
+				yzmaLogger.Warn("⚠️ Yzma request timeout disabled (request_timeout: 0)")
+			}
 
 			// Initialize UI handler (YZMA-UI-01)
 			if r.templateRenderer != nil {

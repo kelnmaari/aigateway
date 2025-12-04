@@ -118,6 +118,7 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 }
 
 // GetModelDetails handles HTMX request for model details
+// Also supports JSON response for SvelteKit frontend (Accept: application/json)
 func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
@@ -125,14 +126,23 @@ func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 	modelID := c.Param("model_id")
 	// Reconstruct model ID (e.g., "TheBloke/Llama-2-7B-GGUF")
 	if strings.Contains(c.Request.URL.Path, "/") {
-		// Extract from path
+		// Extract from path - handle both /models/ and /model/
 		parts := strings.Split(c.Request.URL.Path, "/models/")
 		if len(parts) == 2 {
 			modelID = parts[1]
+		} else {
+			parts = strings.Split(c.Request.URL.Path, "/model/")
+			if len(parts) == 2 {
+				modelID = parts[1]
+			}
 		}
 	}
 	
 	if modelID == "" {
+		if strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Model ID is required"})
+			return
+		}
 		h.renderError(c, "Model ID is required")
 		return
 	}
@@ -143,11 +153,21 @@ func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 	model, err := h.hfClient.GetModelInfo(ctx, modelID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get model info")
+		if strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		h.renderError(c, "Failed to load model details: "+err.Error())
 		return
 	}
 	
-	// Render details
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, model)
+		return
+	}
+	
+	// Render HTML details (HTMX)
 	data := map[string]interface{}{
 		"Model": model,
 	}

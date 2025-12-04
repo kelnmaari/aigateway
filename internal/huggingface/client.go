@@ -121,6 +121,9 @@ type ModelInfo struct {
 	GGUFFiles     []File `json:"gguf_files,omitempty"`     // Only GGUF files
 	HasGGUF       bool   `json:"has_gguf"`                 // Has GGUF files
 	ParameterSize string `json:"parameter_size,omitempty"` // e.g., "7B", "13B"
+	
+	// README content (fetched separately)
+	Description   string `json:"description,omitempty"`    // Model README/description (truncated)
 }
 
 // File represents a model file
@@ -309,10 +312,15 @@ func (c *Client) SearchModels(ctx context.Context, filters ModelFilters) ([]Mode
 
 // GetModelInfo retrieves detailed information about a specific model
 func (c *Client) GetModelInfo(ctx context.Context, modelID string) (*ModelInfo, error) {
-	// Build URL with query parameters to get full file information
+	// Build URL with query parameters to get full model information
 	params := url.Values{}
-	params.Add("expand[]", "siblings")  // Include full file information with LFS data
-	params.Add("blobs", "true")         // Include blob information
+	params.Add("expand[]", "siblings")    // Include full file information with LFS data
+	params.Add("expand[]", "cardData")    // Include model card metadata (license, languages, base_model)
+	params.Add("expand[]", "config")      // Include model config (architecture, hidden_size, etc.)
+	params.Add("expand[]", "lastModified")// Include last modified date
+	params.Add("expand[]", "downloads")   // Include download count
+	params.Add("expand[]", "tags")        // Include tags
+	params.Add("blobs", "true")           // Include blob information
 	
 	reqURL := fmt.Sprintf("%s%s/%s?%s", c.baseURL, APIEndpoint, modelID, params.Encode())
 	
@@ -362,6 +370,20 @@ func (c *Client) GetModelInfo(ctx context.Context, modelID string) (*ModelInfo, 
 	
 	// Enrich model with computed fields
 	c.enrichModelInfo(&model)
+	
+	// Fetch README for description (non-blocking, ignore errors)
+	if readme, err := c.GetModelReadme(ctx, modelID); err == nil {
+		model.Description = extractDescriptionFromReadme(readme)
+		c.logger.WithFields(logrus.Fields{
+			"model_id":    modelID,
+			"desc_length": len(model.Description),
+		}).Debug("Extracted model description from README")
+	} else {
+		c.logger.WithFields(logrus.Fields{
+			"model_id": modelID,
+			"error":    err.Error(),
+		}).Debug("Could not fetch README (optional)")
+	}
 	
 	return &model, nil
 }
@@ -430,6 +452,123 @@ func (c *Client) enrichModelInfo(model *ModelInfo) {
 			}
 		}
 	}
+}
+
+// GetModelReadme fetches the README content for a model
+func (c *Client) GetModelReadme(ctx context.Context, modelID string) (string, error) {
+	// README is available at /raw/main/README.md
+	readmeURL := fmt.Sprintf("%s/%s/raw/main/README.md", c.baseURL, modelID)
+	
+	c.logger.WithField("url", readmeURL).Debug("Fetching model README")
+	
+	req, err := http.NewRequestWithContext(ctx, "GET", readmeURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	if c.apiToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiToken))
+	}
+	
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch README: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("README not found (status %d)", resp.StatusCode)
+	}
+	
+	// Read README content (limit to 50KB to avoid huge files)
+	limitedReader := io.LimitReader(resp.Body, 50*1024)
+	content, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read README: %w", err)
+	}
+	
+	return string(content), nil
+}
+
+// extractDescriptionFromReadme extracts a clean description from README markdown
+func extractDescriptionFromReadme(readme string) string {
+	if readme == "" {
+		return ""
+	}
+	
+	lines := strings.Split(readme, "\n")
+	var description strings.Builder
+	inFrontMatter := false
+	foundContent := false
+	lineCount := 0
+	maxLines := 20 // Limit description to ~20 lines
+	
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Skip YAML front matter
+		if trimmed == "---" {
+			inFrontMatter = !inFrontMatter
+			continue
+		}
+		if inFrontMatter {
+			continue
+		}
+		
+		// Skip empty lines at the beginning
+		if !foundContent && trimmed == "" {
+			continue
+		}
+		
+		// Skip headers (we want prose text)
+		if strings.HasPrefix(trimmed, "#") {
+			if foundContent {
+				// Stop at next header after finding content
+				break
+			}
+			continue
+		}
+		
+		// Skip badges, links to images, etc.
+		if strings.HasPrefix(trimmed, "[![") || strings.HasPrefix(trimmed, "![") {
+			continue
+		}
+		
+		// Skip HTML comments
+		if strings.HasPrefix(trimmed, "<!--") {
+			continue
+		}
+		
+		// Skip license agreement blocks
+		if strings.Contains(strings.ToLower(trimmed), "license agreement") ||
+		   strings.Contains(strings.ToLower(trimmed), "you need to agree") {
+			continue
+		}
+		
+		// Found content
+		if trimmed != "" {
+			foundContent = true
+			if description.Len() > 0 {
+				description.WriteString("\n")
+			}
+			description.WriteString(trimmed)
+			lineCount++
+			
+			if lineCount >= maxLines {
+				description.WriteString("...")
+				break
+			}
+		}
+	}
+	
+	result := description.String()
+	
+	// Truncate if too long (max 2000 chars)
+	if len(result) > 2000 {
+		result = result[:1997] + "..."
+	}
+	
+	return result
 }
 
 // ListGGUFModels returns models with GGUF files

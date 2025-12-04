@@ -41,6 +41,7 @@ inference:
     top_p: 0.9
     min_p: 0.1
     verbose: true
+    request_timeout: "30m"  # Max time for a single generation (0 = no timeout for thinking models)
 
 auth:
   enabled: true
@@ -266,17 +267,21 @@ web_fetch:
   cache_enabled: true
   cache_ttl: "1h"
 
-# LOCAL PostgreSQL + MinIO for RAG (Docker)
+# LOCAL Qdrant + MinIO for RAG (Docker)
 rag:
   enabled: true
   
   vector_store:
-    type: "pgvector"
-    connection_string: "postgres://proxy_user:secure_password_change_me@localhost:5432/ollama_proxy?sslmode=disable"
+    type: "qdrant"
     dimensions: 1024
     distance_metric: "cosine"
-    hnsw_ef_construction: 200
-    hnsw_m: 16
+    
+    # Qdrant configuration
+    qdrant:
+      url: "http://localhost:6333"
+      collection: "aigateway_rag"
+      prefer_grpc: false
+      timeout: 30s
   
   file_storage:
     type: "s3"

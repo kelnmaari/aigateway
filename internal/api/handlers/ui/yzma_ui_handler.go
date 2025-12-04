@@ -470,4 +470,58 @@ func (h *YzmaUIHandler) GetProviderModels(c *gin.Context) {
 	})
 }
 
-
+// GetModelMetadata returns detailed metadata for a loaded model
+// GET /api/ui/yzma/metadata/*model_path
+func (h *YzmaUIHandler) GetModelMetadata(c *gin.Context) {
+	modelPath := c.Param("model_path")
+	// Remove leading slash if present
+	if len(modelPath) > 0 && modelPath[0] == '/' {
+		modelPath = modelPath[1:]
+	}
+	
+	// Normalize path separators (Windows paths may have backslashes)
+	modelPath = strings.ReplaceAll(modelPath, "\\", "/")
+	
+	if modelPath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model_path is required"})
+		return
+	}
+	
+	h.logger.WithField("model_path", modelPath).Debug("Getting model metadata")
+	
+	// Check if model is loaded
+	if !h.client.IsModelLoaded(modelPath) {
+		// Model not loaded - return minimal info from file
+		fullPath := h.client.GetFullModelPath(modelPath)
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Model not found"})
+			return
+		}
+		
+		c.JSON(http.StatusOK, gin.H{
+			"loaded":          false,
+			"path":            modelPath,
+			"name":            filepath.Base(modelPath),
+			"file_size_bytes": info.Size(),
+			"modified_at":     info.ModTime(),
+			"message":         "Load model to see full metadata (architecture, parameters, etc.)",
+		})
+		return
+	}
+	
+	// Get full metadata from loaded model
+	metadata, err := h.client.GetModelMetadata(modelPath)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get model metadata")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"loaded":   true,
+		"path":     modelPath,
+		"name":     filepath.Base(modelPath),
+		"metadata": metadata,
+	})
+}

@@ -162,6 +162,22 @@ export interface CreateInvitationRequest {
 	max_uses?: number;
 }
 
+// ==================== RAG Stats ====================
+export interface VectorStats {
+	total_vectors: number;
+	dimensions: number;
+	index_type: string;
+	collection_url?: string;
+}
+
+export interface RAGStats {
+	enabled: boolean;
+	provider: string;
+	vector_stats?: VectorStats;
+	health_status: string;
+	loaded_at: string;
+}
+
 // ==================== API ====================
 export const adminApi = {
 	// Stats
@@ -232,6 +248,9 @@ export const adminApi = {
 	createInvitation: (data: CreateInvitationRequest) =>
 		api.post<Invitation>('/api/admin/invitations', data),
 
-	revokeInvitation: (id: string) => api.delete(`/api/admin/invitations/${id}`)
+	revokeInvitation: (id: string) => api.delete(`/api/admin/invitations/${id}`),
+
+	// RAG Stats (v3.2.0+)
+	getRAGStats: () => api.get<RAGStats>('/api/admin/rag/stats')
 };
 

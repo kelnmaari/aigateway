@@ -6,9 +6,10 @@ Docker Compose конфигурация для локальной разрабо
 
 | Сервис | Порт | Описание |
 |--------|------|----------|
-| PostgreSQL | 5432 | Основная БД с pgvector |
+| PostgreSQL | 5432 | Основная БД |
 | Redis | 6379 | Rate limiting и кеширование |
 | MinIO | 9000 (API), 9001 (Console) | S3-совместимое хранилище |
+| Qdrant | 6333 (HTTP), 6334 (gRPC) | Vector database для RAG |
 | Jaeger | 16686 (UI), 4318 (OTLP) | Distributed tracing (опционально) |
 | Keycloak | 8180 | OIDC/SSO (опционально) |
 
@@ -21,7 +22,7 @@ cd infra
 # Скопировать конфигурацию
 cp env.template .env
 
-# Запустить базовые сервисы (PostgreSQL, Redis, MinIO)
+# Запустить базовые сервисы (PostgreSQL, Redis, MinIO, Qdrant)
 docker-compose up -d
 
 # Проверить статус
@@ -46,6 +47,11 @@ docker-compose --profile tracing --profile auth up -d
 
 ## Доступ к сервисам
 
+### Qdrant Dashboard
+- URL: http://localhost:6333/dashboard
+- REST API: http://localhost:6333
+- gRPC: localhost:6334
+
 ### MinIO Console
 - URL: http://localhost:9001
 - Login: minioadmin
@@ -60,9 +66,6 @@ Buckets создаются автоматически:
 ```bash
 # Подключение через psql
 docker exec -it aigateway-postgres psql -U proxy_user -d ollama_proxy
-
-# Проверка pgvector
-SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';
 ```
 
 ### Redis
@@ -92,7 +95,7 @@ docker-compose down
 docker-compose down -v
 ```
 
-## Конфигурация dev.yaml
+## Конфигурация dev-local.yaml
 
 После запуска infra, используй `configs/dev-local.yaml`:
 
@@ -122,7 +125,11 @@ file_storage:
 
 rag:
   vector_store:
-    connection_string: "postgres://proxy_user:secure_password_change_me@localhost:5432/ollama_proxy?sslmode=disable"
+    type: "qdrant"
+    dimensions: 1024
+    qdrant:
+      url: "http://localhost:6333"
+      collection: "aigateway_rag"
   file_storage:
     s3_endpoint: "http://localhost:9000"
 
@@ -137,6 +144,5 @@ observability:
 
 - Docker 20.10+
 - Docker Compose v2+
-- ~2GB RAM для базовых сервисов
-- ~4GB RAM со всеми профилями
-
+- ~3GB RAM для базовых сервисов (с Qdrant)
+- ~5GB RAM со всеми профилями

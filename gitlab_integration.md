@@ -1286,71 +1286,230 @@ Provide your review as JSON:
 - [ ] **GITLAB-041**: Реализовать inline comments для конкретных строк
 - [ ] **GITLAB-042**: Добавить collapsible sections для длинных ревью
 - [ ] **GITLAB-043**: Добавить emoji и визуальные индикаторы
+- [ ] **GITLAB-044**: ⚠️ Обработка лимитов GitLab (split long comments)
 
 ### Phase 8: Admin API
-- [ ] **GITLAB-044**: Создать `internal/api/handlers/gitlab_admin.go`
-- [ ] **GITLAB-045**: CRUD для integrations
-- [ ] **GITLAB-046**: CRUD для projects
-- [ ] **GITLAB-047**: Endpoint для test connection
-- [ ] **GITLAB-048**: Endpoint для manual webhook setup
-- [ ] **GITLAB-049**: Endpoints для reviews (list, details, retry)
-- [ ] **GITLAB-050**: Добавить роуты в router.go
+- [ ] **GITLAB-045**: Создать `internal/api/handlers/gitlab_admin.go`
+- [ ] **GITLAB-046**: CRUD для integrations
+- [ ] **GITLAB-047**: CRUD для projects
+- [ ] **GITLAB-048**: Endpoint для test connection
+- [ ] **GITLAB-049**: Endpoint для manual webhook setup
+- [ ] **GITLAB-050**: Endpoints для reviews (list, details, retry)
+- [ ] **GITLAB-051**: Добавить роуты в router.go
 
 ### Phase 9: Admin UI (Svelte)
-- [ ] **GITLAB-051**: Создать страницу `/admin/gitlab` - список интеграций
-- [ ] **GITLAB-052**: Создать модалку добавления/редактирования интеграции
-- [ ] **GITLAB-053**: Создать страницу `/admin/gitlab/:id/projects` - список проектов
-- [ ] **GITLAB-054**: Создать модалку настройки проекта:
-  - [ ] **GITLAB-054a**: Выпадающий список Analysis Model (LLM для ревью)
-  - [ ] **GITLAB-054b**: Выпадающий список Embedding Model (для чанкинизации)
-  - [ ] **GITLAB-054c**: Поля Include/Exclude patterns
-  - [ ] **GITLAB-054d**: Textarea для custom prompt
-  - [ ] **GITLAB-054e**: Advanced settings (chunk size, overlap, max files)
-- [ ] **GITLAB-055**: Создать страницу `/admin/gitlab/reviews` - список ревью с пагинацией
-- [ ] **GITLAB-056**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью
-- [ ] **GITLAB-057**: Добавить в sidebar меню "GitLab" (admin only)
-- [ ] **GITLAB-058**: API endpoint для получения списка доступных моделей (LLM + Embedding)
+- [ ] **GITLAB-052**: Создать страницу `/admin/gitlab` - список интеграций
+- [ ] **GITLAB-053**: Создать модалку добавления/редактирования интеграции
+- [ ] **GITLAB-054**: Создать страницу `/admin/gitlab/:id/projects` - список проектов
+- [ ] **GITLAB-055**: Создать модалку настройки проекта:
+  - [ ] **GITLAB-055a**: Выпадающий список Analysis Model (LLM для ревью)
+  - [ ] **GITLAB-055b**: Выпадающий список Embedding Model (для чанкинизации)
+  - [ ] **GITLAB-055c**: Поля Include/Exclude patterns
+  - [ ] **GITLAB-055d**: Textarea для custom prompt
+  - [ ] **GITLAB-055e**: Advanced settings (chunk size, overlap, max files)
+- [ ] **GITLAB-056**: Создать страницу `/admin/gitlab/reviews` - список ревью с пагинацией
+- [ ] **GITLAB-057**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью
+- [ ] **GITLAB-058**: Добавить в sidebar меню "GitLab" (admin only)
+- [ ] **GITLAB-059**: API endpoint для получения списка доступных моделей (LLM + Embedding)
 
 ### Phase 9.1: Queue Monitor UI
-- [ ] **GITLAB-059**: Создать компонент `/admin/gitlab/queue` - мониторинг очереди
-- [ ] **GITLAB-060**: Отображение статуса воркеров (active/idle, current job, duration)
-- [ ] **GITLAB-061**: Отображение статистики очереди (pending, processing, completed, failed)
-- [ ] **GITLAB-062**: Таблица pending jobs с возможностью отмены
-- [ ] **GITLAB-063**: Таблица failed jobs с retry/delete
-- [ ] **GITLAB-064**: Auto-refresh каждые 5 секунд (или WebSocket)
+- [ ] **GITLAB-060**: Создать компонент `/admin/gitlab/queue` - мониторинг очереди
+- [ ] **GITLAB-061**: Отображение статуса воркеров (active/idle, current job, duration)
+- [ ] **GITLAB-062**: Отображение статистики очереди (pending, processing, completed, failed)
+- [ ] **GITLAB-063**: Таблица pending jobs с возможностью отмены
+- [ ] **GITLAB-064**: Таблица failed jobs с retry/delete
+- [ ] **GITLAB-065**: Auto-refresh каждые 5 секунд (или WebSocket)
 
 ### Phase 10: Analysis Queue & Workers
-- [ ] **GITLAB-065**: Создать `internal/gitlab/queue/interface.go` - AnalysisQueue interface
-- [ ] **GITLAB-066**: Создать `internal/gitlab/queue/redis.go` - Redis implementation
-- [ ] **GITLAB-067**: Создать `internal/gitlab/queue/postgres.go` - PostgreSQL implementation
-- [ ] **GITLAB-068**: Создать `internal/gitlab/queue/memory.go` - In-memory implementation
-- [ ] **GITLAB-069**: Создать `internal/gitlab/worker/pool.go` - WorkerPool
-- [ ] **GITLAB-070**: Реализовать configurable worker count (default: 3)
-- [ ] **GITLAB-071**: Реализовать graceful shutdown с drain queue
-- [ ] **GITLAB-072**: Реализовать retry logic с exponential backoff
-- [ ] **GITLAB-073**: Добавить job priority (urgent for main branch)
-- [ ] **GITLAB-074**: Добавить job timeout handling
-- [ ] **GITLAB-075**: Добавить queue cleanup (старые completed/failed jobs)
-- [ ] **GITLAB-076**: Добавить Prometheus metrics для очереди
+- [ ] **GITLAB-066**: Создать `internal/gitlab/queue/interface.go` - AnalysisQueue interface
+- [ ] **GITLAB-067**: Создать `internal/gitlab/queue/redis.go` - Redis implementation
+- [ ] **GITLAB-068**: Создать `internal/gitlab/queue/postgres.go` - PostgreSQL implementation
+- [ ] **GITLAB-069**: Создать `internal/gitlab/queue/memory.go` - In-memory implementation
+- [ ] **GITLAB-070**: Создать `internal/gitlab/worker/pool.go` - WorkerPool
+- [ ] **GITLAB-071**: Реализовать configurable worker count (default: 3)
+- [ ] **GITLAB-072**: Реализовать graceful shutdown с drain queue
+- [ ] **GITLAB-073**: Реализовать retry logic с exponential backoff
+- [ ] **GITLAB-074**: Добавить job priority (urgent for main branch)
+- [ ] **GITLAB-075**: Добавить job timeout handling
+- [ ] **GITLAB-076**: Добавить queue cleanup (старые completed/failed jobs)
+- [ ] **GITLAB-077**: Добавить Prometheus metrics для очереди
 
 ### Phase 11: Testing & Documentation
-- [ ] **GITLAB-077**: Integration тесты с mock GitLab server
-- [ ] **GITLAB-078**: E2E тест полного flow: webhook → queue → analysis → comment
-- [ ] **GITLAB-079**: Load test очереди (100+ concurrent webhooks)
-- [ ] **GITLAB-080**: Документация API endpoints (с пагинацией)
-- [ ] **GITLAB-081**: Документация по настройке GitLab webhook
-- [ ] **GITLAB-082**: README с примерами использования
+- [ ] **GITLAB-078**: Integration тесты с mock GitLab server
+- [ ] **GITLAB-079**: E2E тест полного flow: webhook → queue → analysis → comment
+- [ ] **GITLAB-080**: Load test очереди (100+ concurrent webhooks)
+- [ ] **GITLAB-081**: Тест split комментариев при превышении лимита
+- [ ] **GITLAB-082**: Документация API endpoints (с пагинацией)
+- [ ] **GITLAB-083**: Документация по настройке GitLab webhook
+- [ ] **GITLAB-084**: README с примерами использования
 
 ### Phase 12: Enhancements (Future)
-- [ ] **GITLAB-083**: Поддержка GitHub (дополнительно к GitLab)
-- [ ] **GITLAB-084**: Поддержка Bitbucket
-- [ ] **GITLAB-085**: Custom prompts per language
-- [ ] **GITLAB-086**: Integration с Slack/Teams для нотификаций
-- [ ] **GITLAB-087**: Статистика и аналитика по ревью
-- [ ] **GITLAB-088**: Обучение на feedback (approve/reject комментариев)
-- [ ] **GITLAB-089**: Auto-suggest optimal models based on codebase language
-- [ ] **GITLAB-090**: Priority queue для main/release branches
-- [ ] **GITLAB-091**: WebSocket для real-time queue updates
+- [ ] **GITLAB-085**: Поддержка GitHub (дополнительно к GitLab)
+- [ ] **GITLAB-086**: Поддержка Bitbucket
+- [ ] **GITLAB-087**: Custom prompts per language
+- [ ] **GITLAB-088**: Integration с Slack/Teams для нотификаций
+- [ ] **GITLAB-089**: Статистика и аналитика по ревью
+- [ ] **GITLAB-090**: Обучение на feedback (approve/reject комментариев)
+- [ ] **GITLAB-091**: Auto-suggest optimal models based on codebase language
+- [ ] **GITLAB-092**: Priority queue для main/release branches
+- [ ] **GITLAB-093**: WebSocket для real-time queue updates
+
+---
+
+## ⚠️ GitLab API Limits
+
+### Comment Size Limits
+
+| Limit | Value | Notes |
+|-------|-------|-------|
+| **Note body** | 1,000,000 chars | Max length for MR comment |
+| **Description** | 1,048,576 chars | Max length for MR description |
+| **Discussions** | 1,000,000 chars | Per discussion thread |
+| **Inline comment** | 1,000,000 chars | Per line comment |
+
+**Практический лимит:** ~50,000-100,000 символов для читаемости.
+
+### Handling Large Reviews
+
+```go
+const (
+    // GitLab limits
+    MaxNoteLength        = 1_000_000   // GitLab max
+    SafeNoteLength       = 50_000      // Practical limit for readability
+    MaxInlineCommentLen  = 10_000      // Per-line comment limit
+    
+    // Split settings
+    SplitThreshold       = 45_000      // When to start splitting
+    PartOverlap          = 500         // Context overlap between parts
+)
+
+// CommentSplitter разбивает длинные комментарии
+type CommentSplitter struct {
+    maxLength int
+    overlap   int
+}
+
+// Split разбивает комментарий на части если превышен лимит
+func (s *CommentSplitter) Split(content string) []string {
+    if len(content) <= s.maxLength {
+        return []string{content}
+    }
+    
+    var parts []string
+    remaining := content
+    partNum := 1
+    totalParts := (len(content) / s.maxLength) + 1
+    
+    for len(remaining) > 0 {
+        // Find split point (prefer splitting at section boundary)
+        splitAt := s.findSplitPoint(remaining, s.maxLength)
+        
+        part := remaining[:splitAt]
+        
+        // Add part header/footer
+        header := fmt.Sprintf("## 📄 AI Review (Part %d/%d)\n\n", partNum, totalParts)
+        footer := "\n\n---\n*Continued in next comment...*"
+        
+        if partNum == totalParts {
+            footer = "\n\n---\n*End of review*"
+        }
+        
+        parts = append(parts, header + part + footer)
+        
+        // Move to next part with overlap for context
+        if splitAt < len(remaining) {
+            overlap := min(s.overlap, len(remaining)-splitAt)
+            remaining = remaining[splitAt-overlap:]
+        } else {
+            remaining = ""
+        }
+        partNum++
+    }
+    
+    return parts
+}
+
+// findSplitPoint finds best place to split (prefer ## headers, then ---, then \n\n)
+func (s *CommentSplitter) findSplitPoint(content string, maxLen int) int {
+    if len(content) <= maxLen {
+        return len(content)
+    }
+    
+    searchStart := maxLen - 1000 // Search last 1000 chars for good split point
+    if searchStart < 0 {
+        searchStart = 0
+    }
+    
+    // Try to find section header (## )
+    if idx := strings.LastIndex(content[searchStart:maxLen], "\n## "); idx != -1 {
+        return searchStart + idx
+    }
+    
+    // Try to find horizontal rule (---)
+    if idx := strings.LastIndex(content[searchStart:maxLen], "\n---"); idx != -1 {
+        return searchStart + idx
+    }
+    
+    // Try to find paragraph break
+    if idx := strings.LastIndex(content[searchStart:maxLen], "\n\n"); idx != -1 {
+        return searchStart + idx
+    }
+    
+    // Fallback: split at maxLen
+    return maxLen
+}
+
+// PostReviewComment posts review, splitting if necessary
+func (c *GitLabClient) PostReviewComment(ctx context.Context, projectID, mrIID int, review string) error {
+    splitter := &CommentSplitter{
+        maxLength: SafeNoteLength,
+        overlap:   PartOverlap,
+    }
+    
+    parts := splitter.Split(review)
+    
+    for i, part := range parts {
+        note, err := c.PostMRNote(ctx, projectID, mrIID, part)
+        if err != nil {
+            return fmt.Errorf("failed to post part %d/%d: %w", i+1, len(parts), err)
+        }
+        
+        // Rate limit between posts
+        if i < len(parts)-1 {
+            time.Sleep(500 * time.Millisecond)
+        }
+    }
+    
+    return nil
+}
+```
+
+### Rate Limits
+
+| Limit | Value | Scope |
+|-------|-------|-------|
+| **Authenticated API** | 2,000 req/min | Per user |
+| **Unauthenticated** | 500 req/min | Per IP |
+| **Webhooks** | - | Unlimited (from GitLab) |
+| **File uploads** | 10 MB | Per file |
+
+```go
+// Rate limiter for GitLab API
+type GitLabRateLimiter struct {
+    limiter *rate.Limiter  // golang.org/x/time/rate
+}
+
+func NewGitLabRateLimiter() *GitLabRateLimiter {
+    // 30 requests per second = 1800/min (below 2000 limit)
+    return &GitLabRateLimiter{
+        limiter: rate.NewLimiter(rate.Limit(30), 10),
+    }
+}
+
+func (r *GitLabRateLimiter) Wait(ctx context.Context) error {
+    return r.limiter.Wait(ctx)
+}
+```
 
 ---
 
@@ -1376,7 +1535,7 @@ Provide your review as JSON:
 
 | Metric | Value |
 |--------|-------|
-| **Total Tasks** | 91 + 5 subtasks = **96 tasks** |
+| **Total Tasks** | 93 + 5 subtasks = **98 tasks** |
 | **Phases** | 13 (including Phase 5.1 and 9.1) |
 | **Estimated Time** | 120-160 hours |
 | **Priority** | Medium-High |
@@ -1398,7 +1557,8 @@ Provide your review as JSON:
 - ✅ **Retry logic** с exponential backoff
 - ✅ **Queue Monitor UI** со статусом воркеров
 - ✅ **API Pagination** для всех списков
-- ✅ **Complete Flow диаграмма** (Webhook → Queue → Worker)
+- ✅ **Comment Splitter** для обхода лимитов GitLab
+- ✅ **Rate Limiter** для GitLab API (2000 req/min)
 
 ---
 

@@ -432,7 +432,7 @@ func (s *Service) canStartReview(ctx context.Context, projectID, mrIID int) (boo
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     WEBHOOK PROCESSING FLOW                      │
+│                     WEBHOOK PROCESSING FLOW                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Webhook #1 (push commit A)                                     │
@@ -472,10 +472,10 @@ func (s *Service) canStartReview(ctx context.Context, projectID, mrIID int) (boo
 │               │      ANALYSIS QUEUE         │                   │
 │               │  (Redis/PostgreSQL/Memory)  │                   │
 │               │                             │                   │
-│               │  ┌─────────────────────┐   │                   │
-│               │  │ Workers pick jobs   │   │                   │
-│               │  │ and process them    │   │                   │
-│               │  └─────────────────────┘   │                   │
+│               │  ┌─────────────────────┐    │                   │
+│               │  │ Workers pick jobs   │    │                   │
+│               │  │ and process them    │    │                   │
+│               │  └─────────────────────┘    │                   │
 │               └─────────────────────────────┘                   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -1310,7 +1310,8 @@ Provide your review as JSON:
 - [ ] **GITLAB-056**: Создать страницу `/admin/gitlab/reviews` - список ревью с пагинацией
 - [ ] **GITLAB-057**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью
 - [ ] **GITLAB-058**: Добавить в sidebar меню "GitLab" (admin only)
-- [ ] **GITLAB-059**: API endpoint для получения списка доступных моделей (LLM + Embedding)
+- [ ] **GITLAB-059**: API endpoint для получения списка доступных моделей (только active!)
+- [ ] **GITLAB-059a**: ⚠️ Блокировка деактивации модели используемой в GitLab
 
 ### Phase 9.1: Queue Monitor UI
 - [ ] **GITLAB-060**: Создать компонент `/admin/gitlab/queue` - мониторинг очереди
@@ -1513,6 +1514,239 @@ func (r *GitLabRateLimiter) Wait(ctx context.Context) error {
 
 ---
 
+## 🤖 Model Selection Rules
+
+### ⚠️ ВАЖНО: Бизнес-правила для моделей
+
+#### 1. Только активные модели для выбора
+
+```go
+// GET /api/admin/gitlab/models/available
+type AvailableModelsResponse struct {
+    LLMModels       []ModelOption `json:"llm_models"`       // Для analysis
+    EmbeddingModels []ModelOption `json:"embedding_models"` // Для chunking
+}
+
+type ModelOption struct {
+    ID       string `json:"id"`
+    Name     string `json:"name"`
+    Provider string `json:"provider"` // ollama, openai, yzma, etc.
+    Type     string `json:"type"`     // chat, embedding
+}
+
+// Фильтрация: только модели со статусом "active"
+func (s *Service) GetAvailableModels(ctx context.Context) (*AvailableModelsResponse, error) {
+    // Получаем только активные модели
+    models, err := s.modelStore.ListByStatus(ctx, models.StatusActive)
+    if err != nil {
+        return nil, err
+    }
+    
+    var llm, embedding []ModelOption
+    for _, m := range models {
+        opt := ModelOption{
+            ID:       m.ID,
+            Name:     m.Name,
+            Provider: m.Provider,
+            Type:     m.Type,
+        }
+        
+        switch m.Type {
+        case "chat", "completion":
+            llm = append(llm, opt)
+        case "embedding":
+            embedding = append(embedding, opt)
+        }
+    }
+    
+    return &AvailableModelsResponse{
+        LLMModels:       llm,
+        EmbeddingModels: embedding,
+    }, nil
+}
+```
+
+#### 2. Блокировка деактивации используемой модели
+
+```go
+// При попытке деактивировать модель - проверяем использование в GitLab
+
+// GET /api/admin/models/:id/usage
+type ModelUsageResponse struct {
+    ModelID         string              `json:"model_id"`
+    IsUsedInGitLab  bool                `json:"is_used_in_gitlab"`
+    GitLabProjects  []GitLabProjectRef  `json:"gitlab_projects,omitempty"`
+    CanDeactivate   bool                `json:"can_deactivate"`
+    BlockingReason  string              `json:"blocking_reason,omitempty"`
+}
+
+type GitLabProjectRef struct {
+    IntegrationID   string `json:"integration_id"`
+    IntegrationName string `json:"integration_name"`
+    ProjectID       int64  `json:"project_id"`
+    ProjectName     string `json:"project_name"`
+    UsageType       string `json:"usage_type"` // "analysis" | "embedding"
+}
+
+// Проверка перед деактивацией
+func (s *ModelService) CanDeactivate(ctx context.Context, modelID string) (*ModelUsageResponse, error) {
+    // Ищем проекты где модель используется
+    projects, err := s.gitlabStore.FindProjectsByModel(ctx, modelID)
+    if err != nil {
+        return nil, err
+    }
+    
+    resp := &ModelUsageResponse{
+        ModelID:        modelID,
+        IsUsedInGitLab: len(projects) > 0,
+        GitLabProjects: projects,
+        CanDeactivate:  len(projects) == 0,
+    }
+    
+    if len(projects) > 0 {
+        resp.BlockingReason = fmt.Sprintf(
+            "Model is used in %d GitLab project(s). "+
+            "Change model in these projects before deactivating.",
+            len(projects),
+        )
+    }
+    
+    return resp, nil
+}
+
+// PATCH /api/admin/models/:id/status
+func (h *ModelHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+    modelID := chi.URLParam(r, "id")
+    
+    var req struct {
+        Status string `json:"status"`
+    }
+    json.NewDecoder(r.Body).Decode(&req)
+    
+    // Если деактивация - проверяем использование
+    if req.Status == "inactive" || req.Status == "disabled" {
+        usage, err := h.service.CanDeactivate(r.Context(), modelID)
+        if err != nil {
+            respondError(w, err)
+            return
+        }
+        
+        if !usage.CanDeactivate {
+            respondJSON(w, http.StatusConflict, map[string]any{
+                "error":   "model_in_use",
+                "message": usage.BlockingReason,
+                "usage":   usage.GitLabProjects,
+            })
+            return
+        }
+    }
+    
+    // Продолжаем деактивацию
+    // ...
+}
+```
+
+#### 3. UI Warning при выборе модели
+
+```svelte
+<!-- project-settings-modal.svelte -->
+<script>
+    let availableModels = { llm_models: [], embedding_models: [] };
+    let selectedAnalysisModel = '';
+    let selectedEmbeddingModel = '';
+    
+    onMount(async () => {
+        // Загружаем только активные модели
+        const resp = await fetch('/api/admin/gitlab/models/available');
+        availableModels = await resp.json();
+    });
+</script>
+
+<div class="form-group">
+    <label>Analysis Model (LLM)</label>
+    <select bind:value={selectedAnalysisModel}>
+        <option value="">-- Select Model --</option>
+        {#each availableModels.llm_models as model}
+            <option value={model.id}>
+                {model.name} ({model.provider})
+            </option>
+        {/each}
+    </select>
+    {#if availableModels.llm_models.length === 0}
+        <p class="warning">⚠️ No active LLM models available. 
+           <a href="/admin/models">Activate a model</a> first.</p>
+    {/if}
+</div>
+
+<div class="form-group">
+    <label>Embedding Model</label>
+    <select bind:value={selectedEmbeddingModel}>
+        <option value="">-- Select Model --</option>
+        {#each availableModels.embedding_models as model}
+            <option value={model.id}>
+                {model.name} ({model.provider})
+            </option>
+        {/each}
+    </select>
+    {#if availableModels.embedding_models.length === 0}
+        <p class="warning">⚠️ No active embedding models available.</p>
+    {/if}
+</div>
+```
+
+#### 4. UI Warning при деактивации модели
+
+```svelte
+<!-- model-status-toggle.svelte -->
+<script>
+    async function toggleStatus(modelId, newStatus) {
+        if (newStatus === 'inactive') {
+            // Проверяем использование
+            const usage = await fetch(`/api/admin/models/${modelId}/usage`);
+            const data = await usage.json();
+            
+            if (!data.can_deactivate) {
+                showModal({
+                    title: '⚠️ Cannot Deactivate Model',
+                    message: data.blocking_reason,
+                    details: data.gitlab_projects.map(p => 
+                        `• ${p.integration_name} / ${p.project_name} (${p.usage_type})`
+                    ).join('\n'),
+                    actions: [
+                        { label: 'Go to GitLab Settings', href: '/admin/gitlab' },
+                        { label: 'Cancel', close: true }
+                    ]
+                });
+                return;
+            }
+        }
+        
+        // Proceed with status change
+        await fetch(`/api/admin/models/${modelId}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus })
+        });
+    }
+</script>
+```
+
+#### 5. Cascade Check при удалении интеграции
+
+```go
+// При удалении GitLab интеграции - освобождаем модели
+func (s *Service) DeleteIntegration(ctx context.Context, id string) error {
+    // Удаляем все проекты интеграции (модели автоматически "освобождаются")
+    if err := s.store.DeleteProjectsByIntegration(ctx, id); err != nil {
+        return err
+    }
+    
+    // Удаляем интеграцию
+    return s.store.DeleteIntegration(ctx, id)
+}
+```
+
+---
+
 ## 🔐 Security Considerations
 
 1. **Token Storage** - Access tokens шифруются в БД (AES-256-GCM)
@@ -1535,7 +1769,7 @@ func (r *GitLabRateLimiter) Wait(ctx context.Context) error {
 
 | Metric | Value |
 |--------|-------|
-| **Total Tasks** | 93 + 5 subtasks = **98 tasks** |
+| **Total Tasks** | 93 + 6 subtasks = **99 tasks** |
 | **Phases** | 13 (including Phase 5.1 and 9.1) |
 | **Estimated Time** | 120-160 hours |
 | **Priority** | Medium-High |
@@ -1559,6 +1793,8 @@ func (r *GitLabRateLimiter) Wait(ctx context.Context) error {
 - ✅ **API Pagination** для всех списков
 - ✅ **Comment Splitter** для обхода лимитов GitLab
 - ✅ **Rate Limiter** для GitLab API (2000 req/min)
+- ✅ **Model Selection** - только активные модели
+- ✅ **Model Lock** - блокировка деактивации используемых моделей
 
 ---
 

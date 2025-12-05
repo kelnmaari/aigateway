@@ -19,6 +19,11 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	r.logger.Info("Setting up GitLab admin routes")
 
 	gitlabHandler := handlers.NewGitLabAdminHandler(store, r.logger)
+	
+	// Set main DB for model access
+	if r.db != nil {
+		gitlabHandler.SetMainDB(r.db)
+	}
 
 	// GitLab Admin Routes
 	gitlab := r.engine.Group("/api/admin/gitlab")
@@ -74,6 +79,13 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	gitlab.GET("/queue/jobs", gitlabHandler.ListJobs)
 	gitlab.POST("/queue/jobs/:id/cancel", gitlabHandler.CancelJob)
 	gitlab.POST("/queue/jobs/:id/retry", gitlabHandler.RetryJob)
+
+	// ============================================================================
+	// Model Selection (for GitLab project configuration)
+	// ============================================================================
+	gitlab.GET("/models", gitlabHandler.ListActiveModels)
+	gitlab.GET("/models/analysis", gitlabHandler.ListAnalysisModels)
+	gitlab.GET("/models/embedding", gitlabHandler.ListEmbeddingModels)
 
 	r.logger.Info("GitLab admin routes configured successfully")
 

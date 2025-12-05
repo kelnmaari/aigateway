@@ -1223,7 +1223,8 @@ Provide your review as JSON:
 - [x] **GITLAB-007**: Реализовать `PostMRNote`, `PostMRDiscussion` (inline comments)
 - [x] **GITLAB-008**: Реализовать `CreateWebhook`, `DeleteWebhook`
 - [x] **GITLAB-009**: Добавить retry logic и rate limiting
-- [ ] **GITLAB-010**: Написать unit тесты для GitLab client
+- [x] **GITLAB-010**: Написать unit тесты для GitLab client
+  - `internal/gitlab/client/client_test.go` - 10 тест-функций, 20+ тест-кейсов
 
 ### Phase 3: Storage Layer ✅ COMPLETED
 - [x] **GITLAB-011**: Создать `internal/gitlab/storage/interface.go` - интерфейсы хранилища
@@ -1246,7 +1247,9 @@ Provide your review as JSON:
 - [x] **GITLAB-024**: Реализовать per-file analysis (analyzeLargeMR)
 - [x] **GITLAB-025**: Реализовать aggregation результатов (aggregateResults)
 - [x] **GITLAB-026**: Типы для code embeddings (`types.go`)
-- [ ] **GITLAB-027**: ⚠️ Qdrant integration для context retrieval (опционально)
+- [x] **GITLAB-027**: ⚠️ Qdrant integration для context retrieval (опционально)
+  - `internal/gitlab/rag/qdrant.go` - QdrantClient для vector database
+  - `internal/gitlab/rag/service.go` - RAGService для code context retrieval
 
 ### Phase 6: Code Chunking ✅ COMPLETED
 - [x] **GITLAB-028**: Создать `internal/gitlab/chunker/chunker.go` interface
@@ -1263,38 +1266,47 @@ Provide your review as JSON:
 - [x] **GITLAB-043**: Добавить emoji и визуальные индикаторы
 - [x] **GITLAB-044**: ⚠️ Обработка лимитов GitLab (split long comments) - `internal/gitlab/comment/splitter.go`
 
-### Phase 8: Admin API
-- [ ] **GITLAB-045**: Создать `internal/api/handlers/gitlab_admin.go`
-- [ ] **GITLAB-046**: CRUD для integrations
-- [ ] **GITLAB-047**: CRUD для projects
-- [ ] **GITLAB-048**: Endpoint для test connection
-- [ ] **GITLAB-049**: Endpoint для manual webhook setup
-- [ ] **GITLAB-050**: Endpoints для reviews (list, details, retry)
-- [ ] **GITLAB-051**: Добавить роуты в router.go
+### Phase 8: Admin API ✅ COMPLETED
+- [x] **GITLAB-045**: Создать `internal/api/handlers/gitlab_admin.go`
+- [x] **GITLAB-046**: CRUD для integrations
+- [x] **GITLAB-047**: CRUD для projects
+- [x] **GITLAB-048**: Endpoint для test connection
+- [x] **GITLAB-049**: Endpoint для manual webhook setup
+- [x] **GITLAB-050**: Endpoints для reviews (list, details, retry)
+- [x] **GITLAB-051**: Добавить роуты в `internal/api/router/gitlab_routes.go`
 
-### Phase 9: Admin UI (Svelte)
-- [ ] **GITLAB-052**: Создать страницу `/admin/gitlab` - список интеграций
-- [ ] **GITLAB-053**: Создать модалку добавления/редактирования интеграции
-- [ ] **GITLAB-054**: Создать страницу `/admin/gitlab/:id/projects` - список проектов
-- [ ] **GITLAB-055**: Создать модалку настройки проекта:
-  - [ ] **GITLAB-055a**: Выпадающий список Analysis Model (LLM для ревью)
-  - [ ] **GITLAB-055b**: Выпадающий список Embedding Model (для чанкинизации)
-  - [ ] **GITLAB-055c**: Поля Include/Exclude patterns
-  - [ ] **GITLAB-055d**: Textarea для custom prompt
-  - [ ] **GITLAB-055e**: Advanced settings (chunk size, overlap, max files)
-- [ ] **GITLAB-056**: Создать страницу `/admin/gitlab/reviews` - список ревью с пагинацией
-- [ ] **GITLAB-057**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью
-- [ ] **GITLAB-058**: Добавить в sidebar меню "GitLab" (admin only)
-- [ ] **GITLAB-059**: API endpoint для получения списка доступных моделей (только active!)
-- [ ] **GITLAB-059a**: ⚠️ Блокировка деактивации модели используемой в GitLab
+### Phase 9: Admin UI (Svelte) ✅ COMPLETED
+- [x] **GITLAB-052**: Создать страницу `/admin/gitlab` - список интеграций
+- [x] **GITLAB-053**: Создать модалку добавления/редактирования интеграции
+- [x] **GITLAB-054**: Создать страницу `/admin/gitlab/:id/projects` - список проектов
+- [x] **GITLAB-055**: Создать модалку настройки проекта:
+  - [x] **GITLAB-055a**: Выпадающий список Analysis Model (LLM для ревью)
+  - [x] **GITLAB-055b**: Выпадающий список Embedding Model (для чанкинизации)
+  - [x] **GITLAB-055c**: Поля Include/Exclude patterns
+    - UI: textarea с glob patterns (один на строку)
+    - API: передаётся как `settings.include_patterns` / `settings.exclude_patterns`
+  - [x] **GITLAB-055d**: Textarea для custom prompt
+  - [x] **GITLAB-055e**: Advanced settings (chunk size, overlap, max files)
+    - UI: collapsible "Advanced Settings" секция
+    - Поля: chunk_size, chunk_overlap, max_files_per_mr, max_lines_per_file, skip_draft_mrs, skip_bots
+- [x] **GITLAB-056**: Создать страницу `/admin/gitlab/reviews` - список ревью с пагинацией
+- [x] **GITLAB-057**: Создать страницу `/admin/gitlab/reviews/:id` - детали ревью (modal)
+- [x] **GITLAB-058**: Добавить в sidebar меню "GitLab" (admin only)
+- [x] **GITLAB-059**: API endpoint для получения списка доступных моделей (только active!)
+  - `GET /api/admin/gitlab/models` - все активные модели
+  - `GET /api/admin/gitlab/models/analysis` - модели с capability chat
+  - `GET /api/admin/gitlab/models/embedding` - модели с capability embedding
+- [x] **GITLAB-059a**: ⚠️ Блокировка деактивации модели используемой в GitLab
+  - Проверка в `UpdateModel` и `DeleteModel` в registry_handler.go
+  - Возвращает 409 Conflict с информацией о проектах использующих модель
 
-### Phase 9.1: Queue Monitor UI
-- [ ] **GITLAB-060**: Создать компонент `/admin/gitlab/queue` - мониторинг очереди
-- [ ] **GITLAB-061**: Отображение статуса воркеров (active/idle, current job, duration)
-- [ ] **GITLAB-062**: Отображение статистики очереди (pending, processing, completed, failed)
-- [ ] **GITLAB-063**: Таблица pending jobs с возможностью отмены
-- [ ] **GITLAB-064**: Таблица failed jobs с retry/delete
-- [ ] **GITLAB-065**: Auto-refresh каждые 5 секунд (или WebSocket)
+### Phase 9.1: Queue Monitor UI ✅ COMPLETED
+- [x] **GITLAB-060**: Создать компонент `/admin/gitlab/queue` - мониторинг очереди
+- [x] **GITLAB-061**: Отображение статуса воркеров (active/idle, current job, duration)
+- [x] **GITLAB-062**: Отображение статистики очереди (pending, processing, completed, failed)
+- [x] **GITLAB-063**: Таблица pending jobs с возможностью отмены
+- [x] **GITLAB-064**: Таблица failed jobs с retry/delete
+- [x] **GITLAB-065**: Auto-refresh каждые 5 секунд
 
 ### Phase 10: Analysis Queue & Workers ✅ COMPLETED
 - [x] **GITLAB-066**: Создать `internal/gitlab/storage/interface.go` - Store interfaces (включая Queue)

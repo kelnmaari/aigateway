@@ -12,6 +12,7 @@ import (
 	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/models"
+	mainStorage "aigateway/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -19,8 +20,9 @@ import (
 
 // GitLabAdminHandler handles GitLab admin API requests
 type GitLabAdminHandler struct {
-	store  storage.Store
-	logger *logrus.Logger
+	store    storage.Store
+	mainDB   mainStorage.Database // For accessing model registry
+	logger   *logrus.Logger
 }
 
 // NewGitLabAdminHandler creates a new GitLab admin handler
@@ -29,6 +31,11 @@ func NewGitLabAdminHandler(store storage.Store, logger *logrus.Logger) *GitLabAd
 		store:  store,
 		logger: logger,
 	}
+}
+
+// SetMainDB sets the main database for model access
+func (h *GitLabAdminHandler) SetMainDB(db mainStorage.Database) {
+	h.mainDB = db
 }
 
 // ============================================================================
@@ -843,5 +850,163 @@ func getBlockingReason(projects []models.GitLabProjectRef) string {
 func SerializeJSON(data interface{}) string {
 	b, _ := json.Marshal(data)
 	return string(b)
+}
+
+// ============================================================================
+// Model Selection Handlers
+// ============================================================================
+
+// ListActiveModels GET /api/admin/gitlab/models
+// Returns list of active models available for selection in GitLab projects
+func (h *GitLabAdminHandler) ListActiveModels(c *gin.Context) {
+	if h.mainDB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Model database not configured"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	// Get capability filter from query param
+	capability := c.Query("capability")
+	
+	// Build filter for active models
+	filter := &models.ModelRegistryFilter{
+		Status: models.ModelStatusActive,
+	}
+	
+	if capability != "" {
+		filter.Capabilities = []models.ModelCapability{models.ModelCapability(capability)}
+	}
+
+	modelsList, err := h.mainDB.ListModelRegistry(ctx, filter)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list active models")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list models"})
+		return
+	}
+
+	// Convert to simplified response
+	type ModelOption struct {
+		ID           string                   `json:"id"`
+		ModelID      string                   `json:"model_id"`
+		Name         string                   `json:"name"`
+		ProviderID   string                   `json:"provider_id"`
+		Capabilities []models.ModelCapability `json:"capabilities"`
+		Description  string                   `json:"description,omitempty"`
+	}
+
+	options := make([]ModelOption, 0, len(modelsList))
+	for _, m := range modelsList {
+		options = append(options, ModelOption{
+			ID:           m.ID,
+			ModelID:      m.ModelID,
+			Name:         m.ModelName,
+			ProviderID:   m.ProviderID,
+			Capabilities: m.Capabilities,
+			Description:  m.Description,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"models": options,
+		"total":  len(options),
+	})
+}
+
+// ListAnalysisModels GET /api/admin/gitlab/models/analysis
+// Returns models suitable for code analysis (chat capability)
+func (h *GitLabAdminHandler) ListAnalysisModels(c *gin.Context) {
+	if h.mainDB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Model database not configured"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	filter := &models.ModelRegistryFilter{
+		Status:       models.ModelStatusActive,
+		Capabilities: []models.ModelCapability{models.CapabilityChat},
+	}
+
+	modelsList, err := h.mainDB.ListModelRegistry(ctx, filter)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list analysis models")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list models"})
+		return
+	}
+
+	type ModelOption struct {
+		ID          string `json:"id"`
+		ModelID     string `json:"model_id"`
+		Name        string `json:"name"`
+		ProviderID  string `json:"provider_id"`
+		Description string `json:"description,omitempty"`
+	}
+
+	options := make([]ModelOption, 0, len(modelsList))
+	for _, m := range modelsList {
+		options = append(options, ModelOption{
+			ID:          m.ID,
+			ModelID:     m.ModelID,
+			Name:        m.ModelName,
+			ProviderID:  m.ProviderID,
+			Description: m.Description,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"models": options,
+		"total":  len(options),
+	})
+}
+
+// ListEmbeddingModels GET /api/admin/gitlab/models/embedding
+// Returns models suitable for embeddings
+func (h *GitLabAdminHandler) ListEmbeddingModels(c *gin.Context) {
+	if h.mainDB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Model database not configured"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	filter := &models.ModelRegistryFilter{
+		Status:       models.ModelStatusActive,
+		Capabilities: []models.ModelCapability{models.CapabilityEmbeddings},
+	}
+
+	modelsList, err := h.mainDB.ListModelRegistry(ctx, filter)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list embedding models")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list models"})
+		return
+	}
+
+	type ModelOption struct {
+		ID          string `json:"id"`
+		ModelID     string `json:"model_id"`
+		Name        string `json:"name"`
+		ProviderID  string `json:"provider_id"`
+		Description string `json:"description,omitempty"`
+	}
+
+	options := make([]ModelOption, 0, len(modelsList))
+	for _, m := range modelsList {
+		options = append(options, ModelOption{
+			ID:          m.ID,
+			ModelID:     m.ModelID,
+			Name:        m.ModelName,
+			ProviderID:  m.ProviderID,
+			Description: m.Description,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"models": options,
+		"total":  len(options),
+	})
 }
 

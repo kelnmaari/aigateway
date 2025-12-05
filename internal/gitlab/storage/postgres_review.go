@@ -305,7 +305,7 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 			review.NoteID = &noteID.Int64
 		}
 		if discussionID.Valid {
-			review.DiscussionID = discussionID.String
+			review.DiscussionID = &discussionID.String
 		}
 		if processingTime.Valid {
 			review.ProcessingTimeMs = processingTime.Int64
@@ -325,9 +325,7 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 		if projectName.Valid {
 			review.ProjectName = projectName.String
 		}
-		if pathWithNS.Valid {
-			review.ProjectPath = pathWithNS.String
-		}
+		// pathWithNS is not stored in review
 
 		reviews = append(reviews, review)
 	}
@@ -396,7 +394,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 		INSERT INTO gitlab_analysis_jobs (
 			id, review_id, integration_id, project_id, mr_iid,
 			status, priority, worker_id, config,
-			retry_count, max_retries, next_retry_at, error,
+			retry_count, max_retries, next_retry_at, last_error,
 			created_at, updated_at, started_at, completed_at
 		) VALUES (
 			$1, $2, $3, $4, $5,
@@ -419,7 +417,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 		job.RetryCount,
 		job.MaxRetries,
 		job.NextRetryAt,
-		job.Error,
+		job.LastError,
 		job.CreatedAt,
 		job.UpdatedAt,
 		job.StartedAt,
@@ -436,13 +434,11 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 	query := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
 		       j.status, j.priority, j.worker_id, j.config,
-		       j.retry_count, j.max_retries, j.next_retry_at, j.error,
+		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
 		       j.created_at, j.updated_at, j.started_at, j.completed_at,
-		       r.mr_title, r.mr_author, r.source_branch, r.target_branch,
-		       p.name as project_name
+		       r.mr_title
 		FROM gitlab_analysis_jobs j
 		LEFT JOIN gitlab_mr_reviews r ON r.id = j.review_id
-		LEFT JOIN gitlab_projects p ON p.id = j.project_id
 		WHERE j.id = $1
 	`
 
@@ -454,10 +450,6 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
 	var mrTitle sql.NullString
-	var mrAuthor sql.NullString
-	var sourceBranch sql.NullString
-	var targetBranch sql.NullString
-	var projectName sql.NullString
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&job.ID,
@@ -478,10 +470,6 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 		&startedAt,
 		&completedAt,
 		&mrTitle,
-		&mrAuthor,
-		&sourceBranch,
-		&targetBranch,
-		&projectName,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -491,7 +479,7 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 	}
 
 	if workerID.Valid {
-		job.WorkerID = workerID.String
+		job.WorkerID = &workerID.String
 	}
 	if configJSON.Valid && configJSON.String != "" {
 		if err := json.Unmarshal([]byte(configJSON.String), &job.Config); err != nil {
@@ -502,7 +490,7 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 		job.NextRetryAt = &nextRetryAt.Time
 	}
 	if errStr.Valid {
-		job.Error = errStr.String
+		job.LastError = errStr.String
 	}
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
@@ -513,18 +501,6 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 	if mrTitle.Valid {
 		job.MRTitle = mrTitle.String
 	}
-	if mrAuthor.Valid {
-		job.MRAuthor = mrAuthor.String
-	}
-	if sourceBranch.Valid {
-		job.SourceBranch = sourceBranch.String
-	}
-	if targetBranch.Valid {
-		job.TargetBranch = targetBranch.String
-	}
-	if projectName.Valid {
-		job.ProjectName = projectName.String
-	}
 
 	return &job, nil
 }
@@ -533,7 +509,7 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 	query := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
 		       j.status, j.priority, j.worker_id, j.config,
-		       j.retry_count, j.max_retries, j.next_retry_at, j.error,
+		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
 		       j.created_at, j.updated_at, j.started_at, j.completed_at
 		FROM gitlab_analysis_jobs j
 		WHERE j.review_id = $1
@@ -576,7 +552,7 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 	}
 
 	if workerID.Valid {
-		job.WorkerID = workerID.String
+		job.WorkerID = &workerID.String
 	}
 	if configJSON.Valid && configJSON.String != "" {
 		if err := json.Unmarshal([]byte(configJSON.String), &job.Config); err != nil {
@@ -587,7 +563,7 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 		job.NextRetryAt = &nextRetryAt.Time
 	}
 	if errStr.Valid {
-		job.Error = errStr.String
+		job.LastError = errStr.String
 	}
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
@@ -604,7 +580,7 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	query := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
 		       j.status, j.priority, j.worker_id, j.config,
-		       j.retry_count, j.max_retries, j.next_retry_at, j.error,
+		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
 		       j.created_at, j.updated_at, j.started_at, j.completed_at,
 		       r.mr_title, r.mr_author, r.source_branch, r.target_branch,
 		       p.name as project_name, p.analysis_model_id, p.embedding_model_id, p.review_prompt
@@ -668,7 +644,7 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	}
 
 	if workerID.Valid {
-		job.WorkerID = workerID.String
+		job.WorkerID = &workerID.String
 	}
 	if configJSON.Valid && configJSON.String != "" {
 		if err := json.Unmarshal([]byte(configJSON.String), &job.Config); err != nil {
@@ -679,7 +655,7 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 		job.NextRetryAt = &nextRetryAt.Time
 	}
 	if errStr.Valid {
-		job.Error = errStr.String
+		job.LastError = errStr.String
 	}
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
@@ -742,7 +718,7 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 	query := fmt.Sprintf(`
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
 		       j.status, j.priority, j.worker_id, j.config,
-		       j.retry_count, j.max_retries, j.next_retry_at, j.error,
+		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
 		       j.created_at, j.updated_at, j.started_at, j.completed_at,
 		       r.mr_title, r.mr_author, r.source_branch, r.target_branch,
 		       p.name as project_name
@@ -811,7 +787,7 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 		}
 
 		if workerID.Valid {
-			job.WorkerID = workerID.String
+			job.WorkerID = &workerID.String
 		}
 		if configJSON.Valid && configJSON.String != "" {
 			if err := json.Unmarshal([]byte(configJSON.String), &job.Config); err != nil {
@@ -822,7 +798,7 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 			job.NextRetryAt = &nextRetryAt.Time
 		}
 		if errStr.Valid {
-			job.Error = errStr.String
+			job.LastError = errStr.String
 		}
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time

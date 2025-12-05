@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -23,14 +24,16 @@ type WebhookHandler interface {
 type GitLabWebhookHandler struct {
 	handler       *webhook.Handler
 	webhookSecret string
+	integrationID string // Default integration ID
 	logger        *logrus.Logger
 }
 
 // NewGitLabWebhookHandler creates a new GitLab webhook handler
-func NewGitLabWebhookHandler(handler *webhook.Handler, webhookSecret string, logger *logrus.Logger) *GitLabWebhookHandler {
+func NewGitLabWebhookHandler(handler *webhook.Handler, webhookSecret, integrationID string, logger *logrus.Logger) *GitLabWebhookHandler {
 	return &GitLabWebhookHandler{
 		handler:       handler,
 		webhookSecret: webhookSecret,
+		integrationID: integrationID,
 		logger:        logger,
 	}
 }
@@ -82,14 +85,33 @@ func (h *GitLabWebhookHandler) HandleWebhook(c *gin.Context) {
 		"content_length": len(body),
 	}).Info("Received GitLab webhook")
 
-	// Process webhook
-	if err := h.handler.HandleWebhook(c.Request.Context(), eventType, body); err != nil {
-		h.logger.WithError(err).Error("Failed to process webhook")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process webhook"})
-		return
+	// Get integration ID from path or use default
+	integrationID := c.Param("integration_id")
+	if integrationID == "" {
+		integrationID = h.integrationID
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	// Create response writer wrapper
+	rw := &responseRecorder{ResponseWriter: c.Writer}
+	
+	// Restore body for handler
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	
+	// Process webhook via internal handler
+	h.handler.HandleWebhook(rw, c.Request, integrationID)
+
+	// Response already sent by handler
+}
+
+// responseRecorder wraps http.ResponseWriter to capture status
+type responseRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseRecorder) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
 }
 
 // verifyHMACSignature verifies the HMAC-SHA256 signature

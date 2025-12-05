@@ -476,3 +476,36 @@ func (c *Client) GetWebhook(ctx context.Context, projectID int64, webhookID int6
 	return &webhook, nil
 }
 
+// ============================================================================
+// User API
+// ============================================================================
+
+// GetCurrentUser returns the currently authenticated user
+func (c *Client) GetCurrentUser(ctx context.Context) (*User, error) {
+	path := "/user"
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var user User
+	if err := c.parseResponse(resp, &user); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	return &user, nil
+}
+
+// CreateProjectWebhook creates a webhook for a GitLab project with MR events enabled
+func (c *Client) CreateProjectWebhook(ctx context.Context, projectID int64, webhookURL, secret string) (*Webhook, error) {
+	req := &CreateWebhookRequest{
+		URL:                   webhookURL,
+		MergeRequestsEvents:   true,
+		PushEvents:            false,
+		Token:                 secret,
+		EnableSSLVerification: true,
+	}
+	return c.CreateWebhook(ctx, projectID, req)
+}
+

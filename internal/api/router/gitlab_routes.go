@@ -3,7 +3,8 @@ package router
 
 import (
 	"aigateway/internal/api/handlers"
-	authMiddleware "aigateway/internal/api/middleware"
+	"aigateway/internal/api/middleware"
+	authMiddleware "aigateway/internal/auth/middleware"
 	"aigateway/internal/gitlab/storage"
 )
 
@@ -26,7 +27,7 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	if r.jwtManager != nil && r.db != nil {
 		r.logger.Info("GitLab routes: Using JWT authentication with admin role check")
 		gitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
-		gitlab.Use(authMiddleware.RequireAdmin(r.db, r.logger))
+		gitlab.Use(middleware.RequireAdmin(r.db, r.logger))
 	} else if r.config.Auth.Enabled && r.authenticator != nil {
 		r.logger.Info("GitLab routes: Using API Key authentication (legacy)")
 		gitlab.Use(r.authenticator.AuthenticationMiddleware())
@@ -83,7 +84,7 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	admin := r.engine.Group("/api/admin")
 	if r.jwtManager != nil && r.db != nil {
 		admin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
-		admin.Use(authMiddleware.RequireAdmin(r.db, r.logger))
+		admin.Use(middleware.RequireAdmin(r.db, r.logger))
 	}
 	
 	admin.GET("/models/:id/gitlab-usage", gitlabHandler.GetModelUsage)

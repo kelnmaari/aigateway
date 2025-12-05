@@ -334,6 +334,15 @@ type GitLabAnalysisJob struct {
 	
 	// Config (JSON)
 	Config        *GitLabJobConfig      `json:"config,omitempty" db:"config"`
+	
+	// Computed fields from joins (not stored in jobs table)
+	MRAuthor        string `json:"mr_author,omitempty" db:"-"`
+	SourceBranch    string `json:"source_branch,omitempty" db:"-"`
+	TargetBranch    string `json:"target_branch,omitempty" db:"-"`
+	ProjectName     string `json:"project_name,omitempty" db:"-"`
+	AnalysisModelID string `json:"analysis_model_id,omitempty" db:"-"`
+	EmbeddingModelID string `json:"embedding_model_id,omitempty" db:"-"`
+	ReviewPrompt    string `json:"review_prompt,omitempty" db:"-"`
 }
 
 // GitLabJobConfig configuration for analysis job
@@ -361,6 +370,7 @@ func (c *GitLabJobConfig) Scan(value interface{}) error {
 		bytes = []byte(str)
 	}
 	return json.Unmarshal(bytes, c)
+}
 
 // GitLabJobStatus represents the status of an analysis job
 type GitLabJobStatus string
@@ -380,17 +390,29 @@ const (
 
 // GitLabWebhookEvent represents a received webhook event
 type GitLabWebhookEvent struct {
-	ID            string    `json:"id" db:"id"`
-	IntegrationID string    `json:"integration_id" db:"integration_id"`
-	ProjectID     int64     `json:"project_id" db:"project_id"`
-	MRIID         int       `json:"mr_iid" db:"mr_iid"`
-	EventType     string    `json:"event_type" db:"event_type"`     // "merge_request"
-	Action        string    `json:"action" db:"action"`             // "open", "update", "reopen"
-	ObjectID      int64     `json:"object_id" db:"object_id"`       // GitLab object_attributes.id
-	ReceivedAt    time.Time `json:"received_at" db:"received_at"`
-	ProcessedAt   *time.Time `json:"processed_at,omitempty" db:"processed_at"`
-	Deduplicated  bool      `json:"deduplicated" db:"deduplicated"` // Was this a duplicate?
+	ID            string               `json:"id" db:"id"`
+	IntegrationID string               `json:"integration_id" db:"integration_id"`
+	ProjectID     int64                `json:"project_id" db:"project_id"`
+	MRIID         int                  `json:"mr_iid" db:"mr_iid"`
+	EventType     string               `json:"event_type" db:"event_type"`     // "merge_request"
+	Action        string               `json:"action" db:"action"`             // "open", "update", "reopen"
+	ObjectID      int64                `json:"object_id" db:"object_id"`       // GitLab object_attributes.id
+	Payload       string               `json:"payload,omitempty" db:"payload"` // JSON payload
+	Status        GitLabWebhookStatus  `json:"status" db:"status"`
+	ReceivedAt    time.Time            `json:"received_at" db:"received_at"`
+	ProcessedAt   *time.Time           `json:"processed_at,omitempty" db:"processed_at"`
+	Deduplicated  bool                 `json:"deduplicated" db:"deduplicated"` // Was this a duplicate?
 }
+
+// GitLabWebhookStatus represents the status of a webhook event
+type GitLabWebhookStatus string
+
+const (
+	GitLabWebhookStatusPending     GitLabWebhookStatus = "pending"
+	GitLabWebhookStatusProcessed   GitLabWebhookStatus = "processed"
+	GitLabWebhookStatusDeduplicated GitLabWebhookStatus = "deduplicated"
+	GitLabWebhookStatusFailed      GitLabWebhookStatus = "failed"
+)
 
 // ============================================================================
 // Request/Response types for API
@@ -520,5 +542,6 @@ type GitLabQueueStats struct {
 	AvgProcessingTimeMs int64 `json:"avg_processing_time_ms"`
 	JobsLastHour        int   `json:"jobs_last_hour"`
 	JobsLast24Hours     int   `json:"jobs_last_24_hours"`
+	CompletedToday      int   `json:"completed_today"`
 }
 

@@ -258,7 +258,7 @@ func (h *GitLabAdminHandler) TestIntegration(c *gin.Context) {
 	}
 
 	// Test connection
-	gitlabClient := client.NewClient(client.Config{
+	gitlabClient := client.NewClient(client.ClientConfig{
 		BaseURL:     integration.BaseURL,
 		AccessToken: integration.AccessToken,
 	})
@@ -391,7 +391,7 @@ func (h *GitLabAdminHandler) AddProject(c *gin.Context) {
 	}
 
 	// Fetch project info from GitLab
-	gitlabClient := client.NewClient(client.Config{
+	gitlabClient := client.NewClient(client.ClientConfig{
 		BaseURL:     integration.BaseURL,
 		AccessToken: integration.AccessToken,
 	})
@@ -536,7 +536,7 @@ func (h *GitLabAdminHandler) SetupWebhook(c *gin.Context) {
 	}
 
 	// Create webhook on GitLab
-	gitlabClient := client.NewClient(client.Config{
+	gitlabClient := client.NewClient(client.ClientConfig{
 		BaseURL:     integration.BaseURL,
 		AccessToken: integration.AccessToken,
 	})
@@ -661,7 +661,7 @@ func (h *GitLabAdminHandler) RetryReview(c *gin.Context) {
 		ProjectID:     review.ProjectID,
 		MRIID:         review.MRIID,
 		Status:        models.GitLabJobStatusPending,
-		Priority:      0,
+		Priority:      models.GitLabReviewPriorityNormal,
 		MaxRetries:    3,
 	}
 

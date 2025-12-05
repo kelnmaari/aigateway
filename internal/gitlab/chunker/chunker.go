@@ -359,7 +359,6 @@ func parseFunctions(content, lang string) []FunctionInfo {
 		return nil
 	}
 	
-	lines := strings.Split(content, "\n")
 	functions := make([]FunctionInfo, 0, len(matches))
 	
 	for i, match := range matches {

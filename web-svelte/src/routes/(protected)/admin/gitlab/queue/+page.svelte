@@ -13,7 +13,9 @@
 		Pause,
 		Server,
 		ArrowLeft,
-		RotateCcw
+		RotateCcw,
+		Wifi,
+		WifiOff
 	} from 'lucide-svelte';
 	import { gitlabApi, type GitLabQueueStats, type GitLabJob } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime } from '$lib/utils';
@@ -26,6 +28,12 @@
 	let autoRefresh = $state(true);
 	let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
+	// WebSocket
+	let ws: WebSocket | null = null;
+	let wsConnected = $state(false);
+	let wsEnabled = $state(true);
+	let recentEvents = $state<{ type: string; data: any; time: Date }[]>([]);
+
 	// Filters
 	let statusFilter = $state('');
 
@@ -36,11 +44,98 @@
 	onMount(async () => {
 		await loadAll();
 		startAutoRefresh();
+		if (wsEnabled) connectWebSocket();
 	});
 
 	onDestroy(() => {
 		stopAutoRefresh();
+		disconnectWebSocket();
 	});
+
+	function connectWebSocket() {
+		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		const wsUrl = `${protocol}//${window.location.host}/api/admin/gitlab/ws`;
+		
+		try {
+			ws = new WebSocket(wsUrl);
+			
+			ws.onopen = () => {
+				wsConnected = true;
+				// Subscribe to queue events
+				ws?.send(JSON.stringify({
+					type: 'subscribe',
+					filters: { event_types: ['job_created', 'job_started', 'job_completed', 'job_failed', 'stats'] }
+				}));
+			};
+			
+			ws.onmessage = (event) => {
+				try {
+					const msg = JSON.parse(event.data);
+					handleWebSocketMessage(msg);
+				} catch (e) {
+					console.error('Failed to parse WebSocket message:', e);
+				}
+			};
+			
+			ws.onclose = () => {
+				wsConnected = false;
+				// Reconnect after 5 seconds
+				if (wsEnabled) {
+					setTimeout(connectWebSocket, 5000);
+				}
+			};
+			
+			ws.onerror = () => {
+				wsConnected = false;
+			};
+		} catch (e) {
+			console.error('WebSocket connection failed:', e);
+		}
+	}
+
+	function disconnectWebSocket() {
+		if (ws) {
+			ws.close();
+			ws = null;
+		}
+	}
+
+	function handleWebSocketMessage(msg: { type: string; event: string; data: any }) {
+		// Add to recent events
+		recentEvents = [{ type: msg.event, data: msg.data, time: new Date() }, ...recentEvents.slice(0, 9)];
+		
+		switch (msg.type) {
+			case 'stats':
+				if (msg.data) {
+					stats = { ...stats, ...msg.data };
+				}
+				break;
+			case 'job_created':
+			case 'job_started':
+			case 'job_completed':
+			case 'job_failed':
+				// Update job in list or add it
+				if (msg.data?.job_id) {
+					const idx = jobs.findIndex(j => j.id === msg.data.job_id);
+					if (idx >= 0) {
+						jobs[idx] = { ...jobs[idx], ...msg.data, status: msg.data.status };
+						jobs = [...jobs];
+					} else if (msg.type === 'job_created') {
+						loadJobs(); // Reload to get new job
+					}
+				}
+				break;
+		}
+	}
+
+	function toggleWebSocket() {
+		wsEnabled = !wsEnabled;
+		if (wsEnabled) {
+			connectWebSocket();
+		} else {
+			disconnectWebSocket();
+		}
+	}
 
 	function startAutoRefresh() {
 		if (refreshInterval) return;
@@ -159,6 +254,21 @@
 			</div>
 		</div>
 		<div class="flex items-center gap-2">
+			<!-- WebSocket Status -->
+			<Button
+				variant={wsEnabled ? (wsConnected ? 'default' : 'outline') : 'outline'}
+				size="sm"
+				onclick={toggleWebSocket}
+				title={wsConnected ? 'Connected - Click to disconnect' : 'Disconnected - Click to connect'}
+			>
+				{#if wsConnected}
+					<Wifi class="mr-2 h-4 w-4 text-green-500" />
+					Live
+				{:else}
+					<WifiOff class="mr-2 h-4 w-4" />
+					{wsEnabled ? 'Connecting...' : 'Offline'}
+				{/if}
+			</Button>
 			<Button
 				variant={autoRefresh ? 'default' : 'outline'}
 				size="sm"
@@ -399,5 +509,35 @@
 			{/if}
 		{/if}
 	</div>
+
+	<!-- Real-time Events -->
+	{#if wsConnected && recentEvents.length > 0}
+		<div class="rounded-lg border bg-card p-4">
+			<h3 class="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+				<Wifi class="h-4 w-4 text-green-500" />
+				Live Events
+			</h3>
+			<div class="space-y-2 max-h-48 overflow-y-auto">
+				{#each recentEvents as event}
+					<div class="flex items-center gap-3 text-sm py-1 border-b border-muted last:border-0">
+						<span class={cn(
+							'w-2 h-2 rounded-full',
+							event.type === 'job_completed' && 'bg-green-500',
+							event.type === 'job_failed' && 'bg-red-500',
+							event.type === 'job_started' && 'bg-blue-500',
+							event.type === 'job_created' && 'bg-yellow-500'
+						)}></span>
+						<span class="capitalize">{event.type.replace('_', ' ')}</span>
+						{#if event.data?.mr_iid}
+							<span class="text-muted-foreground">MR !{event.data.mr_iid}</span>
+						{/if}
+						<span class="text-xs text-muted-foreground ml-auto">
+							{event.time.toLocaleTimeString()}
+						</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>
 

@@ -27,8 +27,16 @@ type Handler struct {
 	debounce    *Debouncer
 	debounceMs  int
 
+	// Rate limiter for webhook flood protection
+	rateLimiter WebhookRateLimiter
+
 	// Job enqueue function (injected)
 	enqueueJob func(ctx context.Context, job *models.GitLabAnalysisJob) error
+}
+
+// WebhookRateLimiter interface for rate limiting webhooks
+type WebhookRateLimiter interface {
+	Allow(integrationID string) bool
 }
 
 // Config holds handler configuration
@@ -56,9 +64,23 @@ func (h *Handler) SetEnqueueFunc(fn func(ctx context.Context, job *models.GitLab
 	h.enqueueJob = fn
 }
 
+// SetRateLimiter sets the rate limiter
+func (h *Handler) SetRateLimiter(rl WebhookRateLimiter) {
+	h.rateLimiter = rl
+}
+
 // HandleWebhook handles incoming GitLab webhook requests
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request, integrationID string) {
 	ctx := r.Context()
+
+	// Rate limit check (per integration)
+	if h.rateLimiter != nil && !h.rateLimiter.Allow(integrationID) {
+		http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+		return
+	}
+
+	// Limit body size to prevent abuse
+	r.Body = http.MaxBytesReader(w, r.Body, 1*1024*1024) // 1MB max
 
 	// Get integration
 	integration, err := h.store.GetIntegration(ctx, integrationID)

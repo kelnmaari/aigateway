@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/pandodao/ollama-openai-proxy/internal/gitlab/storage"
+	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/models"
 )
 
@@ -266,11 +266,11 @@ func (w *Worker) processNextJob() {
 		"mr_iid":    job.MRIID,
 	}).Info("Processing job")
 
-	// Process with timeout
+	// Process with timeout and panic recovery
 	jobCtx, cancel := context.WithTimeout(ctx, w.pool.config.JobTimeout)
 	defer cancel()
 
-	err = w.pool.processor.ProcessJob(jobCtx, job)
+	err = w.safeProcessJob(jobCtx, job)
 	if err != nil {
 		w.handleJobError(ctx, job, err)
 		return
@@ -286,6 +286,21 @@ func (w *Worker) processNextJob() {
 		"worker_id": w.workerID,
 		"job_id":    job.ID,
 	}).Info("Job completed")
+}
+
+// safeProcessJob processes a job with panic recovery
+func (w *Worker) safeProcessJob(ctx context.Context, job *models.GitLabAnalysisJob) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			w.pool.logger.WithFields(logrus.Fields{
+				"worker_id": w.workerID,
+				"job_id":    job.ID,
+				"panic":     r,
+			}).Error("Panic recovered during job processing")
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+	return w.pool.processor.ProcessJob(ctx, job)
 }
 
 // handleJobError handles job failure and retry logic

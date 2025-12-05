@@ -25,8 +25,11 @@ type IntegrationStore interface {
 	// GetIntegration retrieves an integration by ID
 	GetIntegration(ctx context.Context, id string) (*models.GitLabIntegration, error)
 	
-	// ListIntegrations lists integrations with filtering
+	// ListIntegrations lists integrations with filtering (admin)
 	ListIntegrations(ctx context.Context, req *models.GitLabIntegrationListRequest) ([]models.GitLabIntegration, int, error)
+	
+	// ListIntegrationsByOwner lists integrations owned by a user
+	ListIntegrationsByOwner(ctx context.Context, ownerID string) ([]*models.GitLabIntegration, error)
 	
 	// UpdateIntegration updates an integration
 	UpdateIntegration(ctx context.Context, id string, req *models.UpdateGitLabIntegrationRequest) error
@@ -55,6 +58,9 @@ type ProjectStore interface {
 	// ListProjects lists projects with filtering
 	ListProjects(ctx context.Context, req *models.GitLabProjectListRequest) ([]models.GitLabProject, int, error)
 	
+	// ListProjectsByIntegration lists projects for a specific integration
+	ListProjectsByIntegration(ctx context.Context, integrationID string) ([]*models.GitLabProject, error)
+	
 	// UpdateProject updates a project
 	UpdateProject(ctx context.Context, id string, req *models.UpdateGitLabProjectRequest) error
 	
@@ -78,6 +84,9 @@ type ReviewStore interface {
 	
 	// GetReviewByMR retrieves a review by project and MR IID
 	GetReviewByMR(ctx context.Context, projectID string, mrIID int) (*models.GitLabMRReview, error)
+	
+	// ListReviewsByIntegration lists reviews for an integration
+	ListReviewsByIntegration(ctx context.Context, integrationID string) ([]*models.GitLabMRReview, error)
 	
 	// ListReviews lists reviews with filtering
 	ListReviews(ctx context.Context, req *models.GitLabReviewListRequest) ([]models.GitLabMRReview, int, error)

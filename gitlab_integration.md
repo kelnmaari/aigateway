@@ -1320,27 +1320,56 @@ Provide your review as JSON:
 - [x] **GITLAB-074**: Добавить job priority (urgent for main branch)
 - [x] **GITLAB-075**: Добавить job timeout handling
 - [x] **GITLAB-076**: Добавить queue cleanup (старые completed/failed jobs)
-- [ ] **GITLAB-077**: Добавить Prometheus metrics для очереди
+- [x] **GITLAB-077**: Добавить Prometheus metrics для очереди
+  - `internal/gitlab/metrics/prometheus.go` - полный набор метрик
 
 ### Phase 11: Testing & Documentation
-- [ ] **GITLAB-078**: Integration тесты с mock GitLab server
-- [ ] **GITLAB-079**: E2E тест полного flow: webhook → queue → analysis → comment
-- [ ] **GITLAB-080**: Load test очереди (100+ concurrent webhooks)
-- [ ] **GITLAB-081**: Тест split комментариев при превышении лимита
-- [ ] **GITLAB-082**: Документация API endpoints (с пагинацией)
-- [ ] **GITLAB-083**: Документация по настройке GitLab webhook
-- [ ] **GITLAB-084**: README с примерами использования
+- [x] **GITLAB-078**: Integration тесты с mock GitLab server
+  - `internal/gitlab/testing/mock_server.go` - Mock GitLab API server
+  - `internal/gitlab/testing/integration_test.go` - Integration tests
+- [x] **GITLAB-079**: E2E тест полного flow: webhook → queue → analysis → comment
+  - `internal/gitlab/testing/e2e_test.go` - E2E tests
+- [x] **GITLAB-080**: Load test очереди (100+ concurrent webhooks)
+  - `internal/gitlab/testing/load_test.go` - Load tests (skip with -short)
+- [x] **GITLAB-081**: Тест split комментариев при превышении лимита
+  - `internal/gitlab/comment/splitter_test.go` - Splitter unit tests
+  - Исправлен баг с обновлением footer при динамическом количестве частей
+- [x] **GITLAB-082**: Документация API endpoints (с пагинацией)
+  - `docs/gitlab-api.md` - полная документация API с примерами
+- [x] **GITLAB-083**: Документация по настройке GitLab webhook
+  - `docs/gitlab-webhook-setup.md` - пошаговая инструкция
+- [x] **GITLAB-084**: README с примерами использования
+  - `docs/gitlab-readme.md` - обзор, quick start, примеры
 
 ### Phase 12: Enhancements (Future)
-- [ ] **GITLAB-085**: Поддержка GitHub (дополнительно к GitLab)
-- [ ] **GITLAB-086**: Поддержка Bitbucket
-- [ ] **GITLAB-087**: Custom prompts per language
-- [ ] **GITLAB-088**: Integration с Slack/Teams для нотификаций
-- [ ] **GITLAB-089**: Статистика и аналитика по ревью
-- [ ] **GITLAB-090**: Обучение на feedback (approve/reject комментариев)
-- [ ] **GITLAB-091**: Auto-suggest optimal models based on codebase language
-- [ ] **GITLAB-092**: Priority queue для main/release branches
-- [ ] **GITLAB-093**: WebSocket для real-time queue updates
+- [x] **GITLAB-085**: Поддержка GitHub (дополнительно к GitLab)
+  - `internal/git/provider/interface.go` - Unified provider interface
+  - `internal/git/provider/github/client.go` - GitHub API client
+  - `internal/git/provider/github/types.go` - GitHub types
+- [x] **GITLAB-086**: Поддержка Bitbucket
+  - `internal/git/provider/bitbucket/client.go` - Bitbucket API client
+  - `internal/git/provider/bitbucket/types.go` - Bitbucket types
+- [x] **GITLAB-087**: Custom prompts per language
+  - `internal/gitlab/analyzer/language_prompts.go` - Language-specific prompts
+  - Поддержка: Go, TypeScript, JavaScript, Python, Rust, Java, C/C++, SQL, Shell, YAML, Dockerfile, Terraform
+- [x] **GITLAB-088**: Integration с Telegram для нотификаций
+  - `internal/notifications/telegram/client.go` - Telegram Bot API client
+  - `internal/notifications/telegram/notifier.go` - Review notifier service
+- [x] **GITLAB-089**: Статистика и аналитика по ревью
+  - `internal/gitlab/analytics/service.go` - Analytics service with dashboard
+  - Metrics: по проектам, моделям, пользователям, категориям, trends
+- [x] **GITLAB-090**: Обучение на feedback (approve/reject комментариев)
+  - `internal/gitlab/feedback/service.go` - Feedback collection service
+  - Training data export, few-shot examples, model quality metrics
+- [x] **GITLAB-091**: Auto-suggest optimal models based on codebase language
+  - `internal/gitlab/model_suggest/service.go` - Model suggestion service
+  - Scoring: language fit, quality, speed, context size, feedback
+- [x] **GITLAB-092**: Priority queue для main/release branches
+  - `internal/gitlab/queue/priority.go` - Priority queue with branch rules
+  - Default rules: main/master=Critical, release/hotfix=High, feature=Normal, wip=Low
+- [x] **GITLAB-093**: WebSocket для real-time queue updates
+  - `internal/gitlab/realtime/websocket.go` - WebSocket hub and client management
+  - Events: job_created, job_started, job_completed, job_failed, worker_status, stats
 
 ---
 

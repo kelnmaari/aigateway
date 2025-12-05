@@ -13,6 +13,8 @@ import (
 // GitLabIntegration represents a connection to a GitLab instance
 type GitLabIntegration struct {
 	ID            string                   `json:"id" db:"id"`
+	OwnerID       string                   `json:"owner_id" db:"owner_id"`     // User who created the integration
+	TenantID      string                   `json:"tenant_id,omitempty" db:"tenant_id"` // Optional: shared within tenant
 	Name          string                   `json:"name" db:"name"`
 	BaseURL       string                   `json:"base_url" db:"base_url"`
 	AccessToken   string                   `json:"-" db:"access_token"`        // Encrypted, never exposed

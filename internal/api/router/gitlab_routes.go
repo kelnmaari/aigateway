@@ -8,6 +8,55 @@ import (
 	"aigateway/internal/gitlab/storage"
 )
 
+// SetupGitLabUserRoutes registers user-level GitLab routes (for regular users)
+func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
+	if store == nil {
+		r.logger.Warn("GitLab user routes: Store is nil, skipping setup")
+		return
+	}
+
+	r.logger.Info("Setting up GitLab user routes")
+
+	userHandler := handlers.NewGitLabUserHandler(store, r.logger)
+
+	// User-level GitLab Routes (authenticated users, not admin)
+	gitlab := r.engine.Group("/api/gitlab")
+
+	// Apply user authentication (not admin)
+	if r.jwtManager != nil && r.db != nil {
+		gitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		// No RequireAdmin - regular authenticated users can access
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		gitlab.Use(r.authenticator.AuthenticationMiddleware())
+	}
+
+	// ============================================================================
+	// User's Integrations
+	// ============================================================================
+	gitlab.GET("/integrations", userHandler.ListMyIntegrations)
+	gitlab.POST("/integrations", userHandler.CreateMyIntegration)
+	gitlab.GET("/integrations/:id", userHandler.GetMyIntegration)
+	gitlab.PUT("/integrations/:id", userHandler.UpdateMyIntegration)
+	gitlab.DELETE("/integrations/:id", userHandler.DeleteMyIntegration)
+
+	// ============================================================================
+	// User's Projects (within their integrations)
+	// ============================================================================
+	gitlab.GET("/integrations/:id/projects", userHandler.ListMyProjects)
+	gitlab.POST("/integrations/:id/projects", userHandler.AddMyProject)
+	gitlab.GET("/projects/:project_id", userHandler.GetMyProject)
+	gitlab.PUT("/projects/:project_id", userHandler.UpdateMyProject)
+	gitlab.DELETE("/projects/:project_id", userHandler.DeleteMyProject)
+
+	// ============================================================================
+	// User's Reviews
+	// ============================================================================
+	gitlab.GET("/reviews", userHandler.ListMyReviews)
+	gitlab.GET("/reviews/:id", userHandler.GetMyReview)
+
+	r.logger.Info("GitLab user routes configured: /api/gitlab/*")
+}
+
 // SetupGitLabRoutes registers GitLab admin API routes
 // Call this method from main.go after creating Router if GitLab is enabled
 func (r *Router) SetupGitLabRoutes(store storage.Store) {

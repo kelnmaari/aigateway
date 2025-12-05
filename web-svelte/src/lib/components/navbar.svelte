@@ -22,7 +22,8 @@
 		ChevronDown,
 		FolderOpen,
 		Database,
-		Server
+		Server,
+		GitBranch
 	} from 'lucide-svelte';
 
 	const STORAGE_KEY = 'PARAGLIDE_LOCALE';
@@ -37,7 +38,8 @@
 		{ href: '/tenants', label: () => m.nav_tenants(), icon: Building2 },
 		{ href: '/files', label: () => m.nav_files(), icon: FolderOpen },
 		{ href: '/rag', label: () => m.nav_rag(), icon: Database },
-		{ href: '/mcp', label: () => m.nav_mcp(), icon: Server } // Read-only catalog for users
+		{ href: '/mcp', label: () => m.nav_mcp(), icon: Server },
+		{ href: '/gitlab', label: () => 'GitLab', icon: GitBranch }
 	];
 
 	// Admin-only menu items

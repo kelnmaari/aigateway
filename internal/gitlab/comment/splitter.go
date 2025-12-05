@@ -120,12 +120,19 @@ func (s *Splitter) Split(content string) []string {
 		}
 	}
 
-	// Update total parts count in all headers (if different from estimate)
-	if len(parts) != totalParts {
+	// Update total parts count in all headers and footers (if different from estimate)
+	actualTotal := len(parts)
+	if actualTotal != totalParts {
 		for i := range parts {
+			// Update header
 			oldHeader := s.partHeader(i+1, totalParts)
-			newHeader := s.partHeader(i+1, len(parts))
+			newHeader := s.partHeader(i+1, actualTotal)
 			parts[i] = strings.Replace(parts[i], oldHeader, newHeader, 1)
+			
+			// Update footer (especially important for last part)
+			oldFooter := s.partFooter(i+1, totalParts)
+			newFooter := s.partFooter(i+1, actualTotal)
+			parts[i] = strings.Replace(parts[i], oldFooter, newFooter, 1)
 		}
 	}
 
@@ -177,6 +184,12 @@ func (s *Splitter) estimateTotalParts(contentLen int) int {
 	}
 	// Account for headers/footers in estimation
 	effectiveMax := s.maxLength - 200 // ~200 chars for header+footer
+	if effectiveMax <= 0 {
+		effectiveMax = s.maxLength / 2
+		if effectiveMax <= 0 {
+			effectiveMax = 1
+		}
+	}
 	parts := (contentLen + effectiveMax - 1) / effectiveMax
 	return parts
 }

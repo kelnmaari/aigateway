@@ -394,13 +394,21 @@ func (a *Analyzer) aggregateResults(fileReviews []FileReview) *AnalysisResult {
 
 // filterFiles filters files based on config patterns
 func (a *Analyzer) filterFiles(changes []FileChange, cfg AnalysisConfig) []FileChange {
-	if len(cfg.FileFilters) == 0 && cfg.MaxFiles == 0 {
-		return changes
-	}
-	
 	var filtered []FileChange
 	
 	for _, change := range changes {
+		// Skip binary files by extension
+		if isBinaryExtension(change.FilePath) {
+			a.logger.WithField("file", change.FilePath).Debug("Binary file extension, skipping")
+			continue
+		}
+		
+		// Skip empty diffs
+		if isEmptyDiff(change.Diff) {
+			a.logger.WithField("file", change.FilePath).Debug("Empty diff, skipping")
+			continue
+		}
+		
 		// Check include/exclude patterns
 		if len(cfg.FileFilters) > 0 && !matchesFilters(change.FilePath, cfg.FileFilters) {
 			continue
@@ -421,6 +429,57 @@ func (a *Analyzer) filterFiles(changes []FileChange, cfg AnalysisConfig) []FileC
 	}
 	
 	return filtered
+}
+
+// isBinaryExtension checks if file extension suggests binary
+func isBinaryExtension(filename string) bool {
+	binaryExts := map[string]bool{
+		".exe": true, ".dll": true, ".so": true, ".dylib": true,
+		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true, ".webp": true,
+		".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true, ".ppt": true,
+		".zip": true, ".tar": true, ".gz": true, ".rar": true, ".7z": true,
+		".bin": true, ".dat": true, ".db": true, ".sqlite": true,
+		".woff": true, ".woff2": true, ".ttf": true, ".otf": true, ".eot": true,
+		".mp3": true, ".mp4": true, ".avi": true, ".mov": true, ".wav": true,
+		".o": true, ".a": true, ".pyc": true, ".class": true,
+		".lock": true, ".sum": true, // lock files
+	}
+	
+	idx := strings.LastIndex(filename, ".")
+	if idx == -1 {
+		return false
+	}
+	ext := strings.ToLower(filename[idx:])
+	return binaryExts[ext]
+}
+
+// isEmptyDiff checks if diff is effectively empty
+func isEmptyDiff(diff string) bool {
+	diff = strings.TrimSpace(diff)
+	
+	if diff == "" {
+		return true
+	}
+	
+	// Check if only whitespace/metadata changes
+	lines := strings.Split(diff, "\n")
+	meaningfulChanges := 0
+	
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") {
+			// Skip header lines
+			if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+				continue
+			}
+			// Check if line has non-whitespace content
+			content := strings.TrimPrefix(strings.TrimPrefix(line, "+"), "-")
+			if strings.TrimSpace(content) != "" {
+				meaningfulChanges++
+			}
+		}
+	}
+	
+	return meaningfulChanges == 0
 }
 
 // Helper functions

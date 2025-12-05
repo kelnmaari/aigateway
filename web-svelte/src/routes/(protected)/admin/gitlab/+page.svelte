@@ -17,11 +17,22 @@
 		Eye,
 		Folder,
 		Activity,
-		Server
+		Server,
+		BarChart3,
+		MessageSquare,
+		Cog
 	} from 'lucide-svelte';
 	import { gitlabApi, type GitLabIntegration, type GitLabQueueStats } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+
+	// Sub-navigation links
+	const subNavLinks = [
+		{ href: '/admin/gitlab/queue', label: 'Queue', icon: Activity },
+		{ href: '/admin/gitlab/analytics', label: 'Analytics', icon: BarChart3 },
+		{ href: '/admin/gitlab/feedback', label: 'Feedback', icon: MessageSquare },
+		{ href: '/admin/gitlab/settings', label: 'Settings', icon: Cog }
+	];
 
 	let integrations = $state<GitLabIntegration[]>([]);
 	let queueStats = $state<GitLabQueueStats | null>(null);
@@ -52,7 +63,9 @@
 	let createError = $state('');
 
 	onMount(async () => {
-		await Promise.all([loadIntegrations(), loadQueueStats()]);
+		// Load data separately to prevent one failure from blocking everything
+		await loadIntegrations();
+		await loadQueueStats();
 	});
 
 	const debouncedSearch = debounce(() => {
@@ -199,6 +212,19 @@
 </script>
 
 <div class="space-y-6">
+	<!-- Sub Navigation -->
+	<div class="flex items-center gap-2 border-b pb-4">
+		{#each subNavLinks as link}
+			<a
+				href={link.href}
+				class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+			>
+				<svelte:component this={link.icon} class="h-4 w-4" />
+				{link.label}
+			</a>
+		{/each}
+	</div>
+
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>

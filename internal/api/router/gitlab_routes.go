@@ -1,0 +1,114 @@
+// Package router provides GitLab integration routes
+package router
+
+import (
+	"aigateway/internal/api/handlers"
+	authMiddleware "aigateway/internal/api/middleware"
+	"aigateway/internal/gitlab/storage"
+)
+
+// SetupGitLabRoutes registers GitLab admin API routes
+// Call this method from main.go after creating Router if GitLab is enabled
+func (r *Router) SetupGitLabRoutes(store storage.Store) {
+	if store == nil {
+		r.logger.Warn("GitLab routes: Store is nil, skipping setup")
+		return
+	}
+
+	r.logger.Info("Setting up GitLab admin routes")
+
+	gitlabHandler := handlers.NewGitLabAdminHandler(store, r.logger)
+
+	// GitLab Admin Routes
+	gitlab := r.engine.Group("/api/admin/gitlab")
+
+	// Apply authentication
+	if r.jwtManager != nil && r.db != nil {
+		r.logger.Info("GitLab routes: Using JWT authentication with admin role check")
+		gitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		gitlab.Use(authMiddleware.RequireAdmin(r.db, r.logger))
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		r.logger.Info("GitLab routes: Using API Key authentication (legacy)")
+		gitlab.Use(r.authenticator.AuthenticationMiddleware())
+		gitlab.Use(r.authenticator.PermissionMiddleware("admin"))
+	} else {
+		r.logger.Warn("GitLab routes: No authentication enabled")
+	}
+
+	// ============================================================================
+	// Integration Management
+	// ============================================================================
+	gitlab.GET("/integrations", gitlabHandler.ListIntegrations)
+	gitlab.POST("/integrations", gitlabHandler.CreateIntegration)
+	gitlab.GET("/integrations/:id", gitlabHandler.GetIntegration)
+	gitlab.PUT("/integrations/:id", gitlabHandler.UpdateIntegration)
+	gitlab.DELETE("/integrations/:id", gitlabHandler.DeleteIntegration)
+	gitlab.POST("/integrations/:id/test", gitlabHandler.TestIntegration)
+
+	// ============================================================================
+	// Project Management (within integration)
+	// ============================================================================
+	gitlab.GET("/integrations/:id/projects", gitlabHandler.ListProjects)
+	gitlab.POST("/integrations/:id/projects", gitlabHandler.AddProject)
+
+	// ============================================================================
+	// Project Management (direct)
+	// ============================================================================
+	gitlab.GET("/projects/:project_id", gitlabHandler.GetProject)
+	gitlab.PUT("/projects/:project_id", gitlabHandler.UpdateProject)
+	gitlab.DELETE("/projects/:project_id", gitlabHandler.DeleteProject)
+	gitlab.POST("/projects/:project_id/webhook", gitlabHandler.SetupWebhook)
+
+	// ============================================================================
+	// Review Management
+	// ============================================================================
+	gitlab.GET("/reviews", gitlabHandler.ListReviews)
+	gitlab.GET("/reviews/:id", gitlabHandler.GetReview)
+	gitlab.POST("/reviews/:id/retry", gitlabHandler.RetryReview)
+
+	// ============================================================================
+	// Queue Management
+	// ============================================================================
+	gitlab.GET("/queue/status", gitlabHandler.GetQueueStatus)
+	gitlab.GET("/queue/jobs", gitlabHandler.ListJobs)
+	gitlab.POST("/queue/jobs/:id/cancel", gitlabHandler.CancelJob)
+	gitlab.POST("/queue/jobs/:id/retry", gitlabHandler.RetryJob)
+
+	r.logger.Info("GitLab admin routes configured successfully")
+
+	// ============================================================================
+	// Model Usage (extends existing admin routes)
+	// ============================================================================
+	// This should be called from admin group, add model usage endpoint
+	admin := r.engine.Group("/api/admin")
+	if r.jwtManager != nil && r.db != nil {
+		admin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		admin.Use(authMiddleware.RequireAdmin(r.db, r.logger))
+	}
+	
+	admin.GET("/models/:id/gitlab-usage", gitlabHandler.GetModelUsage)
+	r.logger.Info("Model GitLab usage endpoint registered: GET /api/admin/models/:id/gitlab-usage")
+}
+
+// SetupGitLabWebhookRoute registers GitLab webhook endpoint
+// This endpoint should not require authentication (uses webhook secret)
+func (r *Router) SetupGitLabWebhookRoute(webhookHandler handlers.WebhookHandler) {
+	if webhookHandler == nil {
+		r.logger.Warn("GitLab webhook: Handler is nil, skipping setup")
+		return
+	}
+
+	r.logger.Info("Setting up GitLab webhook route")
+
+	// Webhook endpoint - NO authentication, uses webhook secret verification
+	r.engine.POST("/webhook/gitlab", webhookHandler.HandleWebhook)
+	
+	r.logger.Info("GitLab webhook route configured: POST /webhook/gitlab")
+}
+
+// WebhookHandler interface for GitLab webhooks
+// Defined in handlers package, re-exported here for convenience
+type WebhookHandlerInterface interface {
+	HandleWebhook(c interface{})
+}
+

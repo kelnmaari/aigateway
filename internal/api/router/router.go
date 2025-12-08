@@ -304,8 +304,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 	r.setupHandlers(opts.Config, opts.Logger)
 
 	r.setupEngine()
-	r.setupRoutes()
-	r.setupInferenceRoutes()
+	r.setupRoutes() // includes setupInferenceRoutes()
 
 	return r, nil
 }

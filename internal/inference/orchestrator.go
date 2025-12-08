@@ -59,6 +59,7 @@ func NewOrchestrator(runtime ContainerRuntime, downloader *ModelDownloader, logg
 }
 
 // PrepareModel ensures artifacts are present locally according to spec.
+// For HF format without specific file, providers (vLLM, SGLang, TGI) download via HF Hub themselves.
 func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*ModelInstance, error) {
 	o.mu.Lock()
 	if existing, ok := o.models[spec.Alias]; ok {
@@ -81,11 +82,30 @@ func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*Model
 	} else {
 		switch spec.Format {
 		case FormatHF:
-			localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+			// For HF format: if HFFile is specified, download specific file.
+			// Otherwise, providers (vLLM, SGLang, TGI) will download via HF Hub themselves
+			// by mounting the HF cache directory and using --model HFRepo argument.
+			if spec.HFFile != "" {
+				localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+			} else if spec.HFRepo == "" {
+				err = fmt.Errorf("hf format requires either hf_repo or local_path")
+			}
+			// else: localPath stays empty, provider will download via HFRepo
 		case FormatGGUF:
-			localPath, err = o.downloader.EnsureGGUF(ctx, spec.GGUFURL, spec.ExpectedSHA)
+			if spec.GGUFURL != "" {
+				localPath, err = o.downloader.EnsureGGUF(ctx, spec.GGUFURL, spec.ExpectedSHA)
+			} else if spec.HFRepo != "" && spec.HFFile != "" {
+				// GGUF from HF repo
+				localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+			} else {
+				err = fmt.Errorf("gguf format requires gguf_url or (hf_repo + hf_file)")
+			}
 		case FormatTRT:
-			localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+			if spec.HFRepo != "" && spec.HFFile != "" {
+				localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+			} else if spec.LocalPath == "" {
+				err = fmt.Errorf("trt format requires local_path or (hf_repo + hf_file)")
+			}
 		default:
 			err = fmt.Errorf("unsupported format: %s", spec.Format)
 		}

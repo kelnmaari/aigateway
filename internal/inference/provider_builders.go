@@ -10,10 +10,10 @@ import (
 
 const (
 	DefaultVLLMImage     = "vllm/vllm-openai:latest"
-	DefaultLlamaImage    = "ghcr.io/ggerganov/llama.cpp:server"
-	DefaultSGLangImage   = "arrichm/sglang:latest"
+	DefaultLlamaImage    = "ghcr.io/ggml-org/llama.cpp:server-cuda"
+	DefaultSGLangImage   = "lmsysorg/sglang:latest"
 	DefaultTGIImage      = "ghcr.io/huggingface/text-generation-inference:latest"
-	DefaultTRTLLMImage   = "nvcr.io/nvidia/tensorrt-llm:latest"
+	DefaultTRTLLMImage   = "nvcr.io/nvidia/tritonserver:24.12-trtllm-python-py3"
 	defaultVLLMPort      = 8000
 	defaultLlamaServPort = 8080
 	defaultSGLangPort    = 8000
@@ -294,4 +294,3 @@ func fetchMetricsHTTP(ctx context.Context, url string) (string, error) {
 	n, _ := resp.Body.Read(buf)
 	return string(buf[:n]), nil
 }
-

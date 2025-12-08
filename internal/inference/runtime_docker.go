@@ -280,11 +280,21 @@ func (r *DockerRuntime) pullImageAPI(ctx context.Context, image string) error {
 	if image == "" {
 		return fmt.Errorf("image is empty")
 	}
+	r.logger.WithField("image", image).Info("Pulling Docker image...")
 	out, err := r.api.ImagePull(ctx, image, types.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("docker api pull: %w", err)
 	}
 	defer out.Close()
+	// Must read the entire response to wait for pull completion
+	buf := make([]byte, 8192)
+	for {
+		_, readErr := out.Read(buf)
+		if readErr != nil {
+			break
+		}
+	}
+	r.logger.WithField("image", image).Info("Docker image pulled successfully")
 	return nil
 }
 
@@ -292,10 +302,12 @@ func (r *DockerRuntime) pullImageCLI(ctx context.Context, image string) error {
 	if image == "" {
 		return fmt.Errorf("image is empty")
 	}
+	r.logger.WithField("image", image).Info("Pulling Docker image (CLI)...")
 	cmd := exec.CommandContext(ctx, r.dockerBin, "pull", image)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("docker pull failed: %w: %s", err, string(out))
 	}
+	r.logger.WithField("image", image).Info("Docker image pulled successfully")
 	return nil
 }
 

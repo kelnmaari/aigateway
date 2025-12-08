@@ -51,6 +51,29 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 		cfg.CacheMaxBytes = 0
 	}
 
+	// Docker requires absolute paths for volume mounts
+	if cfg.HFCacheDir != "" && !filepath.IsAbs(cfg.HFCacheDir) {
+		abs, err := filepath.Abs(cfg.HFCacheDir)
+		if err != nil {
+			return nil, fmt.Errorf("resolve HFCacheDir path: %w", err)
+		}
+		cfg.HFCacheDir = abs
+	}
+	if cfg.GGUFCacheDir != "" && !filepath.IsAbs(cfg.GGUFCacheDir) {
+		abs, err := filepath.Abs(cfg.GGUFCacheDir)
+		if err != nil {
+			return nil, fmt.Errorf("resolve GGUFCacheDir path: %w", err)
+		}
+		cfg.GGUFCacheDir = abs
+	}
+	if cfg.TRTEnginesDir != "" && !filepath.IsAbs(cfg.TRTEnginesDir) {
+		abs, err := filepath.Abs(cfg.TRTEnginesDir)
+		if err != nil {
+			return nil, fmt.Errorf("resolve TRTEnginesDir path: %w", err)
+		}
+		cfg.TRTEnginesDir = abs
+	}
+
 	dl, err := NewModelDownloader(ModelDownloaderConfig{
 		HFToken:       cfg.HFToken,
 		HFCacheDir:    cfg.HFCacheDir,

@@ -186,7 +186,8 @@ func (h *InferenceHandler) GetHealth(c *gin.Context) {
 		return
 	}
 	if err := h.router.Health(c.Request.Context(), alias); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "error": err.Error()})
+		// Return 200 with error info instead of 503 - allows UI to show status gracefully
+		c.JSON(http.StatusOK, gin.H{"status": "error", "error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "healthy"})
@@ -316,10 +317,11 @@ func (h *InferenceHandler) GetLogs(c *gin.Context) {
 	}
 	logs, err := h.router.ContainerLogs(c.Request.Context(), alias, tail)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Return 200 with empty logs for not-running models
+		c.JSON(http.StatusOK, gin.H{"alias": alias, "logs": "", "lines": 0, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"logs": logs})
+	c.JSON(http.StatusOK, gin.H{"alias": alias, "logs": logs, "lines": tail})
 }
 
 // GetMetrics returns provider metrics (Prometheus format) for alias.
@@ -331,10 +333,11 @@ func (h *InferenceHandler) GetMetrics(c *gin.Context) {
 	}
 	metrics, err := h.router.ContainerMetrics(c.Request.Context(), alias)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Return 200 with empty metrics for not-running models
+		c.JSON(http.StatusOK, gin.H{"alias": alias, "metrics": "", "content_type": "text/plain", "error": err.Error()})
 		return
 	}
-	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(metrics))
+	c.JSON(http.StatusOK, gin.H{"alias": alias, "metrics": metrics, "content_type": "text/plain"})
 }
 
 // ConvertTRT handles TensorRT-LLM model conversion request.

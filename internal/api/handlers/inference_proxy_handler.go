@@ -61,13 +61,21 @@ func (h *InferenceProxyHandler) HandleChatCompletions(c *gin.Context) {
 
 	endpoint := inst.Handle.Endpoint + "/v1/chat/completions"
 
+	// Rewrite model name to what provider expects
+	// vLLM/TGI/SGLang expect HFRepo (e.g., "Qwen/Qwen2.5-3B-Instruct"), not alias
+	providerModel := h.resolveProviderModelName(inst)
+
 	h.logger.WithFields(logrus.Fields{
-		"model":    req.Model,
-		"alias":    inst.Spec.Alias,
-		"provider": inst.Spec.Provider,
-		"endpoint": endpoint,
-		"stream":   req.Stream,
+		"model":          req.Model,
+		"alias":          inst.Spec.Alias,
+		"provider":       inst.Spec.Provider,
+		"provider_model": providerModel,
+		"endpoint":       endpoint,
+		"stream":         req.Stream,
 	}).Debug("proxying chat completion request")
+
+	// Rewrite model in request to match provider's expected name
+	req.Model = providerModel
 
 	// Re-encode request body
 	bodyBytes, err := json.Marshal(req)
@@ -130,6 +138,9 @@ func (h *InferenceProxyHandler) HandleCompletions(c *gin.Context) {
 	}
 
 	endpoint := inst.Handle.Endpoint + "/v1/completions"
+
+	// Rewrite model name to what provider expects
+	req.Model = h.resolveProviderModelName(inst)
 
 	bodyBytes, _ := json.Marshal(req)
 	proxyReq, _ := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
@@ -218,5 +229,25 @@ func (h *InferenceProxyHandler) errorResponse(c *gin.Context, status int, errTyp
 			"type":    errType,
 		},
 	})
+}
+
+// resolveProviderModelName returns the model name that the provider expects.
+// vLLM/TGI/SGLang expect HFRepo (e.g., "Qwen/Qwen2.5-3B-Instruct"),
+// llama.cpp expects the filename.
+func (h *InferenceProxyHandler) resolveProviderModelName(inst *inference.ModelInstance) string {
+	switch inst.Spec.Provider {
+	case inference.ProviderVLLM, inference.ProviderTGI, inference.ProviderSGLang, inference.ProviderTRTLLM:
+		// HF-based providers expect the HF repo name
+		if inst.Spec.HFRepo != "" {
+			return inst.Spec.HFRepo
+		}
+		// Fallback to alias if no HFRepo
+		return inst.Spec.Alias
+	case inference.ProviderLlamaCPP:
+		// llama.cpp server uses --alias flag, so alias works
+		return inst.Spec.Alias
+	default:
+		return inst.Spec.Alias
+	}
 }
 

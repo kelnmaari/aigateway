@@ -132,7 +132,7 @@
 </script>
 
 <div bind:this={container} class="flex-1 overflow-y-auto px-4 py-6">
-	<div class="mx-auto max-w-3xl space-y-6">
+	<div class="mx-auto max-w-5xl space-y-6">
 		{#each messages as message (message.id)}
 			<div
 				class={cn(

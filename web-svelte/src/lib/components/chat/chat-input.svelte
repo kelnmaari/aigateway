@@ -53,7 +53,7 @@
 </script>
 
 <form onsubmit={handleSubmit} class="border-t border-border bg-background p-4">
-	<div class="mx-auto max-w-3xl">
+	<div class="mx-auto max-w-5xl">
 		<div class="relative flex items-end gap-2">
 			<div class="relative flex-1">
 				<textarea

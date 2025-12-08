@@ -44,8 +44,8 @@ inference:
     cache_max_bytes: 107374182400           # 100GB cache limit (0 = unlimited)
     
     # Timeouts
-    health_check_timeout: "60s"             # Health check after container start
-    startup_timeout: "10m"                  # Overall model loading timeout
+    health_check_timeout: "60m"             # Wait for large model download inside container
+    startup_timeout: "60m"                  # Overall model loading timeout
     
     # Docker settings
     docker_bin: "docker"                    # Path to docker binary

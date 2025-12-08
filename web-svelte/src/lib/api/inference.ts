@@ -17,6 +17,11 @@ export interface ModelInfo {
 	last_error?: string;
 	container_id?: string;
 
+	// Source info (for restart)
+	hf_repo?: string;
+	hf_file?: string;
+	gguf_url?: string;
+
 	// vLLM params
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
@@ -75,12 +80,46 @@ export interface TRTEngine {
 	compatible: boolean;
 }
 
+export interface GPUDevice {
+	index: number;
+	name: string;
+	memory_mb: number;
+	memory_free_mb: number;
+}
+
+export interface GPUListResponse {
+	enabled: boolean;
+	devices: GPUDevice[];
+	error?: string;
+}
+
 export interface TRTConvertRequest {
 	hf_model: string;
 	max_batch_size?: number;
 	max_input_len?: number;
 	max_output_len?: number;
 	dtype?: string;
+}
+
+export interface SavedModel {
+	alias: string;
+	provider: Provider;
+	format: Format;
+	capabilities?: Capability[];
+	hf_repo?: string;
+	hf_file?: string;
+	gguf_url?: string;
+	gpu_device?: string;
+	auto_start: boolean;
+	saved_at?: string;
+	vllm_tensor_parallel?: number;
+	vllm_max_model_len?: number;
+	vllm_gpu_utilization?: number;
+	llama_main_gpu?: number;
+	llama_n_gpu_layers?: number;
+	sglang_tensor_parallel?: number;
+	sglang_mem_fraction?: number;
+	tgi_num_shard?: number;
 }
 
 export interface LoadRequest {
@@ -92,6 +131,9 @@ export interface LoadRequest {
 	hf_revision?: string;
 	gguf_url?: string;
 	capabilities?: Capability[];
+	
+	// GPU selection (e.g., "0", "1", "0,1" for specific GPU(s), empty = all)
+	gpu_device?: string;
 	
 	// Provider-specific
 	vllm_tensor_parallel?: number;
@@ -148,5 +190,20 @@ export const inferenceApi = {
 	
 	deleteTRTEngine: (modelId: string) => 
 		api.post<{ message: string }>(`/api/system/inference/delete-trt-engine?model_id=${encodeURIComponent(modelId)}`),
+
+	// GPU list for device selection
+	listGPUs: () => api.get<GPUListResponse>('/api/gpu/list'),
+
+	// Saved models (persist between restarts)
+	listSaved: () => api.get<SavedModel[]>('/api/system/inference/saved'),
+	
+	saveModel: (alias: string, autoStart: boolean = false) => 
+		api.post<{ status: string }>('/api/system/inference/save', { alias, auto_start: autoStart }),
+	
+	deleteSaved: (alias: string) => 
+		api.post<void>(`/api/system/inference/delete-saved?alias=${encodeURIComponent(alias)}`),
+	
+	setAutoStart: (alias: string, enabled: boolean) => 
+		api.post<{ alias: string; auto_start: boolean }>(`/api/system/inference/auto-start?alias=${encodeURIComponent(alias)}&enabled=${enabled}`),
 };
 

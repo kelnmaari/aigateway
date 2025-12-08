@@ -111,9 +111,9 @@ func (r *Router) ListModels() []*ModelInstance {
 	return r.mgr.svc.ListModels()
 }
 
-// Evict stops and forgets a model by alias (keeps artifacts on disk).
+// Evict stops container and removes model from list (keeps artifacts on disk).
 func (r *Router) Evict(ctx context.Context, alias string) error {
-	return r.mgr.Stop(ctx, alias)
+	return r.mgr.Evict(ctx, alias)
 }
 
 // Pin marks model as pinned (skip auto-stop/evict).

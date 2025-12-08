@@ -17,6 +17,7 @@ type ServiceConfig struct {
 	HFCacheDir            string
 	GGUFCacheDir          string
 	TRTEnginesDir         string // /data/engines/trt for TensorRT-LLM engines
+	ContainerLogsDir      string // directory for container log files (default: logs/containers)
 	MaxConcurrentDownload int
 	AutoResume            bool
 	HTTPTimeout           time.Duration
@@ -90,6 +91,7 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 	runtime := NewDockerRuntime(DockerRuntimeConfig{
 		DockerBin: cfg.DockerBin,
 		Logger:    cfg.Logger,
+		LogsDir:   cfg.ContainerLogsDir,
 	})
 
 	orch := NewOrchestrator(runtime, dl, cfg.Logger, OrchestratorConfig{
@@ -205,9 +207,36 @@ func (s *Service) Stop(ctx context.Context, alias string) error {
 	return s.orch.StopModel(ctx, alias)
 }
 
-// Shutdown releases downloader workers.
+// Forget removes model from in-memory registry (keeps artifacts on disk).
+func (s *Service) Forget(alias string) {
+	s.orch.ForgetModel(alias)
+}
+
+// Shutdown stops all running containers and releases downloader workers.
 func (s *Service) Shutdown() {
+	s.StopAll()
 	s.downloader.Shutdown()
+}
+
+// StopAll stops all running model containers.
+func (s *Service) StopAll() {
+	models := s.orch.ListModels()
+	if len(models) == 0 {
+		return
+	}
+
+	s.logger.WithField("count", len(models)).Info("Stopping all model containers...")
+	ctx := context.Background()
+
+	for _, m := range models {
+		if m.Status == StatusRunning || m.Status == StatusStarting {
+			s.logger.WithField("alias", m.Spec.Alias).Info("Stopping model container")
+			if err := s.orch.StopModel(ctx, m.Spec.Alias); err != nil {
+				s.logger.WithError(err).WithField("alias", m.Spec.Alias).Warn("Failed to stop model container")
+			}
+		}
+	}
+	s.logger.Info("All model containers stopped")
 }
 
 // GetModel returns tracked model by alias.

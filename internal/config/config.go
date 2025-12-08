@@ -773,8 +773,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("inference.docker.gguf_dir", "./data/models/gguf")
 	v.SetDefault("inference.docker.trt_engines_dir", "./data/engines/trt")
 	v.SetDefault("inference.docker.max_running_models", 2)
-	v.SetDefault("inference.docker.cache_max_bytes", 0) // 0 = unlimited
-	v.SetDefault("inference.docker.health_check_timeout", "60s")
+	v.SetDefault("inference.docker.cache_max_bytes", 0)          // 0 = unlimited
+	v.SetDefault("inference.docker.health_check_timeout", "60m") // 60min for large model download inside container
 	v.SetDefault("inference.docker.startup_timeout", "5m")
 	v.SetDefault("inference.docker.docker_bin", "docker")
 	v.SetDefault("inference.docker.max_concurrent_downloads", 2)

@@ -45,16 +45,20 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir string) ContainerStartRequest {
 		cmd = append(cmd, "--gpu-memory-utilization", fmt.Sprintf("%.2f", spec.VLLMGPUUtilization))
 	}
 
+	env := map[string]string{
+		"CUDA_DEVICE_ORDER": "PCI_BUS_ID", // Ensure consistent GPU ordering
+	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
 		Provider:   ProviderVLLM,
 		Image:      DefaultVLLMImage,
 		Command:    cmd,
-		Env:        map[string]string{},
+		Env:        env,
 		Ports:      map[string]int{"http": defaultVLLMPort},
 		Mounts: []VolumeMount{
 			{HostPath: hfCacheDir, ContainerPath: "/root/.cache/huggingface", ReadOnly: false},
 		},
+		GPUDevice: spec.GPUDevice,
 	}
 }
 
@@ -96,7 +100,9 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 		cmd = append(cmd, "--chunked-prefill-size", "8192")
 	}
 
-	env := map[string]string{}
+	env := map[string]string{
+		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+	}
 	// Only pass HF_TOKEN if model needs to be downloaded (LocalPath empty)
 	// Security: isolate token from container when model is already cached
 	if hfToken != "" && spec.LocalPath == "" {
@@ -112,6 +118,7 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 		Mounts: []VolumeMount{
 			{HostPath: hfCacheDir, ContainerPath: "/root/.cache/huggingface", ReadOnly: false},
 		},
+		GPUDevice: spec.GPUDevice,
 	}
 }
 
@@ -122,7 +129,9 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	if spec.LocalPath != "" {
 		modelArg = spec.LocalPath
 	}
-	env := map[string]string{}
+	env := map[string]string{
+		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+	}
 	// Only pass HF_TOKEN if model needs to be downloaded (LocalPath empty)
 	// Security: isolate token from container when model is already cached
 	if hfToken != "" && spec.LocalPath == "" {
@@ -162,6 +171,7 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 		Mounts: []VolumeMount{
 			{HostPath: hfCacheDir, ContainerPath: "/data", ReadOnly: false},
 		},
+		GPUDevice: spec.GPUDevice,
 	}
 }
 
@@ -172,7 +182,9 @@ func BuildTRTLLMRequest(spec ModelSpec, enginesDir, _ string) (ContainerStartReq
 	if spec.LocalPath == "" {
 		return ContainerStartRequest{}, fmt.Errorf("trt-llm requires LocalPath to engine/artifacts")
 	}
-	env := map[string]string{}
+	env := map[string]string{
+		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+	}
 	// Placeholder command: rely on image entrypoint; users may need to override via HF repo config.
 	cmd := []string{}
 	return ContainerStartRequest{
@@ -186,6 +198,7 @@ func BuildTRTLLMRequest(spec ModelSpec, enginesDir, _ string) (ContainerStartReq
 			{HostPath: filepath.Dir(spec.LocalPath), ContainerPath: "/engines", ReadOnly: false},
 			{HostPath: enginesDir, ContainerPath: "/data", ReadOnly: false},
 		},
+		GPUDevice: spec.GPUDevice,
 	}, nil
 }
 
@@ -219,11 +232,12 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 		Provider:   ProviderLlamaCPP,
 		Image:      DefaultLlamaImage,
 		Command:    cmd,
-		Env:        map[string]string{},
+		Env:        map[string]string{"CUDA_DEVICE_ORDER": "PCI_BUS_ID"},
 		Ports:      map[string]int{"http": defaultLlamaServPort},
 		Mounts: []VolumeMount{
 			{HostPath: modelDir, ContainerPath: "/models", ReadOnly: true},
 		},
+		GPUDevice: spec.GPUDevice,
 	}, nil
 }
 

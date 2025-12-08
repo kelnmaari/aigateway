@@ -238,6 +238,14 @@ func (o *Orchestrator) StopModel(ctx context.Context, alias string) error {
 	return nil
 }
 
+// ForgetModel removes model from in-memory registry (after stop).
+// Used by Evict to completely remove model from tracking.
+func (o *Orchestrator) ForgetModel(alias string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	delete(o.models, alias)
+}
+
 // saveInstance saves/updates instance in registry.
 func (o *Orchestrator) saveInstance(inst *ModelInstance) {
 	o.mu.Lock()

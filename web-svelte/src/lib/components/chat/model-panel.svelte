@@ -33,7 +33,7 @@
 </script>
 
 <div class="border-b border-border bg-card/50 px-4 py-3">
-	<div class="mx-auto flex max-w-3xl items-center gap-4">
+	<div class="mx-auto flex max-w-5xl items-center gap-4">
 		<!-- Model Select -->
 		<div class="flex-1">
 			<label for="model-select" class="sr-only">{m.chat_model()}</label>
@@ -83,7 +83,7 @@
 
 	<!-- Parameters Panel -->
 	{#if showParams}
-		<div class="mx-auto mt-4 max-w-3xl rounded-lg border border-border bg-background p-4">
+		<div class="mx-auto mt-4 max-w-5xl rounded-lg border border-border bg-background p-4">
 			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<!-- Temperature -->
 				<div class="space-y-2">

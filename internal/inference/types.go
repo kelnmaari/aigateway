@@ -43,6 +43,9 @@ type ModelSpec struct {
 	ExpectedSHA  string             // optional sha256 for validation
 	LocalPath    string             // resolved local path after download
 
+	// GPU selection (e.g., "0", "1", "0,1" for specific GPU(s), empty = all)
+	GPUDevice string
+
 	// vLLM-specific
 	VLLMTensorParallel int     // --tensor-parallel-size
 	VLLMMaxModelLen    int     // --max-model-len
@@ -104,6 +107,7 @@ type ContainerStartRequest struct {
 	Env        map[string]string
 	Ports      map[string]int
 	Mounts     []VolumeMount
+	GPUDevice  string // GPU device(s) to use, e.g., "0", "1", "0,1", empty = all
 }
 
 // VolumeMount describes a host->container mount.

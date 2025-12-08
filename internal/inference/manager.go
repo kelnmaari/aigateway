@@ -74,7 +74,7 @@ func (m *Manager) Health(ctx context.Context, alias string) error {
 	return m.svc.Health(ctx, alias)
 }
 
-// Stop stops running container.
+// Stop stops running container (keeps model in list as Ready).
 func (m *Manager) Stop(ctx context.Context, alias string) error {
 	if m.isPinned(alias) {
 		return fmt.Errorf("model is pinned: %s", alias)
@@ -84,6 +84,27 @@ func (m *Manager) Stop(ctx context.Context, alias string) error {
 	}
 	m.setStatus(alias, StatusReady)
 	m.touch(alias)
+	metrics.ModelsLoaded.Set(float64(len(m.svc.ListModels())))
+	return nil
+}
+
+// Evict stops container and removes model from in-memory list (artifacts stay on disk).
+func (m *Manager) Evict(ctx context.Context, alias string) error {
+	if m.isPinned(alias) {
+		return fmt.Errorf("model is pinned: %s", alias)
+	}
+	// Stop container if running (ignore error if not running)
+	_ = m.svc.Stop(ctx, alias)
+	// Remove from in-memory registry
+	m.svc.Forget(alias)
+	// Remove from status tracking
+	m.statusMu.Lock()
+	delete(m.statusMap, alias)
+	m.statusMu.Unlock()
+	// Remove from pins if any
+	m.pinsMu.Lock()
+	delete(m.pins, alias)
+	m.pinsMu.Unlock()
 	metrics.ModelsLoaded.Set(float64(len(m.svc.ListModels())))
 	return nil
 }

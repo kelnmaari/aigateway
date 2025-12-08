@@ -1,10 +1,14 @@
 package inference
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -25,18 +29,23 @@ import (
 type DockerRuntime struct {
 	dockerBin string
 	logger    *logrus.Logger
+	logsDir   string // directory for container log files
 
 	mu      sync.Mutex
 	handles map[string]*ContainerHandle // containerName -> handle
 
 	useAPI bool
 	api    *client.Client
+
+	// Log streaming goroutine cancellation
+	logCancels map[string]context.CancelFunc
 }
 
 // DockerRuntimeConfig holds runtime options.
 type DockerRuntimeConfig struct {
 	DockerBin string
 	Logger    *logrus.Logger
+	LogsDir   string // directory where container logs will be written
 }
 
 // NewDockerRuntime creates DockerRuntime with defaults.
@@ -48,10 +57,19 @@ func NewDockerRuntime(cfg DockerRuntimeConfig) *DockerRuntime {
 	if cfg.Logger == nil {
 		cfg.Logger = logrus.New()
 	}
+	logsDir := cfg.LogsDir
+	if logsDir == "" {
+		logsDir = "logs/containers"
+	}
+	// Ensure logs directory exists
+	_ = os.MkdirAll(logsDir, 0755)
+
 	r := &DockerRuntime{
-		dockerBin: bin,
-		logger:    cfg.Logger,
-		handles:   make(map[string]*ContainerHandle),
+		dockerBin:  bin,
+		logger:     cfg.Logger,
+		logsDir:    logsDir,
+		handles:    make(map[string]*ContainerHandle),
+		logCancels: make(map[string]context.CancelFunc),
 	}
 
 	if cli, err := newDockerAPIClient(); err == nil {
@@ -125,6 +143,18 @@ func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req 
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	// Build GPU device request - specific device(s) or all
+	gpuRequest := container.DeviceRequest{
+		Capabilities: [][]string{{"gpu"}},
+	}
+	if req.GPUDevice != "" {
+		// Use specific GPU(s), e.g., "0" or "0,1"
+		gpuRequest.DeviceIDs = strings.Split(req.GPUDevice, ",")
+	} else {
+		// Use all GPUs
+		gpuRequest.Count = -1
+	}
+
 	resp, err := r.api.ContainerCreate(ctx,
 		&container.Config{
 			Image:        req.Image,
@@ -137,12 +167,7 @@ func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req 
 			Mounts:       mounts,
 			AutoRemove:   true,
 			Resources: container.Resources{
-				DeviceRequests: []container.DeviceRequest{
-					{
-						Capabilities: [][]string{{"gpu"}},
-						Count:        -1, // all GPUs
-					},
-				},
+				DeviceRequests: []container.DeviceRequest{gpuRequest},
 			},
 		},
 		nil, nil, containerName,
@@ -172,14 +197,24 @@ func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req 
 		Endpoint:   endpoint,
 	}
 	r.handles[containerName] = handle
+
+	// Start streaming logs to file
+	r.startLogStreaming(req.ModelAlias, resp.ID)
+
 	return handle, nil
 }
 
 func (r *DockerRuntime) startCLI(ctx context.Context, containerName string, req ContainerStartRequest, hostPorts map[string]int) (*ContainerHandle, error) {
 	args := []string{"run", "-d", "--rm", "--name", containerName}
 
-	// GPU access (all GPUs) if NVIDIA runtime available
-	args = append(args, "--gpus", "all")
+	// GPU access - specific device(s) or all
+	if req.GPUDevice != "" {
+		// Use specific GPU(s), e.g., "0" or "0,1"
+		args = append(args, "--gpus", fmt.Sprintf(`"device=%s"`, req.GPUDevice))
+	} else {
+		// Use all GPUs
+		args = append(args, "--gpus", "all")
+	}
 
 	for name, cport := range req.Ports {
 		hp := hostPorts[name]
@@ -224,6 +259,10 @@ func (r *DockerRuntime) startCLI(ctx context.Context, containerName string, req 
 		Endpoint:   endpoint,
 	}
 	r.handles[containerName] = handle
+
+	// Start streaming logs to file
+	r.startLogStreaming(req.ModelAlias, handle.ID)
+
 	return handle, nil
 }
 
@@ -232,9 +271,17 @@ func (r *DockerRuntime) Stop(ctx context.Context, handleID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Stop log streaming for this container
+	r.stopLogStreaming(handleID)
+
 	if r.useAPI && r.api != nil {
 		if err := r.api.ContainerRemove(ctx, handleID, container.RemoveOptions{Force: true}); err != nil {
-			return fmt.Errorf("docker api rm failed: %w", err)
+			// Ignore "no such container" errors - container already dead
+			if !strings.Contains(err.Error(), "No such container") &&
+				!strings.Contains(err.Error(), "not found") {
+				return fmt.Errorf("docker api rm failed: %w", err)
+			}
+			r.logger.WithField("container", handleID).Debug("Container already removed, ignoring")
 		}
 		return nil
 	}
@@ -242,7 +289,13 @@ func (r *DockerRuntime) Stop(ctx context.Context, handleID string) error {
 	cmd := exec.CommandContext(ctx, r.dockerBin, "rm", "-f", handleID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("docker rm failed: %w: %s", err, string(out))
+		// Ignore "no such container" errors - container already dead
+		outStr := string(out)
+		if !strings.Contains(outStr, "No such container") &&
+			!strings.Contains(outStr, "not found") {
+			return fmt.Errorf("docker rm failed: %w: %s", err, outStr)
+		}
+		r.logger.WithField("container", handleID).Debug("Container already removed, ignoring")
 	}
 	return nil
 }
@@ -338,4 +391,158 @@ func (r *DockerRuntime) Logs(ctx context.Context, handleID string, tailLines int
 		return "", fmt.Errorf("docker logs failed: %w: %s", err, string(out))
 	}
 	return string(out), nil
+}
+
+// startLogStreaming starts a goroutine that streams container logs to a file.
+func (r *DockerRuntime) startLogStreaming(alias, containerID string) {
+	if r.logsDir == "" {
+		return
+	}
+
+	// Create log file
+	logPath := filepath.Join(r.logsDir, alias+".log")
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		r.logger.WithError(err).WithField("path", logPath).Error("Failed to create container log file")
+		return
+	}
+
+	// Write header
+	fmt.Fprintf(f, "=== Container logs for %s (container: %s) ===\n", alias, containerID)
+	fmt.Fprintf(f, "=== Started: %s ===\n\n", time.Now().Format(time.RFC3339))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	r.logCancels[containerID] = cancel
+
+	go func() {
+		defer f.Close()
+		defer func() {
+			fmt.Fprintf(f, "\n=== Log streaming ended: %s ===\n", time.Now().Format(time.RFC3339))
+		}()
+
+		if r.useAPI && r.api != nil {
+			r.streamLogsAPI(ctx, containerID, f)
+		} else {
+			r.streamLogsCLI(ctx, containerID, f)
+		}
+	}()
+
+	r.logger.WithFields(logrus.Fields{
+		"alias":     alias,
+		"container": containerID,
+		"log_file":  logPath,
+	}).Info("Started container log streaming")
+}
+
+// stopLogStreaming cancels log streaming for a container.
+func (r *DockerRuntime) stopLogStreaming(containerID string) {
+	if cancel, ok := r.logCancels[containerID]; ok {
+		cancel()
+		delete(r.logCancels, containerID)
+	}
+}
+
+// streamLogsAPI streams logs using Docker API.
+func (r *DockerRuntime) streamLogsAPI(ctx context.Context, containerID string, w io.Writer) {
+	opts := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+		Timestamps: true,
+	}
+	rc, err := r.api.ContainerLogs(ctx, containerID, opts)
+	if err != nil {
+		fmt.Fprintf(w, "ERROR: Failed to get container logs: %v\n", err)
+		return
+	}
+	defer rc.Close()
+
+	// Docker multiplexes stdout/stderr with 8-byte header:
+	// [0]: stream type (1=stdout, 2=stderr)
+	// [1-3]: reserved
+	// [4-7]: payload size (big endian uint32)
+	header := make([]byte, 8)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		// Read 8-byte header
+		_, err := io.ReadFull(rc, header)
+		if err != nil {
+			if err != io.EOF && ctx.Err() == nil {
+				fmt.Fprintf(w, "ERROR: Log read error: %v\n", err)
+			}
+			return
+		}
+
+		// Parse payload size from header[4:8] (big endian)
+		size := uint32(header[4])<<24 | uint32(header[5])<<16 | uint32(header[6])<<8 | uint32(header[7])
+		if size == 0 {
+			continue
+		}
+
+		// Read payload
+		payload := make([]byte, size)
+		_, err = io.ReadFull(rc, payload)
+		if err != nil {
+			if err != io.EOF && ctx.Err() == nil {
+				fmt.Fprintf(w, "ERROR: Log read error: %v\n", err)
+			}
+			return
+		}
+
+		// Write clean payload
+		w.Write(payload)
+
+		// Flush
+		if f, ok := w.(*os.File); ok {
+			f.Sync()
+		}
+	}
+}
+
+// streamLogsCLI streams logs using docker CLI.
+func (r *DockerRuntime) streamLogsCLI(ctx context.Context, containerID string, w io.Writer) {
+	cmd := exec.CommandContext(ctx, r.dockerBin, "logs", "-f", "--timestamps", containerID)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Fprintf(w, "ERROR: Failed to get stdout pipe: %v\n", err)
+		return
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		fmt.Fprintf(w, "ERROR: Failed to get stderr pipe: %v\n", err)
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(w, "ERROR: Failed to start docker logs: %v\n", err)
+		return
+	}
+
+	// Stream both stdout and stderr
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			fmt.Fprintln(w, scanner.Text())
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			fmt.Fprintln(w, "[stderr] "+scanner.Text())
+		}
+	}()
+
+	wg.Wait()
+	cmd.Wait()
 }

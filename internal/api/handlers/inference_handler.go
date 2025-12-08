@@ -13,8 +13,9 @@ import (
 
 // InferenceHandler exposes minimal endpoints to manage inference providers.
 type InferenceHandler struct {
-	router *inference.Router
-	logger *logrus.Logger
+	router     *inference.Router
+	modelStore *inference.ModelStore
+	logger     *logrus.Logger
 }
 
 // NewInferenceHandler constructs handler.
@@ -23,6 +24,11 @@ func NewInferenceHandler(router *inference.Router, logger *logrus.Logger) *Infer
 		router: router,
 		logger: logger,
 	}
+}
+
+// SetModelStore sets the model store for persistence.
+func (h *InferenceHandler) SetModelStore(store *inference.ModelStore) {
+	h.modelStore = store
 }
 
 // LoadRequest describes model spec input.
@@ -36,6 +42,9 @@ type LoadRequest struct {
 	HFRevision   string                 `json:"hf_revision"`
 	GGUFURL      string                 `json:"gguf_url"`
 	ExpectedSHA  string                 `json:"expected_sha"`
+
+	// GPU selection (e.g., "0", "1", "0,1" for multi-GPU)
+	GPUDevice string `json:"gpu_device"`
 
 	// vLLM options
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel"`
@@ -73,6 +82,23 @@ type ModelsResponse struct {
 	LastUsed     string                 `json:"last_used,omitempty"`
 	Capabilities []inference.Capability `json:"capabilities,omitempty"`
 	Pinned       bool                   `json:"pinned,omitempty"`
+
+	// Source info for restart
+	HFRepo      string `json:"hf_repo,omitempty"`
+	HFFile      string `json:"hf_file,omitempty"`
+	GGUFURL     string `json:"gguf_url,omitempty"`
+	ContainerID string `json:"container_id,omitempty"`
+
+	// Provider params (for restart with same settings)
+	VLLMTensorParallel   int     `json:"vllm_tensor_parallel,omitempty"`
+	VLLMMaxModelLen      int     `json:"vllm_max_model_len,omitempty"`
+	VLLMGPUUtilization   float64 `json:"vllm_gpu_utilization,omitempty"`
+	LlamaMainGPU         int     `json:"llama_main_gpu,omitempty"`
+	LlamaTensorSplit     string  `json:"llama_tensor_split,omitempty"`
+	LlamaNGPULayers      int     `json:"llama_n_gpu_layers,omitempty"`
+	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
+	SGLangMemFraction    float64 `json:"sglang_mem_fraction,omitempty"`
+	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
 }
 
 // PostLoad starts container after ensuring artifacts.
@@ -93,6 +119,7 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		HFRevision:         req.HFRevision,
 		GGUFURL:            req.GGUFURL,
 		ExpectedSHA:        req.ExpectedSHA,
+		GPUDevice:          req.GPUDevice,
 		VLLMTensorParallel: req.VLLMTensorParallel,
 		VLLMMaxModelLen:    req.VLLMMaxModelLen,
 		VLLMGPUUtilization: req.VLLMGPUUtilization,
@@ -151,6 +178,7 @@ func (h *InferenceHandler) PostPrepare(c *gin.Context) {
 		HFRevision:   req.HFRevision,
 		GGUFURL:      req.GGUFURL,
 		ExpectedSHA:  req.ExpectedSHA,
+		GPUDevice:    req.GPUDevice,
 	}
 	inst, err := h.router.PrepareBySpec(c.Request.Context(), spec)
 	if err != nil {
@@ -290,9 +318,24 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 			LocalPath:    m.Spec.LocalPath,
 			Capabilities: m.Spec.Capabilities,
 			LastError:    m.Error,
+			// Source info
+			HFRepo:  m.Spec.HFRepo,
+			HFFile:  m.Spec.HFFile,
+			GGUFURL: m.Spec.GGUFURL,
+			// Provider params
+			VLLMTensorParallel:   m.Spec.VLLMTensorParallel,
+			VLLMMaxModelLen:      m.Spec.VLLMMaxModelLen,
+			VLLMGPUUtilization:   m.Spec.VLLMGPUUtilization,
+			LlamaMainGPU:         m.Spec.LlamaMainGPU,
+			LlamaTensorSplit:     m.Spec.LlamaTensorSplit,
+			LlamaNGPULayers:      m.Spec.LlamaNGPULayers,
+			SGLangTensorParallel: m.Spec.SGLangTensorParallel,
+			SGLangMemFraction:    m.Spec.SGLangMemFraction,
+			TGINumShard:          m.Spec.TGINumShard,
 		}
 		if m.Handle != nil {
 			item.Endpoint = m.Handle.Endpoint
+			item.ContainerID = m.Handle.ID
 		}
 		if !m.LastUsed.IsZero() {
 			item.LastUsed = m.LastUsed.UTC().Format(time.RFC3339)
@@ -430,4 +473,148 @@ func (h *InferenceHandler) DeleteTRTEngine(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "deleted", "alias": alias})
+}
+
+// --- Saved Models API ---
+
+// SavedModelResponse describes a saved model configuration.
+type SavedModelResponse struct {
+	Alias                string                 `json:"alias"`
+	Provider             inference.ProviderKind `json:"provider"`
+	Format               inference.ModelFormat  `json:"format"`
+	Capabilities         []inference.Capability `json:"capabilities,omitempty"`
+	HFRepo               string                 `json:"hf_repo,omitempty"`
+	HFFile               string                 `json:"hf_file,omitempty"`
+	GGUFURL              string                 `json:"gguf_url,omitempty"`
+	GPUDevice            string                 `json:"gpu_device,omitempty"`
+	AutoStart            bool                   `json:"auto_start"`
+	SavedAt              string                 `json:"saved_at,omitempty"`
+	VLLMTensorParallel   int                    `json:"vllm_tensor_parallel,omitempty"`
+	VLLMMaxModelLen      int                    `json:"vllm_max_model_len,omitempty"`
+	VLLMGPUUtilization   float64                `json:"vllm_gpu_utilization,omitempty"`
+	LlamaMainGPU         int                    `json:"llama_main_gpu,omitempty"`
+	LlamaNGPULayers      int                    `json:"llama_n_gpu_layers,omitempty"`
+	SGLangTensorParallel int                    `json:"sglang_tensor_parallel,omitempty"`
+	SGLangMemFraction    float64                `json:"sglang_mem_fraction,omitempty"`
+	TGINumShard          int                    `json:"tgi_num_shard,omitempty"`
+}
+
+// GetSavedModels returns list of saved model configurations.
+// GET /api/system/inference/saved
+func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
+	if h.modelStore == nil {
+		c.JSON(http.StatusOK, []SavedModelResponse{})
+		return
+	}
+
+	saved := h.modelStore.List()
+	resp := make([]SavedModelResponse, 0, len(saved))
+	for _, m := range saved {
+		resp = append(resp, SavedModelResponse{
+			Alias:                m.Alias,
+			Provider:             m.Provider,
+			Format:               m.Format,
+			Capabilities:         m.Capabilities,
+			HFRepo:               m.HFRepo,
+			HFFile:               m.HFFile,
+			GGUFURL:              m.GGUFURL,
+			GPUDevice:            m.GPUDevice,
+			AutoStart:            m.AutoStart,
+			SavedAt:              m.SavedAt.Format(time.RFC3339),
+			VLLMTensorParallel:   m.VLLMTensorParallel,
+			VLLMMaxModelLen:      m.VLLMMaxModelLen,
+			VLLMGPUUtilization:   m.VLLMGPUUtilization,
+			LlamaMainGPU:         m.LlamaMainGPU,
+			LlamaNGPULayers:      m.LlamaNGPULayers,
+			SGLangTensorParallel: m.SGLangTensorParallel,
+			SGLangMemFraction:    m.SGLangMemFraction,
+			TGINumShard:          m.TGINumShard,
+		})
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// PostSaveModel saves a model configuration for later use.
+// POST /api/system/inference/save
+func (h *InferenceHandler) PostSaveModel(c *gin.Context) {
+	if h.modelStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model store not configured"})
+		return
+	}
+
+	var req struct {
+		Alias     string `json:"alias" binding:"required"`
+		AutoStart bool   `json:"auto_start"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get model spec from running/registered models
+	models := h.router.ListModels()
+	var found *inference.ModelInstance
+	for _, m := range models {
+		if m.Spec.Alias == req.Alias {
+			found = m
+			break
+		}
+	}
+
+	if found == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "model not found in registry"})
+		return
+	}
+
+	if err := h.modelStore.SaveFromSpec(found.Spec, req.AutoStart); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "saved", "alias": req.Alias, "auto_start": req.AutoStart})
+}
+
+// PostDeleteSaved deletes a saved model configuration.
+// POST /api/system/inference/delete-saved?alias=...
+func (h *InferenceHandler) PostDeleteSaved(c *gin.Context) {
+	if h.modelStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model store not configured"})
+		return
+	}
+
+	alias := c.Query("alias")
+	if alias == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "alias is required"})
+		return
+	}
+
+	if err := h.modelStore.Delete(alias); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// PostSetAutoStart toggles auto_start flag for a saved model.
+// POST /api/system/inference/auto-start?alias=...&enabled=true/false
+func (h *InferenceHandler) PostSetAutoStart(c *gin.Context) {
+	if h.modelStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model store not configured"})
+		return
+	}
+
+	alias := c.Query("alias")
+	if alias == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "alias is required"})
+		return
+	}
+
+	enabled := c.Query("enabled") == "true"
+	if err := h.modelStore.SetAutoStart(alias, enabled); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"alias": alias, "auto_start": enabled})
 }

@@ -1,14 +1,19 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest } from '$lib/api/inference';
+	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest, type GPUDevice, type SavedModel } from '$lib/api/inference';
 	import { api } from '$lib/api/client';
 	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
+	
+	// GPU devices for selection
+	let gpuDevices: GPUDevice[] = $state([]);
+	let selectedGPUs: number[] = $state([]);
 
 	const providers: Provider[] = ['vllm', 'sglang', 'tgi', 'tensorrt-llm', 'llama.cpp'];
 	const formats: Format[] = ['hf', 'gguf', 'trt', 'other'];
 	const capabilities: Capability[] = ['chat', 'embeddings', 'vision'];
 
 	let models: ModelInfo[] = $state([]);
+	let savedModels: SavedModel[] = $state([]);
 	let artifacts: ArtifactInfo[] = $state([]);
 	let trtEngines: TRTEngine[] = $state([]);
 	let busy = $state(false);
@@ -59,14 +64,15 @@
 		hf_revision: '',
 		gguf_url: '',
 		capabilities: ['chat'],
+		gpu_device: '',
 		vllm_tensor_parallel: 0,
 		vllm_max_model_len: 0,
-		vllm_gpu_utilization: 0.92,
+		vllm_gpu_utilization: 0.8,
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
 		sglang_tensor_parallel: 0,
-		sglang_mem_fraction: 0.9,
+		sglang_mem_fraction: 0.8,
 		tgi_num_shard: 1
 	});
 
@@ -82,6 +88,7 @@
 	onMount(async () => {
 		await refreshAll();
 		await loadPopularHF();
+		await loadGPUs();
 	});
 
 	onDestroy(() => {
@@ -89,7 +96,37 @@
 	});
 
 	async function refreshAll() {
-		await Promise.all([loadModels(), loadCache(), loadTRTEngines()]);
+		await Promise.all([loadModels(), loadSavedModels(), loadCache(), loadTRTEngines()]);
+	}
+
+	async function loadSavedModels() {
+		try {
+			savedModels = (await inferenceApi.listSaved()) || [];
+		} catch (e: any) {
+			console.error('Failed to load saved models:', e);
+			savedModels = [];
+		}
+	}
+	
+	async function loadGPUs() {
+		try {
+			const resp = await inferenceApi.listGPUs();
+			if (resp.enabled && resp.devices) {
+				gpuDevices = resp.devices;
+			}
+		} catch {
+			gpuDevices = [];
+		}
+	}
+	
+	function toggleGPU(index: number) {
+		if (selectedGPUs.includes(index)) {
+			selectedGPUs = selectedGPUs.filter(i => i !== index);
+		} else {
+			selectedGPUs = [...selectedGPUs, index];
+		}
+		// Update form.gpu_device string
+		form.gpu_device = selectedGPUs.sort((a, b) => a - b).join(',');
 	}
 	
 	// HuggingFace Browser functions
@@ -249,6 +286,7 @@
 				hf_revision: form.hf_revision?.trim(),
 				gguf_url: form.gguf_url?.trim(),
 				capabilities: form.capabilities,
+				gpu_device: form.gpu_device?.trim(),
 				vllm_tensor_parallel: form.vllm_tensor_parallel,
 				vllm_max_model_len: form.vllm_max_model_len,
 				vllm_gpu_utilization: form.vllm_gpu_utilization,
@@ -284,6 +322,36 @@
 		}
 	}
 
+	async function startModel(m: ModelInfo) {
+		try {
+			// Restart model with same parameters
+			const req: LoadRequest = {
+				alias: m.alias,
+				provider: m.provider,
+				format: m.format,
+				capabilities: m.capabilities || ['chat'],
+				hf_repo: m.hf_repo,
+				hf_file: m.hf_file,
+				gguf_url: m.gguf_url,
+				gpu_device: '', // Use default GPUs
+				vllm_tensor_parallel: m.vllm_tensor_parallel,
+				vllm_max_model_len: m.vllm_max_model_len,
+				vllm_gpu_utilization: m.vllm_gpu_utilization,
+				llama_main_gpu: m.llama_main_gpu,
+				llama_tensor_split: m.llama_tensor_split,
+				llama_n_gpu_layers: m.llama_n_gpu_layers,
+				sglang_tensor_parallel: m.sglang_tensor_parallel,
+				sglang_mem_fraction: m.sglang_mem_fraction,
+				tgi_num_shard: m.tgi_num_shard,
+			};
+			await inferenceApi.load(req);
+			showMsg(`Модель ${m.alias} запускается`, 'success');
+			await loadModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка запуска', 'error');
+		}
+	}
+
 	async function evictModel(alias: string) {
 		try {
 			await inferenceApi.evict(alias);
@@ -304,6 +372,63 @@
 			await loadModels();
 		} catch (e: any) {
 			showMsg(e?.message || 'Ошибка pin/unpin', 'error');
+		}
+	}
+
+	async function saveModelConfig(alias: string, autoStart: boolean = false) {
+		try {
+			await inferenceApi.saveModel(alias, autoStart);
+			showMsg(`Конфигурация ${alias} сохранена`, 'success');
+			await loadSavedModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка сохранения', 'error');
+		}
+	}
+
+	async function deleteSavedModel(alias: string) {
+		try {
+			await inferenceApi.deleteSaved(alias);
+			showMsg(`Сохранённая модель ${alias} удалена`, 'success');
+			await loadSavedModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка удаления', 'error');
+		}
+	}
+
+	async function toggleAutoStart(saved: SavedModel) {
+		try {
+			await inferenceApi.setAutoStart(saved.alias, !saved.auto_start);
+			await loadSavedModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка изменения auto-start', 'error');
+		}
+	}
+
+	async function loadSavedModelConfig(saved: SavedModel) {
+		try {
+			const req: LoadRequest = {
+				alias: saved.alias,
+				provider: saved.provider,
+				format: saved.format,
+				capabilities: saved.capabilities || ['chat'],
+				hf_repo: saved.hf_repo,
+				hf_file: saved.hf_file,
+				gguf_url: saved.gguf_url,
+				gpu_device: saved.gpu_device || '',
+				vllm_tensor_parallel: saved.vllm_tensor_parallel,
+				vllm_max_model_len: saved.vllm_max_model_len,
+				vllm_gpu_utilization: saved.vllm_gpu_utilization,
+				llama_main_gpu: saved.llama_main_gpu,
+				llama_n_gpu_layers: saved.llama_n_gpu_layers,
+				sglang_tensor_parallel: saved.sglang_tensor_parallel,
+				sglang_mem_fraction: saved.sglang_mem_fraction,
+				tgi_num_shard: saved.tgi_num_shard,
+			};
+			await inferenceApi.load(req);
+			showMsg(`Модель ${saved.alias} запускается`, 'success');
+			await loadModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка загрузки', 'error');
 		}
 	}
 
@@ -531,6 +656,35 @@
 						</label>
 					</div>
 
+					<!-- GPU Device Selection -->
+					<div class="flex flex-col gap-2 text-sm">
+						<span class="font-medium">GPU Device</span>
+						{#if gpuDevices.length > 0}
+							<div class="flex flex-wrap gap-2">
+								{#each gpuDevices as gpu}
+									<button
+										type="button"
+										class="px-3 py-2 rounded border text-sm flex flex-col items-start {selectedGPUs.includes(gpu.index) ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}"
+										onclick={() => toggleGPU(gpu.index)}
+									>
+										<span class="font-medium">GPU {gpu.index}: {gpu.name}</span>
+										<span class="text-xs opacity-75">{Math.round(gpu.memory_mb / 1024)} GB ({Math.round(gpu.memory_free_mb / 1024)} GB free)</span>
+									</button>
+								{/each}
+							</div>
+							<span class="text-xs text-muted-foreground">
+								{selectedGPUs.length === 0 ? 'No GPU selected = use all GPUs' : `Selected: GPU ${selectedGPUs.join(', ')}`}
+							</span>
+						{:else}
+							<input 
+								class="border rounded px-3 py-2 bg-background" 
+								bind:value={form.gpu_device} 
+								placeholder="0, 1, or 0,1 (empty = all GPUs)"
+							/>
+							<span class="text-xs text-muted-foreground">GPU list unavailable. Enter index manually.</span>
+						{/if}
+					</div>
+
 					<!-- Capabilities -->
 					<div class="flex flex-col gap-2 text-sm">
 						<span class="font-medium">Capabilities</span>
@@ -604,7 +758,50 @@
 					</div>
 				</div>
 
-				<!-- Models List -->
+				<!-- Saved Models (persisted configs) -->
+				{#if savedModels.length > 0}
+					<div class="border rounded-lg overflow-hidden bg-card">
+						<div class="px-4 py-3 border-b bg-muted/50">
+							<h2 class="font-semibold">Saved Models <span class="text-xs text-muted-foreground font-normal">(click to load)</span></h2>
+						</div>
+						<div class="divide-y">
+							{#each savedModels as saved}
+								{@const isRunning = models.some(m => m.alias === saved.alias)}
+								<div class="px-4 py-3 hover:bg-muted/30 flex items-center gap-4">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2">
+											<span class="font-medium">{saved.alias}</span>
+											{#if saved.auto_start}
+												<span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">auto-start</span>
+											{/if}
+											{#if isRunning}
+												<span class="text-xs px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">running</span>
+											{/if}
+										</div>
+										<div class="text-xs text-muted-foreground mt-1">
+											{saved.provider} · {saved.format} · {saved.hf_repo || saved.gguf_url || 'local'}
+										</div>
+									</div>
+									<div class="flex gap-1 flex-shrink-0">
+										{#if !isRunning}
+											<button class="px-2 py-1 text-xs rounded border bg-primary/10 text-primary hover:bg-primary/20" onclick={() => loadSavedModelConfig(saved)}>Load</button>
+										{/if}
+										<button 
+											class="px-2 py-1 text-xs rounded border hover:bg-muted" 
+											onclick={() => toggleAutoStart(saved)}
+											title={saved.auto_start ? 'Disable auto-start' : 'Enable auto-start'}
+										>
+											{saved.auto_start ? '⏸' : '▶'}
+										</button>
+										<button class="px-2 py-1 text-xs rounded border text-red-500 hover:bg-red-500/10" onclick={() => deleteSavedModel(saved.alias)}>✕</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Running Models List -->
 				<div class="border rounded-lg overflow-hidden bg-card">
 					<div class="px-4 py-3 border-b bg-muted/50 flex items-center justify-between">
 						<h2 class="font-semibold">Running Models</h2>
@@ -614,12 +811,16 @@
 							<div class="px-4 py-8 text-center text-muted-foreground">No models loaded</div>
 						{:else}
 							{#each (models || []) as m}
+								{@const isSaved = savedModels.some(s => s.alias === m.alias)}
 								<div class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-4" onclick={() => selectModel(m)}>
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-2">
 											<span class="font-semibold">{m.alias}</span>
 											{#if m.pinned}
 												<span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">pinned</span>
+											{/if}
+											{#if isSaved}
+												<span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">saved</span>
 											{/if}
 											<span class={`text-sm font-medium ${statusColor(m.status)}`}>{m.status}</span>
 										</div>
@@ -634,7 +835,14 @@
 										{/if}
 									</div>
 									<div class="flex gap-1 flex-shrink-0">
-										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); stopModel(m.alias); }}>Stop</button>
+										{#if m.status === 'running' || m.status === 'starting'}
+											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); stopModel(m.alias); }}>Stop</button>
+										{:else}
+											<button class="px-2 py-1 text-xs rounded border bg-green-500/10 text-green-600 hover:bg-green-500/20" onclick={(e) => { e.stopPropagation(); startModel(m); }}>Start</button>
+										{/if}
+										{#if !isSaved}
+											<button class="px-2 py-1 text-xs rounded border bg-blue-500/10 text-blue-600 hover:bg-blue-500/20" onclick={(e) => { e.stopPropagation(); saveModelConfig(m.alias); }} title="Save config for restart">Save</button>
+										{/if}
 										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); evictModel(m.alias); }}>Evict</button>
 										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); togglePin(m); }}>
 											{m.pinned ? 'Unpin' : 'Pin'}

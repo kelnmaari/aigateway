@@ -205,11 +205,12 @@ type Router struct {
 	hfUIHandler  *handlersUI.HuggingFaceUIHandler // Hugging Face Model Browser
 
 	// Inference v4 (multi-provider)
-	inferenceSvc         *inference.Service
-	inferenceMgr         *inference.Manager
-	inferenceRouter      *inference.Router
-	inferenceHandler     *handlers.InferenceHandler
+	inferenceSvc          *inference.Service
+	inferenceMgr          *inference.Manager
+	inferenceRouter       *inference.Router
+	inferenceHandler      *handlers.InferenceHandler
 	inferenceProxyHandler *handlers.InferenceProxyHandler
+	inferenceModelStore   *inference.ModelStore
 
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
 	yzmaClient    *yzma.Client
@@ -321,8 +322,34 @@ func (r *Router) Initialize() error {
 		}
 	}
 
+	// Auto-start saved models with auto_start=true
+	if r.inferenceModelStore != nil && r.inferenceRouter != nil {
+		go r.autoStartSavedModels()
+	}
+
 	r.logger.Info("Router initialized successfully")
 	return nil
+}
+
+// autoStartSavedModels loads models marked with auto_start=true
+func (r *Router) autoStartSavedModels() {
+	autoStart := r.inferenceModelStore.ListAutoStart()
+	if len(autoStart) == 0 {
+		return
+	}
+
+	r.logger.WithField("count", len(autoStart)).Info("Auto-starting saved models")
+	ctx := context.Background()
+
+	for _, saved := range autoStart {
+		spec := saved.ToSpec()
+		r.logger.WithField("alias", spec.Alias).Info("Auto-starting model")
+
+		_, err := r.inferenceRouter.EnsureBySpec(ctx, spec)
+		if err != nil {
+			r.logger.WithError(err).WithField("alias", spec.Alias).Error("Failed to auto-start model")
+		}
+	}
 }
 
 // Close закрывает роутер и освобождает ресурсы
@@ -537,6 +564,11 @@ func (r *Router) setupInferenceRoutes() {
 		group.GET("/trt-engines", r.inferenceHandler.ListTRTEngines)
 		group.POST("/convert-trt", r.inferenceHandler.ConvertTRT)
 		group.POST("/delete-trt-engine", r.inferenceHandler.DeleteTRTEngine)
+		// Saved models (persist config between restarts)
+		group.GET("/saved", r.inferenceHandler.GetSavedModels)
+		group.POST("/save", r.inferenceHandler.PostSaveModel)
+		group.POST("/delete-saved", r.inferenceHandler.PostDeleteSaved)
+		group.POST("/auto-start", r.inferenceHandler.PostSetAutoStart)
 	}
 	r.logger.Info("Inference v4 routes configured")
 
@@ -772,6 +804,7 @@ func (r *Router) setupGPURoutes() {
 	api := r.engine.Group("/api/gpu")
 	{
 		api.GET("/metrics", r.gpuHandler.GetGPUMetrics)
+		api.GET("/list", r.gpuHandler.GetGPUList) // v3.3.x: GPU list for model deployment
 	}
 
 	r.logger.Info("✅ GPU monitoring routes registered")
@@ -1682,6 +1715,13 @@ func (r *Router) setupOpenAIRoutes() {
 			// No inference manager - return empty list
 			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
 		})
+
+		// Fallback /v1/chat/completions for inference v4 models (v3.3.x)
+		if r.inferenceProxyHandler != nil {
+			r.logger.Info("yzma disabled - registering fallback /v1/chat/completions endpoint for inference v4")
+			v1.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
+			v1.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
+		}
 	}
 }
 
@@ -2602,6 +2642,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		HFCacheDir:            infHFCache,
 		GGUFCacheDir:          infGGUFCache,
 		TRTEnginesDir:         infTRTDir,
+		ContainerLogsDir:      "logs/containers", // Container logs directory
 		MaxConcurrentDownload: infMaxConcurrent,
 		AutoResume:            infAutoResume,
 		HTTPTimeout:           infHTTPTimeout,
@@ -2620,6 +2661,15 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		r.inferenceRouter = inference.NewRouter(r.inferenceMgr)
 		r.inferenceHandler = handlers.NewInferenceHandler(r.inferenceRouter, logger)
 		r.inferenceProxyHandler = handlers.NewInferenceProxyHandler(r.inferenceRouter, logger)
+		// Initialize model store for persistence (store in data/ directory)
+		modelStore, storeErr := inference.NewModelStore("./data", logger)
+		if storeErr != nil {
+			logger.WithError(storeErr).Warn("Failed to create model store")
+		} else {
+			r.inferenceModelStore = modelStore
+			r.inferenceHandler.SetModelStore(modelStore)
+			logger.Info("Inference model store initialized")
+		}
 		// Idle stop using legacy preload.unload_after if set
 		idleAfter := cfg.Models.Preload.UnloadAfter
 		if idleAfter > 0 {

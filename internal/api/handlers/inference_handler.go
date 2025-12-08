@@ -246,7 +246,12 @@ func (h *InferenceHandler) PostDeleteArtifacts(c *gin.Context) {
 func (h *InferenceHandler) GetCache(c *gin.Context) {
 	artifacts, err := h.router.ListArtifacts()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.logger.WithError(err).Warn("Failed to list cache artifacts")
+		c.JSON(http.StatusOK, []gin.H{})
+		return
+	}
+	if len(artifacts) == 0 {
+		c.JSON(http.StatusOK, []gin.H{})
 		return
 	}
 	c.JSON(http.StatusOK, artifacts)
@@ -381,17 +386,24 @@ func (h *InferenceHandler) ConvertTRT(c *gin.Context) {
 func (h *InferenceHandler) ListTRTEngines(c *gin.Context) {
 	converter := h.router.TRTConverter()
 	if converter == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "TRT converter not configured"})
+		// Return empty array when TRT converter not configured
+		c.JSON(http.StatusOK, []gin.H{})
 		return
 	}
 
 	engines, err := converter.ListEngines()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.logger.WithError(err).Warn("Failed to list TRT engines")
+		c.JSON(http.StatusOK, []gin.H{})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"engines": engines})
+	if len(engines) == 0 {
+		c.JSON(http.StatusOK, []gin.H{})
+		return
+	}
+
+	c.JSON(http.StatusOK, engines)
 }
 
 // DeleteTRTEngine deletes a cached TRT engine.

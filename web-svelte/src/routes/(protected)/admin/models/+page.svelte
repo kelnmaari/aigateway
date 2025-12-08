@@ -205,25 +205,28 @@
 
 	async function loadModels() {
 		try {
-			models = await inferenceApi.listModels();
+			models = (await inferenceApi.listModels()) || [];
 		} catch (e: any) {
 			showMsg(e?.message || 'Не удалось получить список моделей', 'error');
+			models = [];
 		}
 	}
 
 	async function loadCache() {
 		try {
-			artifacts = await inferenceApi.listCache();
+			artifacts = (await inferenceApi.listCache()) || [];
 		} catch (e: any) {
 			console.error(e);
+			artifacts = [];
 		}
 	}
 
 	async function loadTRTEngines() {
 		try {
-			trtEngines = await inferenceApi.listTRTEngines();
+			trtEngines = (await inferenceApi.listTRTEngines()) || [];
 		} catch (e: any) {
 			console.error(e);
+			trtEngines = [];
 		}
 	}
 
@@ -476,7 +479,7 @@
 	<!-- Tabs -->
 	<div class="flex gap-2 border-b">
 		<button class={`px-4 py-2 -mb-px ${activeTab === 'models' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'models'}>
-			Models ({models.length})
+			Models ({(models || []).length})
 		</button>
 		<button class={`px-4 py-2 -mb-px ${activeTab === 'hf' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'hf'}>
 			🤗 HuggingFace
@@ -607,10 +610,10 @@
 						<h2 class="font-semibold">Running Models</h2>
 					</div>
 					<div class="divide-y">
-						{#if models.length === 0}
+						{#if (models || []).length === 0}
 							<div class="px-4 py-8 text-center text-muted-foreground">No models loaded</div>
 						{:else}
-							{#each models as m}
+							{#each (models || []) as m}
 								<div class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-4" onclick={() => selectModel(m)}>
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-2">
@@ -947,10 +950,10 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y">
-						{#if artifacts.length === 0}
+						{#if (artifacts || []).length === 0}
 							<tr><td class="px-4 py-8 text-center text-muted-foreground" colspan="5">No cache artifacts</td></tr>
 						{:else}
-							{#each artifacts as a}
+							{#each (artifacts || []) as a}
 								<tr class="hover:bg-muted/30">
 									<td class="px-4 py-2 break-all max-w-md">{a.path}</td>
 									<td class="px-4 py-2">{formatSize(a.size)}</td>
@@ -1011,10 +1014,10 @@
 					<h2 class="font-semibold">Cached TRT Engines</h2>
 				</div>
 				<div class="divide-y">
-					{#if trtEngines.length === 0}
+					{#if (trtEngines || []).length === 0}
 						<div class="px-4 py-8 text-center text-muted-foreground">No TRT engines</div>
 					{:else}
-						{#each trtEngines as e}
+						{#each (trtEngines || []) as e}
 							<div class="px-4 py-3">
 								<div class="flex items-start justify-between">
 									<div>

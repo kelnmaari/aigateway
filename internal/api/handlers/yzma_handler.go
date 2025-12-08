@@ -512,6 +512,40 @@ func (h *YzmaHandler) HandleYzmaStats(c *gin.Context) {
 	})
 }
 
+// HandleGPUInfo returns GPU configuration and status (v3.2.2+)
+// This endpoint is safe to call before models are loaded
+func (h *YzmaHandler) HandleGPUInfo(c *gin.Context) {
+	gpuInfo := h.client.GetGPUInfo()
+	
+	c.JSON(http.StatusOK, gin.H{
+		"gpu":               gpuInfo,
+		"backend_ready":     gpuInfo.Initialized,
+		"models_ready":      gpuInfo.LoadedModelCount > 0,
+		"loaded_model_count": gpuInfo.LoadedModelCount,
+	})
+}
+
+// HandleHealthCheck returns basic health status (v3.2.2+)
+// This endpoint always works, even during model loading
+func (h *YzmaHandler) HandleHealthCheck(c *gin.Context) {
+	initialized := h.client.IsInitialized()
+	loadedModels := h.client.ListLoadedModels()
+	
+	status := "initializing"
+	if initialized && len(loadedModels) > 0 {
+		status = "ready"
+	} else if initialized {
+		status = "waiting_for_models"
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"status":             status,
+		"initialized":        initialized,
+		"loaded_model_count": len(loadedModels),
+		"loaded_models":      loadedModels,
+	})
+}
+
 // Helper methods
 func (h *YzmaHandler) getIntValue(ptr *int, defaultVal int) int {
 	if ptr == nil {

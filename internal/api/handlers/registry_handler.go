@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"aigateway/internal/models"
@@ -10,11 +12,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// ModelUsageChecker interface for checking model usage in integrations
+type ModelUsageChecker interface {
+	IsModelUsed(ctx context.Context, modelID string) (bool, error)
+	FindProjectsByModel(ctx context.Context, modelID string) ([]models.GitLabProjectRef, error)
+}
+
 // RegistryHandler обрабатывает запросы к Model Registry API
 type RegistryHandler struct {
 	db              storage.Database
 	providerManager *providers.ProviderManager
 	logger          *logrus.Logger
+	usageChecker    ModelUsageChecker // Optional: for GitLab integration checks
 }
 
 // NewRegistryHandler создает новый RegistryHandler
@@ -24,6 +33,11 @@ func NewRegistryHandler(db storage.Database, providerManager *providers.Provider
 		providerManager: providerManager,
 		logger:          logger,
 	}
+}
+
+// SetModelUsageChecker sets the model usage checker for GitLab integration
+func (h *RegistryHandler) SetModelUsageChecker(checker ModelUsageChecker) {
+	h.usageChecker = checker
 }
 
 // ========================================
@@ -287,6 +301,30 @@ func (h *RegistryHandler) UpdateModel(c *gin.Context) {
 		return
 	}
 
+	// Check if model is being deactivated and is used in GitLab
+	if req.Status != nil && *req.Status != models.ModelStatusActive && model.Status == models.ModelStatusActive {
+		if h.usageChecker != nil {
+			isUsed, err := h.usageChecker.IsModelUsed(c.Request.Context(), modelID)
+			if err != nil {
+				h.logger.WithError(err).Warn("Failed to check model usage in GitLab")
+				// Continue anyway - don't block if check fails
+			} else if isUsed {
+				// Get projects using this model for error message
+				projects, _ := h.usageChecker.FindProjectsByModel(c.Request.Context(), modelID)
+				projectCount := len(projects)
+				c.JSON(http.StatusConflict, gin.H{
+					"error":          "Cannot deactivate model",
+					"reason":         fmt.Sprintf("Model is used in %d GitLab project(s)", projectCount),
+					"gitlab_usage":   true,
+					"project_count":  projectCount,
+					"projects":       projects,
+					"resolution":     "Change the model in these GitLab projects before deactivating",
+				})
+				return
+			}
+		}
+	}
+
 	// Обновляем поля
 	if req.ModelName != nil {
 		model.ModelName = *req.ModelName
@@ -332,6 +370,28 @@ func (h *RegistryHandler) UpdateModel(c *gin.Context) {
 // DELETE /api/admin/registry/models/:id
 func (h *RegistryHandler) DeleteModel(c *gin.Context) {
 	modelID := c.Param("id")
+
+	// Check if model is used in GitLab before deletion
+	if h.usageChecker != nil {
+		isUsed, err := h.usageChecker.IsModelUsed(c.Request.Context(), modelID)
+		if err != nil {
+			h.logger.WithError(err).Warn("Failed to check model usage in GitLab")
+			// Continue anyway - don't block if check fails
+		} else if isUsed {
+			// Get projects using this model for error message
+			projects, _ := h.usageChecker.FindProjectsByModel(c.Request.Context(), modelID)
+			projectCount := len(projects)
+			c.JSON(http.StatusConflict, gin.H{
+				"error":          "Cannot delete model",
+				"reason":         fmt.Sprintf("Model is used in %d GitLab project(s)", projectCount),
+				"gitlab_usage":   true,
+				"project_count":  projectCount,
+				"projects":       projects,
+				"resolution":     "Change the model in these GitLab projects before deleting",
+			})
+			return
+		}
+	}
 
 	if err := h.db.DeleteModelRegistry(c.Request.Context(), modelID); err != nil {
 		h.logger.WithError(err).Errorf("Failed to delete model: %s", modelID)

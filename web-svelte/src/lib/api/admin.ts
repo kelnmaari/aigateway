@@ -140,20 +140,27 @@ export interface SystemMetrics {
 // ==================== Invitations ====================
 export interface Invitation {
 	id: string;
-	email?: string;
 	token: string;
-	role: string;
-	created_by: string;
+	created_by_user_id: string;
 	created_at: string;
-	expires_at: string;
+	email?: string;
+	expires_at?: string;
+	max_uses: number;
+	current_uses: number;
 	used_at?: string;
-	used_by?: string;
-	status: 'pending' | 'used' | 'expired' | 'revoked';
+	used_by_user_id?: string;
+	revoked_at?: string;
+	revoked_by_user_id?: string;
 }
 
 export interface InvitationsResponse {
 	invitations: Invitation[];
-	total: number;
+	count: number;
+}
+
+export interface CreateInvitationResponse {
+	invitation: Invitation;
+	invitation_link: string;
 }
 
 export interface CreateInvitationRequest {
@@ -176,6 +183,70 @@ export interface RAGStats {
 	vector_stats?: VectorStats;
 	health_status: string;
 	loaded_at: string;
+}
+
+// ==================== GPU Metrics ====================
+export interface GPUDevice {
+	index: number;
+	name: string;
+	uuid: string;
+	temperature_c: number;
+	power_usage_w: number;
+	power_limit_w: number;
+	utilization_gpu_percent: number;
+	utilization_memory_percent: number;
+	memory_total_mb: number;
+	memory_used_mb: number;
+	memory_free_mb: number;
+	memory_usage_percent: number;
+	fan_speed_percent: number;
+	clock_graphics_mhz: number;
+	clock_memory_mhz: number;
+}
+
+export interface GPUMetrics {
+	device_count: number;
+	devices: GPUDevice[];
+	total_memory_mb: number;
+	used_memory_mb: number;
+	memory_usage_percent: number;
+}
+
+export interface GPUMetricsResponse {
+	enabled: boolean;
+	message?: string;
+	data?: GPUMetrics;
+}
+
+// ==================== Yzma GPU/Health (v3.2.2+) ====================
+export interface YzmaGPUInfo {
+	max_devices: number;
+	supports_gpu: boolean;
+	n_gpu_layers: number;
+	main_gpu: number;
+	tensor_split?: number[];
+	flash_attention: boolean;
+	threads: number;
+	threads_batch: number;
+	context_size: number;
+	batch_size: number;
+	initialized: boolean;
+	models_loading: boolean;
+	loaded_model_count: number;
+}
+
+export interface YzmaGPUResponse {
+	gpu: YzmaGPUInfo;
+	backend_ready: boolean;
+	models_ready: boolean;
+	loaded_model_count: number;
+}
+
+export interface YzmaHealthResponse {
+	status: 'initializing' | 'waiting_for_models' | 'ready';
+	initialized: boolean;
+	loaded_model_count: number;
+	loaded_models: string[];
 }
 
 // ==================== API ====================
@@ -246,11 +317,18 @@ export const adminApi = {
 	getInvitations: () => api.get<InvitationsResponse>('/api/admin/invitations'),
 
 	createInvitation: (data: CreateInvitationRequest) =>
-		api.post<Invitation>('/api/admin/invitations', data),
+		api.post<CreateInvitationResponse>('/api/admin/invitations', data),
 
 	revokeInvitation: (id: string) => api.delete(`/api/admin/invitations/${id}`),
 
 	// RAG Stats (v3.2.0+)
-	getRAGStats: () => api.get<RAGStats>('/api/admin/rag/stats')
+	getRAGStats: () => api.get<RAGStats>('/api/admin/rag/stats'),
+
+	// GPU Metrics
+	getGPUMetrics: () => api.get<GPUMetricsResponse>('/api/gpu/metrics'),
+
+	// Yzma GPU/Health (v3.2.2+) - works before models are loaded
+	getYzmaGPUInfo: () => api.get<YzmaGPUResponse>('/api/system/yzma/gpu'),
+	getYzmaHealth: () => api.get<YzmaHealthResponse>('/api/system/yzma/health')
 };
 

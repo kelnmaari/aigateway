@@ -731,6 +731,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("inference.yzma.top_p", 0.9)
 	v.SetDefault("inference.yzma.min_p", 0.1)
 	v.SetDefault("inference.yzma.verbose", false)
+	// GPU configuration (v3.2.1+)
+	v.SetDefault("inference.yzma.main_gpu", 0)
+	v.SetDefault("inference.yzma.tensor_split", "")       // Empty = single GPU
+	v.SetDefault("inference.yzma.flash_attention", true)  // Enable by default for modern GPUs
+	v.SetDefault("inference.yzma.threads", 0)             // 0 = auto (use all CPU cores)
+	v.SetDefault("inference.yzma.threads_batch", 0)       // 0 = same as threads
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
@@ -1006,6 +1012,28 @@ type YzmaConfig struct {
 	// RequestTimeout - maximum time for a single generation request (default: 30m)
 	// Set to 0 for no timeout (use with caution)
 	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+
+	// === GPU Configuration (v3.2.1+) ===
+
+	// MainGPU - index of the GPU to use for scratch buffers (default: 0)
+	// When using tensor_split, this GPU handles temporary computations
+	MainGPU int32 `mapstructure:"main_gpu"`
+
+	// TensorSplit - how to distribute model layers across GPUs
+	// Example: "0.5,0.5" for 50/50 split between 2 GPUs
+	// Empty string = all layers on MainGPU
+	TensorSplit string `mapstructure:"tensor_split"`
+
+	// FlashAttention - enable Flash Attention for faster inference (default: true)
+	// Recommended for Ada Lovelace (RTX 40xx) and newer
+	FlashAttention bool `mapstructure:"flash_attention"`
+
+	// Threads - number of CPU threads for generation (default: number of CPU cores)
+	// Used for preprocessing and CPU-based operations
+	Threads int32 `mapstructure:"threads"`
+
+	// ThreadsBatch - number of CPU threads for batch processing (default: same as Threads)
+	ThreadsBatch int32 `mapstructure:"threads_batch"`
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

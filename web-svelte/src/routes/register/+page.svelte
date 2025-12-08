@@ -88,7 +88,7 @@
 				username,
 				email,
 				password,
-				full_name: fullName || undefined,
+				display_name: fullName || undefined,
 				invitation_token: invitationToken || undefined
 			});
 

@@ -148,6 +148,10 @@
 	let selectedYzmaModel = $state<YzmaModel | null>(null);
 	let yzmaMetadata = $state<YzmaModelMetadata | null>(null);
 	let isLoadingMetadata = $state(false);
+	
+	// Loading/unloading state
+	let loadingModels = $state<Set<string>>(new Set());
+	let unloadingModels = $state<Set<string>>(new Set());
 
 	// HuggingFace state
 	let hfModels = $state<HFModel[]>([]);
@@ -211,23 +215,56 @@
 	}
 
 	async function loadModel(path: string) {
+		loadingModels.add(path);
+		loadingModels = new Set(loadingModels);
+		
 		try {
 			await api.post('/api/ui/yzma/load', { model_path: path });
 			await loadLocalModels();
 		} catch (error) {
 			console.error('Failed to load model:', error);
 			alert('Failed to load model');
+		} finally {
+			loadingModels.delete(path);
+			loadingModels = new Set(loadingModels);
 		}
 	}
 
+// Cancel in-flight model load
+async function cancelModelLoad(path: string) {
+	try {
+		await api.post('/api/ui/yzma/cancel', { model_path: path });
+	} catch (error) {
+		console.error('Failed to cancel model load:', error);
+	}
+	// Remove loading flag and refresh list
+	loadingModels.delete(path);
+	loadingModels = new Set(loadingModels);
+	await loadLocalModels();
+}
+
 	async function unloadModel(path: string) {
+		unloadingModels.add(path);
+		unloadingModels = new Set(unloadingModels);
+		
 		try {
 			await api.post('/api/ui/yzma/unload', { model_path: path });
 			await loadLocalModels();
 		} catch (error) {
 			console.error('Failed to unload model:', error);
 			alert('Failed to unload model');
+		} finally {
+			unloadingModels.delete(path);
+			unloadingModels = new Set(unloadingModels);
 		}
+	}
+	
+	function isModelLoading(path: string): boolean {
+		return loadingModels.has(path);
+	}
+	
+	function isModelUnloading(path: string): boolean {
+		return unloadingModels.has(path);
 	}
 
 	async function deleteModel(path: string, name: string) {
@@ -491,8 +528,18 @@
 											{/if}
 										</p>
 									</div>
-									<Button variant="ghost" size="sm" onclick={() => unloadModel(model.path)}>
-										Unload
+									<Button 
+										variant="ghost" 
+										size="sm" 
+										onclick={() => unloadModel(model.path)}
+										disabled={isModelUnloading(model.path)}
+									>
+										{#if isModelUnloading(model.path)}
+											<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+											Unloading...
+										{:else}
+											Unload
+										{/if}
 									</Button>
 								</div>
 							</div>
@@ -541,16 +588,26 @@
 									<td class="px-4 py-3 text-sm text-muted-foreground">
 										{model.modified_at ? formatRelativeTime(model.modified_at) : '-'}
 									</td>
-									<td class="px-4 py-3">
-										{#if running}
-											<span class="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-500">
-												<span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-												Running
-											</span>
-										{:else}
-											<span class="text-sm text-muted-foreground">Idle</span>
-										{/if}
-									</td>
+							<td class="px-4 py-3">
+								{#if isModelLoading(model.path || model.name)}
+									<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-500">
+										<Loader2 class="h-3 w-3 animate-spin" />
+										Loading...
+									</span>
+								{:else if isModelUnloading(model.path || model.name)}
+									<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-500">
+										<Loader2 class="h-3 w-3 animate-spin" />
+										Unloading...
+									</span>
+								{:else if running}
+									<span class="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-500">
+										<span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+										Running
+									</span>
+								{:else}
+									<span class="text-sm text-muted-foreground">Idle</span>
+								{/if}
+							</td>
 									<td class="px-4 py-3 text-right">
 										<div class="flex items-center justify-end gap-1">
 											<button
@@ -560,11 +617,20 @@
 											>
 												<FileText class="h-4 w-4" />
 											</button>
-										{#if !running}
+										{#if isModelLoading(model.path || model.name)}
+											<button
+												onclick={() => cancelModelLoad(model.path || model.name)}
+												class="rounded p-1.5 text-amber-500 hover:bg-amber-500/10"
+												title="Cancel loading"
+											>
+												<X class="h-4 w-4" />
+											</button>
+										{:else if !running}
 											<button
 												onclick={() => loadModel(model.path || model.name)}
 												class="rounded p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
 												title="Load model"
+												disabled={isModelLoading(model.path || model.name)}
 											>
 												<Play class="h-4 w-4" />
 											</button>
@@ -1110,21 +1176,29 @@
 				{:else if !isModelRunning(selectedYzmaModel.path || selectedYzmaModel.name)}
 					<!-- Model not loaded - show message -->
 					<div class="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center">
-						<Zap class="mx-auto h-12 w-12 text-amber-500" />
-						<h3 class="mt-4 text-lg font-semibold">Model Not Loaded</h3>
-						<p class="mt-2 text-muted-foreground">
-							Load the model to see detailed architecture information (layers, attention heads, context size, etc.)
-						</p>
-						<Button 
-							class="mt-4" 
-							onclick={async () => {
-								await loadModel(selectedYzmaModel!.path || selectedYzmaModel!.name);
-								await viewLocalModelDetails(selectedYzmaModel!);
-							}}
-						>
-							<Play class="mr-2 h-4 w-4" />
-							Load Model
-						</Button>
+						{#if isModelLoading(selectedYzmaModel.path || selectedYzmaModel.name)}
+							<Loader2 class="mx-auto h-12 w-12 animate-spin text-amber-500" />
+							<h3 class="mt-4 text-lg font-semibold">Loading Model...</h3>
+							<p class="mt-2 text-muted-foreground">
+								This may take 30-60 seconds for large models. Please wait.
+							</p>
+						{:else}
+							<Zap class="mx-auto h-12 w-12 text-amber-500" />
+							<h3 class="mt-4 text-lg font-semibold">Model Not Loaded</h3>
+							<p class="mt-2 text-muted-foreground">
+								Load the model to see detailed architecture information (layers, attention heads, context size, etc.)
+							</p>
+							<Button 
+								class="mt-4" 
+								onclick={async () => {
+									await loadModel(selectedYzmaModel!.path || selectedYzmaModel!.name);
+									await viewLocalModelDetails(selectedYzmaModel!);
+								}}
+							>
+								<Play class="mr-2 h-4 w-4" />
+								Load Model
+							</Button>
+						{/if}
 					</div>
 				{:else if yzmaMetadata}
 					<div class="space-y-6">
@@ -1257,13 +1331,30 @@
 			<!-- Footer -->
 			<div class="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
 				{#if isModelRunning(selectedYzmaModel.path || selectedYzmaModel.name)}
-					<Button variant="outline" onclick={() => unloadModel(selectedYzmaModel!.path || selectedYzmaModel!.name)}>
-						Unload
+					<Button 
+						variant="outline" 
+						onclick={() => unloadModel(selectedYzmaModel!.path || selectedYzmaModel!.name)}
+						disabled={isModelUnloading(selectedYzmaModel.path || selectedYzmaModel.name)}
+					>
+						{#if isModelUnloading(selectedYzmaModel.path || selectedYzmaModel.name)}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Unloading...
+						{:else}
+							Unload
+						{/if}
 					</Button>
 				{:else}
-					<Button onclick={() => loadModel(selectedYzmaModel!.path || selectedYzmaModel!.name)}>
-						<Play class="mr-2 h-4 w-4" />
-						Load
+					<Button 
+						onclick={() => loadModel(selectedYzmaModel!.path || selectedYzmaModel!.name)}
+						disabled={isModelLoading(selectedYzmaModel.path || selectedYzmaModel.name)}
+					>
+						{#if isModelLoading(selectedYzmaModel.path || selectedYzmaModel.name)}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Loading...
+						{:else}
+							<Play class="mr-2 h-4 w-4" />
+							Load
+						{/if}
 					</Button>
 				{/if}
 				<Button variant="outline" onclick={() => (selectedYzmaModel = null)}>

@@ -1,0 +1,1028 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import {
+		GitBranch,
+		Plus,
+		RefreshCw,
+		Loader2,
+		Trash2,
+		Settings,
+		X,
+		Search,
+		ExternalLink,
+		CheckCircle,
+		XCircle,
+		AlertCircle,
+		Play,
+		Eye,
+		ArrowLeft,
+		Webhook,
+		Bot,
+		FileCode,
+		Clock,
+		BarChart3
+	} from 'lucide-svelte';
+	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview } from '$lib/api/gitlab';
+	import { cn, formatRelativeTime, debounce } from '$lib/utils';
+	import { Button } from '$lib/components/ui/button';
+
+	let integration = $state<GitLabIntegration | null>(null);
+	let projects = $state<GitLabProject[]>([]);
+	let reviews = $state<GitLabReview[]>([]);
+	let totalProjects = $state(0);
+	let totalReviews = $state(0);
+	let isLoading = $state(true);
+	let activeTab = $state<'projects' | 'reviews'>('projects');
+
+	// Filters
+	let searchQuery = $state('');
+	let statusFilter = $state('');
+
+	// Pagination
+	let currentPage = $state(0);
+	let pageSize = 10;
+
+	// Modals
+	let showAddProjectModal = $state(false);
+	let showProjectDetailModal = $state(false);
+	let showReviewDetailModal = $state(false);
+	let selectedProject = $state<GitLabProject | null>(null);
+	let selectedReview = $state<GitLabReview | null>(null);
+
+	// Add Project form
+	let formGitLabProjectId = $state('');
+	let formAnalysisModelId = $state('');
+	let formEmbeddingModelId = $state('');
+	let formAutoReview = $state(true);
+	let formReviewPrompt = $state('');
+	// Include/Exclude patterns (GITLAB-055c)
+	let formIncludePatterns = $state('');
+	let formExcludePatterns = $state('');
+	// Advanced settings (GITLAB-055e)
+	let formChunkSize = $state('4000');
+	let formChunkOverlap = $state('200');
+	let formMaxFilesPerMR = $state('50');
+	let formMaxLinesPerFile = $state('1000');
+	let formSkipDraftMRs = $state(true);
+	let formSkipBots = $state(true);
+	let showAdvancedSettings = $state(false);
+	let isAdding = $state(false);
+	let addError = $state('');
+
+	const integrationId = $derived($page.params.id);
+
+	onMount(async () => {
+		await loadIntegration();
+		await loadProjects();
+	});
+
+	const debouncedSearch = debounce(() => {
+		currentPage = 0;
+		if (activeTab === 'projects') {
+			loadProjects();
+		} else {
+			loadReviews();
+		}
+	}, 300);
+
+	async function loadIntegration() {
+		try {
+			integration = await gitlabApi.getIntegration(integrationId);
+		} catch (error) {
+			console.error('Failed to load integration:', error);
+			goto('/admin/gitlab');
+		}
+	}
+
+	async function loadProjects() {
+		isLoading = true;
+		try {
+			const response = await gitlabApi.listProjects(integrationId, {
+				limit: pageSize,
+				offset: currentPage * pageSize,
+				search: searchQuery || undefined,
+				status: statusFilter || undefined
+			});
+			projects = response.data || [];
+			totalProjects = response.total || projects.length;
+		} catch (error) {
+			console.error('Failed to load projects:', error);
+			projects = [];
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	async function loadReviews() {
+		isLoading = true;
+		try {
+			const response = await gitlabApi.listReviews({
+				limit: pageSize,
+				offset: currentPage * pageSize,
+				status: statusFilter || undefined,
+				search: searchQuery || undefined
+			});
+			reviews = response.data || [];
+			totalReviews = response.total || reviews.length;
+		} catch (error) {
+			console.error('Failed to load reviews:', error);
+			reviews = [];
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	function switchTab(tab: 'projects' | 'reviews') {
+		activeTab = tab;
+		currentPage = 0;
+		searchQuery = '';
+		statusFilter = '';
+		if (tab === 'projects') {
+			loadProjects();
+		} else {
+			loadReviews();
+		}
+	}
+
+	function openAddProjectModal() {
+		formGitLabProjectId = '';
+		formAnalysisModelId = '';
+		formEmbeddingModelId = '';
+		formAutoReview = true;
+		formReviewPrompt = '';
+		// Reset patterns (GITLAB-055c)
+		formIncludePatterns = '';
+		formExcludePatterns = '';
+		// Reset advanced settings (GITLAB-055e)
+		formChunkSize = '4000';
+		formChunkOverlap = '200';
+		formMaxFilesPerMR = '50';
+		formMaxLinesPerFile = '1000';
+		formSkipDraftMRs = true;
+		formSkipBots = true;
+		showAdvancedSettings = false;
+		addError = '';
+		showAddProjectModal = true;
+	}
+
+	async function handleAddProject() {
+		if (!formGitLabProjectId.trim()) {
+			addError = 'GitLab Project ID is required';
+			return;
+		}
+		if (!formAnalysisModelId.trim()) {
+			addError = 'Analysis Model is required';
+			return;
+		}
+
+		isAdding = true;
+		addError = '';
+
+		// Build settings object
+		const settings: Record<string, unknown> = {};
+		
+		// Include/Exclude patterns (GITLAB-055c)
+		if (formIncludePatterns.trim()) {
+			settings.include_patterns = formIncludePatterns.split('\n').map(p => p.trim()).filter(Boolean);
+		}
+		if (formExcludePatterns.trim()) {
+			settings.exclude_patterns = formExcludePatterns.split('\n').map(p => p.trim()).filter(Boolean);
+		}
+		
+		// Advanced settings (GITLAB-055e)
+		const chunkSize = parseInt(formChunkSize, 10);
+		const chunkOverlap = parseInt(formChunkOverlap, 10);
+		const maxFiles = parseInt(formMaxFilesPerMR, 10);
+		const maxLines = parseInt(formMaxLinesPerFile, 10);
+		
+		if (!isNaN(chunkSize) && chunkSize !== 4000) settings.chunk_size = chunkSize;
+		if (!isNaN(chunkOverlap) && chunkOverlap !== 200) settings.chunk_overlap = chunkOverlap;
+		if (!isNaN(maxFiles) && maxFiles !== 50) settings.max_files_per_mr = maxFiles;
+		if (!isNaN(maxLines) && maxLines !== 1000) settings.max_lines_per_file = maxLines;
+		if (!formSkipDraftMRs) settings.skip_draft_mrs = false;
+		if (!formSkipBots) settings.skip_bots = false;
+
+		try {
+			const newProject = await gitlabApi.addProject(integrationId, {
+				gitlab_project_id: parseInt(formGitLabProjectId, 10),
+				analysis_model_id: formAnalysisModelId.trim(),
+				embedding_model_id: formEmbeddingModelId.trim() || undefined,
+				auto_review: formAutoReview,
+				review_prompt: formReviewPrompt.trim() || undefined,
+				settings: Object.keys(settings).length > 0 ? settings : undefined
+			});
+
+			projects = [newProject, ...projects];
+			totalProjects++;
+			showAddProjectModal = false;
+		} catch (error) {
+			addError = error instanceof Error ? error.message : 'Failed to add project';
+		} finally {
+			isAdding = false;
+		}
+	}
+
+	async function handleSetupWebhook(project: GitLabProject) {
+		const webhookUrl = `${window.location.origin}/api/gitlab/webhook/${integrationId}`;
+		
+		try {
+			const result = await gitlabApi.setupWebhook(project.id, webhookUrl);
+			// Refresh projects
+			await loadProjects();
+			alert(`Webhook created with ID: ${result.webhook_id}`);
+		} catch (error) {
+			alert('Failed to setup webhook: ' + (error instanceof Error ? error.message : 'Unknown error'));
+		}
+	}
+
+	async function handleDeleteProject(project: GitLabProject) {
+		if (!confirm(`Remove project "${project.path_with_namespace}" from integration?`)) {
+			return;
+		}
+
+		try {
+			await gitlabApi.deleteProject(project.id);
+			projects = projects.filter((p) => p.id !== project.id);
+			totalProjects--;
+		} catch (error) {
+			alert('Failed to delete project');
+		}
+	}
+
+	async function handleRetryReview(review: GitLabReview) {
+		try {
+			await gitlabApi.retryReview(review.id);
+			// Refresh reviews
+			await loadReviews();
+		} catch (error) {
+			alert('Failed to retry review');
+		}
+	}
+
+	function viewProjectDetails(project: GitLabProject) {
+		selectedProject = project;
+		showProjectDetailModal = true;
+	}
+
+	function viewReviewDetails(review: GitLabReview) {
+		selectedReview = review;
+		showReviewDetailModal = true;
+	}
+
+	function getStatusIcon(status: string) {
+		switch (status) {
+			case 'active':
+			case 'completed':
+				return CheckCircle;
+			case 'error':
+			case 'failed':
+				return XCircle;
+			case 'pending':
+			case 'queued':
+			case 'analyzing':
+				return Clock;
+			default:
+				return AlertCircle;
+		}
+	}
+
+	function getStatusColor(status: string) {
+		switch (status) {
+			case 'active':
+			case 'completed':
+				return 'text-green-500';
+			case 'error':
+			case 'failed':
+				return 'text-red-500';
+			case 'pending':
+			case 'queued':
+			case 'analyzing':
+				return 'text-yellow-500';
+			default:
+				return 'text-muted-foreground';
+		}
+	}
+
+	const totalPages = $derived(Math.ceil((activeTab === 'projects' ? totalProjects : totalReviews) / pageSize));
+</script>
+
+<div class="space-y-6">
+	<!-- Header -->
+	<div class="flex items-center gap-4">
+		<a href="/admin/gitlab" class="rounded p-2 hover:bg-muted">
+			<ArrowLeft class="h-5 w-5" />
+		</a>
+		<div class="flex-1">
+			<h2 class="text-2xl font-bold text-foreground">{integration?.name || 'Loading...'}</h2>
+			{#if integration}
+				<a href={integration.base_url} target="_blank" class="text-sm text-primary hover:underline flex items-center gap-1">
+					{integration.base_url}
+					<ExternalLink class="h-3 w-3" />
+				</a>
+			{/if}
+		</div>
+		{#if activeTab === 'projects'}
+			<Button onclick={openAddProjectModal}>
+				<Plus class="mr-2 h-4 w-4" />
+				Add Project
+			</Button>
+		{/if}
+	</div>
+
+	<!-- Tabs -->
+	<div class="flex gap-2 border-b">
+		<button
+			onclick={() => switchTab('projects')}
+			class={cn(
+				'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+				activeTab === 'projects'
+					? 'border-primary text-primary'
+					: 'border-transparent text-muted-foreground hover:text-foreground'
+			)}
+		>
+			<FileCode class="inline-block mr-2 h-4 w-4" />
+			Projects ({totalProjects})
+		</button>
+		<button
+			onclick={() => switchTab('reviews')}
+			class={cn(
+				'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+				activeTab === 'reviews'
+					? 'border-primary text-primary'
+					: 'border-transparent text-muted-foreground hover:text-foreground'
+			)}
+		>
+			<BarChart3 class="inline-block mr-2 h-4 w-4" />
+			Reviews ({totalReviews})
+		</button>
+	</div>
+
+	<!-- Filters -->
+	<div class="flex flex-wrap items-center gap-4">
+		<div class="relative flex-1 min-w-[200px]">
+			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+			<input
+				type="text"
+				placeholder={activeTab === 'projects' ? 'Search projects...' : 'Search reviews...'}
+				bind:value={searchQuery}
+				oninput={debouncedSearch}
+				class="h-10 w-full rounded-md border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+			/>
+		</div>
+		<select
+			bind:value={statusFilter}
+			onchange={() => { currentPage = 0; activeTab === 'projects' ? loadProjects() : loadReviews(); }}
+			class="h-10 rounded-md border bg-background px-3 text-sm"
+		>
+			<option value="">All Statuses</option>
+			{#if activeTab === 'projects'}
+				<option value="active">Active</option>
+				<option value="disabled">Disabled</option>
+			{:else}
+				<option value="pending">Pending</option>
+				<option value="analyzing">Analyzing</option>
+				<option value="completed">Completed</option>
+				<option value="failed">Failed</option>
+			{/if}
+		</select>
+		<Button variant="outline" onclick={() => { searchQuery = ''; statusFilter = ''; currentPage = 0; activeTab === 'projects' ? loadProjects() : loadReviews(); }}>
+			<RefreshCw class="mr-2 h-4 w-4" />
+			Reset
+		</Button>
+	</div>
+
+	<!-- Content -->
+	<div class="rounded-lg border bg-card">
+		{#if isLoading}
+			<div class="flex items-center justify-center py-12">
+				<Loader2 class="h-8 w-8 animate-spin text-primary" />
+			</div>
+		{:else if activeTab === 'projects'}
+			<!-- Projects Table -->
+			{#if projects.length === 0}
+				<div class="flex flex-col items-center justify-center py-12 text-center">
+					<FileCode class="h-12 w-12 text-muted-foreground/50" />
+					<p class="mt-4 text-lg font-medium text-muted-foreground">No projects configured</p>
+					<p class="text-sm text-muted-foreground">Add a GitLab project to start AI reviews</p>
+					<Button class="mt-4" onclick={openAddProjectModal}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Project
+					</Button>
+				</div>
+			{:else}
+				<table class="w-full">
+					<thead>
+						<tr class="border-b text-left text-sm text-muted-foreground">
+							<th class="px-4 py-3 font-medium">Project</th>
+							<th class="px-4 py-3 font-medium">Status</th>
+							<th class="px-4 py-3 font-medium">Auto Review</th>
+							<th class="px-4 py-3 font-medium">Webhook</th>
+							<th class="px-4 py-3 font-medium">Reviews</th>
+							<th class="px-4 py-3 font-medium">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each projects as project}
+							<tr class="border-b last:border-0 hover:bg-muted/50">
+								<td class="px-4 py-3">
+									<div class="font-medium">{project.name}</div>
+									<div class="text-sm text-muted-foreground">{project.path_with_namespace}</div>
+								</td>
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2">
+										<svelte:component
+											this={getStatusIcon(project.status)}
+											class={cn('h-4 w-4', getStatusColor(project.status))}
+										/>
+										<span class="text-sm capitalize">{project.status}</span>
+									</div>
+								</td>
+								<td class="px-4 py-3">
+									<span class={cn('text-sm', project.auto_review ? 'text-green-500' : 'text-muted-foreground')}>
+										{project.auto_review ? 'Enabled' : 'Disabled'}
+									</span>
+								</td>
+								<td class="px-4 py-3">
+									{#if project.webhook_id}
+										<span class="flex items-center gap-1 text-sm text-green-500">
+											<Webhook class="h-4 w-4" />
+											#{project.webhook_id}
+										</span>
+									{:else}
+										<button
+											onclick={() => handleSetupWebhook(project)}
+											class="text-sm text-primary hover:underline flex items-center gap-1"
+										>
+											<Webhook class="h-4 w-4" />
+											Setup
+										</button>
+									{/if}
+								</td>
+								<td class="px-4 py-3">
+									<span class="text-sm">{project.review_count || 0}</span>
+								</td>
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2">
+										<button
+											onclick={() => viewProjectDetails(project)}
+											class="rounded p-1.5 hover:bg-muted"
+											title="View Details"
+										>
+											<Eye class="h-4 w-4" />
+										</button>
+										<button
+											onclick={() => handleDeleteProject(project)}
+											class="rounded p-1.5 text-red-500 hover:bg-red-500/10"
+											title="Remove"
+										>
+											<Trash2 class="h-4 w-4" />
+										</button>
+									</div>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+		{:else}
+			<!-- Reviews Table -->
+			{#if reviews.length === 0}
+				<div class="flex flex-col items-center justify-center py-12 text-center">
+					<BarChart3 class="h-12 w-12 text-muted-foreground/50" />
+					<p class="mt-4 text-lg font-medium text-muted-foreground">No reviews yet</p>
+					<p class="text-sm text-muted-foreground">Reviews will appear here when MRs are analyzed</p>
+				</div>
+			{:else}
+				<table class="w-full">
+					<thead>
+						<tr class="border-b text-left text-sm text-muted-foreground">
+							<th class="px-4 py-3 font-medium">MR</th>
+							<th class="px-4 py-3 font-medium">Status</th>
+							<th class="px-4 py-3 font-medium">Files</th>
+							<th class="px-4 py-3 font-medium">Issues</th>
+							<th class="px-4 py-3 font-medium">Time</th>
+							<th class="px-4 py-3 font-medium">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each reviews as review}
+							<tr class="border-b last:border-0 hover:bg-muted/50">
+								<td class="px-4 py-3">
+									<div class="font-medium">!{review.mr_iid}: {review.mr_title}</div>
+									<div class="text-sm text-muted-foreground">
+										{review.source_branch} → {review.target_branch}
+									</div>
+								</td>
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2">
+										<svelte:component
+											this={getStatusIcon(review.status)}
+											class={cn('h-4 w-4', getStatusColor(review.status))}
+										/>
+										<span class="text-sm capitalize">{review.status}</span>
+									</div>
+									{#if review.error}
+										<p class="mt-1 text-xs text-red-500 truncate max-w-[200px]" title={review.error}>
+											{review.error}
+										</p>
+									{/if}
+								</td>
+								<td class="px-4 py-3">
+									<span class="text-sm">{review.files_analyzed}</span>
+								</td>
+								<td class="px-4 py-3">
+									<span class={cn('text-sm', review.issues_found > 0 ? 'text-yellow-500' : 'text-green-500')}>
+										{review.issues_found}
+									</span>
+								</td>
+								<td class="px-4 py-3">
+									<span class="text-sm text-muted-foreground">
+										{review.processing_time_ms ? `${(review.processing_time_ms / 1000).toFixed(1)}s` : '-'}
+									</span>
+								</td>
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2">
+										<button
+											onclick={() => viewReviewDetails(review)}
+											class="rounded p-1.5 hover:bg-muted"
+											title="View Details"
+										>
+											<Eye class="h-4 w-4" />
+										</button>
+										<a
+											href={review.mr_url}
+											target="_blank"
+											class="rounded p-1.5 hover:bg-muted"
+											title="Open in GitLab"
+										>
+											<ExternalLink class="h-4 w-4" />
+										</a>
+										{#if review.status === 'failed'}
+											<button
+												onclick={() => handleRetryReview(review)}
+												class="rounded p-1.5 text-primary hover:bg-primary/10"
+												title="Retry"
+											>
+												<RefreshCw class="h-4 w-4" />
+											</button>
+										{/if}
+									</div>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+		{/if}
+
+		<!-- Pagination -->
+		{#if totalPages > 1}
+			<div class="flex items-center justify-between border-t px-4 py-3">
+				<p class="text-sm text-muted-foreground">
+					Page {currentPage + 1} of {totalPages}
+				</p>
+				<div class="flex items-center gap-2">
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={currentPage === 0}
+						onclick={() => { currentPage--; activeTab === 'projects' ? loadProjects() : loadReviews(); }}
+					>
+						Previous
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={currentPage >= totalPages - 1}
+						onclick={() => { currentPage++; activeTab === 'projects' ? loadProjects() : loadReviews(); }}
+					>
+						Next
+					</Button>
+				</div>
+			</div>
+		{/if}
+	</div>
+</div>
+
+<!-- Add Project Modal -->
+{#if showAddProjectModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		onclick={(e) => e.target === e.currentTarget && (showAddProjectModal = false)}
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="w-full max-w-lg rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-lg font-semibold">Add GitLab Project</h3>
+				<button onclick={() => (showAddProjectModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if addError}
+				<div class="mb-4 rounded-md bg-red-500/10 p-3 text-sm text-red-500">
+					{addError}
+				</div>
+			{/if}
+
+			<div class="space-y-4">
+				<div>
+					<label class="mb-1.5 block text-sm font-medium">GitLab Project ID *</label>
+					<input
+						type="number"
+						bind:value={formGitLabProjectId}
+						placeholder="12345"
+						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+					/>
+					<p class="mt-1 text-xs text-muted-foreground">
+						Find this in GitLab: Settings → General → Project ID
+					</p>
+				</div>
+
+				<div>
+					<label class="mb-1.5 block text-sm font-medium">Analysis Model ID *</label>
+					<input
+						type="text"
+						bind:value={formAnalysisModelId}
+						placeholder="model-uuid-here"
+						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+					/>
+					<p class="mt-1 text-xs text-muted-foreground">
+						LLM model to use for code analysis
+					</p>
+				</div>
+
+				<div>
+					<label class="mb-1.5 block text-sm font-medium">Embedding Model ID (optional)</label>
+					<input
+						type="text"
+						bind:value={formEmbeddingModelId}
+						placeholder="model-uuid-here"
+						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+					/>
+					<p class="mt-1 text-xs text-muted-foreground">
+						Model for code embeddings (RAG context)
+					</p>
+				</div>
+
+				<div class="flex items-center gap-3">
+					<input
+						type="checkbox"
+						id="autoReview"
+						bind:checked={formAutoReview}
+						class="h-4 w-4 rounded border"
+					/>
+					<label for="autoReview" class="text-sm font-medium">
+						Enable Auto Review
+					</label>
+				</div>
+				<p class="text-xs text-muted-foreground -mt-2">
+					Automatically analyze new MRs when created or updated
+				</p>
+
+				<div>
+					<label class="mb-1.5 block text-sm font-medium">Custom Review Prompt (optional)</label>
+					<textarea
+						bind:value={formReviewPrompt}
+						placeholder="Custom instructions for the AI reviewer..."
+						rows="4"
+						class="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+					></textarea>
+				</div>
+
+				<!-- Include/Exclude Patterns (GITLAB-055c) -->
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="mb-1.5 block text-sm font-medium">Include Patterns</label>
+						<textarea
+							bind:value={formIncludePatterns}
+							placeholder="*.go&#10;*.ts&#10;src/**/*.js"
+							rows="3"
+							class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+						></textarea>
+						<p class="mt-1 text-xs text-muted-foreground">
+							Glob patterns (one per line). If empty, all files included.
+						</p>
+					</div>
+					<div>
+						<label class="mb-1.5 block text-sm font-medium">Exclude Patterns</label>
+						<textarea
+							bind:value={formExcludePatterns}
+							placeholder="*.min.js&#10;vendor/**&#10;*.lock"
+							rows="3"
+							class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+						></textarea>
+						<p class="mt-1 text-xs text-muted-foreground">
+							Glob patterns to exclude (one per line)
+						</p>
+					</div>
+				</div>
+
+				<!-- Advanced Settings Toggle (GITLAB-055e) -->
+				<button
+					type="button"
+					onclick={() => showAdvancedSettings = !showAdvancedSettings}
+					class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+				>
+					<Settings class="h-4 w-4" />
+					{showAdvancedSettings ? 'Hide' : 'Show'} Advanced Settings
+				</button>
+
+				{#if showAdvancedSettings}
+					<div class="rounded-md border bg-muted/50 p-4 space-y-4">
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label class="mb-1.5 block text-sm font-medium">Chunk Size (tokens)</label>
+								<input
+									type="number"
+									bind:value={formChunkSize}
+									min="500"
+									max="32000"
+									class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+								/>
+							</div>
+							<div>
+								<label class="mb-1.5 block text-sm font-medium">Chunk Overlap (tokens)</label>
+								<input
+									type="number"
+									bind:value={formChunkOverlap}
+									min="0"
+									max="1000"
+									class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+								/>
+							</div>
+						</div>
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label class="mb-1.5 block text-sm font-medium">Max Files per MR</label>
+								<input
+									type="number"
+									bind:value={formMaxFilesPerMR}
+									min="1"
+									max="500"
+									class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+								/>
+							</div>
+							<div>
+								<label class="mb-1.5 block text-sm font-medium">Max Lines per File</label>
+								<input
+									type="number"
+									bind:value={formMaxLinesPerFile}
+									min="100"
+									max="10000"
+									class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+								/>
+							</div>
+						</div>
+						<div class="flex items-center gap-6">
+							<label class="flex items-center gap-2">
+								<input
+									type="checkbox"
+									bind:checked={formSkipDraftMRs}
+									class="h-4 w-4 rounded border"
+								/>
+								<span class="text-sm">Skip Draft MRs</span>
+							</label>
+							<label class="flex items-center gap-2">
+								<input
+									type="checkbox"
+									bind:checked={formSkipBots}
+									class="h-4 w-4 rounded border"
+								/>
+								<span class="text-sm">Skip Bot Authors</span>
+							</label>
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<div class="mt-6 flex justify-end gap-3">
+				<Button variant="outline" onclick={() => (showAddProjectModal = false)}>
+					Cancel
+				</Button>
+				<Button onclick={handleAddProject} disabled={isAdding}>
+					{#if isAdding}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{/if}
+					Add Project
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Project Detail Modal -->
+{#if showProjectDetailModal && selectedProject}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		onclick={(e) => e.target === e.currentTarget && (showProjectDetailModal = false)}
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="w-full max-w-2xl rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-lg font-semibold">{selectedProject.name}</h3>
+				<button onclick={() => (showProjectDetailModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<span class="text-sm text-muted-foreground">Path:</span>
+						<p class="font-mono text-sm">{selectedProject.path_with_namespace}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">GitLab ID:</span>
+						<p class="font-mono text-sm">{selectedProject.gitlab_project_id}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Status:</span>
+						<p class={cn('text-sm capitalize', getStatusColor(selectedProject.status))}>
+							{selectedProject.status}
+						</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Auto Review:</span>
+						<p class="text-sm">{selectedProject.auto_review ? 'Enabled' : 'Disabled'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Analysis Model:</span>
+						<p class="font-mono text-sm">{selectedProject.analysis_model_id || '-'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Embedding Model:</span>
+						<p class="font-mono text-sm">{selectedProject.embedding_model_id || '-'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Webhook ID:</span>
+						<p class="font-mono text-sm">{selectedProject.webhook_id || 'Not configured'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Reviews:</span>
+						<p class="text-sm">{selectedProject.review_count || 0}</p>
+					</div>
+				</div>
+
+				{#if selectedProject.review_prompt}
+					<div>
+						<span class="text-sm text-muted-foreground">Custom Prompt:</span>
+						<pre class="mt-1 p-3 bg-muted rounded-md text-sm whitespace-pre-wrap">{selectedProject.review_prompt}</pre>
+					</div>
+				{/if}
+
+				{#if selectedProject.settings}
+					<div>
+						<span class="text-sm text-muted-foreground">Settings:</span>
+						<pre class="mt-1 p-3 bg-muted rounded-md text-sm overflow-auto">{JSON.stringify(selectedProject.settings, null, 2)}</pre>
+					</div>
+				{/if}
+			</div>
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showProjectDetailModal = false)}>
+					Close
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Review Detail Modal -->
+{#if showReviewDetailModal && selectedReview}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		onclick={(e) => e.target === e.currentTarget && (showReviewDetailModal = false)}
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="w-full max-w-3xl rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-lg font-semibold">!{selectedReview.mr_iid}: {selectedReview.mr_title}</h3>
+				<button onclick={() => (showReviewDetailModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+					<div>
+						<span class="text-sm text-muted-foreground">Status:</span>
+						<p class={cn('text-sm capitalize', getStatusColor(selectedReview.status))}>
+							{selectedReview.status}
+						</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Author:</span>
+						<p class="text-sm">{selectedReview.mr_author}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Branch:</span>
+						<p class="text-sm font-mono">{selectedReview.source_branch} → {selectedReview.target_branch}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Files Analyzed:</span>
+						<p class="text-sm">{selectedReview.files_analyzed}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Lines Changed:</span>
+						<p class="text-sm">{selectedReview.lines_changed}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Issues Found:</span>
+						<p class={cn('text-sm', selectedReview.issues_found > 0 ? 'text-yellow-500 font-medium' : 'text-green-500')}>
+							{selectedReview.issues_found}
+						</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Processing Time:</span>
+						<p class="text-sm">{selectedReview.processing_time_ms ? `${(selectedReview.processing_time_ms / 1000).toFixed(2)}s` : '-'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Tokens Used:</span>
+						<p class="text-sm">{selectedReview.tokens_used || '-'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Model:</span>
+						<p class="text-sm font-mono">{selectedReview.model_used || '-'}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Retry Count:</span>
+						<p class="text-sm">{selectedReview.retry_count}</p>
+					</div>
+					<div>
+						<span class="text-sm text-muted-foreground">Created:</span>
+						<p class="text-sm">{formatRelativeTime(selectedReview.created_at)}</p>
+					</div>
+					{#if selectedReview.completed_at}
+						<div>
+							<span class="text-sm text-muted-foreground">Completed:</span>
+							<p class="text-sm">{formatRelativeTime(selectedReview.completed_at)}</p>
+						</div>
+					{/if}
+				</div>
+
+				{#if selectedReview.error}
+					<div class="rounded-md bg-red-500/10 p-3">
+						<span class="text-sm font-medium text-red-500">Error:</span>
+						<p class="mt-1 text-sm text-red-500">{selectedReview.error}</p>
+					</div>
+				{/if}
+
+				{#if selectedReview.review_result}
+					<div>
+						<span class="text-sm font-medium">Review Summary:</span>
+						<div class="mt-2 rounded-md bg-muted p-4">
+							<p class="text-sm">{selectedReview.review_result.summary}</p>
+							{#if selectedReview.review_result.overall_score !== undefined}
+								<div class="mt-2 flex items-center gap-2">
+									<span class="text-sm text-muted-foreground">Score:</span>
+									<span class={cn(
+										'text-sm font-medium',
+										selectedReview.review_result.overall_score >= 80 ? 'text-green-500' :
+										selectedReview.review_result.overall_score >= 60 ? 'text-yellow-500' : 'text-red-500'
+									)}>
+										{selectedReview.review_result.overall_score}/100
+									</span>
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					{#if selectedReview.review_result.categories?.length}
+						<div>
+							<span class="text-sm font-medium">Categories:</span>
+							<div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+								{#each selectedReview.review_result.categories as category}
+									<div class="rounded-md border p-2">
+										<p class="text-sm font-medium">{category.name}</p>
+										<p class="text-xs text-muted-foreground">
+											Score: {category.score}/100 · {category.issue_count} issues
+										</p>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				{/if}
+			</div>
+
+			<div class="mt-6 flex justify-end gap-3">
+				<Button variant="outline" onclick={() => (showReviewDetailModal = false)}>
+					Close
+				</Button>
+				<a href={selectedReview.mr_url} target="_blank">
+					<Button>
+						<ExternalLink class="mr-2 h-4 w-4" />
+						Open in GitLab
+					</Button>
+				</a>
+			</div>
+		</div>
+	</div>
+{/if}
+

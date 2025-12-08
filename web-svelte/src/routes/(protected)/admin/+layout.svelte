@@ -13,7 +13,8 @@
 		Server,
 		Mail,
 		Download,
-		Cpu
+		Cpu,
+		GitBranch
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
@@ -28,6 +29,7 @@
 		{ id: 'models', label: m.admin_models, icon: Cpu, href: '/admin/models' },
 		{ id: 'downloads', label: 'Downloads', icon: Download, href: '/admin/downloads' },
 		{ id: 'mcp', label: 'MCP', icon: Server, href: '/admin/mcp' },
+		{ id: 'gitlab', label: 'GitLab', icon: GitBranch, href: '/admin/gitlab' },
 		{ id: 'settings', label: m.admin_settings, icon: Settings, href: '/admin/settings' },
 		{ id: 'logs', label: m.admin_logs, icon: FileText, href: '/admin/logs' }
 	];

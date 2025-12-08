@@ -16,7 +16,7 @@
 	import { apiKeysStore } from '$lib/stores/apikeys.svelte';
 	import { apiKeysApi, type CreateAPIKeyRequest } from '$lib/api/apikeys';
 	import { chatApi } from '$lib/api';
-	import { cn, formatRelativeTime } from '$lib/utils';
+	import { cn, formatRelativeTime, copyToClipboard as copyText } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 
@@ -160,12 +160,10 @@
 	}
 
 	async function copyToClipboard(text: string) {
-		try {
-			await navigator.clipboard.writeText(text);
+		const success = await copyText(text);
+		if (success) {
 			copiedKey = true;
 			setTimeout(() => (copiedKey = false), 2000);
-		} catch {
-			console.error('Failed to copy');
 		}
 	}
 

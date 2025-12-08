@@ -11,7 +11,7 @@
 		ChatInput,
 		ModelPanel
 	} from '$lib/components/chat';
-	import { cn } from '$lib/utils';
+	import { cn, generateUUID } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
 
 	let sidebarOpen = $state(true);
@@ -119,7 +119,7 @@
 
 		// Add user message
 		const userMessage = {
-			id: crypto.randomUUID(),
+			id: generateUUID(),
 			role: 'user' as const,
 			content,
 			created_at: new Date().toISOString()
@@ -162,7 +162,7 @@
 
 			// Add assistant message
 			const assistantMessage = {
-				id: crypto.randomUUID(),
+				id: generateUUID(),
 				role: 'assistant' as const,
 				content: fullResponse,
 				created_at: new Date().toISOString(),
@@ -185,7 +185,7 @@
 				console.error('Streaming error:', error);
 				// Add error message
 				chatStore.addMessage({
-					id: crypto.randomUUID(),
+					id: generateUUID(),
 					role: 'assistant',
 					content: `Error: ${(error as Error).message}`,
 					created_at: new Date().toISOString()

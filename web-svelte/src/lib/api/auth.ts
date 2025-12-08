@@ -38,15 +38,16 @@ export interface RegisterRequest {
 	username: string;
 	email: string;
 	password: string;
-	full_name?: string;
+	display_name?: string;
 	invitation_token?: string;
 }
 
 export interface BootstrapRequest {
-	bootstrap_token: string;
+	admin_token: string;
 	username: string;
 	email: string;
 	password: string;
+	display_name?: string;
 }
 
 export interface InitStatus {

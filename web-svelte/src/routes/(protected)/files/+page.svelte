@@ -19,7 +19,7 @@
 		X
 	} from 'lucide-svelte';
 	import { filesApi, type FileItem } from '$lib/api/files';
-	import { cn, formatRelativeTime } from '$lib/utils';
+	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 
@@ -584,7 +584,7 @@
 
 			<!-- Footer -->
 			<div class="flex justify-end gap-3 border-t border-border px-6 py-4">
-				<Button variant="outline" onclick={() => { navigator.clipboard.writeText(extractedText); }}>
+				<Button variant="outline" onclick={() => { copyToClipboard(extractedText); }}>
 					Copy Text
 				</Button>
 				<Button onclick={closeTextModal}>Close</Button>

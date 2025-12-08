@@ -154,7 +154,7 @@ type Config struct {
 // CardData represents model card metadata
 type CardData struct {
 	Language   FlexibleStringArray `json:"language,omitempty"`   // Can be string or []string
-	License    string              `json:"license,omitempty"`
+	License    FlexibleStringArray `json:"license,omitempty"`    // Can be string or []string
 	Tags       FlexibleStringArray `json:"tags,omitempty"`       // Can be string or []string
 	Datasets   FlexibleStringArray `json:"datasets,omitempty"`   // Can be string or []string
 	Metrics    FlexibleStringArray `json:"metrics,omitempty"`    // Can be string or []string

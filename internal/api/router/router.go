@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -493,6 +494,7 @@ func (r *Router) setupRoutes() {
 	r.setupGPURoutes()         // GPU Monitoring (v1.9.3)
 	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
 	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
+	r.setupGitLabStubRoutes()  // GitLab Integration stub routes (v3.2.0)
 }
 
 // setupHealthRoutes настраивает health check endpoint для desktop client
@@ -757,6 +759,7 @@ func (r *Router) setupUIRoutes() {
 			yzma.GET("/models", r.yzmaUIHandler.GetModelsList)
 			yzma.GET("/loaded", r.yzmaUIHandler.GetLoadedModelsList)
 			yzma.POST("/load", r.yzmaUIHandler.PostLoadModel)
+			yzma.POST("/cancel", r.yzmaUIHandler.PostCancelModel)
 			yzma.POST("/unload", r.yzmaUIHandler.PostUnloadModel)
 			yzma.POST("/delete", r.yzmaUIHandler.PostDeleteModel)
 
@@ -770,6 +773,14 @@ func (r *Router) setupUIRoutes() {
 			yzma.GET("/provider/models", r.yzmaUIHandler.GetProviderModels)
 		}
 		r.logger.Info("✅ yzma UI routes registered")
+	}
+
+	// GPU Info endpoint (v3.2.2+) - separate from UI handler to work before models load
+	if r.yzmaHandler != nil {
+		// These work even during model loading
+		ui.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)
+		ui.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck)
+		r.logger.Info("✅ yzma GPU/Health UI routes registered")
 	}
 
 	r.logger.Info("✅ HTMX UI routes setup completed")
@@ -898,6 +909,10 @@ func (r *Router) setupSystemRoutes() {
 		// Public models endpoint for login page (v3.0.7+)
 		if r.yzmaHandler != nil {
 			system.GET("/models", r.yzmaHandler.HandleModels)
+			// GPU info and health check - public endpoints (v3.2.2+)
+			// These work even before models are loaded, allowing WebUI to show status
+			system.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)
+			system.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck)
 		}
 	}
 
@@ -1412,6 +1427,8 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
+			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		} else if r.config.Auth.Enabled && r.authenticator != nil {
 			// API Key auth
 			v1.POST("/yzma/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.yzmaHandler.HandleChatCompletion)
@@ -1420,6 +1437,8 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleYzmaStats)
+			v1.GET("/yzma/gpu", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/health", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		} else {
 			// No auth
 			v1.POST("/yzma/chat/completions", r.yzmaHandler.HandleChatCompletion)
@@ -1428,6 +1447,8 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
+			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		}
 	}
 }
@@ -2341,6 +2362,37 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			gpuLayers = -1
 		}
 
+		// Parse tensor_split string into []float32 (v3.2.1+)
+		var tensorSplit []float32
+		tensorSplitStr := cfg.Inference.Yzma.TensorSplit
+		if tensorSplitStr == "" {
+			tensorSplitStr = cfg.Yzma.TensorSplit
+		}
+		yzmaLogger.WithFields(logrus.Fields{
+			"tensor_split_str": tensorSplitStr,
+			"from_inference":   cfg.Inference.Yzma.TensorSplit,
+			"from_yzma":        cfg.Yzma.TensorSplit,
+		}).Debug("🔍 Parsing tensor_split from config")
+		
+		if tensorSplitStr != "" {
+			parts := strings.Split(tensorSplitStr, ",")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if val, err := strconv.ParseFloat(part, 32); err == nil {
+					tensorSplit = append(tensorSplit, float32(val))
+				} else {
+					yzmaLogger.WithError(err).WithField("part", part).Warn("Failed to parse tensor_split value")
+				}
+			}
+			yzmaLogger.WithField("tensor_split", tensorSplit).Info("🎮 Multi-GPU tensor split configured")
+		} else {
+			yzmaLogger.Warn("⚠️ tensor_split not configured - using single GPU mode")
+		}
+
+		// Get flash_attention setting (v3.2.1+)
+		flashAttention := cfg.Inference.Yzma.FlashAttention
+		// Note: FlashAttention defaults to true if not set
+
 		yzmaConfig := yzma.ClientConfig{
 			ModelsDir:   yzmaModelsDir,
 			LibPath:     yzmaLibPath,
@@ -2353,6 +2405,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			MinP:        yzmaMinP,
 			Verbose:     cfg.Inference.Yzma.Verbose || cfg.Yzma.Verbose,
 			NGpuLayers:  gpuLayers, // v3.0.6+: GPU offloading from config
+			// Multi-GPU configuration (v3.2.1+)
+			MainGPU:        cfg.Inference.Yzma.MainGPU,
+			TensorSplit:    tensorSplit,
+			FlashAttention: flashAttention,
+			Threads:        cfg.Inference.Yzma.Threads,
+			ThreadsBatch:   cfg.Inference.Yzma.ThreadsBatch,
 		}
 
 		yzmaClient, err := yzma.NewClient(yzmaConfig, yzmaLogger)
@@ -2386,11 +2444,17 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			if r.db != nil {
 				yzmaClient.SetDB(r.db)
 
-				// Auto-load persisted models
-				ctx := context.Background()
-				if err := yzmaClient.LoadPersistedModels(ctx); err != nil {
-					yzmaLogger.WithError(err).Warn("Failed to auto-load persisted models")
-				}
+				// Auto-load persisted models ASYNCHRONOUSLY (v3.2.2+)
+				// This prevents blocking server startup and WebUI access
+				go func() {
+					yzmaLogger.Info("🔄 Starting background model loading...")
+					ctx := context.Background()
+					if err := yzmaClient.LoadPersistedModels(ctx); err != nil {
+						yzmaLogger.WithError(err).Warn("Failed to auto-load persisted models")
+					} else {
+						yzmaLogger.Info("✅ Background model loading completed")
+					}
+				}()
 			}
 
 			// Start model list background worker (v3.0.6+: background sync)
@@ -2699,4 +2763,191 @@ func (r *Router) setupK8sProbes() {
 	})
 
 	r.logger.Info("✅ Kubernetes health probes configured: /healthz/live, /healthz/ready, /healthz/status")
+}
+
+// setupGitLabStubRoutes настраивает stub routes для GitLab Integration
+// Полная имплементация требует инициализации GitLab storage
+func (r *Router) setupGitLabStubRoutes() {
+	// Admin GitLab routes (stub - returns empty data)
+	adminGitlab := r.engine.Group("/api/admin/gitlab")
+	if r.jwtManager != nil && r.db != nil {
+		adminGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		adminGitlab.Use(middleware.RequireAdmin(r.db, r.logger))
+	}
+
+	// Integrations
+	adminGitlab.GET("/integrations", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	adminGitlab.POST("/integrations", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized. Configure gitlab section in config."})
+	})
+	adminGitlab.GET("/integrations/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+	})
+	adminGitlab.PUT("/integrations/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	adminGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	adminGitlab.POST("/integrations/:id/test", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+
+	// Projects
+	adminGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	adminGitlab.GET("/projects/:project_id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+	})
+	adminGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	adminGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	adminGitlab.POST("/projects/:project_id/webhook", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+
+	// Reviews
+	adminGitlab.GET("/reviews", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	adminGitlab.GET("/reviews/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+	})
+	adminGitlab.POST("/reviews/:id/retry", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+
+	// Queue
+	adminGitlab.GET("/queue/status", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"pending":    0,
+			"processing": 0,
+			"completed":  0,
+			"failed":     0,
+			"workers":    gin.H{"total": 0, "active": 0, "idle": 0},
+		})
+	})
+	adminGitlab.GET("/queue/jobs", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	adminGitlab.POST("/queue/jobs/:id/cancel", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	adminGitlab.POST("/queue/jobs/:id/retry", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+
+	// Models
+	adminGitlab.GET("/models", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	adminGitlab.GET("/models/analysis", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	adminGitlab.GET("/models/embedding", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+
+	// Analytics
+	adminGitlab.GET("/analytics", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"total_reviews":       0,
+			"completed_reviews":   0,
+			"failed_reviews":      0,
+			"avg_analysis_time":   0,
+			"reviews_by_day":      []interface{}{},
+			"reviews_by_project":  []interface{}{},
+			"model_usage":         []interface{}{},
+		})
+	})
+
+	// Feedback
+	adminGitlab.GET("/feedback", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"stats":             gin.H{"total_feedback": 0, "approval_rate": 0, "accuracy_rate": 0},
+			"category_accuracy": []interface{}{},
+			"model_accuracy":    []interface{}{},
+			"recent":            []interface{}{},
+		})
+	})
+	adminGitlab.POST("/feedback/export", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
+	})
+
+	// Settings
+	adminGitlab.GET("/settings", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"telegram_enabled":     false,
+			"github_enabled":       false,
+			"bitbucket_enabled":    false,
+			"default_prompt":       "",
+			"language_prompts":     []interface{}{},
+			"priority_rules":       []interface{}{},
+		})
+	})
+	adminGitlab.PUT("/settings", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+	adminGitlab.POST("/settings/telegram/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Test successful (stub)"})
+	})
+
+	// User-level GitLab routes
+	userGitlab := r.engine.Group("/api/gitlab")
+	if r.jwtManager != nil && r.db != nil {
+		userGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+
+	userGitlab.GET("/integrations", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	userGitlab.POST("/integrations", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	userGitlab.GET("/integrations/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+	})
+	userGitlab.PUT("/integrations/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	userGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	userGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	userGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	userGitlab.GET("/projects/:project_id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+	})
+	userGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	userGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+	})
+	userGitlab.GET("/reviews", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+	})
+	userGitlab.GET("/reviews/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+	})
+
+	// WebSocket stub (returns 501 Not Implemented instead of 404)
+	adminGitlab.GET("/ws", func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "WebSocket not available - GitLab storage not initialized"})
+	})
+
+	r.logger.Info("✅ GitLab Integration stub routes configured: /api/admin/gitlab/*, /api/gitlab/*")
 }

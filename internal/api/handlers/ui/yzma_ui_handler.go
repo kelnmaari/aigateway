@@ -235,6 +235,29 @@ func (h *YzmaUIHandler) PostLoadModel(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", buf.Bytes())
 }
 
+// PostCancelModel cancels an in-flight model load (JSON only) (v3.2.2+)
+func (h *YzmaUIHandler) PostCancelModel(c *gin.Context) {
+	var req struct {
+		ModelPath string `json:"model_path" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ModelPath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model_path is required"})
+		return
+	}
+
+	h.logger.WithField("model_path", req.ModelPath).Info("Cancelling model load via UI")
+
+	if cancelled := h.client.CancelModelLoad(req.ModelPath); cancelled {
+		c.JSON(http.StatusOK, gin.H{
+			"message":    "Model load cancelled",
+			"model_path": req.ModelPath,
+		})
+		return
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "No in-flight load for this model"})
+}
+
 // PostUnloadModel unloads a model from memory (HTMX action)
 // Also supports JSON response for SvelteKit frontend
 func (h *YzmaUIHandler) PostUnloadModel(c *gin.Context) {

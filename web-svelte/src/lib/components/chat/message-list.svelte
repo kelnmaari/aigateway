@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { User, Bot, Copy, Check, Brain, ChevronDown, ChevronRight } from 'lucide-svelte';
-	import { cn } from '$lib/utils';
+	import { cn, copyToClipboard as copyText } from '$lib/utils';
 	import type { Message } from '$lib/stores/chat.svelte';
 
 	interface Props {
@@ -28,7 +28,7 @@
 	}
 
 	// Parse thinking blocks from content
-	// Supports: ◁think▷...◁/think▷, <think>...</think>, [thinking]...[/thinking]
+	// Supports multiple formats including models that output special characters around tags
 	interface ParsedContent {
 		thinking: string | null;
 		response: string;
@@ -38,37 +38,39 @@
 	function parseThinkingContent(content: string): ParsedContent {
 		if (!content) return { thinking: null, response: '', isThinking: false };
 
-		// Pattern variations for thinking tags
-		const patterns = [
-			{ open: '◁think▷', close: '◁/think▷' },
-			{ open: '<think>', close: '</think>' },
-			{ open: '[thinking]', close: '[/thinking]' },
-			{ open: '<|thinking|>', close: '<|/thinking|>' },
-		];
+		// Normalize content - replace various unicode brackets/arrows with standard chars
+		// This handles encoding issues where ◁▷ become garbled
+		let normalized = content
+			.replace(/[◁◀⟨〈❮‹«<＜]/g, '<')
+			.replace(/[▷▶⟩〉❯›»>＞]/g, '>')
+			.replace(/\uFFFD+/g, ''); // Remove replacement characters
 
-		for (const pattern of patterns) {
-			const openIdx = content.indexOf(pattern.open);
-			if (openIdx !== -1) {
-				const closeIdx = content.indexOf(pattern.close, openIdx);
-				
-				if (closeIdx !== -1) {
-					// Complete thinking block
-					const thinking = content.slice(openIdx + pattern.open.length, closeIdx).trim();
-					const beforeThink = content.slice(0, openIdx).trim();
-					const afterThink = content.slice(closeIdx + pattern.close.length).trim();
-					const response = (beforeThink + ' ' + afterThink).trim();
-					
-					return { thinking, response, isThinking: false };
-				} else {
-					// Still thinking (no closing tag yet)
-					const thinking = content.slice(openIdx + pattern.open.length).trim();
-					const beforeThink = content.slice(0, openIdx).trim();
-					
-					return { thinking, response: beforeThink, isThinking: true };
-				}
-			}
+		// Try regex first - most flexible
+		// Match <think> or variations with any brackets
+		const thinkRegex = /[<\[{(]+\s*think\s*[>\]})]+\s*\n?([\s\S]*?)[<\[{(]+\s*\/\s*think\s*[>\]})]+/i;
+		const match = normalized.match(thinkRegex);
+		
+		if (match) {
+			const thinking = match[1].trim();
+			const beforeThink = normalized.slice(0, match.index).trim();
+			const afterThink = normalized.slice((match.index || 0) + match[0].length).trim();
+			const response = (beforeThink + ' ' + afterThink).trim();
+			return { thinking, response, isThinking: false };
 		}
 
+		// Check for incomplete thinking (open tag but no close)
+		const openRegex = /[<\[{(]+\s*think\s*[>\]})]+/i;
+		const closeRegex = /[<\[{(]+\s*\/\s*think\s*[>\]})]+/i;
+		const openMatch = normalized.match(openRegex);
+		
+		if (openMatch && !normalized.match(closeRegex)) {
+			const openIdx = openMatch.index || 0;
+			const thinking = normalized.slice(openIdx + openMatch[0].length).trim();
+			const beforeThink = normalized.slice(0, openIdx).trim();
+			return { thinking, response: beforeThink, isThinking: true };
+		}
+
+		// Fallback - return original content
 		return { thinking: null, response: content, isThinking: false };
 	}
 
@@ -84,14 +86,12 @@
 	});
 
 	async function copyToClipboard(content: string, id: string) {
-		try {
-			await navigator.clipboard.writeText(content);
+		const success = await copyText(content);
+		if (success) {
 			copiedId = id;
 			setTimeout(() => {
 				copiedId = null;
 			}, 2000);
-		} catch {
-			console.error('Failed to copy');
 		}
 	}
 

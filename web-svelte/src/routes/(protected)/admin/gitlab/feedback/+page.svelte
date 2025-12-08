@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import { api } from '$lib/api/client';
+	import GitLabNav from '$lib/components/gitlab-nav.svelte';
 
 	interface FeedbackStats {
 		total_feedback: number;
@@ -70,9 +72,12 @@
 			const params = new URLSearchParams();
 			if (filterType !== 'all') params.append('type', filterType);
 
-			const response = await fetch(`/api/admin/gitlab/feedback?${params}`);
-			if (!response.ok) throw new Error('Failed to load feedback');
-			const data = await response.json();
+			const data = await api.get<{
+				stats: FeedbackStats;
+				category_accuracy: CategoryAccuracy[];
+				model_accuracy: ModelAccuracy[];
+				recent: FeedbackItem[];
+			}>(`/api/admin/gitlab/feedback?${params}`);
 			stats = data.stats;
 			categoryAccuracy = data.category_accuracy || [];
 			modelAccuracy = data.model_accuracy || [];
@@ -86,12 +91,8 @@
 
 	async function exportTrainingData() {
 		try {
-			const response = await fetch('/api/admin/gitlab/feedback/export', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' }
-			});
-			if (!response.ok) throw new Error('Export failed');
-			const blob = await response.blob();
+			const data = await api.post<Blob>('/api/admin/gitlab/feedback/export', {});
+			const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
@@ -136,6 +137,8 @@
 </script>
 
 <div class="space-y-6">
+	<GitLabNav />
+
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold">Review Feedback</h1>

@@ -66,3 +66,57 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 	};
 }
 
+/**
+ * Copy text to clipboard with fallback for HTTP contexts
+ * navigator.clipboard requires HTTPS, so we use execCommand as fallback
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+	// Try modern API first (requires HTTPS)
+	if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+		try {
+			await navigator.clipboard.writeText(text);
+			return true;
+		} catch {
+			// Fall through to fallback
+		}
+	}
+	// Fallback for HTTP contexts
+	if (typeof document !== 'undefined') {
+		try {
+			const textarea = document.createElement('textarea');
+			textarea.value = text;
+			textarea.style.position = 'fixed';
+			textarea.style.opacity = '0';
+			textarea.style.pointerEvents = 'none';
+			document.body.appendChild(textarea);
+			textarea.select();
+			const success = document.execCommand('copy');
+			document.body.removeChild(textarea);
+			return success;
+		} catch {
+			return false;
+		}
+	}
+	return false;
+}
+
+/**
+ * Generate UUID with fallback for HTTP contexts
+ * crypto.randomUUID requires HTTPS, so we use fallback generator
+ */
+export function generateUUID(): string {
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		try {
+			return crypto.randomUUID();
+		} catch {
+			// Fall through to fallback
+		}
+	}
+	// Fallback UUID v4 generator
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+		const r = (Math.random() * 16) | 0;
+		const v = c === 'x' ? r : (r & 0x3) | 0x8;
+		return v.toString(16);
+	});
+}
+

@@ -17,22 +17,12 @@
 		Eye,
 		Folder,
 		Activity,
-		Server,
-		BarChart3,
-		MessageSquare,
-		Cog
+		Server
 	} from 'lucide-svelte';
 	import { gitlabApi, type GitLabIntegration, type GitLabQueueStats } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
-
-	// Sub-navigation links
-	const subNavLinks = [
-		{ href: '/admin/gitlab/queue', label: 'Queue', icon: Activity },
-		{ href: '/admin/gitlab/analytics', label: 'Analytics', icon: BarChart3 },
-		{ href: '/admin/gitlab/feedback', label: 'Feedback', icon: MessageSquare },
-		{ href: '/admin/gitlab/settings', label: 'Settings', icon: Cog }
-	];
+	import GitLabNav from '$lib/components/gitlab-nav.svelte';
 
 	let integrations = $state<GitLabIntegration[]>([]);
 	let queueStats = $state<GitLabQueueStats | null>(null);
@@ -213,17 +203,7 @@
 
 <div class="space-y-6">
 	<!-- Sub Navigation -->
-	<div class="flex items-center gap-2 border-b pb-4">
-		{#each subNavLinks as link}
-			<a
-				href={link.href}
-				class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-			>
-				<svelte:component this={link.icon} class="h-4 w-4" />
-				{link.label}
-			</a>
-		{/each}
-	</div>
+	<GitLabNav />
 
 	<!-- Header -->
 	<div class="flex items-center justify-between">

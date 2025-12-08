@@ -13,7 +13,7 @@
 		User
 	} from 'lucide-svelte';
 	import { adminApi, type Invitation } from '$lib/api/admin';
-	import { cn, formatRelativeTime } from '$lib/utils';
+	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import { toast } from 'svelte-sonner';
 	import * as m from '$lib/paraglide/messages';
@@ -65,14 +65,21 @@
 	async function handleCreate() {
 		isCreating = true;
 		try {
-			const invitation = await adminApi.createInvitation({
+			const response = await adminApi.createInvitation({
 				email: newEmail || undefined,
 				expires_at: getExpiresAt(newExpiresIn),
 				max_uses: 1
 			});
-			invitations = [invitation, ...invitations];
+			invitations = [response.invitation, ...invitations];
 			showCreateModal = false;
 			toast.success('Invitation created');
+			// Copy link to clipboard
+			if (response.invitation_link) {
+				const copied = await copyToClipboard(response.invitation_link);
+				if (copied) {
+					toast.success('Link copied to clipboard');
+				}
+			}
 		} catch (error) {
 			console.error('Failed to create invitation:', error);
 			toast.error('Failed to create invitation');
@@ -95,21 +102,39 @@
 	}
 
 	async function copyLink(invitation: Invitation) {
+		if (!invitation.token) {
+			toast.error('No token available');
+			return;
+		}
 		const link = `${window.location.origin}/register?token=${invitation.token}`;
-		await navigator.clipboard.writeText(link);
-		copiedId = invitation.id;
-		toast.success('Link copied to clipboard');
-		setTimeout(() => (copiedId = null), 2000);
+		const copied = await copyToClipboard(link);
+		if (copied) {
+			copiedId = invitation.id;
+			toast.success('Link copied to clipboard');
+			setTimeout(() => (copiedId = null), 2000);
+		} else {
+			toast.error('Failed to copy link');
+		}
 	}
 
 	function getStatusBadge(invitation: Invitation) {
-		if (invitation.used_at) {
+		if (invitation.revoked_at) {
+			return { text: 'Revoked', class: 'bg-gray-500/10 text-gray-500' };
+		}
+		if (invitation.used_at || invitation.current_uses >= invitation.max_uses) {
 			return { text: 'Used', class: 'bg-green-500/10 text-green-500' };
 		}
-		if (new Date(invitation.expires_at) < new Date()) {
+		if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
 			return { text: 'Expired', class: 'bg-red-500/10 text-red-500' };
 		}
 		return { text: 'Active', class: 'bg-blue-500/10 text-blue-500' };
+	}
+	
+	function isInvitationActive(invitation: Invitation): boolean {
+		if (invitation.revoked_at) return false;
+		if (invitation.used_at || invitation.current_uses >= invitation.max_uses) return false;
+		if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) return false;
+		return true;
 	}
 </script>
 
@@ -157,8 +182,8 @@
 				<thead class="border-b border-border bg-muted/50">
 					<tr>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Email / Token</th>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Role</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Status</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Uses</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Expires</th>
 						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">{m.common_actions()}</th>
 					</tr>
@@ -173,14 +198,13 @@
 										<Mail class="h-4 w-4 text-muted-foreground" />
 										<span>{invitation.email}</span>
 									</div>
-								{:else}
+								{:else if invitation.token}
 									<span class="font-mono text-sm text-muted-foreground">
 										{invitation.token.substring(0, 16)}...
 									</span>
+								{:else}
+									<span class="text-sm text-muted-foreground">—</span>
 								{/if}
-							</td>
-							<td class="px-4 py-3">
-								<span class="capitalize">{invitation.role}</span>
 							</td>
 							<td class="px-4 py-3">
 								<span class={cn('rounded-full px-2 py-0.5 text-xs font-medium', status.class)}>
@@ -188,11 +212,14 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
-								{formatRelativeTime(invitation.expires_at)}
+								{invitation.current_uses || 0} / {invitation.max_uses || 1}
+							</td>
+							<td class="px-4 py-3 text-sm text-muted-foreground">
+								{invitation.expires_at ? formatRelativeTime(invitation.expires_at) : 'Never'}
 							</td>
 							<td class="px-4 py-3 text-right">
 								<div class="flex justify-end gap-1">
-									{#if !invitation.used_at && new Date(invitation.expires_at) > new Date()}
+									{#if isInvitationActive(invitation)}
 										<button
 											onclick={() => copyLink(invitation)}
 											class="rounded p-1.5 text-muted-foreground hover:bg-accent"
@@ -205,13 +232,15 @@
 											{/if}
 										</button>
 									{/if}
-									<button
-										onclick={() => handleRevoke(invitation)}
-										class="rounded p-1.5 text-destructive hover:bg-destructive/10"
-										title="Revoke"
-									>
-										<Trash2 class="h-4 w-4" />
-									</button>
+									{#if !invitation.revoked_at}
+										<button
+											onclick={() => handleRevoke(invitation)}
+											class="rounded p-1.5 text-destructive hover:bg-destructive/10"
+											title="Revoke"
+										>
+											<Trash2 class="h-4 w-4" />
+										</button>
+									{/if}
 								</div>
 							</td>
 						</tr>

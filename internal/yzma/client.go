@@ -65,6 +65,10 @@ type Client struct {
 	aliases  map[string]string        // alias -> path (v3.0.5+)
 	modelsMu sync.RWMutex
 
+	// In-flight model loads (for cancellation)
+	loadingMu      sync.Mutex
+	loadingCancels map[string]context.CancelFunc // modelPath -> cancel func
+
 	// Default parameters
 	contextSize uint32
 	batchSize   uint32
@@ -74,6 +78,13 @@ type Client struct {
 	topP        float32
 	minP        float32
 	nGpuLayers  int32 // GPU offloading: -1 = all layers, 0 = CPU only (v3.0.6+)
+
+	// GPU Configuration (v3.2.1+)
+	mainGPU        int32
+	tensorSplit    []float32
+	flashAttention bool
+	threads        int32
+	threadsBatch   int32
 
 	// Stats
 	totalRequests int64
@@ -113,6 +124,13 @@ type ClientConfig struct {
 	MinP        float32 // Min-P sampling (default: 0.1)
 	Verbose     bool    // Enable llama.cpp logging
 	NGpuLayers  int32   // Number of layers to offload to GPU (0 = CPU only, -1 = all layers, default: -1)
+
+	// GPU Configuration (v3.2.1+)
+	MainGPU        int32     // Index of main GPU for scratch buffers (default: 0)
+	TensorSplit    []float32 // Distribution of model across GPUs (e.g., [0.5, 0.5] for 50/50)
+	FlashAttention bool      // Enable Flash Attention (default: true, recommended for RTX 40xx+)
+	Threads        int32     // CPU threads for generation (0 = auto)
+	ThreadsBatch   int32     // CPU threads for batch processing (0 = same as Threads)
 }
 
 // NewClient creates a new yzma client
@@ -163,21 +181,38 @@ func NewClient(config ClientConfig, logger *logrus.Logger) (*Client, error) {
 		config.NGpuLayers = -1 // Auto-detect GPU and offload all layers
 	}
 
+	// Default threads: use all available CPU cores
+	threads := config.Threads
+	if threads == 0 {
+		threads = int32(runtime.NumCPU())
+	}
+	threadsBatch := config.ThreadsBatch
+	if threadsBatch == 0 {
+		threadsBatch = threads
+	}
+
 	client := &Client{
-		modelsDir:   config.ModelsDir,
-		logger:      logger,
-		libPath:     libPath,
-		db:          nil, // v3.0.6+: Set via SetDB later
-		models:      make(map[string]*ModelContext),
-		aliases:     make(map[string]string), // v3.0.5+: alias -> path map
-		contextSize: config.ContextSize,
-		batchSize:   config.BatchSize,
-		uBatchSize:  config.UBatchSize,
-		temperature: config.Temperature,
-		topK:        config.TopK,
-		topP:        config.TopP,
-		minP:        config.MinP,
-		nGpuLayers:  config.NGpuLayers, // v3.0.6+: GPU offloading
+		modelsDir:      config.ModelsDir,
+		logger:         logger,
+		libPath:        libPath,
+		db:             nil, // v3.0.6+: Set via SetDB later
+		models:         make(map[string]*ModelContext),
+		aliases:        make(map[string]string), // v3.0.5+: alias -> path map
+		loadingCancels: make(map[string]context.CancelFunc),
+		contextSize:    config.ContextSize,
+		batchSize:      config.BatchSize,
+		uBatchSize:     config.UBatchSize,
+		temperature:    config.Temperature,
+		topK:           config.TopK,
+		topP:           config.TopP,
+		minP:           config.MinP,
+		nGpuLayers:     config.NGpuLayers, // v3.0.6+: GPU offloading
+		// GPU Configuration (v3.2.1+)
+		mainGPU:        config.MainGPU,
+		tensorSplit:    config.TensorSplit,
+		flashAttention: config.FlashAttention,
+		threads:        threads,
+		threadsBatch:   threadsBatch,
 	}
 
 	// Load llama.cpp library
@@ -238,6 +273,23 @@ func NewClient(config ClientConfig, logger *logrus.Logger) (*Client, error) {
 	logger.WithField("lib_path", libPath).Info("🔄 Manually calling GGMLBackendLoadAllFromPath...")
 	llama.GGMLBackendLoadAllFromPath(libPath)
 	logger.Info("✅ GGMLBackendLoadAllFromPath completed")
+
+	// GPU diagnostics (v3.2.2+)
+	maxDevices := llama.MaxDevices()
+	supportsGPU := llama.SupportsGpuOffload()
+	logger.WithFields(logrus.Fields{
+		"max_devices":     maxDevices,
+		"supports_gpu":    supportsGPU,
+		"n_gpu_layers":    config.NGpuLayers,
+		"tensor_split":    config.TensorSplit,
+		"main_gpu":        config.MainGPU,
+		"flash_attention": config.FlashAttention,
+	}).Info("🖥️ GPU diagnostics")
+
+	if !supportsGPU && config.NGpuLayers != 0 {
+		logger.Warn("⚠️ GPU offload not supported by llama.cpp library! Models will run on CPU only.")
+		logger.Warn("⚠️ Make sure llama.cpp was compiled with CUDA support (GGML_CUDA=ON)")
+	}
 
 	client.initialized = true
 
@@ -313,6 +365,10 @@ func (c *Client) ResolveModelPath(nameOrAlias string) string {
 // LoadModel loads a GGUF model from disk with optional alias (v3.0.5+)
 // alias parameter is variadic for backward compatibility
 func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...string) error {
+	// Ensure we have a cancellable context
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Extract alias if provided
 	modelAlias := ""
 	if len(alias) > 0 {
@@ -351,6 +407,16 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 		"models_dir": c.modelsDir,
 	}).Info("🔍 Resolved full path for model")
 
+	// Track in-flight load for cancellation
+	c.loadingMu.Lock()
+	c.loadingCancels[modelPath] = cancel
+	c.loadingMu.Unlock()
+	defer func() {
+		c.loadingMu.Lock()
+		delete(c.loadingCancels, modelPath)
+		c.loadingMu.Unlock()
+	}()
+
 	// Verify model file exists
 	if _, err := os.Stat(fullPath); err != nil {
 		c.logger.WithError(err).WithField("full_path", fullPath).Error("❌ Model file not found")
@@ -378,18 +444,58 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 	c.logger.Info("🔄 Calling llama.ModelLoadFromFile...")
 	mParams := llama.ModelDefaultParams()
 
-	// Enable GPU offloading
+	// Progress callback to allow cancellation during model load
+	mParams.SetProgressCallback(func(progress float32, _ uintptr) uint8 {
+		if ctx.Err() != nil {
+			return 0 // abort load
+		}
+		return 1
+	})
+
+	// GPU offloading configuration
 	mParams.NGpuLayers = c.nGpuLayers
+	mParams.MainGpu = c.mainGPU
+
+	// Multi-GPU tensor split (v3.2.1+)
+	// SplitMode: 0 = NONE (single GPU), 1 = LAYER (multi-GPU layer split), 2 = ROW
+	// IMPORTANT: We need to keep tensorSplitCopy alive until after ModelLoadFromFile completes
+	// to prevent GC from moving/freeing the memory while llama.cpp is using the pointer.
+	var tensorSplitCopy []float32
+	if len(c.tensorSplit) > 0 {
+		// Copy to a local slice to ensure memory stays valid during FFI call
+		tensorSplitCopy = make([]float32, len(c.tensorSplit))
+		copy(tensorSplitCopy, c.tensorSplit)
+		mParams.TensorSplit = &tensorSplitCopy[0]
+		mParams.SplitMode = 1 // LAYER split for multi-GPU
+		c.logger.WithFields(logrus.Fields{
+			"tensor_split_values": tensorSplitCopy,
+			"tensor_split_len":    len(tensorSplitCopy),
+		}).Debug("🎮 TensorSplit configured for multi-GPU")
+	} else {
+		// Explicitly set NONE for single GPU to avoid default LAYER mode issue
+		mParams.SplitMode = 0
+		mParams.TensorSplit = nil // Explicitly nil for safety
+		c.logger.Debug("🎮 Single GPU mode (no tensor_split)")
+	}
 
 	c.logger.WithFields(logrus.Fields{
 		"n_gpu_layers": mParams.NGpuLayers,
 		"split_mode":   mParams.SplitMode,
 		"main_gpu":     mParams.MainGpu,
+		"tensor_split": tensorSplitCopy,
 		"vocab_only":   mParams.VocabOnly,
 	}).Info("🔧 Model parameters (GPU offloading enabled)")
 
 	model := llama.ModelLoadFromFile(fullPath, mParams)
+
+	// Keep tensorSplitCopy alive until after the FFI call completes
+	// This prevents GC from collecting the slice while llama.cpp might still reference it
+	runtime.KeepAlive(tensorSplitCopy)
 	if model == 0 {
+		if ctx.Err() != nil {
+			c.logger.WithField("model_path", modelPath).Warn("❌ Model load cancelled by context")
+			return ctx.Err()
+		}
 		c.logger.WithField("full_path", fullPath).Error("❌ llama.ModelLoadFromFile returned 0 (failed)")
 		return fmt.Errorf("failed to load model from file: %s (llama.cpp returned null pointer)", fullPath)
 	}
@@ -403,6 +509,27 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 	ctxParams.NCtx = c.contextSize
 	ctxParams.NBatch = c.batchSize
 	ctxParams.NUbatch = c.uBatchSize
+
+	// CPU threads configuration (v3.2.1+)
+	ctxParams.NThreads = c.threads
+	ctxParams.NThreadsBatch = c.threadsBatch
+
+	// Flash Attention configuration (v3.2.1+)
+	// FlashAttentionType: 0 = disabled, 1 = auto, 2 = enabled
+	if c.flashAttention {
+		ctxParams.FlashAttentionType = 1 // Auto (llama.cpp decides based on model)
+	} else {
+		ctxParams.FlashAttentionType = 0 // Disabled
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"n_ctx":           ctxParams.NCtx,
+		"n_batch":         ctxParams.NBatch,
+		"n_ubatch":        ctxParams.NUbatch,
+		"n_threads":       ctxParams.NThreads,
+		"n_threads_batch": ctxParams.NThreadsBatch,
+		"flash_attention": c.flashAttention,
+	}).Info("🔧 Context parameters")
 
 	lctx := llama.InitFromModel(model, ctxParams)
 	if lctx == 0 {
@@ -466,6 +593,9 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 	}).Info("Model loaded successfully")
 
 	// Phase 4: Non-critical operations (no lock needed)
+	// Use background context since HTTP request context may already be canceled
+	// after long model loading (40+ seconds)
+	bgCtx := context.Background()
 
 	// Save to DB for persistence (v3.0.6+)
 	if c.db != nil {
@@ -477,7 +607,7 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 			CreatedAt: time.Now(),
 		}
 
-		if err := c.db.SaveLoadedModel(ctx, dbModel); err != nil {
+		if err := c.db.SaveLoadedModel(bgCtx, dbModel); err != nil {
 			c.logger.WithError(err).Warn("Failed to persist loaded model to DB")
 			// Don't fail the load, just log the warning
 		} else {
@@ -489,7 +619,7 @@ func (c *Client) LoadModel(ctx context.Context, modelPath string, alias ...strin
 	// NOTE: This must be called AFTER unlock to prevent deadlock
 	// (InvalidateModelListCache calls ListLoadedModels which needs RLock)
 	if c.modelWorker != nil {
-		if err := c.modelWorker.InvalidateModelListCache(ctx); err != nil {
+		if err := c.modelWorker.InvalidateModelListCache(bgCtx); err != nil {
 			c.logger.WithError(err).Warn("Failed to invalidate model list cache")
 			// Don't fail the load, just log the warning
 		} else {
@@ -581,19 +711,19 @@ func (c *Client) IsModelLoaded(modelPath string) bool {
 
 	// Normalize path separators for cross-platform compatibility
 	normalizedPath := filepath.ToSlash(modelPath)
-	
+
 	// Try direct lookup first
 	if _, exists := c.models[modelPath]; exists {
 		return true
 	}
-	
+
 	// Try with normalized path
 	for storedPath := range c.models {
 		if filepath.ToSlash(storedPath) == normalizedPath {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -614,42 +744,42 @@ func (c *Client) GetModelContext(modelPath string) (*ModelContext, error) {
 type ModelMetadata struct {
 	// Basic info
 	Description string `json:"description"`
-	
+
 	// Architecture
-	Architecture    string `json:"architecture,omitempty"`
-	ContextLength   int32  `json:"context_length"`
-	EmbeddingSize   int32  `json:"embedding_size"`
-	NumLayers       int32  `json:"num_layers"`
-	NumHeads        int32  `json:"num_heads"`
-	NumKVHeads      int32  `json:"num_kv_heads"`
-	VocabSize       int32  `json:"vocab_size"`
-	
+	Architecture  string `json:"architecture,omitempty"`
+	ContextLength int32  `json:"context_length"`
+	EmbeddingSize int32  `json:"embedding_size"`
+	NumLayers     int32  `json:"num_layers"`
+	NumHeads      int32  `json:"num_heads"`
+	NumKVHeads    int32  `json:"num_kv_heads"`
+	VocabSize     int32  `json:"vocab_size"`
+
 	// Size
-	ModelSize       uint64 `json:"model_size"`
-	FileSizeBytes   int64  `json:"file_size_bytes"`
-	
+	ModelSize     uint64 `json:"model_size"`
+	FileSizeBytes int64  `json:"file_size_bytes"`
+
 	// Quantization (from GGUF metadata)
-	Quantization    string `json:"quantization,omitempty"`
-	FileType        string `json:"file_type,omitempty"`
-	
+	Quantization string `json:"quantization,omitempty"`
+	FileType     string `json:"file_type,omitempty"`
+
 	// Additional GGUF metadata
 	GeneralName     string `json:"general_name,omitempty"`
 	GeneralAuthor   string `json:"general_author,omitempty"`
 	GeneralBaseName string `json:"general_base_model,omitempty"`
 	License         string `json:"license,omitempty"`
-	
+
 	// Raw metadata (all GGUF keys)
-	RawMetadata     map[string]string `json:"raw_metadata,omitempty"`
+	RawMetadata map[string]string `json:"raw_metadata,omitempty"`
 }
 
 // GetModelMetadata extracts metadata from a loaded model
 func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 	c.modelsMu.RLock()
 	defer c.modelsMu.RUnlock()
-	
+
 	// Normalize path separators for cross-platform compatibility
 	normalizedPath := filepath.ToSlash(modelPath)
-	
+
 	// Find the model with normalized path comparison
 	var modelCtx *ModelContext
 	var actualPath string
@@ -660,14 +790,14 @@ func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 			break
 		}
 	}
-	
+
 	if modelCtx == nil {
 		return nil, fmt.Errorf("model not loaded: %s", modelPath)
 	}
-	
+
 	// Use actual stored path for file operations
 	modelPath = actualPath
-	
+
 	meta := &ModelMetadata{
 		Description:   llama.ModelDesc(modelCtx.Model),
 		ContextLength: llama.ModelNCtxTrain(modelCtx.Model),
@@ -679,13 +809,13 @@ func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 		ModelSize:     llama.ModelSize(modelCtx.Model),
 		RawMetadata:   make(map[string]string),
 	}
-	
+
 	// Get file size
 	fullPath := filepath.Join(c.modelsDir, modelPath)
 	if info, err := os.Stat(fullPath); err == nil {
 		meta.FileSizeBytes = info.Size()
 	}
-	
+
 	// Extract all GGUF metadata
 	metaCount := llama.ModelMetaCount(modelCtx.Model)
 	for i := int32(0); i < metaCount; i++ {
@@ -693,7 +823,7 @@ func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 		val, valOk := llama.ModelMetaValStrByIndex(modelCtx.Model, i)
 		if keyOk && valOk {
 			meta.RawMetadata[key] = val
-			
+
 			// Extract specific known fields
 			switch key {
 			case "general.architecture":
@@ -713,12 +843,12 @@ func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 			}
 		}
 	}
-	
+
 	// Try to extract quantization from filename if not in metadata
 	if meta.Quantization == "" {
 		meta.Quantization = extractQuantFromPath(modelPath)
 	}
-	
+
 	c.logger.WithFields(logrus.Fields{
 		"model_path":     modelPath,
 		"description":    meta.Description,
@@ -727,7 +857,7 @@ func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 		"vocab_size":     meta.VocabSize,
 		"meta_count":     metaCount,
 	}).Debug("Model metadata extracted")
-	
+
 	return meta, nil
 }
 
@@ -735,7 +865,7 @@ func (c *Client) GetModelMetadata(modelPath string) (*ModelMetadata, error) {
 func extractQuantFromPath(path string) string {
 	base := filepath.Base(path)
 	base = strings.TrimSuffix(base, ".gguf")
-	
+
 	// Common patterns: Q4_K_M, Q8_0, IQ4_XS, etc.
 	patterns := []string{
 		"Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L",
@@ -747,14 +877,14 @@ func extractQuantFromPath(path string) string {
 		"IQ4_NL", "IQ4_XS",
 		"F16", "F32", "BF16",
 	}
-	
+
 	upper := strings.ToUpper(base)
 	for _, pattern := range patterns {
 		if strings.Contains(upper, pattern) {
 			return pattern
 		}
 	}
-	
+
 	return ""
 }
 
@@ -1473,4 +1603,66 @@ func (c *Client) LoadPersistedModels(ctx context.Context) error {
 	}).Info("✅ Persisted models auto-load completed")
 
 	return nil
+}
+
+// GPUInfo contains information about GPU support and configuration (v3.2.2+)
+type GPUInfo struct {
+	MaxDevices       uint64    `json:"max_devices"`
+	SupportsGPU      bool      `json:"supports_gpu"`
+	NGpuLayers       int32     `json:"n_gpu_layers"`
+	MainGPU          int32     `json:"main_gpu"`
+	TensorSplit      []float32 `json:"tensor_split,omitempty"`
+	FlashAttention   bool      `json:"flash_attention"`
+	Threads          int32     `json:"threads"`
+	ThreadsBatch     int32     `json:"threads_batch"`
+	ContextSize      uint32    `json:"context_size"`
+	BatchSize        uint32    `json:"batch_size"`
+	Initialized      bool      `json:"initialized"`
+	ModelsLoading    bool      `json:"models_loading"`
+	LoadedModelCount int       `json:"loaded_model_count"`
+}
+
+// GetGPUInfo returns current GPU configuration and status (v3.2.2+)
+// This method is safe to call before models are loaded
+func (c *Client) GetGPUInfo() GPUInfo {
+	c.modelsMu.RLock()
+	loadedCount := len(c.models)
+	c.modelsMu.RUnlock()
+
+	return GPUInfo{
+		MaxDevices:       llama.MaxDevices(),
+		SupportsGPU:      llama.SupportsGpuOffload(),
+		NGpuLayers:       c.nGpuLayers,
+		MainGPU:          c.mainGPU,
+		TensorSplit:      c.tensorSplit,
+		FlashAttention:   c.flashAttention,
+		Threads:          c.threads,
+		ThreadsBatch:     c.threadsBatch,
+		ContextSize:      c.contextSize,
+		BatchSize:        c.batchSize,
+		Initialized:      c.initialized,
+		ModelsLoading:    false, // Will be updated by background loader
+		LoadedModelCount: loadedCount,
+	}
+}
+
+// IsInitialized returns true if the yzma client is initialized (v3.2.2+)
+func (c *Client) IsInitialized() bool {
+	return c.initialized
+}
+
+// CancelModelLoad aborts an in-flight model load if present (v3.2.2+)
+func (c *Client) CancelModelLoad(modelPath string) bool {
+	c.loadingMu.Lock()
+	cancel, ok := c.loadingCancels[modelPath]
+	if ok {
+		delete(c.loadingCancels, modelPath)
+	}
+	c.loadingMu.Unlock()
+
+	if ok {
+		cancel()
+		return true
+	}
+	return false
 }

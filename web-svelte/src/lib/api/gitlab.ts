@@ -1,5 +1,7 @@
 // GitLab Integration API Client
 
+import { api } from './client';
+
 const API_BASE = '/api/admin/gitlab';
 
 // Types
@@ -186,22 +188,12 @@ export interface TestConnectionResult {
 
 async function apiRequest<T>(
   path: string,
-  options: RequestInit = {}
+  options: { method?: string; body?: unknown } = {}
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+  return api.request<T>(`${API_BASE}${path}`, {
+    method: (options.method || 'GET') as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    body: options.body,
   });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
-  }
-
-  return response.json();
 }
 
 // Integration API

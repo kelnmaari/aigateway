@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import { api } from '$lib/api/client';
+	import GitLabNav from '$lib/components/gitlab-nav.svelte';
 
 	interface ReviewStats {
 		total_reviews: number;
@@ -66,9 +68,12 @@
 		loading = true;
 		error = '';
 		try {
-			const response = await fetch(`/api/admin/gitlab/analytics?range=${timeRange}`);
-			if (!response.ok) throw new Error('Failed to load analytics');
-			const data = await response.json();
+			const data = await api.get<{
+				overview: ReviewStats;
+				top_projects: ProjectStats[];
+				top_models: ModelStats[];
+				issues_by_category: CategoryStats[];
+			}>(`/api/admin/gitlab/analytics?range=${timeRange}`);
 			stats = data.overview;
 			projectStats = data.top_projects || [];
 			modelStats = data.top_models || [];
@@ -102,6 +107,8 @@
 </script>
 
 <div class="space-y-6">
+	<GitLabNav />
+
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold">GitLab Analytics</h1>

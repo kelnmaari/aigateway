@@ -65,7 +65,7 @@
 
 		try {
 			const response = await authApi.bootstrap({
-				bootstrap_token: bootstrapToken,
+				admin_token: bootstrapToken,
 				username,
 				email,
 				password

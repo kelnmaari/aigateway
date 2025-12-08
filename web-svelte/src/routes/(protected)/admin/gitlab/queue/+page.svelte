@@ -12,7 +12,6 @@
 		Play,
 		Pause,
 		Server,
-		ArrowLeft,
 		RotateCcw,
 		Wifi,
 		WifiOff
@@ -20,6 +19,7 @@
 	import { gitlabApi, type GitLabQueueStats, type GitLabJob } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import GitLabNav from '$lib/components/gitlab-nav.svelte';
 
 	let stats = $state<GitLabQueueStats | null>(null);
 	let jobs = $state<GitLabJob[]>([]);
@@ -28,10 +28,10 @@
 	let autoRefresh = $state(true);
 	let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
-	// WebSocket
+	// WebSocket (disabled by default - requires full GitLab integration setup)
 	let ws: WebSocket | null = null;
 	let wsConnected = $state(false);
-	let wsEnabled = $state(true);
+	let wsEnabled = $state(false);
 	let recentEvents = $state<{ type: string; data: any; time: Date }[]>([]);
 
 	// Filters
@@ -242,12 +242,12 @@
 </script>
 
 <div class="space-y-6">
+	<!-- Sub Navigation -->
+	<GitLabNav />
+
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-4">
-			<a href="/admin/gitlab" class="rounded p-2 hover:bg-muted">
-				<ArrowLeft class="h-5 w-5" />
-			</a>
 			<div>
 				<h2 class="text-2xl font-bold text-foreground">Analysis Queue</h2>
 				<p class="text-muted-foreground">Monitor and manage MR analysis jobs</p>

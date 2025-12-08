@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import { api } from '$lib/api/client';
+	import GitLabNav from '$lib/components/gitlab-nav.svelte';
 
 	// Telegram Settings
 	let telegramEnabled = false;
@@ -69,17 +71,24 @@
 	async function loadSettings() {
 		loading = true;
 		try {
-			const response = await fetch('/api/admin/gitlab/settings');
-			if (response.ok) {
-				const data = await response.json();
-				telegramEnabled = data.telegram?.enabled || false;
-				telegramBotToken = data.telegram?.bot_token || '';
-				telegramDefaultChat = data.telegram?.default_chat || '';
-				priorityRules = data.priority_rules || priorityRules;
-				languagePrompts = data.language_prompts || languagePrompts;
+			const data = await api.get<{
+				telegram?: { enabled: boolean; bot_token: string; default_chat: string };
+				priority_rules?: BranchRule[];
+				language_prompts?: LanguagePrompt[];
+			}>('/api/admin/gitlab/settings');
+			telegramEnabled = data.telegram?.enabled || false;
+			telegramBotToken = data.telegram?.bot_token || '';
+			telegramDefaultChat = data.telegram?.default_chat || '';
+			// Only override defaults if API returns non-empty arrays
+			if (Array.isArray(data.priority_rules) && data.priority_rules.length > 0) {
+				priorityRules = data.priority_rules;
+			}
+			if (Array.isArray(data.language_prompts) && data.language_prompts.length > 0) {
+				languagePrompts = data.language_prompts;
 			}
 		} catch (e) {
-			error = 'Failed to load settings';
+			// Settings not configured yet - use defaults
+			console.log('Using default settings');
 		} finally {
 			loading = false;
 		}
@@ -90,20 +99,15 @@
 		error = '';
 		success = '';
 		try {
-			const response = await fetch('/api/admin/gitlab/settings', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					telegram: {
-						enabled: telegramEnabled,
-						bot_token: telegramBotToken,
-						default_chat: telegramDefaultChat
-					},
-					priority_rules: priorityRules,
-					language_prompts: languagePrompts
-				})
+			await api.put('/api/admin/gitlab/settings', {
+				telegram: {
+					enabled: telegramEnabled,
+					bot_token: telegramBotToken,
+					default_chat: telegramDefaultChat
+				},
+				priority_rules: priorityRules,
+				language_prompts: languagePrompts
 			});
-			if (!response.ok) throw new Error('Failed to save settings');
 			success = 'Settings saved successfully';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Unknown error';
@@ -115,19 +119,11 @@
 	async function testTelegram() {
 		telegramTestStatus = 'Testing...';
 		try {
-			const response = await fetch('/api/admin/gitlab/settings/telegram/test', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					bot_token: telegramBotToken,
-					chat_id: telegramDefaultChat
-				})
+			await api.post('/api/admin/gitlab/settings/telegram/test', {
+				bot_token: telegramBotToken,
+				chat_id: telegramDefaultChat
 			});
-			if (response.ok) {
-				telegramTestStatus = '✓ Connection successful!';
-			} else {
-				telegramTestStatus = '✗ Connection failed';
-			}
+			telegramTestStatus = '✓ Connection successful!';
 		} catch {
 			telegramTestStatus = '✗ Connection failed';
 		}
@@ -142,6 +138,7 @@
 	}
 
 	function updatePrompt(lang: string) {
+		if (!Array.isArray(languagePrompts)) return;
 		const prompt = languagePrompts.find(p => p.language === lang);
 		if (prompt) {
 			customPrompt = prompt.instructions;
@@ -158,6 +155,8 @@
 </script>
 
 <div class="space-y-6">
+	<GitLabNav />
+
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold">GitLab Integration Settings</h1>

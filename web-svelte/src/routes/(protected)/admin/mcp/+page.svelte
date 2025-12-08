@@ -28,7 +28,7 @@
 		Globe
 	} from 'lucide-svelte';
 	import { mcpApi, type MCPServer } from '$lib/api/mcp';
-	import { cn, formatRelativeTime, debounce } from '$lib/utils';
+	import { cn, formatRelativeTime, debounce, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 	// This page is in admin section - always has full access
@@ -230,11 +230,13 @@
 		}
 	}
 
-	function copyInstallGuide() {
+	async function copyInstallGuide() {
 		if (selectedServer?.installation_guide) {
-			navigator.clipboard.writeText(selectedServer.installation_guide);
-			copiedGuide = true;
-			setTimeout(() => { copiedGuide = false; }, 2000);
+			const success = await copyToClipboard(selectedServer.installation_guide);
+			if (success) {
+				copiedGuide = true;
+				setTimeout(() => { copiedGuide = false; }, 2000);
+			}
 		}
 	}
 

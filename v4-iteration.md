@@ -13,6 +13,7 @@
 - B: SGLang (мультимодальность: текст+vision).
 - C: TGI (backend=vLLM без конверсии; backend=TensorRT-LLM с конверсией/кешем).
 - D: llama.cpp server (GGUF, минимальные зависимости).
+- Политика развёртывания: 1 контейнер = 1 модель.
 
 ## 📅 Фазы
 
@@ -44,14 +45,14 @@
 ### Phase 5: Provider C (TGI + backend vLLM / TensorRT-LLM)
 - [ ] INF-040: Адаптер TGI (ghcr.io/huggingface/text-generation-inference).
 - [ ] INF-041: Backend=vLLM: простая ветка без конверсии.
-- [ ] INF-042: Backend=TensorRT-LLM: пайплайн конверсии (trt-llm-converter), кеш /data/engines/trt, валидация совместимости GPU/SM.
+- [ ] INF-042: Backend=TensorRT-LLM: пайплайн конверсии (trt-llm-converter), кеш /data/engines/trt (монтируем в контейнер), валидация совместимости GPU/SM, хранить метаданные cuda_ver/trt_ver/driver_ver/gpu_sm и при несовпадении делать реконверсию.
 - [ ] INF-043: Параметры: --model-id, --num-shard, --max-concurrent-requests; health/metrics.
 - [ ] INF-044: Тест: текстовая модель HF → TRT конверсия → инференс.
 
 ### Phase 6: API & Routing
 - [ ] INF-050: Единый OpenAI фасад: /v1/chat/completions, /v1/completions, /v1/models → маршрутизация к провайдеру по модели/alias.
 - [ ] INF-051: Admin API: операции load/unload, статус, логи, выбор провайдера, просмотр кешей.
-- [ ] INF-052: Поддержка отмены загрузки/старта контейнера, тайм-ауты.
+- [ ] INF-052: Поддержка отмены загрузки/старта контейнера, тайм-ауты; выбор провайдера по алиасу и capability (text/vision).
 
 ### Phase 7: UI (Admin) — рефактор после yzma
 - [ ] INF-060: Удалить/скрыть yzma-специфичные блоки (GPU offload, tensor_split, cancel load) из моделей/статуса; заменить на универсальные провайдеры и параметры per engine.
@@ -67,7 +68,7 @@
 
 ### Phase 9: Reliability & GC
 - [ ] INF-080: Политики авто-стопа неиспользуемых контейнеров (idle timeout).
-- [ ] INF-081: Политики очистки кеша: LRU по размеру/времени; защита pinned моделей.
+- [ ] INF-081: Политики очистки кеша: LRU по размеру/времени; защита pinned моделей; ручное удаление.
 - [ ] INF-082: Ретраи скачивания (backoff), проверка checksum/etag.
 
 ### Phase 10: Security & Networking

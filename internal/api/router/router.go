@@ -513,8 +513,12 @@ func (r *Router) setupInferenceRoutes() {
 		return
 	}
 	group := r.engine.Group("/api/system/inference")
-	if r.db != nil {
-		group.Use(middleware.APIKeyDBAuth(r.config, r.db, r.logger))
+	
+	// Use JWT authentication for admin UI access (like other admin routes)
+	if r.jwtManager != nil && r.db != nil {
+		r.logger.Info("Inference routes: Using JWT authentication with admin role check")
+		group.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		group.Use(middleware.RequireAdmin(r.db, r.logger))
 	}
 	{
 		group.POST("/load", r.inferenceHandler.PostLoad)
@@ -530,11 +534,122 @@ func (r *Router) setupInferenceRoutes() {
 		group.GET("/models", r.inferenceHandler.GetModels)
 		group.GET("/logs", r.inferenceHandler.GetLogs)
 		group.GET("/metrics", r.inferenceHandler.GetMetrics)
+		group.GET("/trt-engines", r.inferenceHandler.ListTRTEngines)
+		group.POST("/convert-trt", r.inferenceHandler.ConvertTRT)
+		group.POST("/delete-trt-engine", r.inferenceHandler.DeleteTRTEngine)
 	}
 	r.logger.Info("Inference v4 routes configured")
 
 	// OpenAI-compatible proxy routes for inference v4 providers
 	r.setupInferenceProxyRoutes()
+	
+	// HuggingFace JSON API for model browser (v3.3.0+)
+	r.setupHuggingFaceAPIRoutes()
+}
+
+// setupHuggingFaceAPIRoutes registers JSON API endpoints for HuggingFace model browser.
+func (r *Router) setupHuggingFaceAPIRoutes() {
+	if r.hfClient == nil || r.engine == nil {
+		return
+	}
+	
+	hfGroup := r.engine.Group("/api/huggingface")
+	if r.jwtManager != nil && r.db != nil {
+		hfGroup.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+	{
+		// Search models
+		hfGroup.GET("/search", func(c *gin.Context) {
+			query := c.Query("q")
+			author := c.Query("author")
+			tag := c.Query("tag")
+			limitStr := c.DefaultQuery("limit", "20")
+			limit := 20
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+				limit = l
+			}
+			
+			filters := huggingface.ModelFilters{
+				Search: query,
+				Author: author,
+				Limit:  limit,
+				Sort:   "downloads",
+			}
+			if tag != "" {
+				filters.Tags = []string{tag}
+			}
+			
+			models, err := r.hfClient.SearchModels(c.Request.Context(), filters)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			
+			c.JSON(http.StatusOK, gin.H{"models": models})
+		})
+		
+		// Get model info with files
+		hfGroup.GET("/models/:repo/*subpath", func(c *gin.Context) {
+			repo := c.Param("repo")
+			subpath := c.Param("subpath")
+			if subpath != "" && subpath != "/" {
+				repo = repo + subpath
+			}
+			
+			info, err := r.hfClient.GetModelInfo(c.Request.Context(), repo)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			
+			c.JSON(http.StatusOK, info)
+		})
+		
+		// Get popular GGUF models
+		hfGroup.GET("/popular", func(c *gin.Context) {
+			filters := huggingface.ModelFilters{
+				Tags:  []string{"gguf"},
+				Sort:  "downloads",
+				Limit: 50,
+			}
+			
+			models, err := r.hfClient.SearchModels(c.Request.Context(), filters)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			
+			c.JSON(http.StatusOK, gin.H{"models": models})
+		})
+		
+		// Start download
+		hfGroup.POST("/download", func(c *gin.Context) {
+			if r.hfDownloader == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Downloader not configured"})
+				return
+			}
+			
+			var req struct {
+				ModelID   string `json:"model_id"`
+				Filename  string `json:"filename"`
+				TotalSize int64  `json:"total_size"`
+				SHA256    string `json:"sha256"`
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			
+			download, err := r.hfDownloader.StartDownload(req.ModelID, req.Filename, req.TotalSize, req.SHA256)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			
+			c.JSON(http.StatusOK, gin.H{"download_id": download.ID, "message": "Download started"})
+		})
+	}
+	r.logger.Info("HuggingFace JSON API routes configured: /api/huggingface/*")
 }
 
 // setupInferenceProxyRoutes registers OpenAI-compatible proxy routes for inference v4.
@@ -806,6 +921,7 @@ func (r *Router) setupUIRoutes() {
 			hf.GET("/downloads/:download_id/progress", r.hfUIHandler.GetDownloadProgress)
 			hf.POST("/downloads/:download_id/pause", r.hfUIHandler.PostPauseDownload)
 			hf.POST("/downloads/:download_id/cancel", r.hfUIHandler.PostCancelDownload)
+			hf.POST("/downloads/clear-completed", r.hfUIHandler.PostClearCompleted)
 		}
 		r.logger.Info("✅ Hugging Face UI routes registered")
 	}
@@ -972,6 +1088,40 @@ func (r *Router) setupSystemRoutes() {
 			// These work even before models are loaded, allowing WebUI to show status
 			system.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)
 			system.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck)
+		} else {
+			// Stub endpoints when yzma is disabled (v3.3.0+)
+			system.GET("/models", func(c *gin.Context) {
+				// Return models from inference v4 if available
+				if r.inferenceRouter != nil {
+					models := r.inferenceRouter.ListModels()
+					data := make([]gin.H, 0, len(models))
+					for _, m := range models {
+						data = append(data, gin.H{
+							"id":       m.Spec.Alias,
+							"object":   "model",
+							"owned_by": string(m.Spec.Provider),
+							"created":  0,
+						})
+					}
+					c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+			})
+			system.GET("/yzma/gpu", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"available":   false,
+					"device_name": "N/A (yzma disabled)",
+					"cuda_version": "",
+					"message":     "yzma inference backend is disabled, using Docker-based inference",
+				})
+			})
+			system.GET("/yzma/health", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"status":  "unavailable",
+					"message": "yzma inference backend is disabled",
+				})
+			})
 		}
 	}
 
@@ -1509,6 +1659,29 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
 			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		}
+	} else {
+		// Fallback /v1/models endpoint when yzma is disabled (v3.3.0+)
+		// Returns models from inference v4 or empty list
+		r.logger.Info("yzma disabled - registering fallback /v1/models endpoint")
+		v1.GET("/models", func(c *gin.Context) {
+			// Try to get models from inference v4 manager
+			if r.inferenceRouter != nil {
+				models := r.inferenceRouter.ListModels()
+				data := make([]gin.H, 0, len(models))
+				for _, m := range models {
+					data = append(data, gin.H{
+						"id":       m.Spec.Alias,
+						"object":   "model",
+						"owned_by": string(m.Spec.Provider),
+						"created":  0,
+					})
+				}
+				c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+				return
+			}
+			// No inference manager - return empty list
+			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+		})
 	}
 }
 

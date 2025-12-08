@@ -573,6 +573,27 @@ func (d *Downloader) CancelDownload(downloadID string) error {
 	return nil
 }
 
+// ClearCompleted removes all completed, failed, and cancelled downloads from the list
+func (d *Downloader) ClearCompleted() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	cleared := 0
+	for id, download := range d.downloads {
+		download.Mu.RLock()
+		status := download.Status
+		download.Mu.RUnlock()
+
+		if status == DownloadStatusCompleted || status == DownloadStatusFailed || status == DownloadStatusCancelled {
+			delete(d.downloads, id)
+			cleared++
+		}
+	}
+
+	d.logger.WithField("cleared", cleared).Info("Cleared completed downloads")
+	return cleared
+}
+
 // Shutdown gracefully stops the downloader
 func (d *Downloader) Shutdown() {
 	d.logger.Info("Shutting down download manager")

@@ -494,6 +494,25 @@ func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
 	}
 }
 
+// PostClearCompleted removes all completed, failed, and cancelled downloads
+func (h *HuggingFaceUIHandler) PostClearCompleted(c *gin.Context) {
+	cleared := h.downloader.ClearCompleted()
+	
+	// Return JSON for SvelteKit frontend
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"cleared": cleared,
+			"message": fmt.Sprintf("Cleared %d downloads", cleared),
+		})
+		return
+	}
+	
+	// Return HTML for HTMX
+	html := fmt.Sprintf(`<div class="alert alert-success">Cleared %d completed downloads.</div>`, cleared)
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, html)
+}
+
 // renderError renders error message
 func (h *HuggingFaceUIHandler) renderError(c *gin.Context, message string) {
 	html := fmt.Sprintf(`

@@ -84,8 +84,20 @@
 	}
 
 	async function clearCompleted() {
-		// Filter out completed and failed downloads locally since API might not have clear endpoint
-		downloads = downloads.filter((d) => d.status === 'downloading' || d.status === 'pending');
+		try {
+			const response = await fetch('/api/ui/huggingface/downloads/clear-completed', {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+					Accept: 'application/json'
+				}
+			});
+			if (response.ok) {
+				await loadDownloads();
+			}
+		} catch (error) {
+			console.error('Failed to clear completed downloads:', error);
+		}
 	}
 
 	function formatBytes(bytes: number | undefined): string {

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest } from '$lib/api/inference';
+	import { api } from '$lib/api/client';
+	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
 
 	const providers: Provider[] = ['vllm', 'sglang', 'tgi', 'tensorrt-llm', 'llama.cpp'];
 	const formats: Format[] = ['hf', 'gguf', 'trt', 'other'];
@@ -12,7 +14,34 @@
 	let busy = $state(false);
 	let msg = $state('');
 	let msgType = $state<'info' | 'error' | 'success'>('info');
-	let activeTab = $state<'models' | 'cache' | 'trt' | 'logs'>('models');
+	let activeTab = $state<'models' | 'cache' | 'trt' | 'hf'>('models');
+	
+	// HuggingFace Browser state
+	interface HFModel {
+		id: string;
+		author: string;
+		modelId: string;
+		downloads: number;
+		likes: number;
+		lastModified: string;
+		tags: string[];
+		pipeline_tag?: string;
+	}
+	type HFCategory = 'all' | 'gguf' | 'text-generation' | 'text2text-generation' | 'feature-extraction';
+	const hfCategories: {id: HFCategory; label: string; description: string}[] = [
+		{ id: 'all', label: 'All Models', description: 'All HuggingFace models' },
+		{ id: 'gguf', label: 'GGUF (llama.cpp)', description: 'Quantized models for llama.cpp' },
+		{ id: 'text-generation', label: 'Text Generation (vLLM/SGLang/TGI)', description: 'LLMs for chat & completion' },
+		{ id: 'text2text-generation', label: 'Text2Text (T5, BART)', description: 'Encoder-decoder models' },
+		{ id: 'feature-extraction', label: 'Embeddings', description: 'Models for embeddings' },
+	];
+	let hfSearchQuery = $state('');
+	let hfCategory = $state<HFCategory>('text-generation');
+	let hfSearchResults = $state<HFModel[]>([]);
+	let hfPopularModels = $state<HFModel[]>([]);
+	let hfSearching = $state(false);
+	let hfSelectedModel = $state<HFModel | null>(null);
+	let hfModelFiles = $state<any[]>([]);
 	
 	// Selected model for details panel
 	let selectedModel = $state<ModelInfo | null>(null);
@@ -52,6 +81,7 @@
 
 	onMount(async () => {
 		await refreshAll();
+		await loadPopularHF();
 	});
 
 	onDestroy(() => {
@@ -60,6 +90,117 @@
 
 	async function refreshAll() {
 		await Promise.all([loadModels(), loadCache(), loadTRTEngines()]);
+	}
+	
+	// HuggingFace Browser functions
+	async function searchHF() {
+		hfSearching = true;
+		try {
+			let url = `/api/huggingface/search?limit=50`;
+			if (hfSearchQuery.trim()) {
+				url += `&q=${encodeURIComponent(hfSearchQuery)}`;
+			}
+			if (hfCategory === 'gguf') {
+				url += '&tag=gguf';
+			} else if (hfCategory !== 'all') {
+				url += `&tag=${hfCategory}`;
+			}
+			const res = await api.get<{models: HFModel[]}>(url);
+			hfSearchResults = res.models || [];
+		} catch (e: any) {
+			showMsg(e?.message || 'Failed to search HuggingFace', 'error');
+		} finally {
+			hfSearching = false;
+		}
+	}
+	
+	async function loadPopularHF() {
+		hfSearching = true;
+		try {
+			// Load based on current category
+			let url = `/api/huggingface/search?limit=50`;
+			if (hfCategory === 'gguf') {
+				url += '&tag=gguf';
+			} else if (hfCategory !== 'all') {
+				url += `&tag=${hfCategory}`;
+			}
+			const res = await api.get<{models: HFModel[]}>(url);
+			hfPopularModels = res.models || [];
+		} catch (e: any) {
+			console.error('Failed to load popular models:', e);
+		} finally {
+			hfSearching = false;
+		}
+	}
+	
+	// Reload when category changes
+	$effect(() => {
+		if (activeTab === 'hf') {
+			hfSearchResults = [];
+			loadPopularHF();
+		}
+	});
+	
+	async function selectHFModel(m: HFModel) {
+		hfSelectedModel = m;
+		try {
+			const res = await api.get<{siblings?: any[]}>(`/api/huggingface/models/${m.id}`);
+			// Filter files based on category
+			const allFiles = res.siblings || [];
+			if (hfCategory === 'gguf') {
+				hfModelFiles = allFiles.filter((f: any) => f.rfilename?.endsWith('.gguf'));
+			} else {
+				// For HF models show safetensors, bin, and config files
+				hfModelFiles = allFiles.filter((f: any) => 
+					f.rfilename?.endsWith('.safetensors') || 
+					f.rfilename?.endsWith('.bin') ||
+					f.rfilename === 'config.json' ||
+					f.rfilename === 'tokenizer.json'
+				);
+			}
+		} catch (e: any) {
+			console.error('Failed to get model files:', e);
+			hfModelFiles = [];
+		}
+	}
+	
+	function useHFModel(m: HFModel, file?: any) {
+		// Pre-fill the load form with HF model data
+		form.hf_repo = m.id;
+		
+		if (file?.rfilename?.endsWith('.gguf')) {
+			form.hf_file = file.rfilename;
+			form.format = 'gguf';
+			form.provider = 'llama.cpp';
+		} else {
+			form.hf_file = '';
+			form.format = 'hf';
+			// Suggest provider based on category
+			if (hfCategory === 'feature-extraction') {
+				form.provider = 'vllm'; // vLLM supports embeddings
+			} else {
+				form.provider = 'vllm'; // Default to vLLM for text generation
+			}
+		}
+		
+		form.alias = m.id.split('/').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'model';
+		
+		// Set capabilities based on category
+		if (hfCategory === 'feature-extraction') {
+			form.capabilities = ['embeddings'];
+		} else {
+			form.capabilities = ['chat'];
+		}
+		
+		// Switch to models tab
+		activeTab = 'models';
+		showMsg(`Selected ${m.id}. Configure provider and click Load.`, 'info');
+	}
+	
+	function formatNumber(n: number): string {
+		if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+		if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+		return n.toString();
 	}
 
 	async function loadModels() {
@@ -306,7 +447,7 @@
 		}
 	}
 
-	const totalCacheSize = $derived(artifacts.reduce((sum, a) => sum + (a.size || 0), 0));
+	const totalCacheSize = $derived((artifacts || []).reduce((sum, a) => sum + (a.size || 0), 0));
 </script>
 
 <svelte:head>
@@ -337,11 +478,14 @@
 		<button class={`px-4 py-2 -mb-px ${activeTab === 'models' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'models'}>
 			Models ({models.length})
 		</button>
+		<button class={`px-4 py-2 -mb-px ${activeTab === 'hf' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'hf'}>
+			🤗 HuggingFace
+		</button>
 		<button class={`px-4 py-2 -mb-px ${activeTab === 'cache' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'cache'}>
 			Cache ({formatSize(totalCacheSize)})
 		</button>
 		<button class={`px-4 py-2 -mb-px ${activeTab === 'trt' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'trt'}>
-			TRT Engines ({trtEngines.length})
+			TRT Engines ({(trtEngines || []).length})
 		</button>
 	</div>
 
@@ -565,6 +709,206 @@
 							<button class="px-3 py-1.5 text-sm rounded border hover:bg-muted" onclick={() => fetchLogs(selectedModel!.alias)}>
 								Refresh Logs
 							</button>
+						</div>
+					</div>
+				{:else}
+					<div class="p-8 text-center text-muted-foreground">
+						Select a model to view details
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- HuggingFace Browser Tab -->
+	{#if activeTab === 'hf'}
+		<div class="grid gap-4 lg:grid-cols-[1fr_400px]">
+			<!-- Left: Search and results -->
+			<div class="flex flex-col gap-4">
+				<!-- Category selector -->
+				<div class="flex flex-wrap gap-2">
+					{#each hfCategories as cat}
+						<button 
+							class="px-3 py-1.5 text-sm rounded-md border transition-colors {hfCategory === cat.id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}"
+							onclick={() => { hfCategory = cat.id; hfSearchQuery = ''; }}
+							title={cat.description}
+						>
+							{cat.label}
+						</button>
+					{/each}
+				</div>
+				
+				<!-- Search -->
+				<div class="flex gap-2">
+					<div class="relative flex-1">
+						<Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+						<input 
+							type="text" 
+							class="w-full border rounded-md pl-10 pr-4 py-2 bg-background"
+							placeholder="Search {hfCategories.find(c => c.id === hfCategory)?.label || 'models'}..."
+							bind:value={hfSearchQuery}
+							onkeydown={(e) => e.key === 'Enter' && searchHF()}
+						/>
+					</div>
+					<button 
+						class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center gap-2 disabled:opacity-50"
+						onclick={searchHF}
+						disabled={hfSearching}
+					>
+						{#if hfSearching}
+							<Loader2 class="h-4 w-4 animate-spin" />
+						{/if}
+						Search
+					</button>
+				</div>
+				
+				<!-- Provider hint -->
+				<div class="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2">
+					{#if hfCategory === 'gguf'}
+						💡 GGUF models work with <strong>llama.cpp</strong> provider
+					{:else if hfCategory === 'text-generation'}
+						💡 Text generation models work with <strong>vLLM</strong>, <strong>SGLang</strong>, or <strong>TGI</strong>
+					{:else if hfCategory === 'feature-extraction'}
+						💡 Embedding models work with <strong>vLLM</strong> (set capability to "embeddings")
+					{:else}
+						💡 Select a category to filter models by type
+					{/if}
+				</div>
+				
+				<!-- Results -->
+				<div class="border rounded-lg bg-card">
+					<div class="px-4 py-3 border-b bg-muted/50">
+						<h2 class="font-semibold">
+							{#if hfSearchResults.length > 0}
+								Search Results ({hfSearchResults.length})
+							{:else}
+								Popular GGUF Models
+							{/if}
+						</h2>
+					</div>
+					<div class="divide-y max-h-[600px] overflow-y-auto">
+						{#each (hfSearchResults.length > 0 ? hfSearchResults : hfPopularModels) as m}
+							<div 
+								class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-3 {hfSelectedModel?.id === m.id ? 'bg-primary/10' : ''}"
+								onclick={() => selectHFModel(m)}
+							>
+								<div class="flex-1 min-w-0">
+									<div class="font-medium truncate">{m.id}</div>
+									<div class="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
+										<span>⬇️ {formatNumber(m.downloads || 0)}</span>
+										<span>❤️ {formatNumber(m.likes || 0)}</span>
+										{#if m.pipeline_tag}
+											<span class="px-1.5 py-0.5 rounded bg-muted text-xs">{m.pipeline_tag}</span>
+										{/if}
+									</div>
+									{#if m.tags?.length}
+										<div class="flex flex-wrap gap-1 mt-1">
+											{#each m.tags.slice(0, 5) as tag}
+												<span class="px-1.5 py-0.5 rounded bg-muted/50 text-xs">{tag}</span>
+											{/each}
+										</div>
+									{/if}
+								</div>
+								<a 
+									href="https://huggingface.co/{m.id}" 
+									target="_blank" 
+									class="p-1 hover:bg-muted rounded"
+									onclick={(e) => e.stopPropagation()}
+								>
+									<ExternalLink class="h-4 w-4" />
+								</a>
+							</div>
+						{:else}
+							<div class="px-4 py-8 text-center text-muted-foreground">
+								{#if hfSearching}
+									<Loader2 class="h-6 w-6 animate-spin mx-auto mb-2" />
+									Searching...
+								{:else}
+									Search for models or wait for popular models to load
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			</div>
+			
+			<!-- Right: Selected model details -->
+			<div class="border rounded-lg bg-card">
+				<div class="px-4 py-3 border-b bg-muted/50">
+					<h2 class="font-semibold">Model Details</h2>
+				</div>
+				{#if hfSelectedModel}
+					<div class="p-4 space-y-4">
+						<div>
+							<div class="text-sm text-muted-foreground">Model ID</div>
+							<div class="font-mono text-sm break-all">{hfSelectedModel.id}</div>
+						</div>
+						<div>
+							<div class="text-sm text-muted-foreground">Author</div>
+							<div>{hfSelectedModel.author || hfSelectedModel.id.split('/')[0]}</div>
+						</div>
+						<div class="flex gap-4">
+							<div>
+								<div class="text-sm text-muted-foreground">Downloads</div>
+								<div>{formatNumber(hfSelectedModel.downloads || 0)}</div>
+							</div>
+							<div>
+								<div class="text-sm text-muted-foreground">Likes</div>
+								<div>{formatNumber(hfSelectedModel.likes || 0)}</div>
+							</div>
+						</div>
+						
+						<!-- Files (GGUF/safetensors) -->
+						{#if hfModelFiles.length > 0}
+							<div>
+								<div class="text-sm text-muted-foreground mb-2">Available Files</div>
+								<div class="space-y-1 max-h-64 overflow-y-auto">
+									{#each hfModelFiles as f}
+										<div class="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 text-sm">
+											<span class="truncate flex-1" title={f.rfilename}>{f.rfilename}</span>
+											<div class="flex items-center gap-1">
+												{#if f.size}
+													<span class="text-xs text-muted-foreground">{formatSize(f.size)}</span>
+												{/if}
+												<button 
+													class="px-2 py-1 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
+													onclick={() => useHFModel(hfSelectedModel!, f)}
+												>
+													Use
+												</button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						
+						<!-- Recommended provider -->
+						<div class="text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
+							{#if hfCategory === 'gguf'}
+								Recommended: <strong>llama.cpp</strong>
+							{:else if hfSelectedModel.tags?.includes('text-generation-inference')}
+								Recommended: <strong>TGI</strong> (optimized)
+							{:else}
+								Recommended: <strong>vLLM</strong> or <strong>SGLang</strong>
+							{/if}
+						</div>
+						
+						<div class="flex gap-2 pt-2">
+							<button 
+								class="flex-1 px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+								onclick={() => useHFModel(hfSelectedModel!)}
+							>
+								Use This Model
+							</button>
+							<a 
+								href="https://huggingface.co/{hfSelectedModel.id}" 
+								target="_blank"
+								class="px-4 py-2 rounded border hover:bg-muted flex items-center gap-2"
+							>
+								<ExternalLink class="h-4 w-4" />
+								View on HF
+							</a>
 						</div>
 					</div>
 				{:else}

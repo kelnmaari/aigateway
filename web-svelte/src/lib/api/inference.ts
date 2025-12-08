@@ -1,0 +1,152 @@
+// Inference API types and client functions
+
+export type Provider = 'vllm' | 'sglang' | 'tgi' | 'tensorrt-llm' | 'llama.cpp';
+export type Format = 'hf' | 'gguf' | 'trt' | 'other';
+export type Capability = 'chat' | 'embeddings' | 'vision';
+
+export interface ModelInfo {
+	alias: string;
+	provider: Provider;
+	format: Format;
+	status: string;
+	endpoint?: string;
+	local_path?: string;
+	last_used?: string;
+	capabilities?: Capability[];
+	pinned?: boolean;
+	last_error?: string;
+	container_id?: string;
+
+	// vLLM params
+	vllm_tensor_parallel?: number;
+	vllm_max_model_len?: number;
+	vllm_gpu_utilization?: number;
+
+	// llama.cpp params
+	llama_main_gpu?: number;
+	llama_tensor_split?: string;
+	llama_n_gpu_layers?: number;
+
+	// SGLang params
+	sglang_tensor_parallel?: number;
+	sglang_mem_fraction?: number;
+
+	// TGI params
+	tgi_num_shard?: number;
+}
+
+export interface ArtifactInfo {
+	path: string;
+	size: number;
+	mod_time: string;
+	root: string;
+	format: Format;
+}
+
+export interface HealthResponse {
+	alias: string;
+	status: string;
+	endpoint?: string;
+	response_time_ms?: number;
+	error?: string;
+}
+
+export interface LogsResponse {
+	alias: string;
+	logs: string;
+	lines: number;
+}
+
+export interface MetricsResponse {
+	alias: string;
+	metrics: string;
+	content_type: string;
+}
+
+export interface TRTEngine {
+	model_id: string;
+	engine_path: string;
+	created_at: string;
+	cuda_version: string;
+	trt_version: string;
+	driver_version: string;
+	gpu_sm: string;
+	size_bytes: number;
+	compatible: boolean;
+}
+
+export interface TRTConvertRequest {
+	hf_model: string;
+	max_batch_size?: number;
+	max_input_len?: number;
+	max_output_len?: number;
+	dtype?: string;
+}
+
+export interface LoadRequest {
+	alias: string;
+	provider: Provider;
+	format: Format;
+	hf_repo?: string;
+	hf_file?: string;
+	hf_revision?: string;
+	gguf_url?: string;
+	capabilities?: Capability[];
+	
+	// Provider-specific
+	vllm_tensor_parallel?: number;
+	vllm_max_model_len?: number;
+	vllm_gpu_utilization?: number;
+	llama_main_gpu?: number;
+	llama_tensor_split?: string;
+	llama_n_gpu_layers?: number;
+	sglang_tensor_parallel?: number;
+	sglang_mem_fraction?: number;
+	tgi_num_shard?: number;
+}
+
+import { api } from './client';
+
+export const inferenceApi = {
+	// Models
+	listModels: () => api.get<ModelInfo[]>('/api/system/inference/models'),
+	
+	load: (req: LoadRequest) => api.post<{ message: string }>('/api/system/inference/load', req),
+	
+	prepare: (req: LoadRequest) => api.post<{ message: string }>('/api/system/inference/prepare', req),
+	
+	stop: (alias: string) => api.post<{ message: string }>(`/api/system/inference/stop?alias=${encodeURIComponent(alias)}`),
+	
+	evict: (alias: string) => api.post<{ message: string }>(`/api/system/inference/evict?alias=${encodeURIComponent(alias)}`),
+	
+	pin: (alias: string) => api.post<{ message: string }>(`/api/system/inference/pin?alias=${encodeURIComponent(alias)}`),
+	
+	unpin: (alias: string) => api.post<{ message: string }>(`/api/system/inference/unpin?alias=${encodeURIComponent(alias)}`),
+	
+	deleteArtifacts: (alias: string) => api.post<{ message: string }>(`/api/system/inference/delete-artifacts?alias=${encodeURIComponent(alias)}`),
+
+	// Health & Observability
+	health: (alias: string) => api.get<HealthResponse>(`/api/system/inference/health?alias=${encodeURIComponent(alias)}`),
+	
+	logs: (alias: string, tail: number = 100) => 
+		api.get<LogsResponse>(`/api/system/inference/logs?alias=${encodeURIComponent(alias)}&tail=${tail}`),
+	
+	metrics: (alias: string) => 
+		api.get<MetricsResponse>(`/api/system/inference/metrics?alias=${encodeURIComponent(alias)}`),
+
+	// Cache
+	listCache: () => api.get<ArtifactInfo[]>('/api/system/inference/cache'),
+	
+	evictCache: (limitBytes: number) => 
+		api.post<{ evicted: number }>(`/api/system/inference/evict-cache?limit_bytes=${limitBytes}`),
+
+	// TRT Engines
+	listTRTEngines: () => api.get<TRTEngine[]>('/api/system/inference/trt-engines'),
+	
+	convertTRT: (req: TRTConvertRequest) => 
+		api.post<{ engine_path: string }>('/api/system/inference/convert-trt', req),
+	
+	deleteTRTEngine: (modelId: string) => 
+		api.post<{ message: string }>(`/api/system/inference/delete-trt-engine?model_id=${encodeURIComponent(modelId)}`),
+};
+

@@ -23,14 +23,41 @@ server:
     enabled: true
     version: "svelte"
 
-# Inference Configuration
+# Inference Configuration (v3.3.0+: Docker-based multi-provider)
 inference:
-  backend: "yzma"
+  backend: "docker"  # "docker" (multi-provider containers) or "yzma" (legacy in-process)
   max_loaded_models: 3
-  gpu_layers: -1
+  gpu_layers: -1  # Only used by yzma backend
   
-  yzma:
+  # Docker-based inference (v3.3.0+ multi-provider)
+  # Providers: vLLM, SGLang, TGI, TensorRT-LLM, llama.cpp server
+  docker:
     enabled: true
+    
+    # Model cache directories (host paths, mounted to containers)
+    hf_cache_dir: "./data/models/hf"        # HuggingFace models cache
+    gguf_dir: "./data/models/gguf"          # GGUF files for llama.cpp
+    trt_engines_dir: "./data/engines/trt"   # TensorRT-LLM compiled engines
+    
+    # Container limits
+    max_running_models: 2                   # Max concurrent inference containers
+    cache_max_bytes: 107374182400           # 100GB cache limit (0 = unlimited)
+    
+    # Timeouts
+    health_check_timeout: "60s"             # Health check after container start
+    startup_timeout: "10m"                  # Overall model loading timeout
+    
+    # Docker settings
+    docker_bin: "docker"                    # Path to docker binary
+    max_concurrent_downloads: 2             # Parallel model downloads
+    auto_resume: true                       # Resume interrupted downloads
+    
+    # Default provider when not specified in load request
+    default_provider: "vllm"                # vllm | sglang | tgi | tensorrt-llm | llama.cpp
+  
+  # Legacy yzma backend (in-process llama.cpp, deprecated)
+  yzma:
+    enabled: false
     lib_path: "C:/llama"
     models_dir: "./data/models"
     context_size: 4096
@@ -41,7 +68,7 @@ inference:
     top_p: 0.9
     min_p: 0.1
     verbose: true
-    request_timeout: "30m"  # Max time for a single generation (0 = no timeout for thinking models)
+    request_timeout: "30m"
 
 auth:
   enabled: true

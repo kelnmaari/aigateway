@@ -37,6 +37,7 @@ import (
 	filestorageBackend "aigateway/internal/filestorage/storage"
 	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
+	"aigateway/internal/inference"
 	internalLogger "aigateway/internal/logger"
 	"aigateway/internal/metrics"
 	"aigateway/internal/models"
@@ -203,6 +204,13 @@ type Router struct {
 	hfDownloader *huggingface.Downloader          // Model downloader
 	hfUIHandler  *handlersUI.HuggingFaceUIHandler // Hugging Face Model Browser
 
+	// Inference v4 (multi-provider)
+	inferenceSvc         *inference.Service
+	inferenceMgr         *inference.Manager
+	inferenceRouter      *inference.Router
+	inferenceHandler     *handlers.InferenceHandler
+	inferenceProxyHandler *handlers.InferenceProxyHandler
+
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
 	yzmaClient    *yzma.Client
 	yzmaHandler   *handlers.YzmaHandler     // yzma inference handler
@@ -230,6 +238,7 @@ type NewOptions struct {
 	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
 	RAGOrchestrator      *ragorchestrator.RAGOrchestrator  // Опциональный RAG Orchestrator (v1.13.1+)
 	VectorStore          vector.VectorStore                // Опциональный Vector Store для RAG (v3.2.0+)
+	InferenceRouter      *inference.Router                 // Опциональный Inference Router для Docker-based providers (v3.3.0+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -296,6 +305,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 
 	r.setupEngine()
 	r.setupRoutes()
+	r.setupInferenceRoutes()
 
 	return r, nil
 }
@@ -495,6 +505,56 @@ func (r *Router) setupRoutes() {
 	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
 	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
 	r.setupGitLabStubRoutes()  // GitLab Integration stub routes (v3.2.0)
+	r.setupInferenceRoutes()   // Inference v4 system routes
+}
+
+// setupInferenceRoutes registers minimal inference v4 endpoints (system).
+func (r *Router) setupInferenceRoutes() {
+	if r.inferenceHandler == nil || r.engine == nil {
+		return
+	}
+	group := r.engine.Group("/api/system/inference")
+	if r.db != nil {
+		group.Use(middleware.APIKeyDBAuth(r.config, r.db, r.logger))
+	}
+	{
+		group.POST("/load", r.inferenceHandler.PostLoad)
+		group.POST("/prepare", r.inferenceHandler.PostPrepare)
+		group.POST("/stop", r.inferenceHandler.PostStop)
+		group.POST("/evict", r.inferenceHandler.PostEvict)
+		group.POST("/pin", r.inferenceHandler.PostPin)
+		group.POST("/unpin", r.inferenceHandler.PostUnpin)
+		group.POST("/delete-artifacts", r.inferenceHandler.PostDeleteArtifacts)
+		group.POST("/evict-cache", r.inferenceHandler.PostEvictCache)
+		group.GET("/cache", r.inferenceHandler.GetCache)
+		group.GET("/health", r.inferenceHandler.GetHealth)
+		group.GET("/models", r.inferenceHandler.GetModels)
+		group.GET("/logs", r.inferenceHandler.GetLogs)
+		group.GET("/metrics", r.inferenceHandler.GetMetrics)
+	}
+	r.logger.Info("Inference v4 routes configured")
+
+	// OpenAI-compatible proxy routes for inference v4 providers
+	r.setupInferenceProxyRoutes()
+}
+
+// setupInferenceProxyRoutes registers OpenAI-compatible proxy routes for inference v4.
+func (r *Router) setupInferenceProxyRoutes() {
+	if r.inferenceProxyHandler == nil || r.engine == nil {
+		return
+	}
+
+	// /v1/inference/* routes - proxy to running provider containers
+	v1inf := r.engine.Group("/v1/inference")
+	if r.db != nil {
+		v1inf.Use(middleware.APIKeyDBAuth(r.config, r.db, r.logger))
+	}
+	{
+		v1inf.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
+		v1inf.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
+		v1inf.GET("/models", r.inferenceProxyHandler.HandleModels)
+	}
+	r.logger.Info("Inference v4 OpenAI proxy routes configured: /v1/inference/*")
 }
 
 // setupHealthRoutes настраивает health check endpoint для desktop client
@@ -2289,6 +2349,128 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		hfLogger.Info("✅ Hugging Face browser initialized")
 	}
 
+	// Inference v4 (multi-provider) bootstrap
+	// Use cfg.Inference.Docker if backend is "docker", otherwise fallback to legacy config
+	dockerCfg := cfg.Inference.Docker
+	useDockerInference := cfg.Inference.Backend == "docker" && dockerCfg.Enabled
+
+	var infHFCache, infGGUFCache, infTRTDir string
+	var infMaxConcurrent int
+	var infAutoResume bool
+	var infHTTPTimeout, infHealthTimeout, infStartupTimeout time.Duration
+	var infMaxRunning int
+	var infCacheMax int64
+	var infDockerBin string
+
+	if useDockerInference {
+		// Use new Docker inference config (v3.3.0+)
+		infHFCache = dockerCfg.HFCacheDir
+		if infHFCache == "" {
+			infHFCache = "./data/models/hf"
+		}
+		infGGUFCache = dockerCfg.GGUFDir
+		if infGGUFCache == "" {
+			infGGUFCache = "./data/models/gguf"
+		}
+		infTRTDir = dockerCfg.TRTEnginesDir
+		if infTRTDir == "" {
+			infTRTDir = "./data/engines/trt"
+		}
+		infMaxConcurrent = dockerCfg.MaxConcurrentDownloads
+		if infMaxConcurrent <= 0 {
+			infMaxConcurrent = 2
+		}
+		infAutoResume = dockerCfg.AutoResume
+		infHTTPTimeout = cfg.HuggingFace.DefaultDownloadTimeout
+		if infHTTPTimeout == 0 {
+			infHTTPTimeout = 5 * time.Minute
+		}
+		infHealthTimeout = dockerCfg.HealthCheckTimeout
+		if infHealthTimeout == 0 {
+			infHealthTimeout = 60 * time.Second
+		}
+		infStartupTimeout = dockerCfg.StartupTimeout
+		if infStartupTimeout == 0 {
+			infStartupTimeout = 5 * time.Minute
+		}
+		infMaxRunning = dockerCfg.MaxRunningModels
+		if infMaxRunning <= 0 {
+			infMaxRunning = 2
+		}
+		infCacheMax = dockerCfg.CacheMaxBytes
+		infDockerBin = dockerCfg.DockerBin
+		logger.WithFields(logrus.Fields{
+			"hf_cache":       infHFCache,
+			"gguf_cache":     infGGUFCache,
+			"trt_engines":    infTRTDir,
+			"max_running":    infMaxRunning,
+			"default_provider": dockerCfg.DefaultProvider,
+		}).Info("Using Docker-based inference (v3.3.0+)")
+	} else {
+		// Legacy fallback for non-docker mode
+		infHFCache = downloadsDir
+		infGGUFCache = cfg.Yzma.ModelsDir
+		if infGGUFCache == "" {
+			infGGUFCache = infHFCache
+		}
+		infHTTPTimeout = cfg.HuggingFace.DefaultDownloadTimeout
+		if infHTTPTimeout == 0 {
+			infHTTPTimeout = 5 * time.Minute
+		}
+		infMaxConcurrent = maxConcurrent
+		infAutoResume = cfg.HuggingFace.AutoResume
+		infMaxRunning = cfg.Models.Preload.MaxLoadedModels
+		infCacheMax = cfg.HuggingFace.CacheMaxBytes
+		infHealthTimeout = 60 * time.Second
+		infStartupTimeout = 5 * time.Minute
+	}
+
+	infSvc, err := inference.NewService(inference.ServiceConfig{
+		HFToken:               hfAPIToken,
+		HFCacheDir:            infHFCache,
+		GGUFCacheDir:          infGGUFCache,
+		TRTEnginesDir:         infTRTDir,
+		MaxConcurrentDownload: infMaxConcurrent,
+		AutoResume:            infAutoResume,
+		HTTPTimeout:           infHTTPTimeout,
+		DockerBin:             infDockerBin,
+		Logger:                logger,
+		MaxRunningModels:      infMaxRunning,
+		CacheMaxBytes:         infCacheMax,
+		HealthCheckTimeout:    infHealthTimeout,
+		StartupTimeout:        infStartupTimeout,
+	})
+	if err != nil {
+		logger.WithError(err).Warn("Inference v4 service init failed")
+	} else {
+		r.inferenceSvc = infSvc
+		r.inferenceMgr = inference.NewManager(infSvc)
+		r.inferenceRouter = inference.NewRouter(r.inferenceMgr)
+		r.inferenceHandler = handlers.NewInferenceHandler(r.inferenceRouter, logger)
+		r.inferenceProxyHandler = handlers.NewInferenceProxyHandler(r.inferenceRouter, logger)
+		// Idle stop using legacy preload.unload_after if set
+		idleAfter := cfg.Models.Preload.UnloadAfter
+		if idleAfter > 0 {
+			checkEvery := idleAfter / 2
+			if checkEvery <= 0 {
+				checkEvery = idleAfter
+			}
+			r.inferenceMgr.StartIdleReaper(context.Background(), idleAfter, checkEvery)
+			logger.WithFields(logrus.Fields{
+				"idle_after": idleAfter,
+				"interval":   checkEvery,
+			}).Info("Inference idle reaper started")
+		}
+		// Periodic cache metrics refresh
+		r.inferenceMgr.StartCacheGaugeUpdater(context.Background(), time.Minute)
+		logger.WithFields(logrus.Fields{
+			"hf_cache":    infHFCache,
+			"gguf_cache":  infGGUFCache,
+			"max_download": maxConcurrent,
+			"use_docker":  true,
+		}).Info("Inference v4 service initialized")
+	}
+
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
 	// v3.0.5+: Use Inference.Yzma
 	yzmaEnabled := cfg.Inference.Yzma.Enabled
@@ -2565,6 +2747,11 @@ func (r *Router) Shutdown(ctx context.Context) error {
 	// Останавливаем Request Storage
 	if r.requestStorage != nil {
 		r.requestStorage.Stop()
+	}
+
+	if r.inferenceSvc != nil {
+		r.inferenceSvc.Shutdown()
+		r.logger.Info("Inference service stopped")
 	}
 
 	r.logger.Info("All router components stopped")

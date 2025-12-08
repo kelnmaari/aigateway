@@ -136,6 +136,72 @@ var (
 		},
 		[]string{"model", "error_type"},
 	)
+
+	// InferenceCacheBytes tracks current size of inference artifact cache.
+	InferenceCacheBytes = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "inference_cache_bytes",
+			Help:      "Current size of inference artifact cache in bytes",
+		},
+	)
+
+	// InferenceCacheLimitBytes tracks configured cache limit (0 = unlimited).
+	InferenceCacheLimitBytes = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "inference_cache_limit_bytes",
+			Help:      "Configured cache size limit in bytes (0 = unlimited)",
+		},
+	)
+
+	// InferenceCacheEvictedBytes counts evicted bytes.
+	InferenceCacheEvictedBytes = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "inference_cache_evicted_bytes_total",
+			Help:      "Total bytes evicted from inference cache",
+		},
+	)
+
+	// InferenceCacheEvictedFiles counts evicted files.
+	InferenceCacheEvictedFiles = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "inference_cache_evicted_files_total",
+			Help:      "Total files evicted from inference cache",
+		},
+	)
+
+	// InferenceStartupFailures counts container startup failures by provider.
+	InferenceStartupFailures = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "inference_startup_failures_total",
+			Help:      "Total inference container startup failures",
+		},
+		[]string{"provider"},
+	)
+
+	// InferenceHealthFailures counts health check failures by provider.
+	InferenceHealthFailures = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "inference_health_failures_total",
+			Help:      "Total inference container health check failures",
+		},
+		[]string{"provider"},
+	)
+
+	// InferenceContainersStarted counts successfully started containers by provider.
+	InferenceContainersStarted = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "inference_containers_started_total",
+			Help:      "Total inference containers started successfully",
+		},
+		[]string{"provider"},
+	)
 )
 
 // ========================================

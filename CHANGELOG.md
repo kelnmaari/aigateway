@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2025-12-08
+
+### Added
+
+- **🚀 Multi-Provider Inference System (v4)**: Полная система инференса с поддержкой нескольких провайдеров
+  - **vLLM**: высокопроизводительный инференс для HuggingFace моделей (tensor parallelism, GPU utilization control)
+  - **SGLang**: поддержка Vision Language Models (Qwen2-VL, LLaVA) + текстовые модели
+  - **TGI**: Text Generation Inference от HuggingFace с multi-GPU sharding
+  - **llama.cpp**: GGUF модели с GPU offload (n_gpu_layers, tensor_split)
+  - **TensorRT-LLM**: конверсия и кеширование TRT engines с валидацией совместимости
+
+- **📦 Model Orchestrator**: управление жизненным циклом контейнеров
+  - Автоматическое скачивание моделей (HuggingFace/GGUF/HTTP)
+  - Resume downloads с exponential backoff retry (1s→2s→4s)
+  - SHA256 validation для GGUF файлов
+  - Health check с configurable таймаутами
+  - Pin/unpin для защиты моделей от auto-evict
+  - LRU cache eviction по размеру
+
+- **🔧 TensorRT-LLM Converter**: конверсия HF моделей в TRT engines
+  - Кеширование engines в `/data/engines/trt`
+  - Метаданные: CUDA/TRT/Driver/GPU SM версии
+  - Автоматическая реконверсия при несовпадении версий
+
+- **🔌 API Endpoints** (`/api/system/inference/*`):
+  - `load`, `prepare`, `stop`, `evict`, `pin`, `unpin`
+  - `delete-artifacts`, `evict-cache`, `cache`
+  - `health`, `models`, `logs`, `metrics`
+  - `convert-trt`, `trt-engines`, `delete-trt-engine`
+
+- **🌐 OpenAI Proxy** (`/v1/inference/*`):
+  - `chat/completions` с streaming поддержкой
+  - Routing по alias и capability (text/vision)
+
+- **📊 Prometheus Metrics**:
+  - `inference_startup_failures_total` (по провайдеру)
+  - `inference_health_failures_total` (по провайдеру)
+  - `inference_containers_started_total` (по провайдеру)
+
+### Security
+
+- **HF_TOKEN Isolation**: токен НЕ передаётся в контейнер если модель уже скачана
+- **Port Binding**: контейнеры привязаны к 127.0.0.1
+
+### Technical
+
+- `internal/inference/` package: service, orchestrator, manager, router, downloader
+- `internal/inference/provider_builders.go`: BuildVLLMRequest, BuildSGLangRequest, BuildTGIRequest, BuildLlamaCPPRequest, BuildTRTLLMRequest
+- `internal/inference/trt_converter.go`: TRTEngineMetadata, Convert(), GetCachedEngine(), isCompatible()
+- MockContainerRuntime для интеграционных тестов
+- 28 unit/integration tests, benchmark tests (4700+ req/s)
+
+### Documentation
+
+- `docs/LLM_INFRA_ARCH.md` - архитектура системы инференса
+- `docs/INFERENCE_HOWTO.md` - руководство по провайдерам
+- `docs/INFERENCE_TROUBLESHOOTING.md` - диагностика проблем
+
 ## [3.2.0] - 2025-11-29
 
 ### Added

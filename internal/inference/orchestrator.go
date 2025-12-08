@@ -1,0 +1,262 @@
+package inference
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"aigateway/internal/metrics"
+	"github.com/sirupsen/logrus"
+)
+
+// Orchestrator coordinates model preparation (download) and container lifecycle.
+type Orchestrator struct {
+	runtime            ContainerRuntime
+	downloader         *ModelDownloader
+	logger             *logrus.Logger
+	healthCheckTimeout time.Duration
+	startupTimeout     time.Duration
+
+	mu      sync.RWMutex
+	models  map[string]*ModelInstance // alias -> instance
+}
+
+// ModelInstance tracks current state of a model/container.
+type ModelInstance struct {
+	Spec     ModelSpec
+	Status   ModelStatus
+	Handle   *ContainerHandle
+	LocalDir string
+	Error    string
+	LastUsed time.Time
+}
+
+// OrchestratorConfig holds orchestrator parameters.
+type OrchestratorConfig struct {
+	HealthCheckTimeout time.Duration
+	StartupTimeout     time.Duration
+}
+
+// NewOrchestrator creates an orchestrator with given runtime and downloader.
+func NewOrchestrator(runtime ContainerRuntime, downloader *ModelDownloader, logger *logrus.Logger, cfg OrchestratorConfig) *Orchestrator {
+	hcTimeout := cfg.HealthCheckTimeout
+	if hcTimeout <= 0 {
+		hcTimeout = 60 * time.Second
+	}
+	startTimeout := cfg.StartupTimeout
+	if startTimeout <= 0 {
+		startTimeout = 5 * time.Minute
+	}
+	return &Orchestrator{
+		runtime:            runtime,
+		downloader:         downloader,
+		logger:             logger,
+		healthCheckTimeout: hcTimeout,
+		startupTimeout:     startTimeout,
+		models:             make(map[string]*ModelInstance),
+	}
+}
+
+// PrepareModel ensures artifacts are present locally according to spec.
+func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*ModelInstance, error) {
+	o.mu.Lock()
+	if existing, ok := o.models[spec.Alias]; ok {
+		o.mu.Unlock()
+		return existing, nil
+	}
+	o.mu.Unlock()
+
+	inst := &ModelInstance{
+		Spec:   spec,
+		Status: StatusPending,
+	}
+
+	var localPath string
+	var err error
+
+	// Skip download if LocalPath already set (pre-cached or manually specified)
+	if spec.LocalPath != "" {
+		localPath = spec.LocalPath
+	} else {
+		switch spec.Format {
+		case FormatHF:
+			localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+		case FormatGGUF:
+			localPath, err = o.downloader.EnsureGGUF(ctx, spec.GGUFURL, spec.ExpectedSHA)
+		case FormatTRT:
+			localPath, err = o.downloader.EnsureHFFile(ctx, spec.HFRepo, spec.HFFile, spec.ExpectedSHA)
+		default:
+			err = fmt.Errorf("unsupported format: %s", spec.Format)
+		}
+
+		if err != nil {
+			inst.Status = StatusFailed
+			inst.Error = err.Error()
+			o.saveInstance(inst)
+			return inst, err
+		}
+	}
+
+	inst.Spec.LocalPath = localPath
+	inst.Status = StatusReady
+	inst.LastUsed = time.Now()
+	o.saveInstance(inst)
+	return inst, nil
+}
+
+// StartModel starts provider container (if runtime provided) after ensuring artifacts.
+// Respects context cancellation and applies startupTimeout if context has no deadline.
+func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq ContainerStartRequest) (*ModelInstance, error) {
+	// Apply overall startup timeout if no deadline in context
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && o.startupTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, o.startupTimeout)
+		defer cancel()
+	}
+
+	inst, err := o.PrepareModel(ctx, spec)
+	if err != nil {
+		return inst, err
+	}
+
+	// Check if cancelled during prepare
+	if ctx.Err() != nil {
+		inst.Status = StatusFailed
+		inst.Error = fmt.Sprintf("cancelled: %v", ctx.Err())
+		o.saveInstance(inst)
+		return inst, ctx.Err()
+	}
+
+	// If already running, return existing handle.
+	if inst.Handle != nil && inst.Status == StatusRunning {
+		return inst, nil
+	}
+
+	if o.runtime == nil {
+		return inst, fmt.Errorf("container runtime is not configured")
+	}
+
+	inst.Status = StatusStarting
+	o.saveInstance(inst)
+
+	handle, err := o.runtime.Start(ctx, startReq)
+	if err != nil {
+		inst.Status = StatusFailed
+		inst.Error = err.Error()
+		o.saveInstance(inst)
+		metrics.InferenceStartupFailures.WithLabelValues(string(spec.Provider)).Inc()
+		o.logger.WithFields(logrus.Fields{
+			"event":    "container_start_failed",
+			"alias":    spec.Alias,
+			"provider": spec.Provider,
+			"error":    err.Error(),
+		}).Error("failed to start inference container")
+		return inst, err
+	}
+
+	inst.Handle = handle
+	inst.Status = StatusStarting
+	o.saveInstance(inst)
+
+	// Health wait with configurable timeout
+	if handle.Endpoint != "" {
+		healthCtx, cancel := context.WithTimeout(ctx, o.healthCheckTimeout)
+		defer cancel()
+		healthURL := providerHealthURL(handle.Provider, handle.Endpoint)
+		if err := waitForHealth(healthCtx, healthURL, 2*time.Second); err != nil {
+			inst.Status = StatusFailed
+			inst.Error = fmt.Sprintf("health check failed: %v", err)
+			_ = o.runtime.Stop(context.Background(), handle.ID)
+			o.saveInstance(inst)
+			metrics.InferenceHealthFailures.WithLabelValues(string(spec.Provider)).Inc()
+			// Alert: health check timeout/failure
+			o.logger.WithFields(logrus.Fields{
+				"event":    "health_check_failed",
+				"alias":    spec.Alias,
+				"provider": spec.Provider,
+				"endpoint": handle.Endpoint,
+				"timeout":  o.healthCheckTimeout,
+				"error":    err.Error(),
+			}).Warn("inference container health check failed, container stopped")
+			return inst, err
+		}
+	}
+
+	inst.Status = StatusRunning
+	inst.LastUsed = time.Now()
+	o.saveInstance(inst)
+	metrics.InferenceContainersStarted.WithLabelValues(string(spec.Provider)).Inc()
+	o.logger.WithFields(logrus.Fields{
+		"event":    "container_started",
+		"alias":    spec.Alias,
+		"provider": spec.Provider,
+		"endpoint": handle.Endpoint,
+	}).Info("inference container started successfully")
+	return inst, nil
+}
+
+// StopModel stops container if running.
+func (o *Orchestrator) StopModel(ctx context.Context, alias string) error {
+	o.mu.Lock()
+	inst, ok := o.models[alias]
+	o.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("model not found: %s", alias)
+	}
+	if inst.Handle == nil || o.runtime == nil {
+		return nil
+	}
+
+	if err := o.runtime.Stop(ctx, inst.Handle.ID); err != nil {
+		return err
+	}
+
+	inst.Status = StatusReady
+	inst.Handle = nil
+	o.saveInstance(inst)
+	return nil
+}
+
+// saveInstance saves/updates instance in registry.
+func (o *Orchestrator) saveInstance(inst *ModelInstance) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.models[inst.Spec.Alias] = inst
+}
+
+// GetModel returns model instance by alias.
+func (o *Orchestrator) GetModel(alias string) (*ModelInstance, bool) {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	inst, ok := o.models[alias]
+	return inst, ok
+}
+
+// ListModels returns all tracked instances.
+func (o *Orchestrator) ListModels() []*ModelInstance {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	result := make([]*ModelInstance, 0, len(o.models))
+	for _, inst := range o.models {
+		result = append(result, inst)
+	}
+	return result
+}
+
+// waitForHealth polls health endpoint until success or timeout.
+func waitForHealth(ctx context.Context, url string, interval time.Duration) error {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		if err := HealthCheckHTTP(ctx, url); err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+		}
+	}
+}
+

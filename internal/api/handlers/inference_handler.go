@@ -152,14 +152,13 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		TGIMaxTotalTokens:    req.TGIMaxTotalTokens,
 	}
 
-	inst, err := h.router.EnsureByAlias(c.Request.Context(), req.Alias)
+	// Always use the provided spec from the request, not a cached one from registry.
+	// This ensures that when user explicitly selects provider=tei, we use tei,
+	// not a previously cached spec with provider=vllm.
+	inst, err := h.router.EnsureBySpec(c.Request.Context(), spec)
 	if err != nil {
-		// If alias not registered, try with provided spec
-		inst, err = h.router.EnsureBySpec(c.Request.Context(), spec)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -710,4 +709,77 @@ func (h *InferenceHandler) PostPullDockerImage(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{"message": "Image pull started", "image": image})
+}
+
+// POST /api/system/inference/download-repo
+// Downloads all files for a HuggingFace repository locally for offline use.
+func (h *InferenceHandler) PostDownloadRepository(c *gin.Context) {
+	var req struct {
+		ModelID string `json:"model_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	downloader := h.router.GetDownloader()
+	if downloader == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "downloader not configured"})
+		return
+	}
+
+	h.logger.WithField("model_id", req.ModelID).Info("Starting repository download")
+
+	repoDownload, err := downloader.DownloadRepository(c.Request.Context(), req.ModelID)
+	if err != nil {
+		h.logger.WithError(err).WithField("model_id", req.ModelID).Error("Failed to start repository download")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":     "Repository download started",
+		"model_id":    req.ModelID,
+		"download_id": repoDownload.ID,
+		"total_files": repoDownload.TotalFiles,
+		"total_size":  repoDownload.TotalSize,
+		"local_path":  repoDownload.LocalPath,
+	})
+}
+
+// GET /api/system/inference/repo-downloads
+// Lists all repository downloads with their status.
+func (h *InferenceHandler) GetRepoDownloads(c *gin.Context) {
+	downloader := h.router.GetDownloader()
+	if downloader == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+
+	downloads := downloader.ListRepoDownloads()
+	c.JSON(http.StatusOK, downloads)
+}
+
+// GET /api/system/inference/repo-downloads/:model_id
+// Gets status of a specific repository download.
+func (h *InferenceHandler) GetRepoDownloadStatus(c *gin.Context) {
+	modelID := c.Param("model_id")
+	if modelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model_id is required"})
+		return
+	}
+
+	downloader := h.router.GetDownloader()
+	if downloader == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "downloader not configured"})
+		return
+	}
+
+	repo, found := downloader.GetRepoDownload(modelID)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "download not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, repo)
 }

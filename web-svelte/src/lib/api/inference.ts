@@ -1,6 +1,6 @@
 // Inference API types and client functions
 
-export type Provider = 'vllm' | 'sglang' | 'tgi' | 'tensorrt-llm' | 'llama.cpp';
+export type Provider = 'vllm' | 'sglang' | 'tgi' | 'tei' | 'tensorrt-llm' | 'llama.cpp';
 export type Format = 'hf' | 'gguf' | 'trt' | 'other';
 export type Capability = 'chat' | 'embeddings' | 'vision';
 
@@ -208,5 +208,40 @@ export const inferenceApi = {
 	
 	setAutoStart: (alias: string, enabled: boolean) => 
 		api.post<{ alias: string; auto_start: boolean }>(`/api/system/inference/auto-start?alias=${encodeURIComponent(alias)}&enabled=${enabled}`),
+
+	// Repository downloads (v3.3.x+) - download all model files locally
+	downloadRepository: (modelId: string) => 
+		api.post<RepoDownloadResponse>('/api/system/inference/download-repo', { model_id: modelId }),
+	
+	listRepoDownloads: () => api.get<RepoDownload[]>('/api/system/inference/repo-downloads'),
+	
+	getRepoDownloadStatus: (modelId: string) => 
+		api.get<RepoDownload>(`/api/system/inference/repo-downloads/${encodeURIComponent(modelId)}`),
 };
+
+// Repository download types
+export interface RepoDownload {
+	id: string;
+	model_id: string;
+	status: 'pending' | 'downloading' | 'completed' | 'failed' | 'cancelled';
+	total_files: number;
+	completed_files: number;
+	failed_files: number;
+	total_size: number;
+	downloaded_size: number;
+	progress: number;
+	error?: string;
+	local_path: string;
+	started_at?: string;
+	completed_at?: string;
+}
+
+export interface RepoDownloadResponse {
+	message: string;
+	model_id: string;
+	download_id: string;
+	total_files: number;
+	total_size: number;
+	local_path: string;
+}
 

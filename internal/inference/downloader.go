@@ -188,6 +188,31 @@ func (d *ModelDownloader) Shutdown() {
 	}
 }
 
+// DownloadRepository downloads all files for a HuggingFace model repository.
+// Returns RepoDownload for tracking progress.
+func (d *ModelDownloader) DownloadRepository(ctx context.Context, modelID string) (*huggingface.RepoDownload, error) {
+	if d.hfDownloader == nil {
+		return nil, fmt.Errorf("HuggingFace downloader not configured")
+	}
+	return d.hfDownloader.DownloadRepository(ctx, modelID)
+}
+
+// GetRepoDownload returns status of a repository download.
+func (d *ModelDownloader) GetRepoDownload(modelID string) (*huggingface.RepoDownload, bool) {
+	if d.hfDownloader == nil {
+		return nil, false
+	}
+	return d.hfDownloader.GetRepoDownload(modelID)
+}
+
+// ListRepoDownloads returns all repository downloads.
+func (d *ModelDownloader) ListRepoDownloads() []*huggingface.RepoDownload {
+	if d.hfDownloader == nil {
+		return nil
+	}
+	return d.hfDownloader.ListRepoDownloads()
+}
+
 // waitForDownload blocks until download completes or fails.
 func (d *ModelDownloader) waitForDownload(ctx context.Context, download *huggingface.Download) error {
 	ticker := time.NewTicker(300 * time.Millisecond)

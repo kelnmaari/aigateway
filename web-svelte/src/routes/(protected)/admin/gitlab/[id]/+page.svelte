@@ -168,7 +168,8 @@
 	}
 
 	async function handleAddProject() {
-		if (!formGitLabProjectId.trim()) {
+		const projectIdStr = String(formGitLabProjectId).trim();
+		if (!projectIdStr) {
 			addError = 'GitLab Project ID is required';
 			return;
 		}
@@ -206,7 +207,7 @@
 
 		try {
 			const newProject = await gitlabApi.addProject(integrationId, {
-				gitlab_project_id: parseInt(formGitLabProjectId, 10),
+				gitlab_project_id: parseInt(projectIdStr, 10),
 				analysis_model_id: formAnalysisModelId.trim(),
 				embedding_model_id: formEmbeddingModelId.trim() || undefined,
 				auto_review: formAutoReview,

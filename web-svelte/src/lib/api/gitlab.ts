@@ -226,7 +226,7 @@ export const gitlabApi = {
   }): Promise<GitLabIntegration> {
     return apiRequest('/integrations', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -239,7 +239,7 @@ export const gitlabApi = {
   }): Promise<GitLabIntegration> {
     return apiRequest(`/integrations/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -281,7 +281,7 @@ export const gitlabApi = {
   }): Promise<GitLabProject> {
     return apiRequest(`/integrations/${integrationId}/projects`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -295,7 +295,7 @@ export const gitlabApi = {
   }): Promise<GitLabProject> {
     return apiRequest(`/projects/${projectId}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -306,7 +306,7 @@ export const gitlabApi = {
   async setupWebhook(projectId: string, webhookUrl: string): Promise<{ webhook_id: number }> {
     return apiRequest(`/projects/${projectId}/webhook`, {
       method: 'POST',
-      body: JSON.stringify({ webhook_url: webhookUrl }),
+      body: { webhook_url: webhookUrl },
     });
   },
 
@@ -381,6 +381,47 @@ export const gitlabApi = {
   async checkModelUsage(modelId: string): Promise<ModelUsage> {
     return apiRequest(`/models/${modelId}/gitlab-usage`);
   },
+
+  // Settings
+  async getSettings(): Promise<GitLabSettings> {
+    return apiRequest('/settings');
+  },
+
+  async updateSettings(settings: Partial<GitLabSettings>): Promise<{ message: string }> {
+    return apiRequest('/settings', { method: 'PUT', body: settings });
+  },
+
+  // Analytics
+  async getAnalytics(range?: string): Promise<GitLabAnalytics> {
+    const params = new URLSearchParams();
+    if (range) params.set('range', range);
+    return apiRequest(`/analytics?${params}`);
+  },
+
+  // Feedback
+  async listFeedback(params?: { limit?: number; offset?: number }): Promise<PaginatedResponse<GitLabFeedback>> {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+    return apiRequest(`/feedback?${searchParams}`);
+  },
+
+  async submitFeedback(data: { review_id: string; rating: number; comment?: string }): Promise<{ message: string }> {
+    return apiRequest('/feedback', { method: 'POST', body: data });
+  },
+
+  // Available Projects (from GitLab API)
+  async listAvailableProjects(integrationId: string, params?: {
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<AvailableProjectsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.per_page) searchParams.set('per_page', params.per_page.toString());
+    return apiRequest(`/integrations/${integrationId}/available-projects?${searchParams}`);
+  },
 };
 
 // Model types
@@ -407,6 +448,59 @@ export interface GitLabProjectRef {
   project_id: string;
   project_name: string;
   usage_type: 'analysis' | 'embedding';
+}
+
+// Settings types
+export interface GitLabSettings {
+  auto_review_enabled: boolean;
+  default_analysis_model: string;
+  default_embedding_model: string;
+  max_files_per_mr: number;
+  max_lines_per_file: number;
+  webhook_secret_rotation: boolean;
+  notification_email: string;
+}
+
+// Analytics types
+export interface GitLabAnalytics {
+  range: string;
+  days: number;
+  total_reviews: number;
+  completed_reviews: number;
+  failed_reviews: number;
+  avg_processing_ms: number;
+  total_issues_found: number;
+  reviews_by_day: Array<{ date: string; count: number }>;
+  reviews_by_project: Array<{ project: string; count: number }>;
+  issue_categories: Array<{ category: string; count: number }>;
+}
+
+// Feedback types
+export interface GitLabFeedback {
+  id: string;
+  review_id: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+// Available projects from GitLab
+export interface AvailableProject {
+  id: number;
+  name: string;
+  path_with_namespace: string;
+  description?: string;
+  web_url: string;
+  default_branch: string;
+  visibility: string;
+  already_added: boolean;
+}
+
+export interface AvailableProjectsResponse {
+  projects: AvailableProject[];
+  total: number;
+  page: number;
+  per_page: number;
 }
 
 export default gitlabApi;

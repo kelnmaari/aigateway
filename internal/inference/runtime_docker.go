@@ -674,3 +674,216 @@ func (r *DockerRuntime) PullImage(image string) error {
 	}
 	return r.pullImageCLI(ctx, image)
 }
+
+// DiscoveredContainer holds info about a discovered running container.
+type DiscoveredContainer struct {
+	ID         string
+	Name       string
+	Image      string
+	ModelAlias string
+	Provider   ProviderKind
+	Endpoint   string
+	Status     string
+	CreatedAt  time.Time
+}
+
+// DiscoverRunningContainers finds already running inference containers with "aigw-" prefix.
+// This allows the server to recover state after restart.
+func (r *DockerRuntime) DiscoverRunningContainers(ctx context.Context) ([]DiscoveredContainer, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.useAPI && r.api != nil {
+		return r.discoverContainersAPI(ctx)
+	}
+	return r.discoverContainersCLI(ctx)
+}
+
+func (r *DockerRuntime) discoverContainersAPI(ctx context.Context) ([]DiscoveredContainer, error) {
+	containers, err := r.api.ContainerList(ctx, container.ListOptions{
+		All: false, // Only running containers
+	})
+	if err != nil {
+		return nil, fmt.Errorf("docker api list: %w", err)
+	}
+
+	var discovered []DiscoveredContainer
+	for _, c := range containers {
+		// Check for our container prefix
+		var containerName string
+		for _, name := range c.Names {
+			name = strings.TrimPrefix(name, "/")
+			if strings.HasPrefix(name, "aigw-") {
+				containerName = name
+				break
+			}
+		}
+		if containerName == "" {
+			continue
+		}
+
+		// Extract model alias from container name: aigw-{alias}-{timestamp}
+		parts := strings.Split(containerName, "-")
+		if len(parts) < 2 {
+			continue
+		}
+		// Reconstruct alias (everything between "aigw-" and the last part which is timestamp)
+		alias := strings.Join(parts[1:len(parts)-1], "-")
+		if alias == "" {
+			alias = parts[1] // Fallback for simple names
+		}
+
+		// Detect provider from image
+		provider := detectProviderFromImage(c.Image)
+
+		// Get port mapping to construct endpoint
+		endpoint := ""
+		for _, port := range c.Ports {
+			if port.PublicPort > 0 {
+				endpoint = fmt.Sprintf("http://127.0.0.1:%d", port.PublicPort)
+				break
+			}
+		}
+
+		dc := DiscoveredContainer{
+			ID:         c.ID,
+			Name:       containerName,
+			Image:      c.Image,
+			ModelAlias: alias,
+			Provider:   provider,
+			Endpoint:   endpoint,
+			Status:     c.State,
+			CreatedAt:  time.Unix(c.Created, 0),
+		}
+		discovered = append(discovered, dc)
+
+		// Also register in handles map
+		r.handles[containerName] = &ContainerHandle{
+			ID:         c.ID,
+			Provider:   provider,
+			ModelAlias: alias,
+			Endpoint:   endpoint,
+		}
+
+		// Start log streaming for discovered container
+		r.startLogStreaming(alias, c.ID)
+
+		r.logger.WithFields(logrus.Fields{
+			"container": containerName,
+			"alias":     alias,
+			"provider":  provider,
+			"endpoint":  endpoint,
+			"image":     c.Image,
+		}).Info("Discovered running inference container")
+	}
+
+	return discovered, nil
+}
+
+func (r *DockerRuntime) discoverContainersCLI(ctx context.Context) ([]DiscoveredContainer, error) {
+	// docker ps --filter "name=aigw-" --format "{{.ID}}|{{.Names}}|{{.Image}}|{{.Ports}}|{{.State}}|{{.CreatedAt}}"
+	cmd := exec.CommandContext(ctx, r.dockerBin, "ps", "--filter", "name=aigw-", "--format", "{{.ID}}|{{.Names}}|{{.Image}}|{{.Ports}}|{{.State}}|{{.CreatedAt}}")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker ps failed: %w", err)
+	}
+
+	var discovered []DiscoveredContainer
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "|")
+		if len(parts) < 5 {
+			continue
+		}
+
+		containerID := parts[0]
+		containerName := parts[1]
+		image := parts[2]
+		portsStr := parts[3]
+		state := parts[4]
+
+		// Extract model alias from container name
+		nameParts := strings.Split(containerName, "-")
+		if len(nameParts) < 2 {
+			continue
+		}
+		alias := strings.Join(nameParts[1:len(nameParts)-1], "-")
+		if alias == "" {
+			alias = nameParts[1]
+		}
+
+		// Detect provider from image
+		provider := detectProviderFromImage(image)
+
+		// Parse port mapping: "0.0.0.0:12345->8080/tcp" or "127.0.0.1:12345->8080/tcp"
+		endpoint := ""
+		if portsStr != "" {
+			for _, portMap := range strings.Split(portsStr, ", ") {
+				if idx := strings.Index(portMap, "->"); idx > 0 {
+					hostPart := portMap[:idx]
+					if colonIdx := strings.LastIndex(hostPart, ":"); colonIdx >= 0 {
+						port := hostPart[colonIdx+1:]
+						endpoint = fmt.Sprintf("http://127.0.0.1:%s", port)
+						break
+					}
+				}
+			}
+		}
+
+		dc := DiscoveredContainer{
+			ID:         containerID,
+			Name:       containerName,
+			Image:      image,
+			ModelAlias: alias,
+			Provider:   provider,
+			Endpoint:   endpoint,
+			Status:     state,
+		}
+		discovered = append(discovered, dc)
+
+		// Register in handles map
+		r.handles[containerName] = &ContainerHandle{
+			ID:         containerID,
+			Provider:   provider,
+			ModelAlias: alias,
+			Endpoint:   endpoint,
+		}
+
+		// Start log streaming
+		r.startLogStreaming(alias, containerID)
+
+		r.logger.WithFields(logrus.Fields{
+			"container": containerName,
+			"alias":     alias,
+			"provider":  provider,
+			"endpoint":  endpoint,
+			"image":     image,
+		}).Info("Discovered running inference container")
+	}
+
+	return discovered, nil
+}
+
+// detectProviderFromImage determines provider type from Docker image name.
+func detectProviderFromImage(image string) ProviderKind {
+	imageLower := strings.ToLower(image)
+	switch {
+	case strings.Contains(imageLower, "vllm"):
+		return ProviderVLLM
+	case strings.Contains(imageLower, "sglang"):
+		return ProviderSGLang
+	case strings.Contains(imageLower, "text-generation-inference") || strings.Contains(imageLower, "tgi"):
+		return ProviderTGI
+	case strings.Contains(imageLower, "text-embeddings-inference") || strings.Contains(imageLower, "tei"):
+		return ProviderTEI
+	case strings.Contains(imageLower, "tensorrt") || strings.Contains(imageLower, "trt"):
+		return ProviderTRTLLM
+	case strings.Contains(imageLower, "llama.cpp") || strings.Contains(imageLower, "llama-cpp"):
+		return ProviderLlamaCPP
+	default:
+		return ProviderVLLM // Default fallback
+	}
+}

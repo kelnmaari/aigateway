@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest, type GPUDevice, type SavedModel } from '$lib/api/inference';
+	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest, type GPUDevice, type SavedModel, type RepoDownload } from '$lib/api/inference';
 	import { api } from '$lib/api/client';
 	import { downloadsApi } from '$lib/api/downloads';
 	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
@@ -20,7 +20,11 @@
 	let busy = $state(false);
 	let msg = $state('');
 	let msgType = $state<'info' | 'error' | 'success'>('info');
-	let activeTab = $state<'models' | 'cache' | 'trt' | 'hf'>('models');
+	let activeTab = $state<'models' | 'cache' | 'trt' | 'hf' | 'downloads'>('models');
+	
+	// Repository downloads state
+	let repoDownloads = $state<RepoDownload[]>([]);
+	let repoDownloadsInterval: ReturnType<typeof setInterval> | null = null;
 	
 	// HuggingFace Browser state
 	interface HFModel {
@@ -79,6 +83,8 @@
 	let hfSearchResults = $state<HFModel[]>([]);
 	let hfPopularModels = $state<HFModel[]>([]);
 	let hfSearching = $state(false);
+	let hfSearchPerformed = $state(false); // Track if search was performed
+	let hfSearchError = $state(''); // Track search error message
 	let hfSelectedModel = $state<HFModel | null>(null);
 	let hfModelFiles = $state<any[]>([]);
 	let hfRepoDebounce: ReturnType<typeof setTimeout> | undefined;
@@ -124,10 +130,23 @@
 		await refreshAll();
 		await loadPopularHF();
 		await loadGPUs();
+		await loadRepoDownloads();
 	});
 
 	onDestroy(() => {
 		if (logsInterval) clearInterval(logsInterval);
+		if (repoDownloadsInterval) clearInterval(repoDownloadsInterval);
+	});
+	
+	// Auto-refresh downloads when tab is active
+	$effect(() => {
+		if (activeTab === 'downloads') {
+			loadRepoDownloads();
+			repoDownloadsInterval = setInterval(loadRepoDownloads, 3000);
+		} else if (repoDownloadsInterval) {
+			clearInterval(repoDownloadsInterval);
+			repoDownloadsInterval = null;
+		}
 	});
 
 	async function refreshAll() {
@@ -314,11 +333,17 @@
 	// HuggingFace Browser functions
 	async function searchHF() {
 		hfSearching = true;
+		hfSearchError = '';
+		hfSearchPerformed = true;
 		try {
 			const res = await downloadsApi.searchHuggingFace(hfSearchQuery, hfProviderFilter);
 			hfSearchResults = res.models || [];
+			if (hfSearchResults.length === 0 && hfSearchQuery) {
+				hfSearchError = `No models found for "${hfSearchQuery}"`;
+			}
 		} catch (e: any) {
-			showMsg(e?.message || 'Failed to search HuggingFace', 'error');
+			hfSearchError = e?.message || 'Failed to search HuggingFace';
+			hfSearchResults = [];
 		} finally {
 			hfSearching = false;
 		}
@@ -493,6 +518,15 @@
 			artifacts = [];
 		}
 	}
+	
+	async function loadRepoDownloads() {
+		try {
+			repoDownloads = (await inferenceApi.listRepoDownloads()) || [];
+		} catch (e: any) {
+			console.error('Failed to load repo downloads:', e);
+			repoDownloads = [];
+		}
+	}
 
 	async function loadTRTEngines() {
 		try {
@@ -537,8 +571,15 @@
 				await inferenceApi.load(req);
 				showMsg('Модель загружается...', 'success');
 			} else {
-				await inferenceApi.prepare(req);
-				showMsg('Артефакты подготавливаются...', 'success');
+				// Download repository locally instead of just preparing
+				if (form.hf_repo) {
+					await inferenceApi.downloadRepository(form.hf_repo);
+					showMsg('Скачивание модели началось. Смотрите вкладку Downloads.', 'success');
+					activeTab = 'downloads';
+					await loadRepoDownloads();
+				} else {
+					showMsg('Укажите HF Repo для скачивания', 'error');
+				}
 			}
 			await refreshAll();
 		} catch (e: any) {
@@ -867,6 +908,9 @@
 		<button class={`px-4 py-2 -mb-px ${activeTab === 'trt' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'trt'}>
 			TRT Engines ({(trtEngines || []).length})
 		</button>
+		<button class={`px-4 py-2 -mb-px ${activeTab === 'downloads' ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`} onclick={() => activeTab = 'downloads'}>
+			📥 Downloads ({repoDownloads.filter(d => d.status === 'downloading').length || ''})
+		</button>
 	</div>
 
 	<!-- Models Tab -->
@@ -1063,7 +1107,7 @@
 							Load & Start
 						</button>
 						<button class="px-4 py-2 rounded border hover:bg-muted disabled:opacity-50" onclick={() => submit(false)} disabled={busy}>
-							Prepare Only
+							Download Local
 						</button>
 					</div>
 				</div>
@@ -1251,7 +1295,7 @@
 					{#each hfProviderFilters as pf}
 						<button 
 							class="px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5 {hfProviderFilter === pf.id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}"
-							onclick={() => { hfProviderFilter = pf.id; hfSearchQuery = ''; hfSearchResults = []; }}
+							onclick={() => { hfProviderFilter = pf.id; hfSearchQuery = ''; hfSearchResults = []; hfSearchPerformed = false; hfSearchError = ''; }}
 							title={pf.description}
 						>
 							<span>{pf.icon}</span>
@@ -1368,6 +1412,14 @@
 								{#if hfSearching}
 									<Loader2 class="h-6 w-6 animate-spin mx-auto mb-2" />
 									Searching...
+								{:else if hfSearchError}
+									<div class="text-amber-500">
+										⚠️ {hfSearchError}
+									</div>
+									<div class="text-xs mt-2">Try a different search term or check model name spelling</div>
+								{:else if hfSearchPerformed && hfSearchResults.length === 0}
+									<div>No models found</div>
+									<div class="text-xs mt-2">Try a different search term</div>
 								{:else}
 									Search for models or wait for popular models to load
 								{/if}
@@ -1593,6 +1645,61 @@
 						{/each}
 					{/if}
 				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Downloads Tab -->
+	{#if activeTab === 'downloads'}
+		<div class="border rounded-lg bg-card">
+			<div class="px-4 py-3 border-b bg-muted/50 flex items-center justify-between">
+				<h2 class="font-semibold">Repository Downloads</h2>
+				<button class="px-3 py-1 text-sm rounded border hover:bg-muted" onclick={loadRepoDownloads}>
+					Refresh
+				</button>
+			</div>
+			<div class="divide-y">
+				{#if repoDownloads.length === 0}
+					<div class="px-4 py-8 text-center text-muted-foreground">
+						<p>No active downloads</p>
+						<p class="text-sm mt-2">Use "Download Local" button in the Models tab to start downloading a model.</p>
+					</div>
+				{:else}
+					{#each repoDownloads as dl}
+						<div class="px-4 py-4">
+							<div class="flex items-start justify-between mb-2">
+								<div>
+									<div class="font-semibold">{dl.model_id}</div>
+									<div class="text-xs text-muted-foreground mt-1">
+										{dl.completed_files}/{dl.total_files} files · {formatSize(dl.downloaded_size)}/{formatSize(dl.total_size)}
+									</div>
+									{#if dl.local_path}
+										<div class="text-xs text-muted-foreground mt-1">📁 {dl.local_path}</div>
+									{/if}
+								</div>
+								<span class={`text-xs px-2 py-1 rounded font-medium ${
+									dl.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+									dl.status === 'downloading' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+									dl.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+									'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
+								}`}>
+									{dl.status === 'downloading' ? '⏳ ' : dl.status === 'completed' ? '✅ ' : dl.status === 'failed' ? '❌ ' : ''}
+									{dl.status}
+								</span>
+							</div>
+							<!-- Progress bar -->
+							{#if dl.status === 'downloading'}
+								<div class="w-full bg-muted rounded-full h-2 mt-2">
+									<div class="bg-primary h-2 rounded-full transition-all" style="width: {dl.progress}%"></div>
+								</div>
+								<div class="text-xs text-muted-foreground mt-1 text-right">{dl.progress.toFixed(1)}%</div>
+							{/if}
+							{#if dl.error}
+								<div class="text-xs text-red-500 mt-2">{dl.error}</div>
+							{/if}
+						</div>
+					{/each}
+				{/if}
 			</div>
 		</div>
 	{/if}

@@ -1010,3 +1010,211 @@ func (h *GitLabAdminHandler) ListEmbeddingModels(c *gin.Context) {
 	})
 }
 
+// ============================================================================
+// Settings Handlers
+// ============================================================================
+
+// GetSettings GET /api/admin/gitlab/settings
+func (h *GitLabAdminHandler) GetSettings(c *gin.Context) {
+	// Return default settings for now - can be extended to store in DB
+	c.JSON(http.StatusOK, gin.H{
+		"auto_review_enabled":     true,
+		"default_analysis_model":  "",
+		"default_embedding_model": "",
+		"max_files_per_mr":        50,
+		"max_lines_per_file":      1000,
+		"webhook_secret_rotation": false,
+		"notification_email":      "",
+	})
+}
+
+// UpdateSettings PUT /api/admin/gitlab/settings
+func (h *GitLabAdminHandler) UpdateSettings(c *gin.Context) {
+	var req map[string]interface{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.WithField("settings", req).Info("GitLab settings update requested")
+
+	// TODO: Persist settings to database
+	c.JSON(http.StatusOK, gin.H{"message": "Settings updated", "settings": req})
+}
+
+// ============================================================================
+// Analytics Handlers
+// ============================================================================
+
+// GetAnalytics GET /api/admin/gitlab/analytics
+func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
+	rangeParam := c.DefaultQuery("range", "7d")
+
+	// Calculate date range
+	var days int
+	switch rangeParam {
+	case "24h":
+		days = 1
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	case "90d":
+		days = 90
+	default:
+		days = 7
+	}
+
+	// TODO: Implement actual analytics from database
+	// For now, return placeholder data
+	c.JSON(http.StatusOK, gin.H{
+		"range":              rangeParam,
+		"days":               days,
+		"total_reviews":      0,
+		"completed_reviews":  0,
+		"failed_reviews":     0,
+		"avg_processing_ms":  0,
+		"total_issues_found": 0,
+		"reviews_by_day":     []interface{}{},
+		"reviews_by_project": []interface{}{},
+		"issue_categories":   []interface{}{},
+	})
+}
+
+// ============================================================================
+// Feedback Handlers
+// ============================================================================
+
+// ListFeedback GET /api/admin/gitlab/feedback
+func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
+	// Placeholder - feedback system not implemented yet
+	c.JSON(http.StatusOK, gin.H{
+		"data":  []interface{}{},
+		"total": 0,
+	})
+}
+
+// SubmitFeedback POST /api/admin/gitlab/feedback
+func (h *GitLabAdminHandler) SubmitFeedback(c *gin.Context) {
+	var req struct {
+		ReviewID string `json:"review_id" binding:"required"`
+		Rating   int    `json:"rating" binding:"required,min=1,max=5"`
+		Comment  string `json:"comment"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"review_id": req.ReviewID,
+		"rating":    req.Rating,
+		"comment":   req.Comment,
+	}).Info("Feedback submitted for review")
+
+	// TODO: Store feedback in database
+	c.JSON(http.StatusOK, gin.H{"message": "Feedback submitted successfully"})
+}
+
+// ============================================================================
+// Available Projects (GitLab API Integration)
+// ============================================================================
+
+// ListAvailableProjects GET /api/admin/gitlab/integrations/:id/available-projects
+// Fetches projects from GitLab that the integration has access to
+func (h *GitLabAdminHandler) ListAvailableProjects(c *gin.Context) {
+	integrationID := c.Param("id")
+	search := c.Query("search")
+	perPage := 20
+	page := 1
+
+	if p, err := strconv.Atoi(c.DefaultQuery("page", "1")); err == nil && p > 0 {
+		page = p
+	}
+	if pp, err := strconv.Atoi(c.DefaultQuery("per_page", "20")); err == nil && pp > 0 && pp <= 100 {
+		perPage = pp
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	// Get integration to access GitLab API
+	integration, err := h.store.GetIntegration(ctx, integrationID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get integration")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get integration"})
+		return
+	}
+	if integration == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		return
+	}
+
+	// Create GitLab client
+	glClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+	})
+
+	// Fetch projects from GitLab
+	projects, err := glClient.ListProjects(ctx, &client.ListProjectsOptions{
+		Search:     search,
+		Page:       page,
+		PerPage:    perPage,
+		Membership: true, // Only show projects user has access to
+	})
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list GitLab projects")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to fetch projects from GitLab: %v", err)})
+		return
+	}
+
+	// Get already added project IDs to mark them
+	existingProjects, _, err := h.store.ListProjects(ctx, &models.GitLabProjectListRequest{
+		IntegrationID: &integrationID,
+		Limit:         1000,
+	})
+	if err != nil {
+		h.logger.WithError(err).Warn("Failed to list existing projects")
+		existingProjects = nil
+	}
+
+	existingIDs := make(map[int64]bool)
+	for _, p := range existingProjects {
+		existingIDs[int64(p.GitLabProjectID)] = true
+	}
+
+	// Format response
+	type ProjectInfo struct {
+		ID                int64  `json:"id"`
+		Name              string `json:"name"`
+		PathWithNamespace string `json:"path_with_namespace"`
+		Description       string `json:"description,omitempty"`
+		WebURL            string `json:"web_url"`
+		DefaultBranch     string `json:"default_branch"`
+		Visibility        string `json:"visibility"`
+		AlreadyAdded      bool   `json:"already_added"`
+	}
+
+	result := make([]ProjectInfo, 0, len(projects))
+	for _, p := range projects {
+		result = append(result, ProjectInfo{
+			ID:                p.ID,
+			Name:              p.Name,
+			PathWithNamespace: p.PathWithNamespace,
+			Description:       p.Description,
+			WebURL:            p.WebURL,
+			DefaultBranch:     p.DefaultBranch,
+			Visibility:        p.Visibility,
+			AlreadyAdded:      existingIDs[p.ID],
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"projects": result,
+		"total":    len(result),
+		"page":     page,
+		"per_page": perPage,
+	})
+}

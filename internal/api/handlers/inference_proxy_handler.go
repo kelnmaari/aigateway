@@ -232,11 +232,14 @@ func (h *InferenceProxyHandler) errorResponse(c *gin.Context, status int, errTyp
 }
 
 // resolveProviderModelName returns the model name that the provider expects.
-// vLLM/TGI/SGLang expect HFRepo (e.g., "Qwen/Qwen2.5-3B-Instruct"),
-// llama.cpp expects the filename.
+// vLLM uses --served-model-name (alias), TGI/SGLang expect HFRepo,
+// llama.cpp expects the alias.
 func (h *InferenceProxyHandler) resolveProviderModelName(inst *inference.ModelInstance) string {
 	switch inst.Spec.Provider {
-	case inference.ProviderVLLM, inference.ProviderTGI, inference.ProviderSGLang, inference.ProviderTRTLLM:
+	case inference.ProviderVLLM:
+		// vLLM uses --served-model-name which we set to alias
+		return inst.Spec.Alias
+	case inference.ProviderTGI, inference.ProviderSGLang, inference.ProviderTRTLLM:
 		// HF-based providers expect the HF repo name
 		if inst.Spec.HFRepo != "" {
 			return inst.Spec.HFRepo
@@ -250,4 +253,3 @@ func (h *InferenceProxyHandler) resolveProviderModelName(inst *inference.ModelIn
 		return inst.Spec.Alias
 	}
 }
-

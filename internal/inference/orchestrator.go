@@ -24,12 +24,15 @@ type Orchestrator struct {
 
 // ModelInstance tracks current state of a model/container.
 type ModelInstance struct {
-	Spec     ModelSpec
-	Status   ModelStatus
-	Handle   *ContainerHandle
-	LocalDir string
-	Error    string
-	LastUsed time.Time
+	Spec        ModelSpec
+	Status      ModelStatus
+	Handle      *ContainerHandle
+	LocalDir    string
+	Error       string
+	LastUsed    time.Time
+	StartedAt   time.Time // When container was started
+	ContainerID string    // Docker container ID
+	Endpoint    string    // HTTP endpoint for the model
 }
 
 // OrchestratorConfig holds orchestrator parameters.
@@ -56,6 +59,33 @@ func NewOrchestrator(runtime ContainerRuntime, downloader *ModelDownloader, logg
 		startupTimeout:     startTimeout,
 		models:             make(map[string]*ModelInstance),
 	}
+}
+
+// AddRecoveredInstance adds a previously running container to the orchestrator's model map.
+// Used during server startup to recover state from already running containers.
+func (o *Orchestrator) AddRecoveredInstance(alias string, inst *ModelInstance) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	// Create a handle from the instance info
+	if inst.Handle == nil && inst.ContainerID != "" {
+		inst.Handle = &ContainerHandle{
+			ID:         inst.ContainerID,
+			Provider:   inst.Spec.Provider,
+			ModelAlias: alias,
+			Endpoint:   inst.Endpoint,
+		}
+	}
+
+	inst.LastUsed = time.Now()
+	o.models[alias] = inst
+
+	o.logger.WithFields(logrus.Fields{
+		"alias":     alias,
+		"provider":  inst.Spec.Provider,
+		"endpoint":  inst.Endpoint,
+		"container": inst.ContainerID,
+	}).Debug("Added recovered instance to orchestrator")
 }
 
 // PrepareModel ensures artifacts are present locally according to spec.

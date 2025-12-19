@@ -578,6 +578,10 @@ func (r *Router) setupInferenceRoutes() {
 		// Docker image management
 		group.GET("/docker-images", r.inferenceHandler.GetDockerImages)
 		group.POST("/docker-images/pull", r.inferenceHandler.PostPullDockerImage)
+		// Repository download (v3.3.x+) - download all model files locally
+		group.POST("/download-repo", r.inferenceHandler.PostDownloadRepository)
+		group.GET("/repo-downloads", r.inferenceHandler.GetRepoDownloads)
+		group.GET("/repo-downloads/:model_id", r.inferenceHandler.GetRepoDownloadStatus)
 	}
 	r.logger.Info("Inference v4 routes configured")
 
@@ -2583,6 +2587,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	r.hfClient = huggingface.NewClient(hfAPIToken, hfLogger)
 
 	// Initialize downloader (HF-02)
+	// Create separate logger for downloads with dedicated log file
+	downloadLogger := internalLogger.NewFileLogger("logs/downloads.log", cfg.Logging.Level)
+	downloadLogger.Info("📥 Downloads logger initialized with separate log file")
+
 	downloadsDir := cfg.HuggingFace.ModelsDir
 	if downloadsDir == "" {
 		downloadsDir = "./data/models"
@@ -2594,11 +2602,11 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	autoResume := cfg.HuggingFace.AutoResume
 
 	var err error
-	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, hfLogger)
+	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, downloadLogger)
 	if err != nil {
-		hfLogger.WithError(err).Error("Failed to initialize Hugging Face downloader")
+		downloadLogger.WithError(err).Error("Failed to initialize Hugging Face downloader")
 	} else {
-		hfLogger.WithFields(logrus.Fields{
+		downloadLogger.WithFields(logrus.Fields{
 			"downloads_dir":  downloadsDir,
 			"max_concurrent": maxConcurrent,
 			"auto_resume":    autoResume,
@@ -2958,6 +2966,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 	// GitLab Integration (v3.1.0+)
 	if cfg.GitLab.Enabled && r.db != nil {
+		// Create separate logger for GitLab with dedicated log file
+		gitlabLogger := internalLogger.NewFileLogger("logs/gitlab.log", cfg.Logging.Level)
+		gitlabLogger.Info("🦊 GitLab Integration logger initialized with separate log file")
+
 		// Create GitLab storage using main database
 		// Try to get underlying *sql.DB via type assertion
 		type sqlDBGetter interface {
@@ -2966,10 +2978,11 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		if getter, ok := r.db.(sqlDBGetter); ok {
 			if sqlDB, ok := getter.GetDB().(*sql.DB); ok && sqlDB != nil {
 				glStore := gitlabStorage.NewPostgresStore(sqlDB)
-				glHandler := handlers.NewGitLabAdminHandler(glStore, logger)
+				glHandler := handlers.NewGitLabAdminHandler(glStore, gitlabLogger)
 				glHandler.SetMainDB(r.db)
 				r.gitlabHandler = glHandler
-				logger.Info("✅ GitLab Integration handler initialized")
+				gitlabLogger.Info("✅ GitLab Integration handler initialized")
+				logger.Info("✅ GitLab Integration handler initialized (logs: logs/gitlab.log)")
 			} else {
 				logger.Warn("GitLab Integration disabled: cannot access SQL DB")
 			}
@@ -3292,6 +3305,16 @@ func (r *Router) setupGitLabRoutes() {
 		adminGitlab.GET("/models/analysis", r.gitlabHandler.ListAnalysisModels)
 		adminGitlab.GET("/models/embedding", r.gitlabHandler.ListEmbeddingModels)
 
+		// Settings, Analytics, Feedback (GITLAB-UI)
+		adminGitlab.GET("/settings", r.gitlabHandler.GetSettings)
+		adminGitlab.PUT("/settings", r.gitlabHandler.UpdateSettings)
+		adminGitlab.GET("/analytics", r.gitlabHandler.GetAnalytics)
+		adminGitlab.GET("/feedback", r.gitlabHandler.ListFeedback)
+		adminGitlab.POST("/feedback", r.gitlabHandler.SubmitFeedback)
+
+		// Available GitLab projects for selection (GITLAB-AUTO)
+		adminGitlab.GET("/integrations/:id/available-projects", r.gitlabHandler.ListAvailableProjects)
+
 		r.logger.Info("✅ GitLab Integration routes configured with real handlers")
 	} else {
 		// Stub routes when GitLab not configured
@@ -3374,6 +3397,41 @@ func (r *Router) setupGitLabRoutes() {
 		})
 		adminGitlab.GET("/models/embedding", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+
+		// Settings, Analytics, Feedback stubs
+		adminGitlab.GET("/settings", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"auto_review_enabled":      true,
+				"default_analysis_model":   "",
+				"default_embedding_model":  "",
+				"max_files_per_mr":         50,
+				"max_lines_per_file":       1000,
+				"webhook_secret_rotation":  false,
+				"notification_email":       "",
+			})
+		})
+		adminGitlab.PUT("/settings", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "Settings updated"})
+		})
+		adminGitlab.GET("/analytics", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"total_reviews":        0,
+				"avg_processing_time":  0,
+				"issues_found":         0,
+				"reviews_by_day":       []interface{}{},
+				"reviews_by_project":   []interface{}{},
+				"top_issue_categories": []interface{}{},
+			})
+		})
+		adminGitlab.GET("/feedback", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.POST("/feedback", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "Feedback submitted"})
+		})
+		adminGitlab.GET("/integrations/:id/available-projects", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"projects": []interface{}{}, "total": 0})
 		})
 
 		r.logger.Info("✅ GitLab Integration stub routes configured (gitlab.enabled=false)")

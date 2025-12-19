@@ -34,6 +34,7 @@ type Service struct {
 	cfg            ServiceConfig
 	orch           *Orchestrator
 	runtime        ContainerRuntime
+	dockerRuntime  *DockerRuntime // Direct reference for discovery
 	downloader     *ModelDownloader
 	trtConverter   *TRTConverter
 	logger         *logrus.Logger
@@ -121,16 +122,72 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 	}
 	provLogger := NewProviderLogger(logsDir, cfg.Logger)
 
-	return &Service{
+	svc := &Service{
 		cfg:            cfg,
 		orch:           orch,
 		runtime:        runtime,
+		dockerRuntime:  runtime,
 		downloader:     dl,
 		trtConverter:   trtConv,
 		logger:         cfg.Logger,
 		registry:       NewSpecRegistry(),
 		providerLogger: provLogger,
-	}, nil
+	}
+
+	// Discover and recover already running containers
+	svc.recoverRunningContainers()
+
+	return svc, nil
+}
+
+// recoverRunningContainers discovers already running inference containers and adds them to the registry.
+// This allows the server to recover state after restart without stopping running models.
+func (s *Service) recoverRunningContainers() {
+	if s.dockerRuntime == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	discovered, err := s.dockerRuntime.DiscoverRunningContainers(ctx)
+	if err != nil {
+		s.logger.WithError(err).Warn("Failed to discover running containers")
+		return
+	}
+
+	if len(discovered) == 0 {
+		s.logger.Debug("No running inference containers found")
+		return
+	}
+
+	s.logger.WithField("count", len(discovered)).Info("🔄 Recovering running inference containers")
+
+	for _, dc := range discovered {
+		// Create minimal spec for the discovered container
+		spec := ModelSpec{
+			Alias:    dc.ModelAlias,
+			Provider: dc.Provider,
+		}
+		s.registry.Register(spec)
+
+		// Add to orchestrator's running instances
+		inst := &ModelInstance{
+			Spec:        spec,
+			ContainerID: dc.ID,
+			Endpoint:    dc.Endpoint,
+			Status:      StatusRunning,
+			StartedAt:   dc.CreatedAt,
+		}
+		s.orch.AddRecoveredInstance(dc.ModelAlias, inst)
+
+		s.logger.WithFields(logrus.Fields{
+			"alias":     dc.ModelAlias,
+			"provider":  dc.Provider,
+			"endpoint":  dc.Endpoint,
+			"container": dc.ID[:12],
+		}).Info("✅ Recovered running model")
+	}
 }
 
 // LoadAndStart prepares artifacts and starts container based on provider.
@@ -267,6 +324,11 @@ func (s *Service) StopAll() {
 // GetModel returns tracked model by alias.
 func (s *Service) GetModel(alias string) (*ModelInstance, bool) {
 	return s.orch.GetModel(alias)
+}
+
+// GetDownloader returns the model downloader instance.
+func (s *Service) GetDownloader() *ModelDownloader {
+	return s.downloader
 }
 
 // ListModels returns tracked models.

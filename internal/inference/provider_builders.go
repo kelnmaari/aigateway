@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -13,7 +14,7 @@ const (
 	DefaultLlamaImage    = "ghcr.io/ggml-org/llama.cpp:server-cuda"
 	DefaultSGLangImage   = "lmsysorg/sglang:latest"
 	DefaultTGIImage      = "ghcr.io/huggingface/text-generation-inference:latest"
-	DefaultTEIImage      = "ghcr.io/huggingface/text-embeddings-inference:cpu-1.7" // Use 1.7 for stability, GPU: :1.7
+	DefaultTEIImage      = "ghcr.io/huggingface/text-embeddings-inference:89-1.8" // Use 1.7 for stability, GPU: :1.7
 	DefaultTRTLLMImage   = "nvcr.io/nvidia/tritonserver:24.12-trtllm-python-py3"
 	defaultVLLMPort      = 8000
 	defaultLlamaServPort = 8080
@@ -27,14 +28,27 @@ const (
 // Expects spec.LocalPath (preferred) or HFRepo reference.
 func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartRequest {
 	modelArg := spec.HFRepo
+	useLocalModel := false
+
 	if spec.LocalPath != "" {
+		// Explicit local path provided
 		modelArg = spec.LocalPath
+		useLocalModel = true
+	} else if spec.HFRepo != "" {
+		// Check if model is already downloaded in cache directory
+		localModelPath := filepath.Join(hfCacheDir, spec.HFRepo)
+		if info, err := os.Stat(localModelPath); err == nil && info.IsDir() {
+			// Model exists locally, use container path
+			modelArg = "/root/.cache/huggingface/" + spec.HFRepo
+			useLocalModel = true
+		}
 	}
 
 	cmd := []string{
 		"--host", "0.0.0.0",
 		"--port", fmt.Sprintf("%d", defaultVLLMPort),
 		"--model", modelArg,
+		"--served-model-name", spec.Alias, // Expose model under alias for API compatibility
 		"--trust-remote-code", // Allow custom model code from HuggingFace
 	}
 
@@ -47,7 +61,7 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 		maxModelLen = 32768 // Reasonable default for most use cases
 	}
 	cmd = append(cmd, "--max-model-len", fmt.Sprintf("%d", maxModelLen))
-	
+
 	if spec.VLLMGPUUtilization > 0 {
 		cmd = append(cmd, "--gpu-memory-utilization", fmt.Sprintf("%.2f", spec.VLLMGPUUtilization))
 	}
@@ -55,12 +69,12 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID", // Ensure consistent GPU ordering
 		// Enable verbose logging for debugging
-		"VLLM_LOGGING_LEVEL":       "DEBUG",
-		"TRANSFORMERS_VERBOSITY":   "info",
+		"VLLM_LOGGING_LEVEL":        "DEBUG",
+		"TRANSFORMERS_VERBOSITY":    "info",
 		"HF_HUB_ENABLE_HF_TRANSFER": "1", // Faster downloads
 	}
-	// Pass HF token for downloading gated/private models
-	if hfToken != "" && spec.LocalPath == "" {
+	// Pass HF token only if downloading from HuggingFace
+	if hfToken != "" && !useLocalModel {
 		env["HF_TOKEN"] = hfToken
 	}
 	return ContainerStartRequest{
@@ -81,9 +95,22 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 // Supports vision models (Qwen2-VL, LLaVA) and text models with configurable parallelism.
 func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartRequest {
 	modelArg := spec.HFRepo
+	useLocalModel := false
+
 	if spec.LocalPath != "" {
+		// Explicit local path provided
 		modelArg = spec.LocalPath
+		useLocalModel = true
+	} else if spec.HFRepo != "" {
+		// Check if model is already downloaded in cache directory
+		localModelPath := filepath.Join(hfCacheDir, spec.HFRepo)
+		if info, err := os.Stat(localModelPath); err == nil && info.IsDir() {
+			// Model exists locally, use container path
+			modelArg = "/root/.cache/huggingface/" + spec.HFRepo
+			useLocalModel = true
+		}
 	}
+
 	// SGLang uses "python -m sglang.launch_server" as entrypoint in the container
 	// Arguments: --model for HF model ID, --host, --port
 	cmd := []string{
@@ -122,9 +149,8 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
 	}
-	// Only pass HF_TOKEN if model needs to be downloaded (LocalPath empty)
-	// Security: isolate token from container when model is already cached
-	if hfToken != "" && spec.LocalPath == "" {
+	// Only pass HF_TOKEN if model needs to be downloaded
+	if hfToken != "" && !useLocalModel {
 		env["HF_TOKEN"] = hfToken
 	}
 	return ContainerStartRequest{
@@ -145,15 +171,27 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 // Supports --num-shard for multi-GPU and various performance tuning options.
 func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartRequest {
 	modelArg := spec.HFRepo
+	useLocalModel := false
+
 	if spec.LocalPath != "" {
+		// Explicit local path provided
 		modelArg = spec.LocalPath
+		useLocalModel = true
+	} else if spec.HFRepo != "" {
+		// Check if model is already downloaded in cache directory
+		localModelPath := filepath.Join(hfCacheDir, spec.HFRepo)
+		if info, err := os.Stat(localModelPath); err == nil && info.IsDir() {
+			// Model exists locally, use container path (TGI mounts to /data)
+			modelArg = "/data/" + spec.HFRepo
+			useLocalModel = true
+		}
 	}
+
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
 	}
-	// Only pass HF_TOKEN if model needs to be downloaded (LocalPath empty)
-	// Security: isolate token from container when model is already cached
-	if hfToken != "" && spec.LocalPath == "" {
+	// Only pass HF_TOKEN if model needs to be downloaded
+	if hfToken != "" && !useLocalModel {
 		env["HUGGINGFACE_HUB_TOKEN"] = hfToken
 	}
 	cmd := []string{
@@ -199,16 +237,30 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 // API: POST /embed with {inputs: ["text"]} -> {embeddings: [[...]]}
 func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartRequest {
 	modelArg := spec.HFRepo
+	useLocalModel := false
+
 	if spec.LocalPath != "" {
+		// Explicit local path provided
 		modelArg = spec.LocalPath
+		useLocalModel = true
+	} else if spec.HFRepo != "" {
+		// Check if model is already downloaded in cache directory
+		localModelPath := filepath.Join(hfCacheDir, spec.HFRepo)
+		if info, err := os.Stat(localModelPath); err == nil && info.IsDir() {
+			// Model exists locally, use container path
+			modelArg = "/data/" + spec.HFRepo
+			useLocalModel = true
+		}
 	}
 
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+		"HF_HOME":           "/data", // Tell TEI to use mounted cache directory
 	}
-	// Pass HF_TOKEN for downloading gated/private models
-	if hfToken != "" && spec.LocalPath == "" {
+	// Pass HF_TOKEN only if downloading from HuggingFace
+	if hfToken != "" && !useLocalModel {
 		env["HUGGINGFACE_HUB_TOKEN"] = hfToken
+		env["HF_TOKEN"] = hfToken // Some versions use HF_TOKEN
 	}
 
 	// TEI command arguments
@@ -221,7 +273,7 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	image := DefaultTEIImage
 	if spec.GPUDevice != "" {
 		// Use GPU variant for better performance
-		image = "ghcr.io/huggingface/text-embeddings-inference:1.7"
+		image = "ghcr.io/huggingface/text-embeddings-inference:89-1.8"
 	}
 
 	return ContainerStartRequest{

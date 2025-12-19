@@ -201,3 +201,11 @@ func (r *Router) GetRuntime() *DockerRuntime {
 	return dr
 }
 
+// GetDownloader returns the model downloader for repository downloads.
+func (r *Router) GetDownloader() *ModelDownloader {
+	if r.mgr == nil || r.mgr.svc == nil {
+		return nil
+	}
+	return r.mgr.svc.downloader
+}
+

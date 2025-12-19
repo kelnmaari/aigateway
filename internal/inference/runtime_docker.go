@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
 )
 
@@ -104,19 +106,29 @@ func (r *DockerRuntime) Start(ctx context.Context, req ContainerStartRequest) (*
 		req.Ports[name] = cport
 	}
 
+	// Use background context for Docker operations to prevent cancellation from HTTP request
+	pullCtx, pullCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer pullCancel()
+
 	if r.useAPI && r.api != nil {
-		if err := r.pullImageAPI(ctx, req.Image); err != nil {
+		if err := r.pullImageAPI(pullCtx, req.Image); err != nil {
 			return nil, err
 		}
 		return r.startAPI(ctx, containerName, req, hostPorts)
 	}
-	if err := r.pullImageCLI(ctx, req.Image); err != nil {
+	if err := r.pullImageCLI(pullCtx, req.Image); err != nil {
 		return nil, err
 	}
 	return r.startCLI(ctx, containerName, req, hostPorts)
 }
 
 func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req ContainerStartRequest, hostPorts map[string]int) (*ContainerHandle, error) {
+	// Use independent context for Docker operations to avoid cancellation from HTTP request
+	// Container creation should complete even if client disconnects
+	dockerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	_ = ctx // original context preserved for future use if needed
+
 	portBindings := nat.PortMap{}
 	exposed := nat.PortSet{}
 	for name, cport := range req.Ports {
@@ -155,28 +167,43 @@ func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req 
 		gpuRequest.Count = -1
 	}
 
-	resp, err := r.api.ContainerCreate(ctx,
+	// Build host config with GPU and multi-GPU support
+	hostConfig := &container.HostConfig{
+		PortBindings: portBindings,
+		Mounts:       mounts,
+		AutoRemove:   true,
+		Resources: container.Resources{
+			DeviceRequests: []container.DeviceRequest{gpuRequest},
+		},
+	}
+
+	// For multi-GPU setups (tensor parallel > 1), add NCCL requirements
+	if strings.Contains(req.GPUDevice, ",") || req.GPUDevice == "" {
+		// IPC host mode required for NCCL inter-GPU communication
+		hostConfig.IpcMode = "host"
+		// Increase shared memory for NCCL (16GB)
+		hostConfig.ShmSize = 16 * 1024 * 1024 * 1024
+		// Remove memlock limits for NCCL
+		hostConfig.Ulimits = []*units.Ulimit{
+			{Name: "memlock", Soft: -1, Hard: -1},
+		}
+	}
+
+	resp, err := r.api.ContainerCreate(dockerCtx,
 		&container.Config{
 			Image:        req.Image,
 			Cmd:          req.Command,
 			Env:          env,
 			ExposedPorts: exposed,
 		},
-		&container.HostConfig{
-			PortBindings: portBindings,
-			Mounts:       mounts,
-			AutoRemove:   true,
-			Resources: container.Resources{
-				DeviceRequests: []container.DeviceRequest{gpuRequest},
-			},
-		},
+		hostConfig,
 		nil, nil, containerName,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("docker api create: %w", err)
 	}
 
-	if err := r.api.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if err := r.api.ContainerStart(dockerCtx, resp.ID, container.StartOptions{}); err != nil {
 		return nil, fmt.Errorf("docker api start: %w", err)
 	}
 
@@ -205,15 +232,27 @@ func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req 
 }
 
 func (r *DockerRuntime) startCLI(ctx context.Context, containerName string, req ContainerStartRequest, hostPorts map[string]int) (*ContainerHandle, error) {
+	// Use independent context for Docker operations to avoid cancellation from HTTP request
+	dockerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	_ = ctx // original context preserved for future use if needed
+
 	args := []string{"run", "-d", "--rm", "--name", containerName}
 
-	// GPU access - specific device(s) or all
+	// GPU access via --gpus all + NVIDIA_VISIBLE_DEVICES for specific devices
+	// This avoids the "cannot set both Count and DeviceIDs" error
+	isMultiGPU := strings.Contains(req.GPUDevice, ",") || req.GPUDevice == ""
+	args = append(args, "--gpus", "all")
 	if req.GPUDevice != "" {
-		// Use specific GPU(s), e.g., "0" or "0,1"
-		args = append(args, "--gpus", fmt.Sprintf(`"device=%s"`, req.GPUDevice))
-	} else {
-		// Use all GPUs
-		args = append(args, "--gpus", "all")
+		// Restrict to specific GPUs via environment variable
+		args = append(args, "-e", fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", req.GPUDevice))
+	}
+
+	// For multi-GPU setups, add NCCL requirements
+	if isMultiGPU {
+		args = append(args, "--ipc=host")                // Required for NCCL inter-GPU communication
+		args = append(args, "--shm-size=16g")            // Increase shared memory for NCCL
+		args = append(args, "--ulimit", "memlock=-1:-1") // Remove memlock limits
 	}
 
 	for name, cport := range req.Ports {
@@ -236,7 +275,7 @@ func (r *DockerRuntime) startCLI(ctx context.Context, containerName string, req 
 	args = append(args, req.Image)
 	args = append(args, req.Command...)
 
-	cmd := exec.CommandContext(ctx, r.dockerBin, args...)
+	cmd := exec.CommandContext(dockerCtx, r.dockerBin, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker run failed: %w: %s", err, string(out))
@@ -380,9 +419,14 @@ func (r *DockerRuntime) Logs(ctx context.Context, handleID string, tailLines int
 			return "", fmt.Errorf("docker api logs: %w", err)
 		}
 		defer rc.Close()
-		buf := make([]byte, 64*1024)
-		n, _ := rc.Read(buf)
-		return string(buf[:n]), nil
+		// Read all logs, not just first 64KB
+		data, err := io.ReadAll(rc)
+		if err != nil && err != io.EOF {
+			return "", fmt.Errorf("docker api logs read: %w", err)
+		}
+		// Docker multiplexed stream has 8-byte header per frame
+		// Clean it up for display
+		return demuxDockerLogs(data), nil
 	}
 	// CLI fallback
 	cmd := exec.CommandContext(ctx, r.dockerBin, "logs", "--tail", fmt.Sprintf("%d", tailLines), handleID)
@@ -391,6 +435,26 @@ func (r *DockerRuntime) Logs(ctx context.Context, handleID string, tailLines int
 		return "", fmt.Errorf("docker logs failed: %w: %s", err, string(out))
 	}
 	return string(out), nil
+}
+
+// demuxDockerLogs removes Docker multiplexed stream headers.
+// Docker logs API returns multiplexed stdout/stderr with 8-byte headers.
+func demuxDockerLogs(data []byte) string {
+	var result strings.Builder
+	for len(data) >= 8 {
+		// Header: [stream_type(1), 0, 0, 0, size(4 big-endian)]
+		size := int(data[4])<<24 | int(data[5])<<16 | int(data[6])<<8 | int(data[7])
+		if size <= 0 || len(data) < 8+size {
+			break
+		}
+		result.Write(data[8 : 8+size])
+		data = data[8+size:]
+	}
+	// If demux failed (e.g., tty mode), return as-is
+	if result.Len() == 0 && len(data) > 0 {
+		return string(data)
+	}
+	return result.String()
 }
 
 // startLogStreaming starts a goroutine that streams container logs to a file.
@@ -545,4 +609,68 @@ func (r *DockerRuntime) streamLogsCLI(ctx context.Context, containerID string, w
 
 	wg.Wait()
 	cmd.Wait()
+}
+
+// ImageExists checks if a Docker image exists locally.
+// Returns (exists, size) where size is human-readable (e.g., "2.5GB").
+func (r *DockerRuntime) ImageExists(image string) (bool, string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Try Docker API first if enabled
+	if r.useAPI && r.api != nil {
+		inspect, _, err := r.api.ImageInspectWithRaw(ctx, image)
+		if err != nil {
+			return false, ""
+		}
+		return true, formatSize(inspect.Size)
+	}
+
+	// Fallback to CLI
+	return r.imageExistsCLI(image)
+}
+
+func (r *DockerRuntime) imageExistsCLI(image string) (bool, string) {
+	cmd := exec.Command(r.dockerBin, "image", "inspect", image, "--format", "{{.Size}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, ""
+	}
+
+	// Parse size
+	sizeStr := strings.TrimSpace(string(output))
+	if sizeBytes, err := strconv.ParseInt(sizeStr, 10, 64); err == nil {
+		return true, formatSize(sizeBytes)
+	}
+	return true, ""
+}
+
+func formatSize(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.1fGB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.1fMB", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.1fKB", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%dB", bytes)
+	}
+}
+
+// PullImage pulls a Docker image. This is a blocking operation.
+func (r *DockerRuntime) PullImage(image string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	if r.useAPI && r.api != nil {
+		return r.pullImageAPI(ctx, image)
+	}
+	return r.pullImageCLI(ctx, image)
 }

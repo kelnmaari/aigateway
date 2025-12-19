@@ -159,6 +159,12 @@ func (r *Router) ListArtifacts() ([]ArtifactInfo, error) {
 	return r.mgr.svc.ListArtifacts()
 }
 
+// ClearCache removes all cached model files from HF and GGUF cache directories.
+// Returns the number of bytes freed and any error.
+func (r *Router) ClearCache() (int64, error) {
+	return r.mgr.svc.ClearCache()
+}
+
 // EvictCacheSize evicts cache to fit under limitBytes (0 = no limit).
 func (r *Router) EvictCacheSize(limitBytes int64) error {
 	if limitBytes <= 0 {
@@ -180,5 +186,18 @@ func (r *Router) ContainerMetrics(ctx context.Context, alias string) (string, er
 // TRTConverter returns the TensorRT-LLM converter instance (may be nil if not configured).
 func (r *Router) TRTConverter() *TRTConverter {
 	return r.mgr.TRTConverter()
+}
+
+// GetRuntime returns the underlying DockerRuntime for image management.
+// Returns nil if runtime is not DockerRuntime.
+func (r *Router) GetRuntime() *DockerRuntime {
+	if r.mgr == nil || r.mgr.svc == nil {
+		return nil
+	}
+	dr, ok := r.mgr.svc.runtime.(*DockerRuntime)
+	if !ok {
+		return nil
+	}
+	return dr
 }
 

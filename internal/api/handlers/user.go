@@ -329,6 +329,7 @@ func (h *UserHandler) CreatePersonalAPIKey(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 		KeyHash:     keyHash,
+		KeyPrefix:   models.ExtractKeyPrefix(plainKey),
 		UserID:      &userID,
 		TenantID:    nil,
 		Scope:       models.APIKeyScopePersonal,

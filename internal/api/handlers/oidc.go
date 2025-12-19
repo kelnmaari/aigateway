@@ -8,12 +8,15 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"aigateway/internal/auth/jwt"
 	oidcauth "aigateway/internal/auth/oidc"
@@ -21,6 +24,38 @@ import (
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
 )
+
+// createAuthLogger creates a separate logger for auth events
+func createAuthLogger(cfg *config.Config) *logrus.Logger {
+	authLogger := logrus.New()
+	authLogger.SetLevel(logrus.DebugLevel)
+	authLogger.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		FullTimestamp:   true,
+	})
+
+	// Use auth log file if configured
+	logPath := cfg.Logging.AuthLogFilePath
+	if logPath == "" {
+		logPath = "logs/auth.log"
+	}
+
+	// Create logs directory if needed
+	if dir := filepath.Dir(logPath); dir != "" {
+		os.MkdirAll(dir, 0755)
+	}
+
+	// Setup rotating file logger
+	authLogger.SetOutput(&lumberjack.Logger{
+		Filename:   logPath,
+		MaxSize:    50, // MB
+		MaxBackups: 10,
+		MaxAge:     90, // days
+		Compress:   true,
+	})
+
+	return authLogger
+}
 
 // OIDCHandler обрабатывает OIDC authentication flow
 type OIDCHandler struct {
@@ -30,18 +65,22 @@ type OIDCHandler struct {
 	jwtMgr            *jwt.Manager
 	tenantProvisioner *oidcauth.TenantProvisioner // Version 1.11.2+: Auto-tenant provisioning
 	logger            *logrus.Logger
+	authLogger        *logrus.Logger // Separate auth logger
 }
 
 // NewOIDCHandler создает новый OIDC handler
 func NewOIDCHandler(cfg *config.Config, provider *oidcauth.OIDCProvider, db storage.Database, jwtMgr *jwt.Manager, logger *logrus.Logger) *OIDCHandler {
 	var tenantProvisioner *oidcauth.TenantProvisioner
-	
+
 	// Initialize tenant provisioner if enabled
 	if cfg.Auth.OIDC.TenantProvisioning.Enabled {
 		tenantProvisioner = oidcauth.NewTenantProvisioner(db, &cfg.Auth.OIDC.TenantProvisioning, logger)
 		logger.Info("Tenant provisioner initialized for OIDC")
 	}
-	
+
+	// Create auth logger
+	authLogger := createAuthLogger(cfg)
+
 	return &OIDCHandler{
 		config:            cfg,
 		provider:          provider,
@@ -49,7 +88,13 @@ func NewOIDCHandler(cfg *config.Config, provider *oidcauth.OIDCProvider, db stor
 		jwtMgr:            jwtMgr,
 		tenantProvisioner: tenantProvisioner,
 		logger:            logger,
+		authLogger:        authLogger,
 	}
+}
+
+// SetAuthLogger sets a custom auth logger (for testing or custom logging)
+func (h *OIDCHandler) SetAuthLogger(logger *logrus.Logger) {
+	h.authLogger = logger
 }
 
 // HandleLogin initiate OIDC login flow
@@ -77,12 +122,12 @@ func (h *OIDCHandler) HandleLogin(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Set("oidc_state", state)
 	session.Set("oidc_created_at", time.Now().Unix())
-	
+
 	// Save redirect URL from query parameter (optional)
 	if redirectURL := c.Query("redirect_url"); redirectURL != "" {
 		session.Set("oidc_redirect_url", redirectURL)
 	}
-	
+
 	if err := session.Save(); err != nil {
 		h.logger.WithError(err).Error("Failed to save OIDC state in session")
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -108,7 +153,7 @@ func (h *OIDCHandler) HandleLogin(c *gin.Context) {
 func (h *OIDCHandler) HandleCallback(c *gin.Context) {
 	// Get session
 	session := sessions.Default(c)
-	
+
 	// Validate state parameter (CSRF protection)
 	savedState := session.Get("oidc_state")
 	if savedState == nil {
@@ -228,14 +273,14 @@ func (h *OIDCHandler) HandleCallback(c *gin.Context) {
 	if h.tenantProvisioner != nil && len(claims.Groups) > 0 {
 		// Parse groups and create tenant mappings
 		mappings := oidcauth.ParseGroups(claims.Groups, &h.config.Auth.OIDC.TenantProvisioning.GroupMapping)
-		
+
 		if len(mappings) > 0 {
 			h.logger.WithFields(logrus.Fields{
 				"user_id":        user.ID,
 				"groups_count":   len(claims.Groups),
 				"mappings_count": len(mappings),
 			}).Info("Provisioning tenants from OIDC groups")
-			
+
 			// Provision tenants (auto-create, add memberships)
 			if err := h.tenantProvisioner.ProvisionTenantsForUser(ctx, user.ID, mappings); err != nil {
 				// Don't fail login if tenant provisioning fails
@@ -258,7 +303,7 @@ func (h *OIDCHandler) HandleCallback(c *gin.Context) {
 		h.logger.WithError(err).Warn("Failed to list user tenants for JWT, proceeding without tenant IDs")
 		tenantIDs = []string{}
 	}
-	
+
 	tokenPair, err := h.jwtMgr.GenerateTokenPair(user.ID, user.Username, user.Email, tenantIDs, false)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to generate JWT token")
@@ -274,6 +319,23 @@ func (h *OIDCHandler) HandleCallback(c *gin.Context) {
 		"email":    user.Email,
 	}).Info("User successfully authenticated via OIDC")
 
+	// Auth log - detailed authentication event with claims
+	h.authLogger.WithFields(logrus.Fields{
+		"event":        "oidc_login_success",
+		"user_id":      user.ID,
+		"username":     user.Username,
+		"email":        user.Email,
+		"is_admin":     user.IsAdmin,
+		"oidc_issuer":  h.config.Auth.OIDC.Issuer,
+		"oidc_subject": claims.Subject,
+		"groups":       claims.Groups,
+		"realm_roles":  claims.RealmRoles,
+		"realm_access": claims.RealmAccess.Roles,
+		"scopes":       h.config.Auth.OIDC.Scopes,
+		"client_ip":    c.ClientIP(),
+		"user_agent":   c.Request.UserAgent(),
+	}).Info("OIDC authentication successful")
+
 	// Clear OIDC session data
 	session.Delete("oidc_state")
 	session.Delete("oidc_created_at")
@@ -287,21 +349,57 @@ func (h *OIDCHandler) HandleCallback(c *gin.Context) {
 		finalRedirectURL = redirectURL.(string)
 	}
 
-	// Return JWT token and redirect URL
-	c.JSON(http.StatusOK, gin.H{
-		"success":       true,
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"token_type":    tokenPair.TokenType,
-		"expires_at":    tokenPair.ExpiresAt,
-		"redirect_url":  finalRedirectURL,
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"is_admin": user.IsAdmin,
-		},
-	})
+	// Auth log - token generation
+	h.authLogger.WithFields(logrus.Fields{
+		"event":        "token_generated",
+		"user_id":      user.ID,
+		"redirect_url": finalRedirectURL,
+		"expires_at":   tokenPair.ExpiresAt.Format(time.RFC3339),
+	}).Debug("JWT token generated for OIDC user")
+
+	// Return HTML page that stores token and redirects
+	// This is needed because OIDC callback is a browser redirect, not an API call
+	// Keys must match auth.svelte.ts: 'access_token', 'refresh_token', 'user'
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Authenticating...</title>
+	<script>
+		(function() {
+			// Store tokens - keys must match authStore in auth.svelte.ts
+			localStorage.setItem('access_token', %q);
+			localStorage.setItem('refresh_token', %q);
+			localStorage.setItem('user', JSON.stringify({
+				id: %q,
+				username: %q,
+				email: %q,
+				is_admin: %t
+			}));
+			
+			console.log('[OIDC] Tokens saved to localStorage');
+			console.log('[OIDC] Redirecting to:', %q);
+			
+			// Redirect to dashboard
+			window.location.href = %q;
+		})();
+	</script>
+</head>
+<body>
+	<p>Authenticating... Please wait.</p>
+</body>
+</html>`,
+		tokenPair.AccessToken,
+		tokenPair.RefreshToken,
+		user.ID,
+		user.Username,
+		user.Email,
+		user.IsAdmin,
+		finalRedirectURL,
+		finalRedirectURL,
+	)
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, html)
 }
 
 // provisionUser creates or updates user based on OIDC claims
@@ -309,29 +407,30 @@ func (h *OIDCHandler) provisionUser(ctx context.Context, issuer string, claims *
 	// Try to find existing user by OIDC subject
 	existingUser, err := h.db.GetUserByOIDCSubject(ctx, issuer, claims.Subject)
 	if err == nil {
-		// User exists - update if auto-update is enabled
-		if h.config.Auth.OIDC.AutoUpdateUser {
-			existingUser.Email = claims.Email
-			existingUser.FullName = claims.Name
-			existingUser.UpdatedAt = time.Now()
-			existingUser.LastLogin = &[]time.Time{time.Now()}[0]
+		// User exists with OIDC binding - update if auto-update is enabled
+		return h.updateExistingUser(ctx, existingUser, claims)
+	}
 
-			if err := h.db.UpdateUser(ctx, existingUser); err != nil {
-				h.logger.WithError(err).Error("Failed to update existing OIDC user")
-				return nil, fmt.Errorf("failed to update user: %w", err)
-			}
+	// User not found by OIDC subject - try to find by email and link
+	if claims.Email != "" {
+		existingByEmail, err := h.db.GetUserByEmail(ctx, claims.Email)
+		if err == nil {
+			// Found existing user by email - link OIDC credentials
+			// Keep original auth_provider (local) to allow both login methods
+			h.logger.WithFields(logrus.Fields{
+				"user_id":       existingByEmail.ID,
+				"email":         claims.Email,
+				"auth_provider": existingByEmail.AuthProvider,
+				"oidc_issuer":   issuer,
+				"oidc_sub":      claims.Subject,
+			}).Info("Linking existing user to OIDC credentials (hybrid auth)")
 
-			h.logger.WithField("user_id", existingUser.ID).Info("Existing OIDC user updated")
-		} else {
-			// Just update last login time
-			now := time.Now()
-			existingUser.LastLogin = &now
-			if err := h.db.UpdateUser(ctx, existingUser); err != nil {
-				h.logger.WithError(err).Warn("Failed to update last login time")
-			}
+			existingByEmail.OIDCSubject = &claims.Subject
+			existingByEmail.OIDCIssuer = &issuer
+			// DO NOT change auth_provider - user can still login with password
+
+			return h.updateExistingUser(ctx, existingByEmail, claims)
 		}
-
-		return existingUser, nil
 	}
 
 	// User doesn't exist - create if auto-create is enabled
@@ -352,7 +451,7 @@ func (h *OIDCHandler) provisionUser(ctx context.Context, issuer string, claims *
 		Status:       models.UserStatusActive,
 		IsAdmin:      h.isAdminRole(claims),
 		IsActive:     true,
-		Verified:     claims.EmailVerified, // Use email verification from OIDC provider
+		Verified:     claims.EmailVerified,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 		LastLogin:    &now,
@@ -361,7 +460,7 @@ func (h *OIDCHandler) provisionUser(ctx context.Context, issuer string, claims *
 			Language: "en",
 			Timezone: "UTC",
 		},
-		Metadata: make(map[string]interface{}), // Empty map for JSONB
+		Metadata: make(map[string]interface{}),
 	}
 
 	if claims.EmailVerified {
@@ -382,6 +481,32 @@ func (h *OIDCHandler) provisionUser(ctx context.Context, issuer string, claims *
 	}).Info("New user created via OIDC auto-provisioning")
 
 	return newUser, nil
+}
+
+// updateExistingUser updates an existing user with OIDC claims
+func (h *OIDCHandler) updateExistingUser(ctx context.Context, user *models.User, claims *oidcauth.KeycloakClaims) (*models.User, error) {
+	now := time.Now()
+	user.LastLogin = &now
+	user.UpdatedAt = now
+
+	if h.config.Auth.OIDC.AutoUpdateUser {
+		user.Email = claims.Email
+		user.FullName = claims.Name
+		user.IsAdmin = h.isAdminRole(claims)
+
+		if claims.EmailVerified && !user.Verified {
+			user.Verified = true
+			user.VerifiedAt = &now
+		}
+	}
+
+	if err := h.db.UpdateUser(ctx, user); err != nil {
+		h.logger.WithError(err).Error("Failed to update user")
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+
+	h.logger.WithField("user_id", user.ID).Debug("User updated via OIDC")
+	return user, nil
 }
 
 // generateUsername creates a username from OIDC claims
@@ -407,26 +532,45 @@ func (h *OIDCHandler) generateUsername(claims *oidcauth.KeycloakClaims) string {
 	return "user_" + claims.Subject[:8]
 }
 
-// isAdminRole determines if user should be admin based on OIDC claims
+// isAdminRole determines if user should be admin based on OIDC claims and config
 func (h *OIDCHandler) isAdminRole(claims *oidcauth.KeycloakClaims) bool {
+	roleMapping := h.config.Auth.OIDC.RoleMapping
+
+	// Use config-defined admin roles, fallback to defaults if not configured
+	adminRoles := roleMapping.AdminRoles
+	if len(adminRoles) == 0 {
+		adminRoles = []string{"admin", "administrator"}
+	}
+
+	adminGroups := roleMapping.AdminGroups
+	if len(adminGroups) == 0 {
+		adminGroups = []string{"/admin", "/administrators", "admin"}
+	}
+
 	// Check realm roles
 	for _, role := range claims.RealmRoles {
-		if role == "admin" || role == "administrator" {
-			return true
+		for _, adminRole := range adminRoles {
+			if role == adminRole {
+				return true
+			}
 		}
 	}
 
 	// Check realm access roles
 	for _, role := range claims.RealmAccess.Roles {
-		if role == "admin" || role == "administrator" {
-			return true
+		for _, adminRole := range adminRoles {
+			if role == adminRole {
+				return true
+			}
 		}
 	}
 
 	// Check groups
 	for _, group := range claims.Groups {
-		if group == "/admin" || group == "/administrators" || group == "admin" {
-			return true
+		for _, adminGroup := range adminGroups {
+			if group == adminGroup {
+				return true
+			}
 		}
 	}
 
@@ -455,5 +599,3 @@ func (h *OIDCHandler) HandleLogout(c *gin.Context) {
 		"message": "Logged out successfully",
 	})
 }
-
-

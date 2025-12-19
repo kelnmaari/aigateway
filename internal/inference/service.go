@@ -31,13 +31,14 @@ type ServiceConfig struct {
 
 // Service wires orchestrator, downloader and runtime to manage models/containers.
 type Service struct {
-	cfg          ServiceConfig
-	orch         *Orchestrator
-	runtime      ContainerRuntime
-	downloader   *ModelDownloader
-	trtConverter *TRTConverter
-	logger       *logrus.Logger
-	registry     *SpecRegistry
+	cfg            ServiceConfig
+	orch           *Orchestrator
+	runtime        ContainerRuntime
+	downloader     *ModelDownloader
+	trtConverter   *TRTConverter
+	logger         *logrus.Logger
+	registry       *SpecRegistry
+	providerLogger *ProviderLogger
 }
 
 // NewService builds inference service with Docker runtime and model downloader.
@@ -113,14 +114,22 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 		}
 	}
 
+	// Determine logs directory for providers
+	logsDir := "logs"
+	if cfg.ContainerLogsDir != "" {
+		logsDir = filepath.Dir(cfg.ContainerLogsDir) // parent of containers dir
+	}
+	provLogger := NewProviderLogger(logsDir, cfg.Logger)
+
 	return &Service{
-		cfg:          cfg,
-		orch:         orch,
-		runtime:      runtime,
-		downloader:   dl,
-		trtConverter: trtConv,
-		logger:       cfg.Logger,
-		registry:     NewSpecRegistry(),
+		cfg:            cfg,
+		orch:           orch,
+		runtime:        runtime,
+		downloader:     dl,
+		trtConverter:   trtConv,
+		logger:         cfg.Logger,
+		registry:       NewSpecRegistry(),
+		providerLogger: provLogger,
 	}, nil
 }
 
@@ -130,7 +139,7 @@ func (s *Service) LoadAndStart(ctx context.Context, spec ModelSpec) (*ModelInsta
 	var req ContainerStartRequest
 	switch spec.Provider {
 	case ProviderVLLM:
-		req = BuildVLLMRequest(spec, s.cfg.HFCacheDir)
+		req = BuildVLLMRequest(spec, s.cfg.HFCacheDir, s.cfg.HFToken)
 	case ProviderSGLang:
 		req = BuildSGLangRequest(spec, s.cfg.HFCacheDir, s.cfg.HFToken)
 	case ProviderTGI:
@@ -151,7 +160,21 @@ func (s *Service) LoadAndStart(ctx context.Context, spec ModelSpec) (*ModelInsta
 		return nil, fmt.Errorf("unsupported provider: %s", spec.Provider)
 	}
 
-	return s.orch.StartModel(ctx, spec, req)
+	// Log provider launch details
+	s.providerLogger.LogLaunch(spec, req)
+
+	inst, err := s.orch.StartModel(ctx, spec, req)
+	if err != nil {
+		s.providerLogger.LogError(spec.Alias, string(spec.Provider), err)
+		return nil, err
+	}
+
+	// Log success
+	if inst.Handle != nil {
+		s.providerLogger.LogSuccess(spec.Alias, string(spec.Provider), inst.Handle.ID, inst.Handle.Endpoint)
+	}
+
+	return inst, nil
 }
 
 // PrepareOnly downloads artifacts without starting a container.
@@ -323,4 +346,65 @@ func (s *Service) ListArtifacts() ([]ArtifactInfo, error) {
 // TRTConverter returns the TensorRT-LLM converter instance (may be nil if not configured).
 func (s *Service) TRTConverter() *TRTConverter {
 	return s.trtConverter
+}
+
+// ClearCache removes all cached model files from HF and GGUF cache directories.
+// Returns the number of bytes freed and any error.
+func (s *Service) ClearCache() (int64, error) {
+	var totalFreed int64
+	var errors []string
+
+	// Get list of all artifacts first
+	artifacts, err := s.ListArtifacts()
+	if err != nil {
+		return 0, fmt.Errorf("failed to list artifacts: %w", err)
+	}
+
+	// Calculate total size
+	for _, a := range artifacts {
+		totalFreed += a.Size
+	}
+
+	// Clear HF cache directory
+	if s.cfg.HFCacheDir != "" {
+		if err := s.clearDirectory(s.cfg.HFCacheDir); err != nil {
+			errors = append(errors, fmt.Sprintf("HFCacheDir: %v", err))
+		}
+	}
+
+	// Clear GGUF cache directory (if different from HF)
+	if s.cfg.GGUFCacheDir != "" && s.cfg.GGUFCacheDir != s.cfg.HFCacheDir {
+		if err := s.clearDirectory(s.cfg.GGUFCacheDir); err != nil {
+			errors = append(errors, fmt.Sprintf("GGUFCacheDir: %v", err))
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"freed_bytes": totalFreed,
+		"files_count": len(artifacts),
+	}).Info("Cache cleared")
+
+	if len(errors) > 0 {
+		return totalFreed, fmt.Errorf("partial clear: %s", strings.Join(errors, "; "))
+	}
+	return totalFreed, nil
+}
+
+// clearDirectory removes all contents of a directory but keeps the directory itself.
+func (s *Service) clearDirectory(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // Directory doesn't exist, nothing to clear
+		}
+		return err
+	}
+
+	for _, entry := range entries {
+		path := filepath.Join(dir, entry.Name())
+		if err := os.RemoveAll(path); err != nil {
+			s.logger.WithError(err).WithField("path", path).Warn("Failed to remove cache entry")
+		}
+	}
+	return nil
 }

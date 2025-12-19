@@ -167,8 +167,9 @@
 		}
 	}
 
-	function maskKey(prefix: string): string {
-		return prefix + '••••••••••••••••';
+	function maskKey(prefix: string | undefined | null): string {
+		if (!prefix) return '••••••••••••••••';
+		return prefix + '••••••••';
 	}
 
 	function toggleModel(modelId: string) {
@@ -295,9 +296,19 @@
 								</div>
 							</td>
 							<td class="px-4 py-3">
-								<code class="rounded bg-muted px-2 py-1 font-mono text-xs">
-									{maskKey(key.key_prefix)}
-								</code>
+								<div class="flex items-center gap-2">
+									<code class="rounded bg-muted px-2 py-1 font-mono text-xs">
+										{maskKey(key.key_prefix)}
+									</code>
+									<button
+										type="button"
+										class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+										title="Copy prefix"
+										onclick={() => copyText(key.key_prefix || '')}
+									>
+										<Copy class="h-3.5 w-3.5" />
+									</button>
+								</div>
 							</td>
 							<td class="px-4 py-3">
 								{#if key.all_models}

@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest, type GPUDevice, type SavedModel } from '$lib/api/inference';
 	import { api } from '$lib/api/client';
+	import { downloadsApi } from '$lib/api/downloads';
 	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
 	
 	// GPU devices for selection
@@ -31,17 +32,50 @@
 		lastModified: string;
 		tags: string[];
 		pipeline_tag?: string;
+		has_gguf?: boolean;
+		// Model size info (from safetensors or config)
+		safetensors?: { total?: number; parameters?: { [key: string]: number } };
+		config?: { num_parameters?: number };
 	}
-	type HFCategory = 'all' | 'gguf' | 'text-generation' | 'text2text-generation' | 'feature-extraction';
-	const hfCategories: {id: HFCategory; label: string; description: string}[] = [
-		{ id: 'all', label: 'All Models', description: 'All HuggingFace models' },
-		{ id: 'gguf', label: 'GGUF (llama.cpp)', description: 'Quantized models for llama.cpp' },
-		{ id: 'text-generation', label: 'Text Generation (vLLM/SGLang/TGI)', description: 'LLMs for chat & completion' },
-		{ id: 'text2text-generation', label: 'Text2Text (T5, BART)', description: 'Encoder-decoder models' },
-		{ id: 'feature-extraction', label: 'Embeddings', description: 'Models for embeddings' },
+	
+	// Model memory recommendations
+	interface MemoryRecommendation {
+		modelSizeGB: number;
+		modelParams: string;
+		quantization: string;
+		totalGPUMemoryGB: number;
+		recommendedMemFraction: number;
+		recommendedTensorParallel: number;
+		minGPUsNeeded: number;
+		willFit: boolean;
+		warning?: string;
+	}
+	let memoryRecommendation = $state<MemoryRecommendation | null>(null);
+	type HFProviderFilter = 'all' | 'vllm' | 'sglang' | 'tgi' | 'llama.cpp' | 'embedding';
+	const hfProviderFilters: {id: HFProviderFilter; label: string; description: string; icon: string}[] = [
+		{ id: 'all', label: 'All LLMs', description: 'Text generation models', icon: '🔤' },
+		{ id: 'vllm', label: 'vLLM', description: 'For vLLM inference', icon: '⚡' },
+		{ id: 'sglang', label: 'SGLang', description: 'For SGLang inference', icon: '🚀' },
+		{ id: 'tgi', label: 'TGI', description: 'For Text Generation Inference', icon: '🤗' },
+		{ id: 'llama.cpp', label: 'llama.cpp (GGUF)', description: 'Quantized GGUF models', icon: '🦙' },
+		{ id: 'embedding', label: 'Embeddings', description: 'Feature extraction & embeddings', icon: '📊' },
 	];
+	
+	// Model size filters
+	type HFSizeFilter = 'any' | 'tiny' | 'small' | 'medium' | 'large' | 'xl' | 'xxl';
+	const hfSizeFilters: {id: HFSizeFilter; label: string; range: string; minB: number; maxB: number}[] = [
+		{ id: 'any', label: 'Any', range: 'All sizes', minB: 0, maxB: Infinity },
+		{ id: 'tiny', label: '< 3B', range: 'Tiny', minB: 0, maxB: 3 },
+		{ id: 'small', label: '3-7B', range: 'Small', minB: 3, maxB: 7 },
+		{ id: 'medium', label: '7-14B', range: 'Medium', minB: 7, maxB: 14 },
+		{ id: 'large', label: '14-30B', range: 'Large', minB: 14, maxB: 30 },
+		{ id: 'xl', label: '30-70B', range: 'XL', minB: 30, maxB: 70 },
+		{ id: 'xxl', label: '70B+', range: 'XXL', minB: 70, maxB: Infinity },
+	];
+	let hfSizeFilter = $state<HFSizeFilter>('any');
+	
 	let hfSearchQuery = $state('');
-	let hfCategory = $state<HFCategory>('text-generation');
+	let hfProviderFilter = $state<HFProviderFilter>('all');
 	let hfSearchResults = $state<HFModel[]>([]);
 	let hfPopularModels = $state<HFModel[]>([]);
 	let hfSearching = $state(false);
@@ -127,22 +161,149 @@
 		}
 		// Update form.gpu_device string
 		form.gpu_device = selectedGPUs.sort((a, b) => a - b).join(',');
+		
+		// Auto-set tensor parallel based on selected GPU count
+		updateTensorParallelForGPUs();
+		
+		// Update memory recommendations
+		updateRecommendations();
+	}
+	
+	// Auto-set tensor parallel based on selected GPU count (for multi-GPU providers)
+	function updateTensorParallelForGPUs() {
+		const gpuCount = selectedGPUs.length;
+		if (gpuCount > 1) {
+			// vLLM, SGLang, TGI support tensor parallelism / sharding
+			if (form.provider === 'vllm') {
+				form.vllm_tensor_parallel = gpuCount;
+			} else if (form.provider === 'sglang') {
+				form.sglang_tensor_parallel = gpuCount;
+			} else if (form.provider === 'tgi') {
+				form.tgi_num_shard = gpuCount;
+			}
+		} else if (gpuCount <= 1) {
+			// Reset to single GPU / default
+			form.vllm_tensor_parallel = 0;
+			form.sglang_tensor_parallel = 0;
+			form.tgi_num_shard = 1;
+		}
+	}
+	
+	// When provider changes, update tensor parallel to match selected GPUs
+	function updateTensorParallelForProvider() {
+		updateTensorParallelForGPUs();
+	}
+	
+	// Calculate memory recommendations based on model size and available GPUs
+	function calculateMemoryRecommendation(model: HFModel | null): MemoryRecommendation | null {
+		if (!model || gpuDevices.length === 0) return null;
+		
+		// Try to get model parameters from various sources
+		let paramCount = 0;
+		let quantization = 'BF16'; // Default assumption
+		
+		// Check tags for quantization info
+		const tags = model.tags || [];
+		if (tags.some(t => t.toLowerCase().includes('awq') || t.toLowerCase().includes('int4') || t.toLowerCase().includes('4bit'))) {
+			quantization = 'INT4';
+		} else if (tags.some(t => t.toLowerCase().includes('gptq') || t.toLowerCase().includes('int8') || t.toLowerCase().includes('8bit'))) {
+			quantization = 'INT8';
+		} else if (tags.some(t => t.toLowerCase().includes('gguf'))) {
+			quantization = 'GGUF (varies)';
+		}
+		
+		// Extract param count from model name (common patterns: 7b, 13b, 30b, 70b)
+		const nameMatch = model.id.toLowerCase().match(/(\d+\.?\d*)b/);
+		if (nameMatch) {
+			paramCount = parseFloat(nameMatch[1]) * 1e9;
+		}
+		
+		// If no params from name, try safetensors info
+		if (paramCount === 0 && model.safetensors?.total) {
+			paramCount = model.safetensors.total;
+		}
+		
+		if (paramCount === 0) {
+			return null; // Can't calculate without knowing model size
+		}
+		
+		// Calculate model size in GB based on quantization
+		let bytesPerParam = 2; // BF16/FP16
+		if (quantization === 'INT8') bytesPerParam = 1;
+		else if (quantization === 'INT4') bytesPerParam = 0.5;
+		else if (quantization.includes('GGUF')) bytesPerParam = 0.6; // Approximate average for GGUF
+		
+		const modelSizeGB = (paramCount * bytesPerParam) / (1024 ** 3);
+		
+		// Calculate total available GPU memory (memory_mb is in megabytes)
+		const selectedGPUMemoryGB = selectedGPUs.length > 0 
+			? selectedGPUs.reduce((sum, idx) => sum + (gpuDevices[idx]?.memory_mb || 0), 0) / 1024
+			: gpuDevices.reduce((sum, gpu) => sum + (gpu.memory_mb || 0), 0) / 1024;
+		
+		const numGPUs = selectedGPUs.length > 0 ? selectedGPUs.length : gpuDevices.length;
+		const perGPUMemory = selectedGPUMemoryGB / numGPUs;
+		
+		// KV cache and overhead estimation (rough: 10-20% of model size)
+		const kvCacheGB = modelSizeGB * 0.15;
+		const overheadGB = 2; // General overhead
+		const totalNeededGB = modelSizeGB + kvCacheGB + overheadGB;
+		
+		// Will it fit?
+		const willFit = totalNeededGB <= selectedGPUMemoryGB;
+		
+		// Calculate recommended mem_fraction
+		let recommendedMemFraction = selectedGPUMemoryGB > 0 
+			? Math.min(0.95, (totalNeededGB / selectedGPUMemoryGB) + 0.05)
+			: 0.9;
+		recommendedMemFraction = Math.round(recommendedMemFraction * 100) / 100;
+		
+		// Calculate minimum GPUs needed
+		const singleGPUMemory = gpuDevices[0]?.memory_mb ? gpuDevices[0].memory_mb / 1024 : 24;
+		const minGPUsNeeded = Math.ceil(totalNeededGB / (singleGPUMemory * 0.9));
+		
+		// Format params for display
+		const paramsInB = paramCount / 1e9;
+		const modelParams = paramsInB >= 1 ? `${paramsInB.toFixed(1)}B` : `${(paramCount / 1e6).toFixed(0)}M`;
+		
+		let warning: string | undefined;
+		if (!willFit) {
+			warning = `Model needs ~${totalNeededGB.toFixed(1)}GB but only ${selectedGPUMemoryGB.toFixed(1)}GB available. Use ${minGPUsNeeded}+ GPUs or quantized version.`;
+		} else if (recommendedMemFraction > 0.85) {
+			warning = `Model will use most of GPU memory. Consider lower context length if OOM occurs.`;
+		}
+		
+		return {
+			modelSizeGB: Math.round(modelSizeGB * 10) / 10,
+			modelParams,
+			quantization,
+			totalGPUMemoryGB: Math.round(selectedGPUMemoryGB * 10) / 10,
+			recommendedMemFraction: willFit ? recommendedMemFraction : 0.9,
+			recommendedTensorParallel: Math.max(1, numGPUs),
+			minGPUsNeeded,
+			willFit,
+			warning
+		};
+	}
+	
+	// Update recommendations when model or GPU selection changes
+	function updateRecommendations() {
+		memoryRecommendation = calculateMemoryRecommendation(hfSelectedModel);
+		
+		// Auto-apply recommendations if available
+		if (memoryRecommendation) {
+			if (form.provider === 'vllm') {
+				form.vllm_gpu_utilization = memoryRecommendation.recommendedMemFraction;
+			} else if (form.provider === 'sglang') {
+				form.sglang_mem_fraction = memoryRecommendation.recommendedMemFraction;
+			}
+		}
 	}
 	
 	// HuggingFace Browser functions
 	async function searchHF() {
 		hfSearching = true;
 		try {
-			let url = `/api/huggingface/search?limit=50`;
-			if (hfSearchQuery.trim()) {
-				url += `&q=${encodeURIComponent(hfSearchQuery)}`;
-			}
-			if (hfCategory === 'gguf') {
-				url += '&tag=gguf';
-			} else if (hfCategory !== 'all') {
-				url += `&tag=${hfCategory}`;
-			}
-			const res = await api.get<{models: HFModel[]}>(url);
+			const res = await downloadsApi.searchHuggingFace(hfSearchQuery, hfProviderFilter);
 			hfSearchResults = res.models || [];
 		} catch (e: any) {
 			showMsg(e?.message || 'Failed to search HuggingFace', 'error');
@@ -154,14 +315,7 @@
 	async function loadPopularHF() {
 		hfSearching = true;
 		try {
-			// Load based on current category
-			let url = `/api/huggingface/search?limit=50`;
-			if (hfCategory === 'gguf') {
-				url += '&tag=gguf';
-			} else if (hfCategory !== 'all') {
-				url += `&tag=${hfCategory}`;
-			}
-			const res = await api.get<{models: HFModel[]}>(url);
+			const res = await downloadsApi.getPopularModels(hfProviderFilter);
 			hfPopularModels = res.models || [];
 		} catch (e: any) {
 			console.error('Failed to load popular models:', e);
@@ -170,10 +324,19 @@
 		}
 	}
 	
-	// Reload when category changes
+	// Reload when provider filter changes
 	$effect(() => {
 		if (activeTab === 'hf') {
 			hfSearchResults = [];
+			loadPopularHF();
+		}
+	});
+	
+	// Watch provider filter changes
+	$effect(() => {
+		// Trigger reload when filter changes
+		const _ = hfProviderFilter;
+		if (activeTab === 'hf') {
 			loadPopularHF();
 		}
 	});
@@ -182,12 +345,13 @@
 		hfSelectedModel = m;
 		try {
 			const res = await api.get<{siblings?: any[]}>(`/api/huggingface/models/${m.id}`);
-			// Filter files based on category
+			// Filter files based on provider filter
 			const allFiles = res.siblings || [];
-			if (hfCategory === 'gguf') {
+			if (hfProviderFilter === 'llama.cpp') {
+				// Show only GGUF files for llama.cpp
 				hfModelFiles = allFiles.filter((f: any) => f.rfilename?.endsWith('.gguf'));
 			} else {
-				// For HF models show safetensors, bin, and config files
+				// For HF models (vLLM/SGLang/TGI) show safetensors, bin, and config files
 				hfModelFiles = allFiles.filter((f: any) => 
 					f.rfilename?.endsWith('.safetensors') || 
 					f.rfilename?.endsWith('.bin') ||
@@ -206,32 +370,92 @@
 		form.hf_repo = m.id;
 		
 		if (file?.rfilename?.endsWith('.gguf')) {
+			// GGUF file selected
 			form.hf_file = file.rfilename;
 			form.format = 'gguf';
 			form.provider = 'llama.cpp';
+			form.capabilities = ['chat'];
 		} else {
 			form.hf_file = '';
 			form.format = 'hf';
-			// Suggest provider based on category
-			if (hfCategory === 'feature-extraction') {
-				form.provider = 'vllm'; // vLLM supports embeddings
-			} else {
-				form.provider = 'vllm'; // Default to vLLM for text generation
+			
+			// Set provider based on filter selection
+			switch (hfProviderFilter) {
+				case 'llama.cpp':
+					// If browsing GGUF but selected non-GGUF file, still suggest llama.cpp
+					form.provider = 'llama.cpp';
+					form.format = 'gguf';
+					form.capabilities = ['chat'];
+					break;
+				case 'vllm':
+					form.provider = 'vllm';
+					form.capabilities = ['chat'];
+					break;
+				case 'sglang':
+					form.provider = 'sglang';
+					form.capabilities = ['chat'];
+					break;
+				case 'tgi':
+					form.provider = 'tgi';
+					form.capabilities = ['chat'];
+					break;
+				case 'embedding':
+					form.provider = 'sglang'; // SGLang handles embeddings well
+					form.capabilities = ['embeddings'];
+					break;
+				default:
+					form.provider = 'vllm'; // Default
+					form.capabilities = ['chat'];
 			}
 		}
 		
 		form.alias = m.id.split('/').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'model';
 		
-		// Set capabilities based on category
-		if (hfCategory === 'feature-extraction') {
-			form.capabilities = ['embeddings'];
-		} else {
-			form.capabilities = ['chat'];
-		}
+		// Store selected model for recommendations
+		hfSelectedModel = m;
+		
+		// Update memory recommendations
+		updateRecommendations();
 		
 		// Switch to models tab
 		activeTab = 'models';
-		showMsg(`Selected ${m.id}. Configure provider and click Load.`, 'info');
+		showMsg(`Selected ${m.id} for ${form.provider}. Configure and click Load.`, 'info');
+	}
+	
+	// Extract model size in billions from model name or tags
+	function extractModelSizeB(model: HFModel): number | null {
+		// Try to extract from model ID (common patterns: 7b, 13b, 30b, 70b, 1.5b)
+		const nameMatch = model.id.toLowerCase().match(/(\d+\.?\d*)b/);
+		if (nameMatch) {
+			return parseFloat(nameMatch[1]);
+		}
+		// Try tags
+		for (const tag of model.tags || []) {
+			const tagMatch = tag.toLowerCase().match(/(\d+\.?\d*)b/);
+			if (tagMatch) {
+				return parseFloat(tagMatch[1]);
+			}
+		}
+		return null;
+	}
+	
+	// Filter models by size
+	function filterBySize(models: HFModel[]): HFModel[] {
+		if (hfSizeFilter === 'any') return models;
+		
+		const filter = hfSizeFilters.find(f => f.id === hfSizeFilter);
+		if (!filter) return models;
+		
+		return models.filter(m => {
+			const sizeB = extractModelSizeB(m);
+			if (sizeB === null) return true; // Include if can't determine size
+			return sizeB >= filter.minB && sizeB < filter.maxB;
+		});
+	}
+	
+	// Get displayed models (with size filter applied)
+	function getFilteredHFModels(models: HFModel[]): HFModel[] {
+		return filterBySize(models);
 	}
 	
 	function formatNumber(n: number): string {
@@ -503,10 +727,26 @@
 		const bytes = Math.floor(mb * 1024 * 1024);
 		try {
 			await inferenceApi.evictCache(bytes);
-			showMsg('Кеш очищен', 'success');
+			showMsg('Cache evicted', 'success');
 			await loadCache();
 		} catch (e: any) {
-			showMsg(e?.message || 'Ошибка очистки кеша', 'error');
+			showMsg(e?.message || 'Error evicting cache', 'error');
+		}
+	}
+
+	async function clearAllCache() {
+		if (!confirm(`Are you sure you want to clear ALL cache (${formatSize(totalCacheSize)})?\n\nThis will delete all downloaded models and cannot be undone.`)) {
+			return;
+		}
+		busy = true;
+		try {
+			const res = await inferenceApi.clearCache();
+			showMsg(`Cache cleared! Freed ${formatSize(res.freed_bytes)}`, 'success');
+			await loadCache();
+		} catch (e: any) {
+			showMsg(e?.message || 'Error clearing cache', 'error');
+		} finally {
+			busy = false;
 		}
 	}
 
@@ -632,7 +872,7 @@
 						</label>
 						<label class="flex flex-col gap-1 text-sm">
 							<span class="font-medium">Provider</span>
-							<select class="border rounded px-3 py-2 bg-background" bind:value={form.provider}>
+							<select class="border rounded px-3 py-2 bg-background" bind:value={form.provider} onchange={updateTensorParallelForProvider}>
 								{#each providers as p}<option value={p}>{p}</option>{/each}
 							</select>
 						</label>
@@ -696,6 +936,55 @@
 							{/each}
 						</div>
 					</div>
+
+					<!-- Memory Recommendations -->
+					{#if memoryRecommendation}
+						<div class="p-3 rounded-lg border {memoryRecommendation.willFit ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}">
+							<div class="flex items-start justify-between gap-4">
+								<div class="flex-1">
+									<div class="text-sm font-medium mb-1">
+										{memoryRecommendation.willFit ? '✅' : '⚠️'} Memory Recommendation
+									</div>
+									<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
+										<div>
+											<span class="text-foreground font-medium">{memoryRecommendation.modelParams}</span>
+											<span class="block">{memoryRecommendation.quantization}</span>
+										</div>
+										<div>
+											<span class="text-foreground font-medium">~{memoryRecommendation.modelSizeGB} GB</span>
+											<span class="block">Model Size</span>
+										</div>
+										<div>
+											<span class="text-foreground font-medium">{memoryRecommendation.totalGPUMemoryGB} GB</span>
+											<span class="block">GPU Available</span>
+										</div>
+										<div>
+											<span class="text-foreground font-medium">{memoryRecommendation.recommendedMemFraction}</span>
+											<span class="block">Rec. Mem Frac</span>
+										</div>
+									</div>
+									{#if memoryRecommendation.warning}
+										<p class="text-xs text-yellow-600 dark:text-yellow-400 mt-2">{memoryRecommendation.warning}</p>
+									{/if}
+								</div>
+								<button
+									type="button"
+									class="text-xs px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary"
+									onclick={() => {
+										if (memoryRecommendation) {
+											if (form.provider === 'vllm') {
+												form.vllm_gpu_utilization = memoryRecommendation.recommendedMemFraction;
+											} else if (form.provider === 'sglang') {
+												form.sglang_mem_fraction = memoryRecommendation.recommendedMemFraction;
+											}
+										}
+									}}
+								>
+									Apply
+								</button>
+							</div>
+						</div>
+					{/if}
 
 					<!-- Provider-specific params -->
 					{#if form.provider === 'vllm'}
@@ -936,15 +1225,30 @@
 		<div class="grid gap-4 lg:grid-cols-[1fr_400px]">
 			<!-- Left: Search and results -->
 			<div class="flex flex-col gap-4">
-				<!-- Category selector -->
+				<!-- Provider filter selector -->
 				<div class="flex flex-wrap gap-2">
-					{#each hfCategories as cat}
+					{#each hfProviderFilters as pf}
 						<button 
-							class="px-3 py-1.5 text-sm rounded-md border transition-colors {hfCategory === cat.id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}"
-							onclick={() => { hfCategory = cat.id; hfSearchQuery = ''; }}
-							title={cat.description}
+							class="px-3 py-1.5 text-sm rounded-md border transition-colors flex items-center gap-1.5 {hfProviderFilter === pf.id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}"
+							onclick={() => { hfProviderFilter = pf.id; hfSearchQuery = ''; hfSearchResults = []; }}
+							title={pf.description}
 						>
-							{cat.label}
+							<span>{pf.icon}</span>
+							{pf.label}
+						</button>
+					{/each}
+				</div>
+				
+				<!-- Size filter selector -->
+				<div class="flex items-center gap-2 flex-wrap">
+					<span class="text-xs text-muted-foreground">Size:</span>
+					{#each hfSizeFilters as sf}
+						<button 
+							class="px-2 py-1 text-xs rounded border transition-colors {hfSizeFilter === sf.id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}"
+							onclick={() => { hfSizeFilter = sf.id; }}
+							title={sf.range}
+						>
+							{sf.label}
 						</button>
 					{/each}
 				</div>
@@ -956,7 +1260,7 @@
 						<input 
 							type="text" 
 							class="w-full border rounded-md pl-10 pr-4 py-2 bg-background"
-							placeholder="Search {hfCategories.find(c => c.id === hfCategory)?.label || 'models'}..."
+							placeholder="Search {hfProviderFilters.find(c => c.id === hfProviderFilter)?.label || 'models'}..."
 							bind:value={hfSearchQuery}
 							onkeydown={(e) => e.key === 'Enter' && searchHF()}
 						/>
@@ -975,14 +1279,18 @@
 				
 				<!-- Provider hint -->
 				<div class="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2">
-					{#if hfCategory === 'gguf'}
-						💡 GGUF models work with <strong>llama.cpp</strong> provider
-					{:else if hfCategory === 'text-generation'}
-						💡 Text generation models work with <strong>vLLM</strong>, <strong>SGLang</strong>, or <strong>TGI</strong>
-					{:else if hfCategory === 'feature-extraction'}
-						💡 Embedding models work with <strong>vLLM</strong> (set capability to "embeddings")
+					{#if hfProviderFilter === 'llama.cpp'}
+						🦙 GGUF quantized models for <strong>llama.cpp</strong> — efficient CPU/GPU inference
+					{:else if hfProviderFilter === 'vllm'}
+						⚡ Models for <strong>vLLM</strong> — high-throughput production serving
+					{:else if hfProviderFilter === 'sglang'}
+						🚀 Models for <strong>SGLang</strong> — fast inference with RadixAttention
+					{:else if hfProviderFilter === 'tgi'}
+						🤗 Models for <strong>TGI</strong> — HuggingFace Text Generation Inference
+					{:else if hfProviderFilter === 'embedding'}
+						📊 Embedding models for <strong>vLLM/SGLang</strong> — feature extraction & RAG
 					{:else}
-						💡 Select a category to filter models by type
+						💡 Filter by provider to find compatible models
 					{/if}
 				</div>
 				
@@ -991,14 +1299,16 @@
 					<div class="px-4 py-3 border-b bg-muted/50">
 						<h2 class="font-semibold">
 							{#if hfSearchResults.length > 0}
-								Search Results ({hfSearchResults.length})
+								{@const filtered = getFilteredHFModels(hfSearchResults)}
+								Search Results ({filtered.length}{hfSizeFilter !== 'any' ? ` of ${hfSearchResults.length}` : ''})
 							{:else}
-								Popular GGUF Models
+								{@const filtered = getFilteredHFModels(hfPopularModels)}
+								Popular {hfProviderFilters.find(c => c.id === hfProviderFilter)?.label || ''} Models ({filtered.length}{hfSizeFilter !== 'any' ? ` of ${hfPopularModels.length}` : ''})
 							{/if}
 						</h2>
 					</div>
 					<div class="divide-y max-h-[600px] overflow-y-auto">
-						{#each (hfSearchResults.length > 0 ? hfSearchResults : hfPopularModels) as m}
+						{#each getFilteredHFModels(hfSearchResults.length > 0 ? hfSearchResults : hfPopularModels) as m}
 							<div 
 								class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-3 {hfSelectedModel?.id === m.id ? 'bg-primary/10' : ''}"
 								onclick={() => selectHFModel(m)}
@@ -1008,6 +1318,9 @@
 									<div class="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
 										<span>⬇️ {formatNumber(m.downloads || 0)}</span>
 										<span>❤️ {formatNumber(m.likes || 0)}</span>
+										{#if extractModelSizeB(m)}
+											<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-medium">{extractModelSizeB(m)}B</span>
+										{/if}
 										{#if m.pipeline_tag}
 											<span class="px-1.5 py-0.5 rounded bg-muted text-xs">{m.pipeline_tag}</span>
 										{/if}
@@ -1096,10 +1409,14 @@
 						
 						<!-- Recommended provider -->
 						<div class="text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
-							{#if hfCategory === 'gguf'}
+							{#if hfProviderFilter === 'llama.cpp'}
 								Recommended: <strong>llama.cpp</strong>
-							{:else if hfSelectedModel.tags?.includes('text-generation-inference')}
-								Recommended: <strong>TGI</strong> (optimized)
+							{:else if hfProviderFilter === 'tgi' || hfSelectedModel.tags?.includes('text-generation-inference')}
+								Recommended: <strong>TGI</strong>
+							{:else if hfProviderFilter === 'sglang'}
+								Recommended: <strong>SGLang</strong>
+							{:else if hfProviderFilter === 'embedding'}
+								Recommended: <strong>SGLang</strong> or <strong>vLLM</strong>
 							{:else}
 								Recommended: <strong>vLLM</strong> or <strong>SGLang</strong>
 							{/if}
@@ -1140,6 +1457,13 @@
 					<input id="evictLimitMB" type="number" class="border rounded px-3 py-1.5 w-24 text-sm bg-background" placeholder="MB" />
 					<button class="px-3 py-1.5 text-sm rounded border hover:bg-muted" onclick={evictCacheToLimit}>
 						Evict to Limit
+					</button>
+					<button 
+						class="px-3 py-1.5 text-sm rounded border border-red-500 text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+						onclick={clearAllCache}
+						disabled={busy || (artifacts || []).length === 0}
+					>
+						🗑️ Clear All
 					</button>
 					<button class="px-3 py-1.5 text-sm rounded border hover:bg-muted" onclick={loadCache}>
 						Refresh

@@ -108,7 +108,42 @@ auth:
       validation_per_ip_minute: 10
 
   oidc:
-    enabled: false
+    enabled: true
+    provider: "keycloak"
+    issuer: "http://localhost:8180/realms/master"  # или /realms/aigateway если создал отдельный realm
+    client_id: "ollama-proxy"
+    client_secret: "kknbVa2RRI3CYhCYvKZNJMJTIddJuona"  # Из Keycloak → Clients → ollama-proxy → Credentials
+    redirect_uri: "http://localhost:8085/api/auth/oidc/callback"
+    scopes:
+      - openid
+      - profile
+      - email
+    
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+      name: "name"
+      groups: "groups"
+      roles: "realm_roles"
+    
+    auto_create_user: true
+    auto_update_user: true
+    default_role: "user"
+    
+    session_store: "memory"
+    session_ttl: "10m"
+    
+    tenant_provisioning:
+      enabled: false  # Включи если нужно автосоздание tenants из групп
+    role_mapping:
+      # Группы которые дают admin права
+      admin_groups:
+        - "/AIG_ADMIN"
+      
+      # Группы обычных пользователей (опционально)
+      user_groups:
+        - "/AIG_USER"
   
   ldap:
     enabled: false
@@ -149,6 +184,8 @@ logging:
   error_log_max_backups: 10
   error_log_max_age: 90
   error_log_compress: true
+  auth_log_enabled: true
+  auth_log_file_path: "logs/auth.log"
 
 models:
   default_embedding_model: "mxbai-embed-large:latest"

@@ -60,11 +60,36 @@ func NewOrchestrator(runtime ContainerRuntime, downloader *ModelDownloader, logg
 
 // PrepareModel ensures artifacts are present locally according to spec.
 // For HF format without specific file, providers (vLLM, SGLang, TGI) download via HF Hub themselves.
+// If model is already running with same basic config, return it.
+// If user explicitly loads with different params, replace the model.
 func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*ModelInstance, error) {
 	o.mu.Lock()
 	if existing, ok := o.models[spec.Alias]; ok {
-		o.mu.Unlock()
-		return existing, nil
+		// If model is currently running/starting, return it as-is
+		// This allows EnsureByAlias to work for chat completions
+		if existing.Status == StatusRunning || existing.Status == StatusStarting {
+			o.mu.Unlock()
+			return existing, nil
+		}
+		// Model exists but not running - check if user wants different parameters
+		// Only replace if there are meaningful parameter changes
+		if existing.Spec.Provider != spec.Provider ||
+			existing.Spec.VLLMGPUUtilization != spec.VLLMGPUUtilization ||
+			existing.Spec.VLLMMaxModelLen != spec.VLLMMaxModelLen ||
+			existing.Spec.VLLMTensorParallel != spec.VLLMTensorParallel {
+			o.logger.WithFields(logrus.Fields{
+				"alias":                    spec.Alias,
+				"old_gpu_util":             existing.Spec.VLLMGPUUtilization,
+				"new_gpu_util":             spec.VLLMGPUUtilization,
+				"old_max_model_len":        existing.Spec.VLLMMaxModelLen,
+				"new_max_model_len":        spec.VLLMMaxModelLen,
+			}).Info("Replacing model spec with new parameters")
+			delete(o.models, spec.Alias)
+		} else {
+			// Same params - return existing (allows restart of stopped model)
+			o.mu.Unlock()
+			return existing, nil
+		}
 	}
 	o.mu.Unlock()
 
@@ -126,26 +151,24 @@ func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*Model
 }
 
 // StartModel starts provider container (if runtime provided) after ensuring artifacts.
-// Respects context cancellation and applies startupTimeout if context has no deadline.
+// Uses background context to prevent cancellation from HTTP request refresh.
+// Applies startupTimeout for the overall operation.
 func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq ContainerStartRequest) (*ModelInstance, error) {
-	// Apply overall startup timeout if no deadline in context
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline && o.startupTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, o.startupTimeout)
-		defer cancel()
+	// Use background context with startup timeout to prevent cancellation from HTTP request
+	// This allows model loading to continue even if user refreshes the page
+	var opCtx context.Context
+	var cancel context.CancelFunc
+	if o.startupTimeout > 0 {
+		opCtx, cancel = context.WithTimeout(context.Background(), o.startupTimeout)
+	} else {
+		opCtx, cancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	}
+	defer cancel()
+	_ = ctx // original HTTP context ignored to prevent cancellation on page refresh
 
-	inst, err := o.PrepareModel(ctx, spec)
+	inst, err := o.PrepareModel(opCtx, spec)
 	if err != nil {
 		return inst, err
-	}
-
-	// Check if cancelled during prepare
-	if ctx.Err() != nil {
-		inst.Status = StatusFailed
-		inst.Error = fmt.Sprintf("cancelled: %v", ctx.Err())
-		o.saveInstance(inst)
-		return inst, ctx.Err()
 	}
 
 	// If already running, return existing handle.
@@ -160,7 +183,7 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 	inst.Status = StatusStarting
 	o.saveInstance(inst)
 
-	handle, err := o.runtime.Start(ctx, startReq)
+	handle, err := o.runtime.Start(opCtx, startReq)
 	if err != nil {
 		inst.Status = StatusFailed
 		inst.Error = err.Error()
@@ -180,8 +203,9 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 	o.saveInstance(inst)
 
 	// Health wait with configurable timeout
+	// Use background context to prevent cancellation from HTTP request refresh
 	if handle.Endpoint != "" {
-		healthCtx, cancel := context.WithTimeout(ctx, o.healthCheckTimeout)
+		healthCtx, cancel := context.WithTimeout(context.Background(), o.healthCheckTimeout)
 		defer cancel()
 		healthURL := providerHealthURL(handle.Provider, handle.Endpoint)
 		if err := waitForHealth(healthCtx, healthURL, 2*time.Second); err != nil {

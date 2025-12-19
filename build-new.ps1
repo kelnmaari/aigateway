@@ -74,6 +74,17 @@ function Test-NodeInstallation {
     }
 }
 
+# Check required tools installation
+function Test-RequiredTools {
+    $requiredTools = @("go", "node", "npm")
+    foreach ($tool in $requiredTools) {
+        if (!(Get-Command $tool -ErrorAction SilentlyContinue)) {
+            Write-ErrorMsg "$tool is not installed or not in PATH"
+            exit 1
+        }
+    }
+}
+
 # Build Svelte WebUI
 function Build-SvelteUI {
     Write-Step "Building Svelte WebUI"
@@ -365,7 +376,7 @@ function Invoke-Package {
 # Display usage
 function Show-Usage {
     @"
-Usage: .\build.ps1 [COMMAND] [OPTIONS]
+Usage: .\build-new.ps1 [COMMAND] [OPTIONS]
 
 Commands:
     all           Build for all platforms (default)
@@ -383,30 +394,30 @@ Options:
 
 Examples:
     # Build all platforms with both UIs
-    .\build.ps1 all
+    .\build-new.ps1 all
 
     # Build with only Svelte UI
-    .\build.ps1 all -WebUI svelte
+    .\build-new.ps1 all -WebUI svelte
 
     # Build with only Legacy UI
-    .\build.ps1 all -WebUI legacy
+    .\build-new.ps1 all -WebUI legacy
 
     # Build only the Svelte frontend (no Go compilation)
-    .\build.ps1 frontend
+    .\build-new.ps1 frontend
 
     # Build Linux only
-    .\build.ps1 linux
+    .\build-new.ps1 linux
 
     # Build with custom version
-    .\build.ps1 all -Version 3.1.0
+    .\build-new.ps1 all -Version 3.1.0
 
     # Build and package
-    .\build.ps1 all
-    .\build.ps1 package
+    .\build-new.ps1 all
+    .\build-new.ps1 package
 
     # Clean everything
-    .\build.ps1 clean
-    .\build.ps1 clean-webui
+    .\build-new.ps1 clean
+    .\build-new.ps1 clean-webui
 
 WebUI Modes:
     legacy    - Only HTML/JS frontend (smaller binary)
@@ -434,21 +445,25 @@ function Test-GoInstallation {
 function Main {
     switch ($Command.ToLower()) {
         "all" {
+            Test-RequiredTools
             Test-GoInstallation
             Invoke-Clean
             Build-All
         }
         "linux" {
+            Test-RequiredTools
             Test-GoInstallation
             Invoke-Clean
             Build-Linux
         }
         "windows" {
+            Test-RequiredTools
             Test-GoInstallation
             Invoke-Clean
             Build-Windows
         }
         "frontend" {
+            Test-RequiredTools
             Build-FrontendOnly
         }
         "package" {
@@ -480,5 +495,3 @@ try {
     Write-ErrorMsg "An error occurred: $_"
     exit 1
 }
-
-

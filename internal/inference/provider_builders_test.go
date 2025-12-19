@@ -13,7 +13,7 @@ func TestBuildVLLMRequest(t *testing.T) {
 		VLLMGPUUtilization: 0.9,
 	}
 
-	req := BuildVLLMRequest(spec, "/data/models")
+	req := BuildVLLMRequest(spec, "/data/models", "")
 
 	if req.ModelAlias != "test-llama" {
 		t.Errorf("ModelAlias = %q, want %q", req.ModelAlias, "test-llama")
@@ -54,7 +54,7 @@ func TestBuildVLLMRequest_UsesLocalPath(t *testing.T) {
 		LocalPath: "/data/models/meta-llama/Llama-3.1-8B",
 	}
 
-	req := BuildVLLMRequest(spec, "/data/models")
+	req := BuildVLLMRequest(spec, "/data/models", "")
 
 	// Should use LocalPath for --model
 	found := false

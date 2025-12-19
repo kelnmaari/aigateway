@@ -808,6 +808,7 @@ func (h *TenantHandler) CreateTenantAPIKey(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 		KeyHash:     keyHash,
+		KeyPrefix:   models.ExtractKeyPrefix(plainKey),
 		UserID:      nil,
 		TenantID:    &tenantID,
 		Scope:       models.APIKeyScopeTenant,

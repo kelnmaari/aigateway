@@ -20,15 +20,16 @@
 		Thermometer,
 		Gauge
 	} from 'lucide-svelte';
-	import { adminApi, type AdminStats, type SystemMetrics, type RAGStats, type GPUMetricsResponse, type GPUDevice, type YzmaHealthResponse, type YzmaGPUResponse } from '$lib/api/admin';
+	import { adminApi, type AdminStats, type SystemMetrics, type RAGStats, type GPUMetricsResponse, type GPUDevice, type BackendStatusResponse, type DockerImagesResponse, type DockerImageStatus } from '$lib/api/admin';
 	import { cn } from '$lib/utils';
 
 	let stats = $state<AdminStats | null>(null);
 	let metrics = $state<SystemMetrics | null>(null);
 	let ragStats = $state<RAGStats | null>(null);
 	let gpuMetrics = $state<GPUMetricsResponse | null>(null);
-	let yzmaHealth = $state<YzmaHealthResponse | null>(null);
-	let yzmaGPU = $state<YzmaGPUResponse | null>(null);
+	let backendStatus = $state<BackendStatusResponse | null>(null);
+	let dockerImages = $state<DockerImagesResponse | null>(null);
+	let pullingImages = $state<Set<string>>(new Set());
 	let isLoading = $state(true);
 	let gpuUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -47,13 +48,13 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			const [statsRes, metricsRes, ragRes, gpuRes, yzmaHealthRes, yzmaGPURes] = await Promise.allSettled([
+			const [statsRes, metricsRes, ragRes, gpuRes, backendRes, dockerImagesRes] = await Promise.allSettled([
 				adminApi.getStats(),
 				adminApi.getMetrics(),
 				adminApi.getRAGStats(),
 				adminApi.getGPUMetrics(),
-				adminApi.getYzmaHealth(),
-				adminApi.getYzmaGPUInfo()
+				adminApi.getBackendStatus(),
+				adminApi.getDockerImages()
 			]);
 
 			if (statsRes.status === 'fulfilled') {
@@ -68,11 +69,11 @@
 			if (gpuRes.status === 'fulfilled') {
 				gpuMetrics = gpuRes.value;
 			}
-			if (yzmaHealthRes.status === 'fulfilled') {
-				yzmaHealth = yzmaHealthRes.value;
+			if (backendRes.status === 'fulfilled') {
+				backendStatus = backendRes.value;
 			}
-			if (yzmaGPURes.status === 'fulfilled') {
-				yzmaGPU = yzmaGPURes.value;
+			if (dockerImagesRes.status === 'fulfilled') {
+				dockerImages = dockerImagesRes.value;
 			}
 		} catch (error) {
 			console.error('Failed to load admin data:', error);
@@ -83,18 +84,51 @@
 
 	async function updateGPUMetrics() {
 		try {
-			const [gpuRes, healthRes] = await Promise.allSettled([
+			const [gpuRes, backendRes, dockerRes] = await Promise.allSettled([
 				adminApi.getGPUMetrics(),
-				adminApi.getYzmaHealth()
+				adminApi.getBackendStatus(),
+				adminApi.getDockerImages()
 			]);
 			if (gpuRes.status === 'fulfilled') {
 				gpuMetrics = gpuRes.value;
 			}
-			if (healthRes.status === 'fulfilled') {
-				yzmaHealth = healthRes.value;
+			if (backendRes.status === 'fulfilled') {
+				backendStatus = backendRes.value;
+			}
+			if (dockerRes.status === 'fulfilled') {
+				dockerImages = dockerRes.value;
 			}
 		} catch (error) {
 			// Silently fail for GPU/health updates
+		}
+	}
+
+	async function pullDockerImage(image: string) {
+		pullingImages = new Set([...pullingImages, image]);
+		try {
+			await adminApi.pullDockerImage(image);
+			// Poll for completion every 5 seconds
+			const pollInterval = setInterval(async () => {
+				try {
+					const res = await adminApi.getDockerImages();
+					dockerImages = res;
+					const img = res.images.find(i => i.image === image);
+					if (img?.exists) {
+						clearInterval(pollInterval);
+						pullingImages = new Set([...pullingImages].filter(i => i !== image));
+					}
+				} catch {
+					// ignore
+				}
+			}, 5000);
+			// Timeout after 30 minutes
+			setTimeout(() => {
+				clearInterval(pollInterval);
+				pullingImages = new Set([...pullingImages].filter(i => i !== image));
+			}, 30 * 60 * 1000);
+		} catch (error) {
+			console.error('Failed to start image pull:', error);
+			pullingImages = new Set([...pullingImages].filter(i => i !== image));
 		}
 	}
 
@@ -286,59 +320,45 @@
 			</div>
 		{/if}
 
-		<!-- Yzma/llama.cpp Status -->
-		{#if yzmaHealth || yzmaGPU}
+		<!-- Docker Inference Backend Status -->
+		{#if backendStatus}
 			<div class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold flex items-center gap-2">
 						<BrainCircuit class="h-5 w-5 text-purple-500" />
-						LLM Backend Status
+						LLM Inference Backend
 					</h2>
-					{#if yzmaHealth}
-						{@const statusColor = yzmaHealth.status === 'ready' ? 'text-green-500' : 
-							yzmaHealth.status === 'waiting_for_models' ? 'text-amber-500' : 'text-blue-500'}
-						<span class={cn("text-sm font-medium flex items-center gap-1.5", statusColor)}>
-							{#if yzmaHealth.status === 'ready'}
-								<CheckCircle class="h-4 w-4" />
-								Ready
-							{:else if yzmaHealth.status === 'waiting_for_models'}
-								<Loader2 class="h-4 w-4 animate-spin" />
-								Loading Models...
-							{:else}
-								<Loader2 class="h-4 w-4 animate-spin" />
-								Initializing...
-							{/if}
-						</span>
-					{/if}
+					<span class={cn("text-sm font-medium flex items-center gap-1.5", backendStatus.ready ? 'text-green-500' : 'text-amber-500')}>
+						{#if backendStatus.ready}
+							<CheckCircle class="h-4 w-4" />
+							Ready
+						{:else}
+							<AlertCircle class="h-4 w-4" />
+							Not Configured
+						{/if}
+					</span>
 				</div>
 				
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<!-- Backend Status -->
+					<!-- Backend Type -->
 					<div class="rounded-lg border border-border/50 p-3">
-						<div class="mb-1 text-xs font-medium text-muted-foreground">Backend</div>
+						<div class="mb-1 text-xs font-medium text-muted-foreground">Backend Type</div>
 						<div class="flex items-center gap-2">
-							{#if yzmaGPU?.backend_ready}
-								<CheckCircle class="h-4 w-4 text-green-500" />
-								<span class="font-medium text-green-500">Initialized</span>
-							{:else}
-								<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
-								<span class="font-medium text-blue-500">Starting...</span>
-							{/if}
+							<Server class="h-4 w-4 text-blue-500" />
+							<span class="font-medium">Docker Containers</span>
 						</div>
 					</div>
 
-					<!-- GPU Support -->
+					<!-- Running Models -->
 					<div class="rounded-lg border border-border/50 p-3">
-						<div class="mb-1 text-xs font-medium text-muted-foreground">GPU Support</div>
+						<div class="mb-1 text-xs font-medium text-muted-foreground">Running Models</div>
 						<div class="flex items-center gap-2">
-							{#if yzmaGPU?.gpu?.supports_gpu}
+							{#if (backendStatus.running_models ?? 0) > 0}
 								<CheckCircle class="h-4 w-4 text-green-500" />
-								<span class="font-medium text-green-500">
-									{yzmaGPU.gpu.max_devices} Device{yzmaGPU.gpu.max_devices !== 1 ? 's' : ''}
-								</span>
+								<span class="font-medium text-green-500">{backendStatus.running_models}</span>
 							{:else}
-								<XCircle class="h-4 w-4 text-red-500" />
-								<span class="font-medium text-red-500">CPU Only</span>
+								<AlertCircle class="h-4 w-4 text-amber-500" />
+								<span class="font-medium text-amber-500">None</span>
 							{/if}
 						</div>
 					</div>
@@ -347,64 +367,53 @@
 					<div class="rounded-lg border border-border/50 p-3">
 						<div class="mb-1 text-xs font-medium text-muted-foreground">Loaded Models</div>
 						<div class="flex items-center gap-2">
-							{#if yzmaHealth?.loaded_model_count && yzmaHealth.loaded_model_count > 0}
-								<CheckCircle class="h-4 w-4 text-green-500" />
-								<span class="font-medium">{yzmaHealth.loaded_model_count} Model{yzmaHealth.loaded_model_count !== 1 ? 's' : ''}</span>
-							{:else}
-								<AlertCircle class="h-4 w-4 text-amber-500" />
-								<span class="font-medium text-amber-500">None</span>
-							{/if}
+							<span class="font-medium">{backendStatus.loaded_models ?? 0}</span>
 						</div>
 					</div>
 
-					<!-- GPU Layers -->
+					<!-- Max Concurrent -->
 					<div class="rounded-lg border border-border/50 p-3">
-						<div class="mb-1 text-xs font-medium text-muted-foreground">GPU Layers</div>
-						<span class="font-medium">
-							{#if yzmaGPU?.gpu?.n_gpu_layers === -1}
-								All (Auto)
-							{:else if yzmaGPU?.gpu?.n_gpu_layers === 0}
-								CPU Only
-							{:else}
-								{yzmaGPU?.gpu?.n_gpu_layers ?? '—'}
-							{/if}
-						</span>
+						<div class="mb-1 text-xs font-medium text-muted-foreground">Max Concurrent</div>
+						<span class="font-medium">{backendStatus.max_running_models ?? 'Unlimited'}</span>
 					</div>
 				</div>
 
-				<!-- Configuration Details -->
-				{#if yzmaGPU?.gpu}
+				<!-- Docker Images Status -->
+				{#if dockerImages?.images}
 					<div class="mt-4 pt-4 border-t border-border/50">
-						<div class="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-							<div>
-								<span class="font-medium">Context Size:</span>
-								{yzmaGPU.gpu.context_size.toLocaleString()}
-							</div>
-							<div>
-								<span class="font-medium">Batch Size:</span>
-								{yzmaGPU.gpu.batch_size.toLocaleString()}
-							</div>
-							<div>
-								<span class="font-medium">Flash Attention:</span>
-								{yzmaGPU.gpu.flash_attention ? 'Enabled' : 'Disabled'}
-							</div>
-							{#if yzmaGPU.gpu.tensor_split && yzmaGPU.gpu.tensor_split.length > 0}
-								<div>
-									<span class="font-medium">Tensor Split:</span>
-									{yzmaGPU.gpu.tensor_split.map(v => (v * 100).toFixed(0) + '%').join(' / ')}
+						<div class="text-xs font-medium text-muted-foreground mb-3">Inference Provider Images:</div>
+						<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+							{#each dockerImages.images as img}
+								{@const isPulling = pullingImages.has(img.image)}
+								<div class="flex items-center justify-between rounded-lg border border-border/50 p-2.5">
+									<div class="flex items-center gap-2 min-w-0 flex-1">
+										{#if img.exists}
+											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+										{:else if isPulling}
+											<Loader2 class="h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
+										{:else}
+											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+										{/if}
+										<div class="min-w-0">
+											<div class="text-sm font-medium capitalize">{img.provider}</div>
+											<div class="text-xs text-muted-foreground truncate" title={img.image}>{img.image.split('/').pop()}</div>
+										</div>
+									</div>
+									<div class="flex items-center gap-2 flex-shrink-0 ml-2">
+										{#if img.exists}
+											<span class="text-xs text-muted-foreground">{img.size}</span>
+										{:else if isPulling}
+											<span class="text-xs text-blue-500">Pulling...</span>
+										{:else}
+											<button
+												onclick={() => pullDockerImage(img.image)}
+												class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+											>
+												Pull
+											</button>
+										{/if}
+									</div>
 								</div>
-							{/if}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Model List -->
-				{#if yzmaHealth?.loaded_models && yzmaHealth.loaded_models.length > 0}
-					<div class="mt-4 pt-4 border-t border-border/50">
-						<div class="text-xs font-medium text-muted-foreground mb-2">Loaded Models:</div>
-						<div class="flex flex-wrap gap-2">
-							{#each yzmaHealth.loaded_models as model}
-								<span class="px-2 py-1 rounded bg-muted text-xs font-mono">{model}</span>
 							{/each}
 						</div>
 					</div>

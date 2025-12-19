@@ -66,7 +66,7 @@ func (db *PostgreSQLDB) CreateAPIKey(ctx context.Context, key *models.APIKey) er
 
 	query := `
 		INSERT INTO api_keys (
-			id, name, description, key_hash,
+			id, name, description, key_hash, key_prefix,
 			user_id, tenant_id, scope,
 			models, permissions, rate_limits,
 			status, created_at, updated_at,
@@ -75,7 +75,7 @@ func (db *PostgreSQLDB) CreateAPIKey(ctx context.Context, key *models.APIKey) er
 			metadata, usage,
 			device_name, device_os, device_hostname, device_version, device_fingerprint,
 			last_seen_at, auto_expire_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
 	`
 
 	_, err = db.db.ExecContext(ctx, query,
@@ -83,6 +83,7 @@ func (db *PostgreSQLDB) CreateAPIKey(ctx context.Context, key *models.APIKey) er
 		key.Name,
 		key.Description,
 		key.KeyHash,
+		key.KeyPrefix,
 		key.UserID,
 		key.TenantID,
 		key.Scope,
@@ -123,7 +124,7 @@ func (db *PostgreSQLDB) GetAPIKey(ctx context.Context, id string) (*models.APIKe
 
 	query := `
 		SELECT 
-			id, name, description, key_hash,
+			id, name, description, key_hash, key_prefix,
 			user_id, tenant_id, scope,
 			models, permissions, rate_limits,
 			status, created_at, updated_at,
@@ -153,7 +154,7 @@ func (db *PostgreSQLDB) GetAPIKeyByHash(ctx context.Context, hash string) (*mode
 
 	query := `
 		SELECT 
-			id, name, description, key_hash,
+			id, name, description, key_hash, key_prefix,
 			user_id, tenant_id, scope,
 			models, permissions, rate_limits,
 			status, created_at, updated_at,
@@ -376,7 +377,7 @@ func (db *PostgreSQLDB) ListAPIKeys(ctx context.Context) ([]*models.APIKey, erro
 
 	query := `
 		SELECT 
-			id, name, description, key_hash,
+			id, name, description, key_hash, key_prefix,
 			user_id, tenant_id, scope,
 			models, permissions, rate_limits,
 			status, created_at, updated_at,
@@ -418,7 +419,7 @@ func (db *PostgreSQLDB) ListPersonalAPIKeys(ctx context.Context, userID string) 
 
 	query := `
 		SELECT 
-			id, name, description, key_hash,
+			id, name, description, key_hash, key_prefix,
 			user_id, tenant_id, scope,
 			models, permissions, rate_limits,
 			status, created_at, updated_at,
@@ -461,7 +462,7 @@ func (db *PostgreSQLDB) ListTenantAPIKeys(ctx context.Context, tenantID string) 
 
 	query := `
 		SELECT 
-			id, name, description, key_hash,
+			id, name, description, key_hash, key_prefix,
 			user_id, tenant_id, scope,
 			models, permissions, rate_limits,
 			status, created_at, updated_at,
@@ -510,6 +511,7 @@ func (db *PostgreSQLDB) scanAPIKey(row scanner) (*models.APIKey, error) {
 	var metadataJSON []byte
 
 	var description sql.NullString
+	var keyPrefix sql.NullString
 	var userID sql.NullString
 	var tenantID sql.NullString
 	var expiresAt sql.NullTime
@@ -522,6 +524,7 @@ func (db *PostgreSQLDB) scanAPIKey(row scanner) (*models.APIKey, error) {
 		&key.Name,
 		&description,
 		&key.KeyHash,
+		&keyPrefix,
 		&userID,
 		&tenantID,
 		&key.Scope,
@@ -546,6 +549,9 @@ func (db *PostgreSQLDB) scanAPIKey(row scanner) (*models.APIKey, error) {
 	// Handle nullable fields
 	if description.Valid {
 		key.Description = description.String
+	}
+	if keyPrefix.Valid {
+		key.KeyPrefix = keyPrefix.String
 	}
 	if userID.Valid {
 		key.UserID = &userID.String

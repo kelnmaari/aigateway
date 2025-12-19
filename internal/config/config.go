@@ -229,6 +229,24 @@ type OIDCConfig struct {
 
 	// TenantProvisioning конфигурация автоматического provisioning tenants из groups (Version 1.11.2+)
 	TenantProvisioning TenantProvisioningConfig `mapstructure:"tenant_provisioning"`
+
+	// RoleMapping конфигурация маппинга ролей из OIDC claims
+	RoleMapping OIDCRoleMapping `mapstructure:"role_mapping"`
+}
+
+// OIDCRoleMapping конфигурация маппинга ролей из OIDC
+type OIDCRoleMapping struct {
+	// AdminRoles список ролей (realm_access.roles) которые дают admin права
+	AdminRoles []string `mapstructure:"admin_roles"`
+
+	// AdminGroups список групп которые дают admin права
+	AdminGroups []string `mapstructure:"admin_groups"`
+
+	// UserRoles список ролей для обычных пользователей (опционально, для явной проверки)
+	UserRoles []string `mapstructure:"user_roles"`
+
+	// UserGroups список групп для обычных пользователей (опционально)
+	UserGroups []string `mapstructure:"user_groups"`
 }
 
 // ClaimsMapping маппинг OIDC claims на поля пользователя
@@ -343,6 +361,10 @@ type LoggingConfig struct {
 	ErrorLogMaxBackups int    `mapstructure:"error_log_max_backups"` // (default: same as MaxBackups)
 	ErrorLogMaxAge     int    `mapstructure:"error_log_max_age"`     // days (default: same as MaxAge)
 	ErrorLogCompress   bool   `mapstructure:"error_log_compress"`    // (default: same as Compress)
+
+	// Auth log file (separate file for authentication events)
+	AuthLogEnabled  bool   `mapstructure:"auth_log_enabled"`   // Enable separate auth log file
+	AuthLogFilePath string `mapstructure:"auth_log_file_path"` // Path to auth log file
 
 	// Structured fields для JSON логирования
 	StructuredFields map[string]string `mapstructure:"structured_fields"`

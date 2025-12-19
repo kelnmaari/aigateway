@@ -18,6 +18,8 @@ export interface AdminUser {
 	is_admin: boolean;
 	status: 'active' | 'disabled' | 'pending';
 	auth_provider: string;
+	oidc_subject?: string;
+	oidc_issuer?: string;
 	created_at: string;
 	updated_at: string;
 	last_login_at?: string;
@@ -329,6 +331,36 @@ export const adminApi = {
 
 	// Yzma GPU/Health (v3.2.2+) - works before models are loaded
 	getYzmaGPUInfo: () => api.get<YzmaGPUResponse>('/api/system/yzma/gpu'),
-	getYzmaHealth: () => api.get<YzmaHealthResponse>('/api/system/yzma/health')
+	getYzmaHealth: () => api.get<YzmaHealthResponse>('/api/system/yzma/health'),
+
+	// Backend status (v3.3.x) - shows which inference backend is active
+	getBackendStatus: () => api.get<BackendStatusResponse>('/api/system/backend'),
+
+	// Docker images for inference providers
+	getDockerImages: () => api.get<DockerImagesResponse>('/api/system/inference/docker-images'),
+	pullDockerImage: (image: string) => api.post<{ message: string; image: string }>(`/api/system/inference/docker-images/pull?image=${encodeURIComponent(image)}`)
 };
+
+export interface BackendStatusResponse {
+	backend: 'docker' | 'yzma';
+	ready: boolean;
+	loaded_models?: number;
+	running_models?: number;
+	max_running_models?: number;
+	docker_enabled?: boolean;
+	yzma_enabled?: boolean;
+}
+
+export interface DockerImageStatus {
+	provider: string;
+	image: string;
+	exists: boolean;
+	size?: string;
+	pulling?: boolean;
+}
+
+export interface DockerImagesResponse {
+	images: DockerImageStatus[];
+	error?: string;
+}
 

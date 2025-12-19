@@ -1,17 +1,37 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Eye, EyeOff, LoaderCircle } from 'lucide-svelte';
+	import { Eye, EyeOff, LoaderCircle, KeyRound } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { authApi } from '$lib/api';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import * as m from '$lib/paraglide/messages';
+	import { onMount } from 'svelte';
 
 	let username = $state('');
 	let password = $state('');
 	let showPassword = $state(false);
 	let isLoading = $state(false);
 	let error = $state('');
+	let oidcEnabled = $state(false);
+	let ldapEnabled = $state(false);
+
+	onMount(async () => {
+		try {
+			const resp = await fetch('/api/auth/providers');
+			if (resp.ok) {
+				const data = await resp.json();
+				oidcEnabled = data.oidc_enabled ?? false;
+				ldapEnabled = data.ldap_enabled ?? false;
+			}
+		} catch {
+			// Ignore - just don't show SSO buttons
+		}
+	});
+
+	function loginWithSSO() {
+		window.location.href = '/api/auth/oidc/login';
+	}
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
@@ -102,6 +122,28 @@
 						{m.auth_login()}
 					{/if}
 				</Button>
+
+				{#if oidcEnabled}
+					<div class="relative my-4">
+						<div class="absolute inset-0 flex items-center">
+							<span class="w-full border-t"></span>
+						</div>
+						<div class="relative flex justify-center text-xs uppercase">
+							<span class="bg-background px-2 text-muted-foreground">or</span>
+						</div>
+					</div>
+
+					<Button
+						type="button"
+						variant="outline"
+						class="w-full"
+						onclick={loginWithSSO}
+						disabled={isLoading}
+					>
+						<KeyRound class="mr-2 h-4 w-4" />
+						Login with SSO
+					</Button>
+				{/if}
 
 				<div class="text-center text-sm">
 					<span class="text-muted-foreground">{m.auth_noAccount()} </span>

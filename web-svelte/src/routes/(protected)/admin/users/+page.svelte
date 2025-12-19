@@ -181,6 +181,9 @@
 							Role
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
+							Auth
+						</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
 							{m.common_status()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
@@ -213,6 +216,24 @@
 									</span>
 								{:else}
 									<span class="text-sm text-muted-foreground">User</span>
+								{/if}
+							</td>
+							<td class="px-4 py-3">
+								{#if user.oidc_subject}
+									<!-- User has OIDC linked (may also have local password) -->
+									<span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400" title="OIDC linked{user.auth_provider === 'local' ? ' + Local password' : ''}">
+										<Key class="h-3 w-3" />
+										OIDC
+									</span>
+								{:else if user.auth_provider === 'ldap'}
+									<span class="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
+										<Key class="h-3 w-3" />
+										LDAP
+									</span>
+								{:else}
+									<span class="inline-flex items-center gap-1 rounded-full bg-gray-500/10 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+										Local
+									</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3">

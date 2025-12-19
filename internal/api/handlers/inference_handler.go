@@ -109,6 +109,19 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		return
 	}
 
+	// Log received parameters for debugging
+	h.logger.WithFields(logrus.Fields{
+		"alias":                req.Alias,
+		"provider":             req.Provider,
+		"format":               req.Format,
+		"hf_repo":              req.HFRepo,
+		"gpu_device":           req.GPUDevice,
+		"vllm_tensor_parallel": req.VLLMTensorParallel,
+		"vllm_max_model_len":   req.VLLMMaxModelLen,
+		"vllm_gpu_utilization": req.VLLMGPUUtilization,
+		"sglang_mem_fraction":  req.SGLangMemFraction,
+	}).Info("Received model load request")
+
 	spec := inference.ModelSpec{
 		Alias:              req.Alias,
 		Provider:           req.Provider,
@@ -303,6 +316,23 @@ func (h *InferenceHandler) PostEvictCache(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// PostClearCache clears all cached model files.
+func (h *InferenceHandler) PostClearCache(c *gin.Context) {
+	freedBytes, err := h.router.ClearCache()
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to clear cache")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":       err.Error(),
+			"freed_bytes": freedBytes,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Cache cleared successfully",
+		"freed_bytes": freedBytes,
+	})
 }
 
 // GetModels returns list of tracked models.
@@ -617,4 +647,66 @@ func (h *InferenceHandler) PostSetAutoStart(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"alias": alias, "auto_start": enabled})
+}
+
+// DockerImageStatus represents the status of a Docker image
+type DockerImageStatus struct {
+	Provider string `json:"provider"`
+	Image    string `json:"image"`
+	Exists   bool   `json:"exists"`
+	Size     string `json:"size,omitempty"`
+	Pulling  bool   `json:"pulling,omitempty"`
+}
+
+// GetDockerImages returns the status of Docker images for inference providers
+// GET /api/ui/inference/docker-images
+func (h *InferenceHandler) GetDockerImages(c *gin.Context) {
+	images := []DockerImageStatus{
+		{Provider: "vllm", Image: inference.DefaultVLLMImage},
+		{Provider: "sglang", Image: inference.DefaultSGLangImage},
+		{Provider: "tgi", Image: inference.DefaultTGIImage},
+		{Provider: "llama.cpp", Image: inference.DefaultLlamaImage},
+		{Provider: "tensorrt-llm", Image: inference.DefaultTRTLLMImage},
+	}
+
+	runtime := h.router.GetRuntime()
+	if runtime == nil {
+		c.JSON(http.StatusOK, gin.H{"images": images, "error": "runtime not available"})
+		return
+	}
+
+	for i := range images {
+		exists, size := runtime.ImageExists(images[i].Image)
+		images[i].Exists = exists
+		images[i].Size = size
+	}
+
+	c.JSON(http.StatusOK, gin.H{"images": images})
+}
+
+// PostPullDockerImage pulls a Docker image
+// POST /api/ui/inference/docker-images/pull?image=...
+func (h *InferenceHandler) PostPullDockerImage(c *gin.Context) {
+	image := c.Query("image")
+	if image == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image parameter is required"})
+		return
+	}
+
+	runtime := h.router.GetRuntime()
+	if runtime == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "runtime not available"})
+		return
+	}
+
+	// Pull in background and return immediately
+	go func() {
+		if err := runtime.PullImage(image); err != nil {
+			h.logger.WithError(err).WithField("image", image).Error("Failed to pull Docker image")
+		} else {
+			h.logger.WithField("image", image).Info("Docker image pulled successfully")
+		}
+	}()
+
+	c.JSON(http.StatusAccepted, gin.H{"message": "Image pull started", "image": image})
 }

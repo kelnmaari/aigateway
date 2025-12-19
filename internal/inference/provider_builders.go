@@ -23,7 +23,7 @@ const (
 
 // BuildVLLMRequest creates a container start request for vLLM openai server.
 // Expects spec.LocalPath (preferred) or HFRepo reference.
-func BuildVLLMRequest(spec ModelSpec, hfCacheDir string) ContainerStartRequest {
+func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartRequest {
 	modelArg := spec.HFRepo
 	if spec.LocalPath != "" {
 		modelArg = spec.LocalPath
@@ -38,15 +38,27 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir string) ContainerStartRequest {
 	if spec.VLLMTensorParallel > 0 {
 		cmd = append(cmd, "--tensor-parallel-size", fmt.Sprintf("%d", spec.VLLMTensorParallel))
 	}
-	if spec.VLLMMaxModelLen > 0 {
-		cmd = append(cmd, "--max-model-len", fmt.Sprintf("%d", spec.VLLMMaxModelLen))
+	// Set max_model_len - use specified value or default to 32768 to avoid OOM with large context models
+	maxModelLen := spec.VLLMMaxModelLen
+	if maxModelLen == 0 {
+		maxModelLen = 32768 // Reasonable default for most use cases
 	}
+	cmd = append(cmd, "--max-model-len", fmt.Sprintf("%d", maxModelLen))
+	
 	if spec.VLLMGPUUtilization > 0 {
 		cmd = append(cmd, "--gpu-memory-utilization", fmt.Sprintf("%.2f", spec.VLLMGPUUtilization))
 	}
 
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID", // Ensure consistent GPU ordering
+		// Enable verbose logging for debugging
+		"VLLM_LOGGING_LEVEL":       "DEBUG",
+		"TRANSFORMERS_VERBOSITY":   "info",
+		"HF_HUB_ENABLE_HF_TRANSFER": "1", // Faster downloads
+	}
+	// Pass HF token for downloading gated/private models
+	if hfToken != "" && spec.LocalPath == "" {
+		env["HF_TOKEN"] = hfToken
 	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
@@ -69,10 +81,13 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 	if spec.LocalPath != "" {
 		modelArg = spec.LocalPath
 	}
+	// SGLang uses "python -m sglang.launch_server" as entrypoint in the container
+	// Arguments: --model for HF model ID, --host, --port
 	cmd := []string{
+		"python", "-m", "sglang.launch_server",
+		"--model", modelArg,
 		"--host", "0.0.0.0",
 		"--port", fmt.Sprintf("%d", defaultSGLangPort),
-		"--model-path", modelArg,
 	}
 
 	// Tensor parallelism (multi-GPU)

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Key, Search, Loader2, Trash2, Eye, EyeOff, MoreVertical, X } from 'lucide-svelte';
+	import { Key, Search, Loader2, Trash2, Eye, EyeOff, MoreVertical, X, Copy } from 'lucide-svelte';
 	import { api } from '$lib/api/client';
-	import { cn, formatRelativeTime } from '$lib/utils';
+	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 
@@ -61,8 +61,9 @@
 		showMenuFor = null;
 	}
 
-	function maskKey(prefix: string): string {
-		return prefix + '••••••••••••••••';
+	function maskKey(prefix: string | undefined | null): string {
+		if (!prefix) return '••••••••••••••••';
+		return prefix + '••••••••';
 	}
 </script>
 
@@ -121,9 +122,19 @@
 								<p class="font-medium">{key.name}</p>
 							</td>
 							<td class="px-4 py-3">
-								<code class="rounded bg-muted px-2 py-1 font-mono text-xs">
-									{maskKey(key.key_prefix)}
-								</code>
+								<div class="flex items-center gap-2">
+									<code class="rounded bg-muted px-2 py-1 font-mono text-xs">
+										{maskKey(key.key_prefix)}
+									</code>
+									<button
+										type="button"
+										class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+										title="Copy prefix"
+										onclick={() => copyToClipboard(key.key_prefix || '')}
+									>
+										<Copy class="h-3.5 w-3.5" />
+									</button>
+								</div>
 							</td>
 							<td class="px-4 py-3 text-sm">
 								{#if key.tenant_name}

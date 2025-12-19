@@ -181,6 +181,9 @@ export const inferenceApi = {
 	
 	evictCache: (limitBytes: number) => 
 		api.post<{ evicted: number }>(`/api/system/inference/evict-cache?limit_bytes=${limitBytes}`),
+	
+	clearCache: () => 
+		api.post<{ message: string; freed_bytes: number }>('/api/system/inference/cache/clear'),
 
 	// TRT Engines
 	listTRTEngines: () => api.get<TRTEngine[]>('/api/system/inference/trt-engines'),

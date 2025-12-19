@@ -557,6 +557,7 @@ func (r *Router) setupInferenceRoutes() {
 		group.POST("/delete-artifacts", r.inferenceHandler.PostDeleteArtifacts)
 		group.POST("/evict-cache", r.inferenceHandler.PostEvictCache)
 		group.GET("/cache", r.inferenceHandler.GetCache)
+		group.POST("/cache/clear", r.inferenceHandler.PostClearCache)
 		group.GET("/health", r.inferenceHandler.GetHealth)
 		group.GET("/models", r.inferenceHandler.GetModels)
 		group.GET("/logs", r.inferenceHandler.GetLogs)
@@ -569,6 +570,9 @@ func (r *Router) setupInferenceRoutes() {
 		group.POST("/save", r.inferenceHandler.PostSaveModel)
 		group.POST("/delete-saved", r.inferenceHandler.PostDeleteSaved)
 		group.POST("/auto-start", r.inferenceHandler.PostSetAutoStart)
+		// Docker image management
+		group.GET("/docker-images", r.inferenceHandler.GetDockerImages)
+		group.POST("/docker-images/pull", r.inferenceHandler.PostPullDockerImage)
 	}
 	r.logger.Info("Inference v4 routes configured")
 
@@ -1156,6 +1160,39 @@ func (r *Router) setupSystemRoutes() {
 				})
 			})
 		}
+
+		// Backend status endpoint (v3.3.x) - shows which inference backend is active
+		system.GET("/backend", func(c *gin.Context) {
+			backendType := r.config.Inference.Backend
+			if backendType == "" {
+				backendType = "docker" // default
+			}
+
+			resp := gin.H{
+				"backend": backendType,
+				"ready":   false,
+			}
+
+			if backendType == "docker" && r.inferenceRouter != nil {
+				models := r.inferenceRouter.ListModels()
+				runningCount := 0
+				for _, m := range models {
+					if m.Status == "running" {
+						runningCount++
+					}
+				}
+				resp["ready"] = true
+				resp["loaded_models"] = len(models)
+				resp["running_models"] = runningCount
+				resp["max_running_models"] = r.config.Inference.Docker.MaxRunningModels
+				resp["docker_enabled"] = r.config.Inference.Docker.Enabled
+			} else if backendType == "yzma" && r.yzmaHandler != nil {
+				resp["ready"] = true
+				resp["yzma_enabled"] = true
+			}
+
+			c.JSON(http.StatusOK, resp)
+		})
 	}
 
 	r.logger.Info("System API endpoints configured")
@@ -1206,6 +1243,14 @@ func (r *Router) setupAuthRoutes() {
 		authPublic.POST("/register", r.authHandler.Register)
 		authPublic.POST("/login", r.authHandler.Login)
 		authPublic.POST("/refresh", r.authHandler.RefreshToken)
+		
+		// Auth providers status (for UI to show SSO buttons)
+		authPublic.GET("/providers", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"oidc_enabled": r.oidcHandler != nil,
+				"ldap_enabled": r.ldapHandler != nil,
+			})
+		})
 	}
 
 	// OIDC authentication endpoints (Version 1.11.1+: Keycloak SSO Integration)

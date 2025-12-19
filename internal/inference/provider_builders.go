@@ -13,11 +13,13 @@ const (
 	DefaultLlamaImage    = "ghcr.io/ggml-org/llama.cpp:server-cuda"
 	DefaultSGLangImage   = "lmsysorg/sglang:latest"
 	DefaultTGIImage      = "ghcr.io/huggingface/text-generation-inference:latest"
+	DefaultTEIImage      = "ghcr.io/huggingface/text-embeddings-inference:cpu-1.7" // Use 1.7 for stability, GPU: :1.7
 	DefaultTRTLLMImage   = "nvcr.io/nvidia/tritonserver:24.12-trtllm-python-py3"
 	defaultVLLMPort      = 8000
 	defaultLlamaServPort = 8080
 	defaultSGLangPort    = 8000
 	defaultTGIPort       = 80
+	defaultTEIPort       = 80
 	defaultTRTPort       = 8000
 )
 
@@ -33,6 +35,7 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 		"--host", "0.0.0.0",
 		"--port", fmt.Sprintf("%d", defaultVLLMPort),
 		"--model", modelArg,
+		"--trust-remote-code", // Allow custom model code from HuggingFace
 	}
 
 	if spec.VLLMTensorParallel > 0 {
@@ -88,6 +91,7 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 		"--model", modelArg,
 		"--host", "0.0.0.0",
 		"--port", fmt.Sprintf("%d", defaultSGLangPort),
+		"--trust-remote-code", // Allow custom model code from HuggingFace
 	}
 
 	// Tensor parallelism (multi-GPU)
@@ -183,6 +187,50 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 		Command:    cmd,
 		Env:        env,
 		Ports:      map[string]int{"http": defaultTGIPort},
+		Mounts: []VolumeMount{
+			{HostPath: hfCacheDir, ContainerPath: "/data", ReadOnly: false},
+		},
+		GPUDevice: spec.GPUDevice,
+	}
+}
+
+// BuildTEIRequest creates a container start request for Text Embeddings Inference.
+// TEI is optimized for embedding models (sentence-transformers, nomic, etc).
+// API: POST /embed with {inputs: ["text"]} -> {embeddings: [[...]]}
+func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartRequest {
+	modelArg := spec.HFRepo
+	if spec.LocalPath != "" {
+		modelArg = spec.LocalPath
+	}
+
+	env := map[string]string{
+		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+	}
+	// Pass HF_TOKEN for downloading gated/private models
+	if hfToken != "" && spec.LocalPath == "" {
+		env["HUGGINGFACE_HUB_TOKEN"] = hfToken
+	}
+
+	// TEI command arguments
+	cmd := []string{
+		"--model-id", modelArg,
+		"--port", fmt.Sprintf("%d", defaultTEIPort),
+	}
+
+	// Determine if GPU is available - use GPU image variant
+	image := DefaultTEIImage
+	if spec.GPUDevice != "" {
+		// Use GPU variant for better performance
+		image = "ghcr.io/huggingface/text-embeddings-inference:1.7"
+	}
+
+	return ContainerStartRequest{
+		ModelAlias: spec.Alias,
+		Provider:   ProviderTEI,
+		Image:      image,
+		Command:    cmd,
+		Env:        env,
+		Ports:      map[string]int{"http": defaultTEIPort},
 		Mounts: []VolumeMount{
 			{HostPath: hfCacheDir, ContainerPath: "/data", ReadOnly: false},
 		},

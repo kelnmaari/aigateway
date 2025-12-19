@@ -3,6 +3,7 @@ package router
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -53,6 +54,7 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
+	gitlabStorage "aigateway/internal/gitlab/storage"
 	"aigateway/internal/web"
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
@@ -222,6 +224,9 @@ type Router struct {
 
 	// UI Framework (v3.1.0: Optimized JS+CSS bundling)
 	frameworkHandler *framework.Handler // Framework asset handler
+
+	// GitLab Integration (v3.1.0+)
+	gitlabHandler *handlers.GitLabAdminHandler // GitLab admin handler
 }
 
 // NewOptions содержит опции для создания роутера
@@ -529,9 +534,9 @@ func (r *Router) setupRoutes() {
 	r.setupMCPRoutes()         // MCP Servers Catalog (v1.4.5)
 	r.setupGPURoutes()         // GPU Monitoring (v1.9.3)
 	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
-	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
-	r.setupGitLabStubRoutes()  // GitLab Integration stub routes (v3.2.0)
-	r.setupInferenceRoutes()   // Inference v4 system routes
+	r.setupUIRoutes()         // HTMX UI Routes (v2.6.0)
+	r.setupGitLabRoutes()     // GitLab Integration routes (v3.1.0)
+	r.setupInferenceRoutes()  // Inference v4 system routes
 }
 
 // setupInferenceRoutes registers minimal inference v4 endpoints (system).
@@ -2950,6 +2955,30 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	} else {
 		logger.Info("yzma local inference disabled in config")
 	}
+
+	// GitLab Integration (v3.1.0+)
+	if cfg.GitLab.Enabled && r.db != nil {
+		// Create GitLab storage using main database
+		// Try to get underlying *sql.DB via type assertion
+		type sqlDBGetter interface {
+			GetDB() interface{}
+		}
+		if getter, ok := r.db.(sqlDBGetter); ok {
+			if sqlDB, ok := getter.GetDB().(*sql.DB); ok && sqlDB != nil {
+				glStore := gitlabStorage.NewPostgresStore(sqlDB)
+				glHandler := handlers.NewGitLabAdminHandler(glStore, logger)
+				glHandler.SetMainDB(r.db)
+				r.gitlabHandler = glHandler
+				logger.Info("✅ GitLab Integration handler initialized")
+			} else {
+				logger.Warn("GitLab Integration disabled: cannot access SQL DB")
+			}
+		} else {
+			logger.Warn("GitLab Integration disabled: database does not support GetDB()")
+		}
+	} else if cfg.GitLab.Enabled {
+		logger.Warn("GitLab Integration enabled but database not available")
+	}
 }
 
 // setupFileStorage инициализирует file storage и extractors (v1.10.0)
@@ -3219,143 +3248,138 @@ func (r *Router) setupK8sProbes() {
 	r.logger.Info("✅ Kubernetes health probes configured: /healthz/live, /healthz/ready, /healthz/status")
 }
 
-// setupGitLabStubRoutes настраивает stub routes для GitLab Integration
-// Полная имплементация требует инициализации GitLab storage
-func (r *Router) setupGitLabStubRoutes() {
-	// Admin GitLab routes (stub - returns empty data)
+// setupGitLabRoutes настраивает routes для GitLab Integration
+// Использует реальный handler если gitlab.enabled=true, иначе stub routes
+func (r *Router) setupGitLabRoutes() {
+	// Admin GitLab routes
 	adminGitlab := r.engine.Group("/api/admin/gitlab")
 	if r.jwtManager != nil && r.db != nil {
 		adminGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
 		adminGitlab.Use(middleware.RequireAdmin(r.db, r.logger))
 	}
 
-	// Integrations
-	adminGitlab.GET("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.POST("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized. Configure gitlab section in config."})
-	})
-	adminGitlab.GET("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
-	})
-	adminGitlab.PUT("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.POST("/integrations/:id/test", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
+	// If gitlabHandler is initialized, use real handlers
+	if r.gitlabHandler != nil {
+		// Integrations
+		adminGitlab.GET("/integrations", r.gitlabHandler.ListIntegrations)
+		adminGitlab.POST("/integrations", r.gitlabHandler.CreateIntegration)
+		adminGitlab.GET("/integrations/:id", r.gitlabHandler.GetIntegration)
+		adminGitlab.PUT("/integrations/:id", r.gitlabHandler.UpdateIntegration)
+		adminGitlab.DELETE("/integrations/:id", r.gitlabHandler.DeleteIntegration)
+		adminGitlab.POST("/integrations/:id/test", r.gitlabHandler.TestIntegration)
 
-	// Projects
-	adminGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.GET("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
-	})
-	adminGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.POST("/projects/:project_id/webhook", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
+		// Projects
+		adminGitlab.GET("/integrations/:id/projects", r.gitlabHandler.ListProjects)
+		adminGitlab.POST("/integrations/:id/projects", r.gitlabHandler.AddProject)
+		adminGitlab.GET("/projects/:project_id", r.gitlabHandler.GetProject)
+		adminGitlab.PUT("/projects/:project_id", r.gitlabHandler.UpdateProject)
+		adminGitlab.DELETE("/projects/:project_id", r.gitlabHandler.DeleteProject)
+		adminGitlab.POST("/projects/:project_id/webhook", r.gitlabHandler.SetupWebhook)
 
-	// Reviews
-	adminGitlab.GET("/reviews", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.GET("/reviews/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
-	})
-	adminGitlab.POST("/reviews/:id/retry", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
+		// Reviews
+		adminGitlab.GET("/reviews", r.gitlabHandler.ListReviews)
+		adminGitlab.GET("/reviews/:id", r.gitlabHandler.GetReview)
+		adminGitlab.POST("/reviews/:id/retry", r.gitlabHandler.RetryReview)
 
-	// Queue
-	adminGitlab.GET("/queue/status", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"pending":    0,
-			"processing": 0,
-			"completed":  0,
-			"failed":     0,
-			"workers":    gin.H{"total": 0, "active": 0, "idle": 0},
+		// Queue
+		adminGitlab.GET("/queue/status", r.gitlabHandler.GetQueueStatus)
+		adminGitlab.GET("/queue/jobs", r.gitlabHandler.ListJobs)
+		adminGitlab.POST("/queue/jobs/:id/cancel", r.gitlabHandler.CancelJob)
+		adminGitlab.POST("/queue/jobs/:id/retry", r.gitlabHandler.RetryJob)
+
+		// Models
+		adminGitlab.GET("/models", r.gitlabHandler.ListActiveModels)
+		adminGitlab.GET("/models/analysis", r.gitlabHandler.ListAnalysisModels)
+		adminGitlab.GET("/models/embedding", r.gitlabHandler.ListEmbeddingModels)
+
+		r.logger.Info("✅ GitLab Integration routes configured with real handlers")
+	} else {
+		// Stub routes when GitLab not configured
+		adminGitlab.GET("/integrations", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 		})
-	})
-	adminGitlab.GET("/queue/jobs", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.POST("/queue/jobs/:id/cancel", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.POST("/queue/jobs/:id/retry", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-
-	// Models
-	adminGitlab.GET("/models", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.GET("/models/analysis", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.GET("/models/embedding", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-
-	// Analytics
-	adminGitlab.GET("/analytics", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"total_reviews":       0,
-			"completed_reviews":   0,
-			"failed_reviews":      0,
-			"avg_analysis_time":   0,
-			"reviews_by_day":      []interface{}{},
-			"reviews_by_project":  []interface{}{},
-			"model_usage":         []interface{}{},
+		adminGitlab.POST("/integrations", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized. Configure gitlab section in config."})
 		})
-	})
-
-	// Feedback
-	adminGitlab.GET("/feedback", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"stats":             gin.H{"total_feedback": 0, "approval_rate": 0, "accuracy_rate": 0},
-			"category_accuracy": []interface{}{},
-			"model_accuracy":    []interface{}{},
-			"recent":            []interface{}{},
+		adminGitlab.GET("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
 		})
-	})
-	adminGitlab.POST("/feedback/export", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
-	})
-
-	// Settings
-	adminGitlab.GET("/settings", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"telegram_enabled":     false,
-			"github_enabled":       false,
-			"bitbucket_enabled":    false,
-			"default_prompt":       "",
-			"language_prompts":     []interface{}{},
-			"priority_rules":       []interface{}{},
+		adminGitlab.PUT("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
 		})
-	})
-	adminGitlab.PUT("/settings", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"success": true})
-	})
-	adminGitlab.POST("/settings/telegram/test", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Test successful (stub)"})
-	})
+		adminGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.POST("/integrations/:id/test", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
 
-	// User-level GitLab routes
+		// Projects stub
+		adminGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.GET("/projects/:project_id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		})
+		adminGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.POST("/projects/:project_id/webhook", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+
+		// Reviews stub
+		adminGitlab.GET("/reviews", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.GET("/reviews/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		})
+		adminGitlab.POST("/reviews/:id/retry", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+
+		// Queue stub
+		adminGitlab.GET("/queue/status", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"pending":    0,
+				"processing": 0,
+				"completed":  0,
+				"failed":     0,
+				"workers":    gin.H{"total": 0, "active": 0, "idle": 0},
+			})
+		})
+		adminGitlab.GET("/queue/jobs", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.POST("/queue/jobs/:id/cancel", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.POST("/queue/jobs/:id/retry", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+
+		// Models stub
+		adminGitlab.GET("/models", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.GET("/models/analysis", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.GET("/models/embedding", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+
+		r.logger.Info("✅ GitLab Integration stub routes configured (gitlab.enabled=false)")
+	}
+
+	// User-level GitLab routes (always stub for now - user-level not implemented)
 	userGitlab := r.engine.Group("/api/gitlab")
 	if r.jwtManager != nil && r.db != nil {
 		userGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
@@ -3365,31 +3389,31 @@ func (r *Router) setupGitLabStubRoutes() {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 	})
 	userGitlab.POST("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/integrations/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
 	})
 	userGitlab.PUT("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 	})
 	userGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/projects/:project_id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 	})
 	userGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/reviews", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
@@ -3397,11 +3421,4 @@ func (r *Router) setupGitLabStubRoutes() {
 	userGitlab.GET("/reviews/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
 	})
-
-	// WebSocket stub (returns 501 Not Implemented instead of 404)
-	adminGitlab.GET("/ws", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "WebSocket not available - GitLab storage not initialized"})
-	})
-
-	r.logger.Info("✅ GitLab Integration stub routes configured: /api/admin/gitlab/*, /api/gitlab/*")
 }

@@ -13,6 +13,7 @@ const (
 	ProviderVLLM     ProviderKind = "vllm"
 	ProviderSGLang   ProviderKind = "sglang"
 	ProviderTGI      ProviderKind = "tgi"
+	ProviderTEI      ProviderKind = "tei" // Text Embeddings Inference (embedding-only)
 	ProviderTRTLLM   ProviderKind = "tensorrt-llm"
 	ProviderLlamaCPP ProviderKind = "llama.cpp"
 )

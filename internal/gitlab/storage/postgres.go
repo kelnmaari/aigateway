@@ -207,6 +207,61 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 	return integrations, total, nil
 }
 
+func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID string) ([]*models.GitLabIntegration, error) {
+	query := `
+		SELECT id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at
+		FROM gitlab_integrations
+		WHERE owner_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("query integrations by owner: %w", err)
+	}
+	defer rows.Close()
+
+	var integrations []*models.GitLabIntegration
+	for rows.Next() {
+		var integration models.GitLabIntegration
+		var lastSyncAt sql.NullTime
+		var lastError sql.NullString
+		var settingsJSON string
+
+		if err := rows.Scan(
+			&integration.ID,
+			&integration.Name,
+			&integration.BaseURL,
+			&integration.AccessToken,
+			&integration.WebhookSecret,
+			&integration.Status,
+			&lastSyncAt,
+			&lastError,
+			&settingsJSON,
+			&integration.CreatedAt,
+			&integration.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan integration: %w", err)
+		}
+
+		if lastSyncAt.Valid {
+			integration.LastSyncAt = &lastSyncAt.Time
+		}
+		if lastError.Valid {
+			integration.LastError = lastError.String
+		}
+		if settingsJSON != "" {
+			if err := json.Unmarshal([]byte(settingsJSON), &integration.Settings); err != nil {
+				// Ignore JSON errors
+			}
+		}
+
+		integrations = append(integrations, &integration)
+	}
+
+	return integrations, nil
+}
+
 func (s *PostgresStore) UpdateIntegration(ctx context.Context, id string, req *models.UpdateGitLabIntegrationRequest) error {
 	var sets []string
 	var args []interface{}
@@ -559,6 +614,74 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 	}
 
 	return projects, total, nil
+}
+
+func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrationID string) ([]*models.GitLabProject, error) {
+	query := `
+		SELECT id, integration_id, gitlab_project_id, name, path_with_namespace,
+		       auto_review, webhook_id, status, analysis_model_id, embedding_model_id, review_prompt,
+		       settings, created_at, updated_at
+		FROM gitlab_projects
+		WHERE integration_id = $1
+		ORDER BY name ASC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, integrationID)
+	if err != nil {
+		return nil, fmt.Errorf("query projects by integration: %w", err)
+	}
+	defer rows.Close()
+
+	var projects []*models.GitLabProject
+	for rows.Next() {
+		var project models.GitLabProject
+		var webhookID sql.NullInt64
+		var settingsJSON string
+		var analysisModelID, embeddingModelID sql.NullString
+		var reviewPrompt sql.NullString
+
+		if err := rows.Scan(
+			&project.ID,
+			&project.IntegrationID,
+			&project.GitLabProjectID,
+			&project.Name,
+			&project.PathWithNamespace,
+			&project.AutoReview,
+			&webhookID,
+			&project.Status,
+			&analysisModelID,
+			&embeddingModelID,
+			&reviewPrompt,
+			&settingsJSON,
+			&project.CreatedAt,
+			&project.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan project: %w", err)
+		}
+
+		if webhookID.Valid {
+			wid := webhookID.Int64
+			project.WebhookID = &wid
+		}
+		if analysisModelID.Valid {
+			project.AnalysisModelID = analysisModelID.String
+		}
+		if embeddingModelID.Valid {
+			project.EmbeddingModelID = embeddingModelID.String
+		}
+		if reviewPrompt.Valid {
+			project.ReviewPrompt = reviewPrompt.String
+		}
+		if settingsJSON != "" {
+			if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
+				// Ignore JSON errors
+			}
+		}
+
+		projects = append(projects, &project)
+	}
+
+	return projects, nil
 }
 
 func (s *PostgresStore) UpdateProject(ctx context.Context, id string, req *models.UpdateGitLabProjectRequest) error {

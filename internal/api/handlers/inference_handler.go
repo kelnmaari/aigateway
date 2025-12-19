@@ -665,6 +665,7 @@ func (h *InferenceHandler) GetDockerImages(c *gin.Context) {
 		{Provider: "vllm", Image: inference.DefaultVLLMImage},
 		{Provider: "sglang", Image: inference.DefaultSGLangImage},
 		{Provider: "tgi", Image: inference.DefaultTGIImage},
+		{Provider: "tei", Image: inference.DefaultTEIImage},
 		{Provider: "llama.cpp", Image: inference.DefaultLlamaImage},
 		{Provider: "tensorrt-llm", Image: inference.DefaultTRTLLMImage},
 	}

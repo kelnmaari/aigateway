@@ -183,6 +183,88 @@ func (s *PostgresStore) scanReview(row *sql.Row) (*models.GitLabMRReview, error)
 	return &review, nil
 }
 
+func (s *PostgresStore) ListReviewsByIntegration(ctx context.Context, integrationID string) ([]*models.GitLabMRReview, error) {
+	query := `
+		SELECT r.id, r.project_id, r.mr_iid, r.mr_title, r.mr_author, r.source_branch, r.target_branch,
+		       r.status, r.files_analyzed, r.lines_changed, r.issues_found, r.review_result,
+		       r.note_id, r.discussion_id, r.processing_time_ms, r.tokens_used, r.model,
+		       r.retry_count, r.max_retries, r.error, r.created_at, r.updated_at, r.completed_at
+		FROM gitlab_mr_reviews r
+		INNER JOIN gitlab_projects p ON r.project_id = p.id
+		WHERE p.integration_id = $1
+		ORDER BY r.created_at DESC
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, integrationID)
+	if err != nil {
+		return nil, fmt.Errorf("query reviews by integration: %w", err)
+	}
+	defer rows.Close()
+
+	var reviews []*models.GitLabMRReview
+	for rows.Next() {
+		var review models.GitLabMRReview
+		var resultJSON []byte
+		var noteID sql.NullInt64
+		var discussionID sql.NullString
+		var completedAt sql.NullTime
+		var errorStr sql.NullString
+
+		if err := rows.Scan(
+			&review.ID,
+			&review.ProjectID,
+			&review.MRIID,
+			&review.MRTitle,
+			&review.MRAuthor,
+			&review.SourceBranch,
+			&review.TargetBranch,
+			&review.Status,
+			&review.FilesAnalyzed,
+			&review.LinesChanged,
+			&review.IssuesFound,
+			&resultJSON,
+			&noteID,
+			&discussionID,
+			&review.ProcessingTimeMs,
+			&review.TokensUsed,
+			&review.ModelUsed,
+			&review.RetryCount,
+			&review.MaxRetries,
+			&errorStr,
+			&review.CreatedAt,
+			&review.UpdatedAt,
+			&completedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan review: %w", err)
+		}
+
+		if noteID.Valid {
+			nid := noteID.Int64
+			review.NoteID = &nid
+		}
+		if discussionID.Valid {
+			did := discussionID.String
+			review.DiscussionID = &did
+		}
+		if errorStr.Valid {
+			review.Error = errorStr.String
+		}
+		if completedAt.Valid {
+			review.CompletedAt = &completedAt.Time
+		}
+		if len(resultJSON) > 0 {
+			var result models.GitLabReviewResult
+			if err := json.Unmarshal(resultJSON, &result); err == nil {
+				review.ReviewResult = &result
+			}
+		}
+
+		reviews = append(reviews, &review)
+	}
+
+	return reviews, nil
+}
+
 func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabReviewListRequest) ([]models.GitLabMRReview, int, error) {
 	var conditions []string
 	var args []interface{}

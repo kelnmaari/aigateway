@@ -144,6 +144,8 @@ func (s *Service) LoadAndStart(ctx context.Context, spec ModelSpec) (*ModelInsta
 		req = BuildSGLangRequest(spec, s.cfg.HFCacheDir, s.cfg.HFToken)
 	case ProviderTGI:
 		req = BuildTGIRequest(spec, s.cfg.HFCacheDir, s.cfg.HFToken)
+	case ProviderTEI:
+		req = BuildTEIRequest(spec, s.cfg.HFCacheDir, s.cfg.HFToken)
 	case ProviderLlamaCPP:
 		var err error
 		req, err = BuildLlamaCPPRequest(spec)

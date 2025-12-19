@@ -443,3 +443,12 @@ huggingface:
   max_concurrent_downloads: 2 # Maximum number of parallel downloads
   auto_resume: true # Automatically resume interrupted downloads
 
+# GitLab MR Review Integration (v3.1.0+)
+gitlab:
+  enabled: true # Enable GitLab integration
+  workers: 2 # Number of concurrent review workers
+  max_files_per_mr: 50 # Maximum files per MR
+  max_lines_per_file: 2000 # Maximum lines per file
+  review_timeout: 5m # Timeout for single review
+  enable_rag: true # Enable RAG for context-aware reviews
+

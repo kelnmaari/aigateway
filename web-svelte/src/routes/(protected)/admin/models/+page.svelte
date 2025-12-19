@@ -9,7 +9,7 @@
 	let gpuDevices: GPUDevice[] = $state([]);
 	let selectedGPUs: number[] = $state([]);
 
-	const providers: Provider[] = ['vllm', 'sglang', 'tgi', 'tensorrt-llm', 'llama.cpp'];
+	const providers: Provider[] = ['vllm', 'sglang', 'tgi', 'tei', 'tensorrt-llm', 'llama.cpp'];
 	const formats: Format[] = ['hf', 'gguf', 'trt', 'other'];
 	const capabilities: Capability[] = ['chat', 'embeddings', 'vision'];
 
@@ -81,6 +81,7 @@
 	let hfSearching = $state(false);
 	let hfSelectedModel = $state<HFModel | null>(null);
 	let hfModelFiles = $state<any[]>([]);
+	let hfRepoDebounce: ReturnType<typeof setTimeout> | undefined;
 	
 	// Selected model for details panel
 	let selectedModel = $state<ModelInfo | null>(null);
@@ -287,7 +288,18 @@
 	
 	// Update recommendations when model or GPU selection changes
 	function updateRecommendations() {
-		memoryRecommendation = calculateMemoryRecommendation(hfSelectedModel);
+		// Use hfSelectedModel if available, otherwise try to create pseudo-model from hf_repo
+		let modelForCalc = hfSelectedModel;
+		if (!modelForCalc && form.hf_repo) {
+			// Create minimal model object from manual input for calculation
+			modelForCalc = {
+				id: form.hf_repo,
+				tags: [],
+				safetensors: undefined
+			} as HFModel;
+		}
+		
+		memoryRecommendation = calculateMemoryRecommendation(modelForCalc);
 		
 		// Auto-apply recommendations if available
 		if (memoryRecommendation) {
@@ -400,7 +412,7 @@
 					form.capabilities = ['chat'];
 					break;
 				case 'embedding':
-					form.provider = 'sglang'; // SGLang handles embeddings well
+					form.provider = 'tei'; // TEI (Text Embeddings Inference) is best for embeddings
 					form.capabilities = ['embeddings'];
 					break;
 				default:
@@ -884,7 +896,16 @@
 						</label>
 						<label class="flex flex-col gap-1 text-sm">
 							<span class="font-medium">HF Repo</span>
-							<input class="border rounded px-3 py-2 bg-background" bind:value={form.hf_repo} placeholder="meta-llama/Llama-3.1-8B-Instruct" />
+							<input 
+								class="border rounded px-3 py-2 bg-background" 
+								bind:value={form.hf_repo} 
+								placeholder="meta-llama/Llama-3.1-8B-Instruct"
+								oninput={() => {
+									// Debounce recommendation update
+									clearTimeout(hfRepoDebounce);
+									hfRepoDebounce = setTimeout(() => updateRecommendations(), 500);
+								}}
+							/>
 						</label>
 						<label class="flex flex-col gap-1 text-sm">
 							<span class="font-medium">HF File (GGUF)</span>

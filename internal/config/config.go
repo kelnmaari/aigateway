@@ -34,6 +34,28 @@ type Config struct {
 	Agent         AgentConfig         `mapstructure:"agent"`          // Version 2.5.0+: Agentic AI configuration
 	HuggingFace   HuggingFaceConfig   `mapstructure:"huggingface"`    // Version 3.0.0+: Hugging Face integration
 	Yzma          YzmaConfig          `mapstructure:"yzma"`           // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
+	GitLab        GitLabConfig        `mapstructure:"gitlab"`         // Version 3.1.0+: GitLab MR Review integration
+}
+
+// GitLabConfig configures GitLab MR Review integration (v3.1.0+)
+type GitLabConfig struct {
+	// Enabled enables GitLab MR review feature
+	Enabled bool `mapstructure:"enabled"`
+
+	// Workers number of concurrent MR review workers
+	Workers int `mapstructure:"workers"`
+
+	// MaxFilesPerMR limits files analyzed per MR
+	MaxFilesPerMR int `mapstructure:"max_files_per_mr"`
+
+	// MaxLinesPerFile limits lines per file
+	MaxLinesPerFile int `mapstructure:"max_lines_per_file"`
+
+	// ReviewTimeout for single MR review
+	ReviewTimeout time.Duration `mapstructure:"review_timeout"`
+
+	// EnableRAG enables RAG for context-aware reviews
+	EnableRAG bool `mapstructure:"enable_rag"`
 }
 
 // InferenceConfig represents unified inference backend configuration (v3.0.6+)

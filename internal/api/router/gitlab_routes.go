@@ -160,12 +160,15 @@ func (r *Router) SetupGitLabWebhookRoute(webhookHandler handlers.WebhookHandler)
 		return
 	}
 
-	r.logger.Info("Setting up GitLab webhook route")
+	r.logger.Info("Setting up GitLab webhook routes")
 
-	// Webhook endpoint - NO authentication, uses webhook secret verification
+	// Webhook endpoints - NO authentication, uses webhook secret verification
+	// Legacy route
 	r.engine.POST("/webhook/gitlab", webhookHandler.HandleWebhook)
+	// New route with integration ID in path (used by frontend)
+	r.engine.POST("/api/gitlab/webhook/:integration_id", webhookHandler.HandleWebhook)
 	
-	r.logger.Info("GitLab webhook route configured: POST /webhook/gitlab")
+	r.logger.Info("GitLab webhook routes configured: POST /webhook/gitlab, POST /api/gitlab/webhook/:integration_id")
 }
 
 // WebhookHandler interface for GitLab webhooks

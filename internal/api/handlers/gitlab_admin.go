@@ -1065,20 +1065,18 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 		days = 7
 	}
 
-	// TODO: Implement actual analytics from database
-	// For now, return placeholder data
-	c.JSON(http.StatusOK, gin.H{
-		"range":              rangeParam,
-		"days":               days,
-		"total_reviews":      0,
-		"completed_reviews":  0,
-		"failed_reviews":     0,
-		"avg_processing_ms":  0,
-		"total_issues_found": 0,
-		"reviews_by_day":     []interface{}{},
-		"reviews_by_project": []interface{}{},
-		"issue_categories":   []interface{}{},
-	})
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	analytics, err := h.store.GetAnalytics(ctx, days)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get analytics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get analytics"})
+		return
+	}
+
+	analytics.Range = rangeParam
+	c.JSON(http.StatusOK, analytics)
 }
 
 // ============================================================================
@@ -1087,19 +1085,53 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 
 // ListFeedback GET /api/admin/gitlab/feedback
 func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
-	// Placeholder - feedback system not implemented yet
+	req := models.GitLabFeedbackListRequest{
+		Limit:  20,
+		Offset: 0,
+	}
+
+	if limit, err := strconv.Atoi(c.DefaultQuery("limit", "20")); err == nil && limit > 0 {
+		req.Limit = limit
+	}
+	if offset, err := strconv.Atoi(c.DefaultQuery("offset", "0")); err == nil && offset >= 0 {
+		req.Offset = offset
+	}
+	if reviewID := c.Query("review_id"); reviewID != "" {
+		req.ReviewID = &reviewID
+	}
+	if feedbackType := c.Query("type"); feedbackType != "" {
+		req.FeedbackType = &feedbackType
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	feedback, total, err := h.store.ListFeedback(ctx, &req)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list feedback")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list feedback"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":  []interface{}{},
-		"total": 0,
+		"data":  feedback,
+		"total": total,
+		"pagination": gin.H{
+			"limit":  req.Limit,
+			"offset": req.Offset,
+			"total":  total,
+		},
 	})
 }
 
 // SubmitFeedback POST /api/admin/gitlab/feedback
 func (h *GitLabAdminHandler) SubmitFeedback(c *gin.Context) {
 	var req struct {
-		ReviewID string `json:"review_id" binding:"required"`
-		Rating   int    `json:"rating" binding:"required,min=1,max=5"`
-		Comment  string `json:"comment"`
+		ReviewID     string  `json:"review_id" binding:"required"`
+		Rating       int     `json:"rating" binding:"required,min=1,max=5"`
+		FeedbackType string  `json:"feedback_type"`
+		Comment      string  `json:"comment"`
+		IssueIndex   *int    `json:"issue_index"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1107,14 +1139,47 @@ func (h *GitLabAdminHandler) SubmitFeedback(c *gin.Context) {
 		return
 	}
 
+	// Default feedback type
+	if req.FeedbackType == "" {
+		req.FeedbackType = models.FeedbackTypeGeneral
+	}
+
+	// Get user ID from context if available
+	var userID *string
+	if uid, exists := c.Get("user_id"); exists {
+		if id, ok := uid.(string); ok {
+			userID = &id
+		}
+	}
+
+	feedback := &models.GitLabReviewFeedback{
+		ReviewID:     req.ReviewID,
+		UserID:       userID,
+		Rating:       req.Rating,
+		FeedbackType: req.FeedbackType,
+		Comment:      req.Comment,
+		IssueIndex:   req.IssueIndex,
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	if err := h.store.CreateFeedback(ctx, feedback); err != nil {
+		h.logger.WithError(err).Error("Failed to submit feedback")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit feedback"})
+		return
+	}
+
 	h.logger.WithFields(logrus.Fields{
-		"review_id": req.ReviewID,
-		"rating":    req.Rating,
-		"comment":   req.Comment,
+		"feedback_id": feedback.ID,
+		"review_id":   req.ReviewID,
+		"rating":      req.Rating,
 	}).Info("Feedback submitted for review")
 
-	// TODO: Store feedback in database
-	c.JSON(http.StatusOK, gin.H{"message": "Feedback submitted successfully"})
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Feedback submitted successfully",
+		"id":      feedback.ID,
+	})
 }
 
 // ============================================================================

@@ -22,43 +22,47 @@ func (s *PostgresStore) CreateReview(ctx context.Context, review *models.GitLabM
 	if review.ID == "" {
 		review.ID = uuid.New().String()
 	}
-	
-	now := time.Now()
-	review.CreatedAt = now
-	review.UpdatedAt = now
 
-	var resultJSON []byte
+	review.CreatedAt = time.Now()
+
+	var resultJSON interface{} = nil
 	if review.ReviewResult != nil {
-		var err error
-		resultJSON, err = json.Marshal(review.ReviewResult)
+		data, err := json.Marshal(review.ReviewResult)
 		if err != nil {
 			return fmt.Errorf("marshal review result: %w", err)
 		}
+		resultJSON = data
 	}
 
 	query := `
 		INSERT INTO gitlab_mr_reviews (
-			id, project_id, mr_iid, mr_title, mr_author, source_branch, target_branch,
-			status, files_analyzed, lines_changed, issues_found, review_result,
-			note_id, discussion_id, processing_time_ms, tokens_used, model,
-			retry_count, max_retries, error, created_at, updated_at, completed_at
+			id, project_id, integration_id, mr_iid, mr_title, mr_author, mr_author_id,
+			source_branch, target_branch, mr_url, status, priority,
+			files_analyzed, lines_changed, issues_found, review_result,
+			note_id, discussion_id, processing_time_ms, tokens_used, model_used,
+			retry_count, error, created_at, completed_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7,
 			$8, $9, $10, $11, $12,
-			$13, $14, $15, $16, $17,
-			$18, $19, $20, $21, $22, $23
+			$13, $14, $15, $16,
+			$17, $18, $19, $20, $21,
+			$22, $23, $24, $25
 		)
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
 		review.ID,
 		review.ProjectID,
+		review.IntegrationID,
 		review.MRIID,
 		review.MRTitle,
 		review.MRAuthor,
+		review.MRAuthorID,
 		review.SourceBranch,
 		review.TargetBranch,
+		review.MRURL,
 		review.Status,
+		review.Priority,
 		review.FilesAnalyzed,
 		review.LinesChanged,
 		review.IssuesFound,
@@ -69,10 +73,8 @@ func (s *PostgresStore) CreateReview(ctx context.Context, review *models.GitLabM
 		review.TokensUsed,
 		review.ModelUsed,
 		review.RetryCount,
-		review.MaxRetries,
 		review.Error,
 		review.CreatedAt,
-		review.UpdatedAt,
 		review.CompletedAt,
 	)
 	if err != nil {
@@ -86,8 +88,8 @@ func (s *PostgresStore) GetReview(ctx context.Context, id string) (*models.GitLa
 	query := `
 		SELECT id, project_id, mr_iid, mr_title, mr_author, source_branch, target_branch,
 		       status, files_analyzed, lines_changed, issues_found, review_result,
-		       note_id, discussion_id, processing_time_ms, tokens_used, model,
-		       retry_count, max_retries, error, created_at, updated_at, completed_at
+		       note_id, discussion_id, processing_time_ms, tokens_used, model_used,
+		       retry_count, error, created_at, completed_at
 		FROM gitlab_mr_reviews
 		WHERE id = $1
 	`
@@ -99,8 +101,8 @@ func (s *PostgresStore) GetReviewByMR(ctx context.Context, projectID string, mrI
 	query := `
 		SELECT id, project_id, mr_iid, mr_title, mr_author, source_branch, target_branch,
 		       status, files_analyzed, lines_changed, issues_found, review_result,
-		       note_id, discussion_id, processing_time_ms, tokens_used, model,
-		       retry_count, max_retries, error, created_at, updated_at, completed_at
+		       note_id, discussion_id, processing_time_ms, tokens_used, model_used,
+		       retry_count, error, created_at, completed_at
 		FROM gitlab_mr_reviews
 		WHERE project_id = $1 AND mr_iid = $2
 		ORDER BY created_at DESC
@@ -140,10 +142,8 @@ func (s *PostgresStore) scanReview(row *sql.Row) (*models.GitLabMRReview, error)
 		&tokensUsed,
 		&model,
 		&review.RetryCount,
-		&review.MaxRetries,
 		&errStr,
 		&review.CreatedAt,
-		&review.UpdatedAt,
 		&completedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -188,7 +188,7 @@ func (s *PostgresStore) ListReviewsByIntegration(ctx context.Context, integratio
 		SELECT r.id, r.project_id, r.mr_iid, r.mr_title, r.mr_author, r.source_branch, r.target_branch,
 		       r.status, r.files_analyzed, r.lines_changed, r.issues_found, r.review_result,
 		       r.note_id, r.discussion_id, r.processing_time_ms, r.tokens_used, r.model_used,
-		       r.retry_count, r.max_retries, r.error, r.created_at, r.updated_at, r.completed_at
+		       r.retry_count, r.error, r.created_at, r.completed_at
 		FROM gitlab_mr_reviews r
 		INNER JOIN gitlab_projects p ON r.project_id = p.id
 		WHERE p.integration_id = $1
@@ -229,10 +229,8 @@ func (s *PostgresStore) ListReviewsByIntegration(ctx context.Context, integratio
 			&review.TokensUsed,
 			&review.ModelUsed,
 			&review.RetryCount,
-			&review.MaxRetries,
 			&errorStr,
 			&review.CreatedAt,
-			&review.UpdatedAt,
 			&completedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan review: %w", err)
@@ -309,7 +307,7 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 		SELECT r.id, r.project_id, r.mr_iid, r.mr_title, r.mr_author, r.source_branch, r.target_branch,
 		       r.status, r.files_analyzed, r.lines_changed, r.issues_found, r.review_result,
 		       r.note_id, r.discussion_id, r.processing_time_ms, r.tokens_used, r.model_used,
-		       r.retry_count, r.max_retries, r.error, r.created_at, r.updated_at, r.completed_at,
+		       r.retry_count, r.error, r.created_at, r.completed_at,
 		       p.name as project_name, p.path_with_namespace
 		FROM gitlab_mr_reviews r
 		LEFT JOIN gitlab_projects p ON p.id = r.project_id
@@ -367,10 +365,8 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 			&tokensUsed,
 			&model,
 			&review.RetryCount,
-			&review.MaxRetries,
 			&errStr,
 			&review.CreatedAt,
-			&review.UpdatedAt,
 			&completedAt,
 			&projectName,
 			&pathWithNS,
@@ -458,7 +454,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 	if job.ID == "" {
 		job.ID = uuid.New().String()
 	}
-	
+
 	now := time.Now()
 	job.CreatedAt = now
 	job.UpdatedAt = now
@@ -474,15 +470,15 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 
 	query := `
 		INSERT INTO gitlab_analysis_jobs (
-			id, review_id, integration_id, project_id, mr_iid,
+			id, review_id, integration_id, project_id, mr_iid, mr_title,
 			status, priority, worker_id, config,
 			retry_count, max_retries, next_retry_at, last_error,
 			created_at, updated_at, started_at, completed_at
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9,
-			$10, $11, $12, $13,
-			$14, $15, $16, $17
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10,
+			$11, $12, $13, $14,
+			$15, $16, $17, $18
 		)
 	`
 
@@ -492,6 +488,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 		job.IntegrationID,
 		job.ProjectID,
 		job.MRIID,
+		job.MRTitle,
 		job.Status,
 		job.Priority,
 		job.WorkerID,
@@ -515,9 +512,9 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAnalysisJob, error) {
 	query := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
-		       j.status, j.priority, j.worker_id, j.mr_title,
+		       j.status, j.priority, j.worker_id, j.mr_title, j.config,
 		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
-		       j.created_at, j.started_at, j.completed_at
+		       j.created_at, j.updated_at, j.started_at, j.completed_at
 		FROM gitlab_analysis_jobs j
 		WHERE j.id = $1
 	`
@@ -525,8 +522,10 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 	var job models.GitLabAnalysisJob
 	var workerID sql.NullString
 	var mrTitle sql.NullString
+	var configJSON []byte
 	var nextRetryAt sql.NullTime
 	var errStr sql.NullString
+	var updatedAt sql.NullTime
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
 
@@ -540,11 +539,13 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 		&job.Priority,
 		&workerID,
 		&mrTitle,
+		&configJSON,
 		&job.RetryCount,
 		&job.MaxRetries,
 		&nextRetryAt,
 		&errStr,
 		&job.CreatedAt,
+		&updatedAt,
 		&startedAt,
 		&completedAt,
 	)
@@ -561,11 +562,18 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 	if mrTitle.Valid {
 		job.MRTitle = mrTitle.String
 	}
+	if len(configJSON) > 0 {
+		job.Config = &models.GitLabJobConfig{}
+		_ = json.Unmarshal(configJSON, job.Config)
+	}
 	if nextRetryAt.Valid {
 		job.NextRetryAt = &nextRetryAt.Time
 	}
 	if errStr.Valid {
 		job.LastError = errStr.String
+	}
+	if updatedAt.Valid {
+		job.UpdatedAt = updatedAt.Time
 	}
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
@@ -580,9 +588,9 @@ func (s *PostgresStore) GetJob(ctx context.Context, id string) (*models.GitLabAn
 func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*models.GitLabAnalysisJob, error) {
 	query := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
-		       j.status, j.priority, j.worker_id, j.mr_title,
+		       j.status, j.priority, j.worker_id, j.mr_title, j.config,
 		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
-		       j.created_at, j.started_at, j.completed_at
+		       j.created_at, j.updated_at, j.started_at, j.completed_at
 		FROM gitlab_analysis_jobs j
 		WHERE j.review_id = $1
 		ORDER BY j.created_at DESC
@@ -592,8 +600,10 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 	var job models.GitLabAnalysisJob
 	var workerID sql.NullString
 	var mrTitle sql.NullString
+	var configJSON []byte
 	var nextRetryAt sql.NullTime
 	var errStr sql.NullString
+	var updatedAt sql.NullTime
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
 
@@ -607,11 +617,13 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 		&job.Priority,
 		&workerID,
 		&mrTitle,
+		&configJSON,
 		&job.RetryCount,
 		&job.MaxRetries,
 		&nextRetryAt,
 		&errStr,
 		&job.CreatedAt,
+		&updatedAt,
 		&startedAt,
 		&completedAt,
 	)
@@ -628,11 +640,18 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 	if mrTitle.Valid {
 		job.MRTitle = mrTitle.String
 	}
+	if len(configJSON) > 0 {
+		job.Config = &models.GitLabJobConfig{}
+		_ = json.Unmarshal(configJSON, job.Config)
+	}
 	if nextRetryAt.Valid {
 		job.NextRetryAt = &nextRetryAt.Time
 	}
 	if errStr.Valid {
 		job.LastError = errStr.String
+	}
+	if updatedAt.Valid {
+		job.UpdatedAt = updatedAt.Time
 	}
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
@@ -648,9 +667,9 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	// Use FOR UPDATE SKIP LOCKED for concurrent access
 	query := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
-		       j.status, j.priority, j.worker_id, j.mr_title,
+		       j.status, j.priority, j.worker_id, j.mr_title, j.config,
 		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
-		       j.created_at, j.started_at, j.completed_at,
+		       j.created_at, j.updated_at, j.started_at, j.completed_at,
 		       r.mr_author, r.source_branch, r.target_branch,
 		       p.name as project_name, p.analysis_model_id, p.embedding_model_id, p.review_prompt
 		FROM gitlab_analysis_jobs j
@@ -665,8 +684,10 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	var job models.GitLabAnalysisJob
 	var workerID sql.NullString
 	var mrTitle sql.NullString
+	var configJSON []byte
 	var nextRetryAt sql.NullTime
 	var errStr sql.NullString
+	var updatedAt sql.NullTime
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
 	var mrAuthor sql.NullString
@@ -687,11 +708,13 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 		&job.Priority,
 		&workerID,
 		&mrTitle,
+		&configJSON,
 		&job.RetryCount,
 		&job.MaxRetries,
 		&nextRetryAt,
 		&errStr,
 		&job.CreatedAt,
+		&updatedAt,
 		&startedAt,
 		&completedAt,
 		&mrAuthor,
@@ -715,11 +738,18 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	if mrTitle.Valid {
 		job.MRTitle = mrTitle.String
 	}
+	if len(configJSON) > 0 {
+		job.Config = &models.GitLabJobConfig{}
+		_ = json.Unmarshal(configJSON, job.Config)
+	}
 	if nextRetryAt.Valid {
 		job.NextRetryAt = &nextRetryAt.Time
 	}
 	if errStr.Valid {
 		job.LastError = errStr.String
+	}
+	if updatedAt.Valid {
+		job.UpdatedAt = updatedAt.Time
 	}
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
@@ -778,9 +808,9 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 	// Fetch items
 	query := fmt.Sprintf(`
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
-		       j.status, j.priority, j.worker_id, j.mr_title,
+		       j.status, j.priority, j.worker_id, j.mr_title, j.config,
 		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
-		       j.created_at, j.started_at, j.completed_at,
+		       j.created_at, j.updated_at, j.started_at, j.completed_at,
 		       r.mr_author, r.source_branch, r.target_branch,
 		       p.name as project_name
 		FROM gitlab_analysis_jobs j
@@ -810,8 +840,10 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 		var job models.GitLabAnalysisJob
 		var workerID sql.NullString
 		var mrTitle sql.NullString
+		var configJSON []byte
 		var nextRetryAt sql.NullTime
 		var errStr sql.NullString
+		var updatedAt sql.NullTime
 		var startedAt sql.NullTime
 		var completedAt sql.NullTime
 		var mrAuthor sql.NullString
@@ -829,11 +861,13 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 			&job.Priority,
 			&workerID,
 			&mrTitle,
+			&configJSON,
 			&job.RetryCount,
 			&job.MaxRetries,
 			&nextRetryAt,
 			&errStr,
 			&job.CreatedAt,
+			&updatedAt,
 			&startedAt,
 			&completedAt,
 			&mrAuthor,
@@ -850,11 +884,18 @@ func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobSt
 		if mrTitle.Valid {
 			job.MRTitle = mrTitle.String
 		}
+		if len(configJSON) > 0 {
+			job.Config = &models.GitLabJobConfig{}
+			_ = json.Unmarshal(configJSON, job.Config)
+		}
 		if nextRetryAt.Valid {
 			job.NextRetryAt = &nextRetryAt.Time
 		}
 		if errStr.Valid {
 			job.LastError = errStr.String
+		}
+		if updatedAt.Valid {
+			job.UpdatedAt = updatedAt.Time
 		}
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time
@@ -988,9 +1029,9 @@ func (s *PostgresStore) CleanupOldJobs(ctx context.Context, olderThanDays int) (
 		WHERE status IN ($1, $2, $3) AND completed_at < $4
 	`
 	cutoff := time.Now().AddDate(0, 0, -olderThanDays)
-	result, err := s.db.ExecContext(ctx, query, 
-		models.GitLabJobStatusCompleted, 
-		models.GitLabJobStatusFailed, 
+	result, err := s.db.ExecContext(ctx, query,
+		models.GitLabJobStatusCompleted,
+		models.GitLabJobStatusFailed,
 		models.GitLabJobStatusCancelled,
 		cutoff)
 	if err != nil {
@@ -1113,3 +1154,271 @@ func (s *PostgresStore) CleanupOldEvents(ctx context.Context, olderThanDays int)
 	return result.RowsAffected()
 }
 
+// ============================================================================
+// Feedback Store Implementation
+// ============================================================================
+
+func (s *PostgresStore) CreateFeedback(ctx context.Context, feedback *models.GitLabReviewFeedback) error {
+	if feedback.ID == "" {
+		feedback.ID = uuid.New().String()
+	}
+	feedback.CreatedAt = time.Now()
+
+	query := `
+		INSERT INTO gitlab_review_feedback (
+			id, review_id, user_id, rating, feedback_type, comment, issue_index, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		feedback.ID,
+		feedback.ReviewID,
+		feedback.UserID,
+		feedback.Rating,
+		feedback.FeedbackType,
+		feedback.Comment,
+		feedback.IssueIndex,
+		feedback.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("insert feedback: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) ListFeedback(ctx context.Context, req *models.GitLabFeedbackListRequest) ([]models.GitLabReviewFeedback, int, error) {
+	var conditions []string
+	var args []interface{}
+	argNum := 1
+
+	if req.ReviewID != nil {
+		conditions = append(conditions, fmt.Sprintf("f.review_id = $%d", argNum))
+		args = append(args, *req.ReviewID)
+		argNum++
+	}
+	if req.FeedbackType != nil {
+		conditions = append(conditions, fmt.Sprintf("f.feedback_type = $%d", argNum))
+		args = append(args, *req.FeedbackType)
+		argNum++
+	}
+	if req.MinRating != nil {
+		conditions = append(conditions, fmt.Sprintf("f.rating >= $%d", argNum))
+		args = append(args, *req.MinRating)
+		argNum++
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Count total
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM gitlab_review_feedback f %s", whereClause)
+	var total int
+	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count feedback: %w", err)
+	}
+
+	// Fetch items
+	query := fmt.Sprintf(`
+		SELECT f.id, f.review_id, f.user_id, f.rating, f.feedback_type, f.comment, f.issue_index, f.created_at
+		FROM gitlab_review_feedback f
+		%s
+		ORDER BY f.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereClause, argNum, argNum+1)
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query feedback: %w", err)
+	}
+	defer rows.Close()
+
+	var feedback []models.GitLabReviewFeedback
+	for rows.Next() {
+		var f models.GitLabReviewFeedback
+		var userID sql.NullString
+		var comment sql.NullString
+		var issueIndex sql.NullInt32
+
+		if err := rows.Scan(
+			&f.ID,
+			&f.ReviewID,
+			&userID,
+			&f.Rating,
+			&f.FeedbackType,
+			&comment,
+			&issueIndex,
+			&f.CreatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan feedback: %w", err)
+		}
+
+		if userID.Valid {
+			f.UserID = &userID.String
+		}
+		if comment.Valid {
+			f.Comment = comment.String
+		}
+		if issueIndex.Valid {
+			idx := int(issueIndex.Int32)
+			f.IssueIndex = &idx
+		}
+
+		feedback = append(feedback, f)
+	}
+
+	return feedback, total, nil
+}
+
+// ============================================================================
+// Analytics Store Implementation
+// ============================================================================
+
+func (s *PostgresStore) GetAnalytics(ctx context.Context, days int) (*models.GitLabAnalytics, error) {
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	analytics := &models.GitLabAnalytics{
+		Days:            days,
+		ReviewsByStatus: make(map[string]int),
+	}
+
+	// Get totals
+	totalsQuery := `
+		SELECT 
+			COUNT(*) as total,
+			COUNT(*) FILTER (WHERE status = 'completed') as completed,
+			COUNT(*) FILTER (WHERE status = 'failed') as failed,
+			COUNT(*) FILTER (WHERE status = 'pending' OR status = 'queued' OR status = 'analyzing') as pending,
+			COALESCE(AVG(processing_time_ms) FILTER (WHERE status = 'completed'), 0) as avg_processing,
+			COALESCE(SUM(issues_found), 0) as total_issues,
+			COALESCE(SUM(tokens_used), 0) as total_tokens
+		FROM gitlab_mr_reviews
+		WHERE created_at >= $1
+	`
+
+	err := s.db.QueryRowContext(ctx, totalsQuery, cutoff).Scan(
+		&analytics.TotalReviews,
+		&analytics.CompletedReviews,
+		&analytics.FailedReviews,
+		&analytics.PendingReviews,
+		&analytics.AvgProcessingMs,
+		&analytics.TotalIssuesFound,
+		&analytics.TotalTokensUsed,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query totals: %w", err)
+	}
+
+	// Get reviews by day
+	dayQuery := `
+		SELECT 
+			DATE(created_at) as date,
+			COUNT(*) as total,
+			COUNT(*) FILTER (WHERE status = 'completed') as completed,
+			COUNT(*) FILTER (WHERE status = 'failed') as failed,
+			COALESCE(SUM(issues_found), 0) as issues
+		FROM gitlab_mr_reviews
+		WHERE created_at >= $1
+		GROUP BY DATE(created_at)
+		ORDER BY date DESC
+	`
+
+	dayRows, err := s.db.QueryContext(ctx, dayQuery, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("query by day: %w", err)
+	}
+	defer dayRows.Close()
+
+	for dayRows.Next() {
+		var ds models.DayStats
+		var date time.Time
+		if err := dayRows.Scan(&date, &ds.TotalReviews, &ds.CompletedReviews, &ds.FailedReviews, &ds.IssuesFound); err != nil {
+			return nil, fmt.Errorf("scan day stats: %w", err)
+		}
+		ds.Date = date.Format("2006-01-02")
+		analytics.ReviewsByDay = append(analytics.ReviewsByDay, ds)
+	}
+
+	// Get reviews by project
+	projectQuery := `
+		SELECT 
+			r.project_id,
+			p.name,
+			COUNT(*) as total,
+			COUNT(*) FILTER (WHERE r.status = 'completed') as completed,
+			COALESCE(SUM(r.issues_found), 0) as issues
+		FROM gitlab_mr_reviews r
+		LEFT JOIN gitlab_projects p ON p.id = r.project_id
+		WHERE r.created_at >= $1
+		GROUP BY r.project_id, p.name
+		ORDER BY total DESC
+		LIMIT 10
+	`
+
+	projectRows, err := s.db.QueryContext(ctx, projectQuery, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("query by project: %w", err)
+	}
+	defer projectRows.Close()
+
+	for projectRows.Next() {
+		var ps models.ProjectStats
+		var projectName sql.NullString
+		if err := projectRows.Scan(&ps.ProjectID, &projectName, &ps.TotalReviews, &ps.CompletedReviews, &ps.IssuesFound); err != nil {
+			return nil, fmt.Errorf("scan project stats: %w", err)
+		}
+		if projectName.Valid {
+			ps.ProjectName = projectName.String
+		} else {
+			ps.ProjectName = "Unknown"
+		}
+		analytics.ReviewsByProject = append(analytics.ReviewsByProject, ps)
+	}
+
+	// Get reviews by status
+	statusQuery := `
+		SELECT status, COUNT(*) FROM gitlab_mr_reviews WHERE created_at >= $1 GROUP BY status
+	`
+	statusRows, err := s.db.QueryContext(ctx, statusQuery, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("query by status: %w", err)
+	}
+	defer statusRows.Close()
+
+	for statusRows.Next() {
+		var status string
+		var count int
+		if err := statusRows.Scan(&status, &count); err != nil {
+			return nil, fmt.Errorf("scan status: %w", err)
+		}
+		analytics.ReviewsByStatus[status] = count
+	}
+
+	// Get feedback stats
+	feedbackQuery := `
+		SELECT 
+			COALESCE(AVG(rating), 0),
+			COUNT(*)
+		FROM gitlab_review_feedback
+		WHERE created_at >= $1
+	`
+	err = s.db.QueryRowContext(ctx, feedbackQuery, cutoff).Scan(&analytics.AvgRating, &analytics.FeedbackCount)
+	if err != nil && err != sql.ErrNoRows {
+		// Ignore error if table doesn't exist yet
+		analytics.AvgRating = 0
+		analytics.FeedbackCount = 0
+	}
+
+	return analytics, nil
+}

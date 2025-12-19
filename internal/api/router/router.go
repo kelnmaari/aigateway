@@ -55,6 +55,7 @@ import (
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
 	gitlabStorage "aigateway/internal/gitlab/storage"
+	gitlabWebhook "aigateway/internal/gitlab/webhook"
 	"aigateway/internal/web"
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
@@ -226,7 +227,8 @@ type Router struct {
 	frameworkHandler *framework.Handler // Framework asset handler
 
 	// GitLab Integration (v3.1.0+)
-	gitlabHandler *handlers.GitLabAdminHandler // GitLab admin handler
+	gitlabHandler        *handlers.GitLabAdminHandler   // GitLab admin handler
+	gitlabWebhookHandler *handlers.GitLabWebhookHandler // GitLab webhook handler
 }
 
 // NewOptions содержит опции для создания роутера
@@ -2965,9 +2967,15 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	}
 
 	// GitLab Integration (v3.1.0+)
+	// Note: r.engine is nil here (setupHandlers called before setupEngine)
+	// Webhook route is registered in setupGitLabRoutes
 	if cfg.GitLab.Enabled && r.db != nil {
 		// Create separate logger for GitLab with dedicated log file
 		gitlabLogger := internalLogger.NewFileLogger("logs/gitlab.log", cfg.Logging.Level)
+		if gitlabLogger == nil {
+			logger.Error("Failed to create GitLab logger")
+			return
+		}
 		gitlabLogger.Info("🦊 GitLab Integration logger initialized with separate log file")
 
 		// Create GitLab storage using main database
@@ -2976,11 +2984,39 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			GetDB() interface{}
 		}
 		if getter, ok := r.db.(sqlDBGetter); ok {
-			if sqlDB, ok := getter.GetDB().(*sql.DB); ok && sqlDB != nil {
+			dbInterface := getter.GetDB()
+			if dbInterface == nil {
+				logger.Warn("GitLab Integration disabled: GetDB() returned nil")
+				return
+			}
+			if sqlDB, ok := dbInterface.(*sql.DB); ok && sqlDB != nil {
 				glStore := gitlabStorage.NewPostgresStore(sqlDB)
+				if glStore == nil {
+					logger.Error("Failed to create GitLab PostgresStore")
+					return
+				}
+				
 				glHandler := handlers.NewGitLabAdminHandler(glStore, gitlabLogger)
+				if glHandler == nil {
+					logger.Error("Failed to create GitLabAdminHandler")
+					return
+				}
 				glHandler.SetMainDB(r.db)
 				r.gitlabHandler = glHandler
+
+				// Create webhook handler
+				webhookService := gitlabWebhook.NewHandler(glStore, gitlabLogger, nil)
+				if webhookService == nil {
+					logger.Error("Failed to create GitLab webhook service")
+					return
+				}
+				r.gitlabWebhookHandler = handlers.NewGitLabWebhookHandler(webhookService, "", "", gitlabLogger)
+				if r.gitlabWebhookHandler == nil {
+					logger.Error("Failed to create GitLabWebhookHandler")
+					return
+				}
+				
+				// Note: Webhook route registered in setupGitLabRoutes (after engine is created)
 				gitlabLogger.Info("✅ GitLab Integration handler initialized")
 				logger.Info("✅ GitLab Integration handler initialized (logs: logs/gitlab.log)")
 			} else {
@@ -3314,6 +3350,12 @@ func (r *Router) setupGitLabRoutes() {
 
 		// Available GitLab projects for selection (GITLAB-AUTO)
 		adminGitlab.GET("/integrations/:id/available-projects", r.gitlabHandler.ListAvailableProjects)
+
+		// Webhook route - NO authentication, uses webhook secret verification
+		if r.gitlabWebhookHandler != nil {
+			r.engine.POST("/api/gitlab/webhook/:integration_id", r.gitlabWebhookHandler.HandleWebhook)
+			r.logger.Info("✅ GitLab webhook route registered: POST /api/gitlab/webhook/:integration_id")
+		}
 
 		r.logger.Info("✅ GitLab Integration routes configured with real handlers")
 	} else {

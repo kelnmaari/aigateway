@@ -547,3 +547,77 @@ type GitLabQueueStats struct {
 	CompletedToday      int   `json:"completed_today"`
 }
 
+// ============================================================================
+// Feedback Models
+// ============================================================================
+
+// GitLabReviewFeedback represents user feedback on a code review
+type GitLabReviewFeedback struct {
+	ID           string    `json:"id" db:"id"`
+	ReviewID     string    `json:"review_id" db:"review_id"`
+	UserID       *string   `json:"user_id,omitempty" db:"user_id"`
+	Rating       int       `json:"rating" db:"rating"`
+	FeedbackType string    `json:"feedback_type" db:"feedback_type"`
+	Comment      string    `json:"comment,omitempty" db:"comment"`
+	IssueIndex   *int      `json:"issue_index,omitempty" db:"issue_index"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
+// FeedbackType constants
+const (
+	FeedbackTypeGeneral       = "general"
+	FeedbackTypeAccuracy      = "accuracy"
+	FeedbackTypeHelpfulness   = "helpfulness"
+	FeedbackTypeFalsePositive = "false_positive"
+	FeedbackTypeMissedIssue   = "missed_issue"
+)
+
+// GitLabFeedbackListRequest request parameters for listing feedback
+type GitLabFeedbackListRequest struct {
+	ReviewID     *string `json:"review_id,omitempty"`
+	FeedbackType *string `json:"feedback_type,omitempty"`
+	MinRating    *int    `json:"min_rating,omitempty"`
+	Limit        int     `json:"limit"`
+	Offset       int     `json:"offset"`
+}
+
+// ============================================================================
+// Analytics Models
+// ============================================================================
+
+// GitLabAnalytics represents aggregated analytics data
+type GitLabAnalytics struct {
+	Range             string                   `json:"range"`
+	Days              int                      `json:"days"`
+	TotalReviews      int                      `json:"total_reviews"`
+	CompletedReviews  int                      `json:"completed_reviews"`
+	FailedReviews     int                      `json:"failed_reviews"`
+	PendingReviews    int                      `json:"pending_reviews"`
+	AvgProcessingMs   int64                    `json:"avg_processing_ms"`
+	TotalIssuesFound  int                      `json:"total_issues_found"`
+	TotalTokensUsed   int64                    `json:"total_tokens_used"`
+	ReviewsByDay      []DayStats               `json:"reviews_by_day"`
+	ReviewsByProject  []ProjectStats           `json:"reviews_by_project"`
+	ReviewsByStatus   map[string]int           `json:"reviews_by_status"`
+	AvgRating         float64                  `json:"avg_rating"`
+	FeedbackCount     int                      `json:"feedback_count"`
+}
+
+// DayStats represents daily statistics
+type DayStats struct {
+	Date             string `json:"date"`
+	TotalReviews     int    `json:"total_reviews"`
+	CompletedReviews int    `json:"completed_reviews"`
+	FailedReviews    int    `json:"failed_reviews"`
+	IssuesFound      int    `json:"issues_found"`
+}
+
+// ProjectStats represents per-project statistics
+type ProjectStats struct {
+	ProjectID        string `json:"project_id"`
+	ProjectName      string `json:"project_name"`
+	TotalReviews     int    `json:"total_reviews"`
+	CompletedReviews int    `json:"completed_reviews"`
+	IssuesFound      int    `json:"issues_found"`
+}
+

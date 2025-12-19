@@ -15,6 +15,8 @@ type Store interface {
 	JobStore
 	WebhookEventStore
 	ModelUsageStore
+	FeedbackStore
+	AnalyticsStore
 }
 
 // IntegrationStore manages GitLab integrations
@@ -168,5 +170,20 @@ type ModelUsageStore interface {
 	
 	// IsModelUsed checks if a model is used by any project
 	IsModelUsed(ctx context.Context, modelID string) (bool, error)
+}
+
+// FeedbackStore manages review feedback
+type FeedbackStore interface {
+	// CreateFeedback creates a new feedback entry
+	CreateFeedback(ctx context.Context, feedback *models.GitLabReviewFeedback) error
+	
+	// ListFeedback lists feedback with filtering
+	ListFeedback(ctx context.Context, req *models.GitLabFeedbackListRequest) ([]models.GitLabReviewFeedback, int, error)
+}
+
+// AnalyticsStore provides analytics queries
+type AnalyticsStore interface {
+	// GetAnalytics retrieves aggregated analytics for the specified number of days
+	GetAnalytics(ctx context.Context, days int) (*models.GitLabAnalytics, error)
 }
 

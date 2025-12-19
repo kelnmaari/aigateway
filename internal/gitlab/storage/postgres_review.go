@@ -412,7 +412,7 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 }
 
 func (s *PostgresStore) UpdateReviewStatus(ctx context.Context, id string, status models.GitLabReviewStatus, errStr string) error {
-	query := "UPDATE gitlab_mr_reviews SET status = $1, error = $2, updated_at = $3 WHERE id = $4"
+	query := "UPDATE gitlab_mr_reviews SET status = $1, last_error = $2, updated_at = $3 WHERE id = $4"
 	_, err := s.db.ExecContext(ctx, query, status, errStr, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("update review status: %w", err)
@@ -679,8 +679,16 @@ func (s *PostgresStore) GetJobByReview(ctx context.Context, reviewID string) (*m
 }
 
 func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAnalysisJob, error) {
-	// Use FOR UPDATE SKIP LOCKED for concurrent access
-	query := `
+	// Use a transaction with SELECT FOR UPDATE + immediate status update
+	// This ensures atomic claim - no two workers can get the same job
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Step 1: Find and lock a pending job
+	selectQuery := `
 		SELECT j.id, j.review_id, j.integration_id, j.project_id, j.mr_iid,
 		       j.status, j.priority, j.worker_id, j.mr_title, j.config,
 		       j.retry_count, j.max_retries, j.next_retry_at, j.last_error,
@@ -693,7 +701,7 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 		WHERE j.status = $1 AND (j.next_retry_at IS NULL OR j.next_retry_at <= $2)
 		ORDER BY j.priority DESC, j.created_at ASC
 		LIMIT 1
-		FOR UPDATE SKIP LOCKED
+		FOR UPDATE OF j SKIP LOCKED
 	`
 
 	var job models.GitLabAnalysisJob
@@ -713,7 +721,7 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	var embeddingModelID sql.NullString
 	var reviewPrompt sql.NullString
 
-	err := s.db.QueryRowContext(ctx, query, models.GitLabJobStatusPending, time.Now()).Scan(
+	err = tx.QueryRowContext(ctx, selectQuery, models.GitLabJobStatusPending, time.Now()).Scan(
 		&job.ID,
 		&job.ReviewID,
 		&job.IntegrationID,
@@ -746,6 +754,23 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 	if err != nil {
 		return nil, fmt.Errorf("query next job: %w", err)
 	}
+
+	// Step 2: Immediately mark as processing (claim the job atomically)
+	updateQuery := `UPDATE gitlab_analysis_jobs SET status = $1, started_at = $2, updated_at = $2 WHERE id = $3`
+	now := time.Now()
+	_, err = tx.ExecContext(ctx, updateQuery, models.GitLabJobStatusProcessing, now, job.ID)
+	if err != nil {
+		return nil, fmt.Errorf("claim job: %w", err)
+	}
+
+	// Step 3: Commit transaction - only now the job is claimed
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit claim: %w", err)
+	}
+
+	// Update job fields from scan results
+	job.Status = models.GitLabJobStatusProcessing
+	job.StartedAt = &now
 
 	if workerID.Valid {
 		job.WorkerID = &workerID.String
@@ -955,7 +980,7 @@ func (s *PostgresStore) CompleteJob(ctx context.Context, jobID string) error {
 }
 
 func (s *PostgresStore) FailJob(ctx context.Context, jobID string, errStr string) error {
-	query := "UPDATE gitlab_analysis_jobs SET status = $1, error = $2, completed_at = $3, updated_at = $4 WHERE id = $5"
+	query := "UPDATE gitlab_analysis_jobs SET status = $1, last_error = $2, completed_at = $3, updated_at = $4 WHERE id = $5"
 	now := time.Now()
 	_, err := s.db.ExecContext(ctx, query, models.GitLabJobStatusFailed, errStr, now, now, jobID)
 	return err

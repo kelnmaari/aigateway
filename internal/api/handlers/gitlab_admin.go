@@ -19,10 +19,16 @@ import (
 )
 
 // GitLabAdminHandler handles GitLab admin API requests
+// WorkerPoolStats interface for getting worker pool statistics
+type WorkerPoolStats interface {
+	GetWorkerCounts() (total, active, idle int)
+}
+
 type GitLabAdminHandler struct {
-	store    storage.Store
-	mainDB   mainStorage.Database // For accessing model registry
-	logger   *logrus.Logger
+	store      storage.Store
+	mainDB     mainStorage.Database // For accessing model registry
+	workerPool WorkerPoolStats      // Worker pool for queue stats
+	logger     *logrus.Logger
 }
 
 // NewGitLabAdminHandler creates a new GitLab admin handler
@@ -31,6 +37,11 @@ func NewGitLabAdminHandler(store storage.Store, logger *logrus.Logger) *GitLabAd
 		store:  store,
 		logger: logger,
 	}
+}
+
+// SetWorkerPool sets the worker pool for queue statistics
+func (h *GitLabAdminHandler) SetWorkerPool(pool WorkerPoolStats) {
+	h.workerPool = pool
 }
 
 // SetMainDB sets the main database for model access
@@ -704,6 +715,14 @@ func (h *GitLabAdminHandler) GetQueueStatus(c *gin.Context) {
 		h.logger.WithError(err).Error("Failed to get queue stats")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get queue stats"})
 		return
+	}
+
+	// Enrich with worker pool stats if available
+	if h.workerPool != nil {
+		total, active, idle := h.workerPool.GetWorkerCounts()
+		stats.TotalWorkers = total
+		stats.ActiveWorkers = active
+		stats.IdleWorkers = idle
 	}
 
 	c.JSON(http.StatusOK, stats)

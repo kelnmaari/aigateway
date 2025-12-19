@@ -3,7 +3,9 @@ package router
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -54,8 +56,10 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
+	gitlabProcessor "aigateway/internal/gitlab/processor"
 	gitlabStorage "aigateway/internal/gitlab/storage"
 	gitlabWebhook "aigateway/internal/gitlab/webhook"
+	gitlabWorker "aigateway/internal/gitlab/worker"
 	"aigateway/internal/web"
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
@@ -229,6 +233,7 @@ type Router struct {
 	// GitLab Integration (v3.1.0+)
 	gitlabHandler        *handlers.GitLabAdminHandler   // GitLab admin handler
 	gitlabWebhookHandler *handlers.GitLabWebhookHandler // GitLab webhook handler
+	gitlabWorkerPool     *gitlabWorker.Pool             // GitLab worker pool for MR analysis
 }
 
 // NewOptions содержит опции для создания роутера
@@ -3016,6 +3021,36 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					return
 				}
 				
+				// Get or create internal API key for GitLab workers
+				gitlabAPIKey := r.getOrCreateGitLabAPIKey(context.Background(), gitlabLogger)
+				if gitlabAPIKey == "" {
+					gitlabLogger.Error("⚠️ GitLab API key not created - workers will fail with 401. Check migration 093 (system user).")
+				} else {
+					gitlabLogger.WithField("key_prefix", gitlabAPIKey[:20]+"...").Info("✅ GitLab API key ready for workers")
+				}
+				
+				// Create processor and worker pool
+				processorCfg := gitlabProcessor.ProcessorConfig{
+					LLMBaseURL:   fmt.Sprintf("http://localhost:%d", cfg.Server.Port), // Use self as LLM endpoint
+					LLMAPIKey:    gitlabAPIKey,                                         // Auto-generated API key
+					EmbeddingURL: fmt.Sprintf("http://localhost:%d", cfg.Server.Port),
+					Timeout:      10 * time.Minute,
+				}
+				processor := gitlabProcessor.NewProcessor(glStore, nil, processorCfg, gitlabLogger) // RAG optional
+				
+				poolCfg := gitlabWorker.DefaultPoolConfig()
+				if cfg.GitLab.Workers > 0 {
+					poolCfg.WorkerCount = cfg.GitLab.Workers
+				}
+				r.gitlabWorkerPool = gitlabWorker.NewPool(glStore, processor, gitlabLogger, poolCfg)
+				
+				// Connect worker pool to handler for stats
+				r.gitlabHandler.SetWorkerPool(r.gitlabWorkerPool)
+				
+				// Start worker pool
+				r.gitlabWorkerPool.Start()
+				gitlabLogger.WithField("workers", poolCfg.WorkerCount).Info("✅ GitLab worker pool started")
+				
 				// Note: Webhook route registered in setupGitLabRoutes (after engine is created)
 				gitlabLogger.Info("✅ GitLab Integration handler initialized")
 				logger.Info("✅ GitLab Integration handler initialized (logs: logs/gitlab.log)")
@@ -3099,8 +3134,104 @@ func (r *Router) Shutdown(ctx context.Context) error {
 		r.logger.Info("Inference service stopped")
 	}
 
+	// Stop GitLab worker pool
+	if r.gitlabWorkerPool != nil {
+		r.gitlabWorkerPool.Stop(30 * time.Second)
+		r.logger.Info("GitLab worker pool stopped")
+	}
+
 	r.logger.Info("All router components stopped")
 	return nil
+}
+
+// getOrCreateGitLabAPIKey returns existing or creates new API key for GitLab workers
+func (r *Router) getOrCreateGitLabAPIKey(parentCtx context.Context, logger *logrus.Logger) string {
+	const gitlabKeyName = "GitlabJobsApiKey"
+	
+	logger.Info("🔑 Starting GitLab API key creation/retrieval...")
+	
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	
+	if r.db == nil {
+		logger.Warn("Database not available, cannot create GitLab API key")
+		return ""
+	}
+	
+	// List all API keys and find by name
+	keys, err := r.db.ListAPIKeys(ctx)
+	if err != nil {
+		logger.WithError(err).Error("Failed to list API keys")
+		return ""
+	}
+	
+	logger.WithField("total_keys", len(keys)).Debug("Listed existing API keys")
+	
+	// Find existing key - we need to regenerate since we can't recover plain key from hash
+	for _, key := range keys {
+		if key.Name == gitlabKeyName {
+			// Delete and recreate to get a new plain key
+			logger.WithField("key_id", key.ID).Info("Found existing GitLab API key, regenerating")
+			if err := r.db.DeleteAPIKey(ctx, key.ID); err != nil {
+				logger.WithError(err).Warn("Failed to delete old GitLab API key")
+			}
+			break
+		}
+	}
+	
+	// Generate new key
+	plainKey := generateSecureAPIKey()
+	keyHash, err := models.HashAPIKey(plainKey)
+	if err != nil {
+		logger.WithError(err).Error("Failed to hash API key")
+		return ""
+	}
+	
+	// Create new key owned by system user
+	systemUserID := "system" // Created by migration 093
+	apiKey := &models.APIKey{
+		ID:          "gitlab-workers-key", // Fixed ID for easy identification
+		Name:        gitlabKeyName,
+		Description: "Internal API key for GitLab MR analysis workers (auto-generated)",
+		KeyHash:     keyHash,
+		KeyPrefix:   plainKey[:12] + "...",
+		UserID:      &systemUserID,                              // Owned by system user
+		TenantID:    nil,                                        // No tenant binding
+		Scope:       models.APIKeyScopePersonal,                 // Personal key of system user
+		Status:      models.APIKeyStatusActive,                  // Must be active!
+		Models:      []string{"*"},                              // Access to all models
+		Permissions: []string{"chat", "models", "embeddings"},   // Required permissions
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	
+	if err := r.db.CreateAPIKey(ctx, apiKey); err != nil {
+		logger.WithError(err).Error("❌ Failed to create GitLab API key - check if system user exists (migration 093)")
+		// Also log to main logger
+		r.logger.WithError(err).Error("❌ Failed to create GitLab API key - check if system user exists (migration 093)")
+		return ""
+	}
+	
+	logger.WithFields(logrus.Fields{
+		"key_id":     apiKey.ID,
+		"key_name":   apiKey.Name,
+		"key_prefix": apiKey.KeyPrefix,
+	}).Info("✅ Created GitLab API key for workers")
+	r.logger.WithField("key_id", apiKey.ID).Info("✅ Created GitLab API key for workers")
+	
+	return plainKey
+}
+
+// generateSecureAPIKey generates a secure random API key
+// bcrypt has a 72 byte limit, so we use 24 random bytes = 48 hex chars
+// Total: "sk-gl-" (6) + 48 = 54 bytes (well under 72)
+func generateSecureAPIKey() string {
+	b := make([]byte, 24) // 24 bytes = 48 hex characters
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to less secure but working method
+		return fmt.Sprintf("sk-gl-%d", time.Now().UnixNano())
+	}
+	return "sk-gl-" + hex.EncodeToString(b)
 }
 
 // setupMCPRoutes настраивает MCP servers catalog endpoints (v1.4.5)

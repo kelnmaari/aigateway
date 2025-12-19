@@ -289,7 +289,7 @@ func getLanguage(change FileChange) string {
 	if change.Language != "" {
 		return change.Language
 	}
-	return DetectLanguage(change.FilePath)
+	return DetectLanguageFromPath(change.FilePath)
 }
 
 func formatContext(context string) string {
@@ -310,8 +310,8 @@ func formatNewContent(change FileChange) string {
 	return ""
 }
 
-// DetectLanguage определяет язык по расширению файла
-func DetectLanguage(filepath string) string {
+// DetectLanguageFromPath определяет язык по расширению файла
+func DetectLanguageFromPath(filepath string) string {
 	extensions := map[string]string{
 		".go":     "go",
 		".py":     "python",

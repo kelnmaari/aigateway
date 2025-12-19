@@ -30,7 +30,7 @@ func NewSQLStorageAdapter(db storage.Database, logger *logrus.Logger) *SQLStorag
 func (s *SQLStorageAdapter) GetSetting(ctx context.Context, id string) (*Setting, error) {
 	// Type assert to get underlying *sql.DB
 	type dbGetter interface {
-		GetDB() *sql.DB
+		GetDB() interface{}
 	}
 	
 	dbg, ok := s.db.(dbGetter)
@@ -38,9 +38,9 @@ func (s *SQLStorageAdapter) GetSetting(ctx context.Context, id string) (*Setting
 		return nil, fmt.Errorf("database does not support GetDB() method")
 	}
 	
-	db := dbg.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database connection is nil")
+	db, ok := dbg.GetDB().(*sql.DB)
+	if !ok || db == nil {
+		return nil, fmt.Errorf("database connection is nil or wrong type")
 	}
 	
 	query := `
@@ -83,7 +83,7 @@ func (s *SQLStorageAdapter) GetSetting(ctx context.Context, id string) (*Setting
 func (s *SQLStorageAdapter) GetSettingsByCategory(ctx context.Context, category SettingCategory) ([]*Setting, error) {
 	// Type assert to get underlying *sql.DB
 	type dbGetter interface {
-		GetDB() *sql.DB
+		GetDB() interface{}
 	}
 	
 	dbg, ok := s.db.(dbGetter)
@@ -91,9 +91,9 @@ func (s *SQLStorageAdapter) GetSettingsByCategory(ctx context.Context, category 
 		return nil, fmt.Errorf("database does not support GetDB() method")
 	}
 	
-	db := dbg.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database connection is nil")
+	db, ok := dbg.GetDB().(*sql.DB)
+	if !ok || db == nil {
+		return nil, fmt.Errorf("database connection is nil or wrong type")
 	}
 	
 	query := `
@@ -148,7 +148,7 @@ func (s *SQLStorageAdapter) GetSettingsByCategory(ctx context.Context, category 
 func (s *SQLStorageAdapter) GetAllSettings(ctx context.Context) ([]*Setting, error) {
 	// Type assert to get underlying *sql.DB
 	type dbGetter interface {
-		GetDB() *sql.DB
+		GetDB() interface{}
 	}
 	
 	dbg, ok := s.db.(dbGetter)
@@ -156,9 +156,9 @@ func (s *SQLStorageAdapter) GetAllSettings(ctx context.Context) ([]*Setting, err
 		return nil, fmt.Errorf("database does not support GetDB() method")
 	}
 	
-	db := dbg.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database connection is nil")
+	db, ok := dbg.GetDB().(*sql.DB)
+	if !ok || db == nil {
+		return nil, fmt.Errorf("database connection is nil or wrong type")
 	}
 	
 	query := `
@@ -218,7 +218,7 @@ func (s *SQLStorageAdapter) UpsertSetting(ctx context.Context, setting *Setting)
 func (s *SQLStorageAdapter) UpdateSettingValue(ctx context.Context, id, value, updatedBy string) error {
 	// Type assert to get underlying *sql.DB
 	type dbGetter interface {
-		GetDB() *sql.DB
+		GetDB() interface{}
 	}
 	
 	dbg, ok := s.db.(dbGetter)
@@ -226,9 +226,9 @@ func (s *SQLStorageAdapter) UpdateSettingValue(ctx context.Context, id, value, u
 		return fmt.Errorf("database does not support GetDB() method")
 	}
 	
-	db := dbg.GetDB()
-	if db == nil {
-		return fmt.Errorf("database connection is nil")
+	db, ok := dbg.GetDB().(*sql.DB)
+	if !ok || db == nil {
+		return fmt.Errorf("database connection is nil or wrong type")
 	}
 	
 	query := `
@@ -267,7 +267,7 @@ func (s *SQLStorageAdapter) UpdateSettingValue(ctx context.Context, id, value, u
 func (s *SQLStorageAdapter) DeleteSetting(ctx context.Context, id string) error {
 	// Type assert to get underlying *sql.DB
 	type dbGetter interface {
-		GetDB() *sql.DB
+		GetDB() interface{}
 	}
 	
 	dbg, ok := s.db.(dbGetter)
@@ -275,9 +275,9 @@ func (s *SQLStorageAdapter) DeleteSetting(ctx context.Context, id string) error 
 		return fmt.Errorf("database does not support GetDB() method")
 	}
 	
-	db := dbg.GetDB()
-	if db == nil {
-		return fmt.Errorf("database connection is nil")
+	db, ok := dbg.GetDB().(*sql.DB)
+	if !ok || db == nil {
+		return fmt.Errorf("database connection is nil or wrong type")
 	}
 	
 	query := `DELETE FROM settings WHERE id = $1`
@@ -304,7 +304,7 @@ func (s *SQLStorageAdapter) DeleteSetting(ctx context.Context, id string) error 
 func (s *SQLStorageAdapter) BulkUpsertSettings(ctx context.Context, settings []*Setting) error {
 	// Type assert to get underlying *sql.DB
 	type dbGetter interface {
-		GetDB() *sql.DB
+		GetDB() interface{}
 	}
 	
 	dbg, ok := s.db.(dbGetter)
@@ -312,9 +312,9 @@ func (s *SQLStorageAdapter) BulkUpsertSettings(ctx context.Context, settings []*
 		return fmt.Errorf("database does not support GetDB() method")
 	}
 	
-	db := dbg.GetDB()
-	if db == nil {
-		return fmt.Errorf("database connection is nil")
+	db, ok := dbg.GetDB().(*sql.DB)
+	if !ok || db == nil {
+		return fmt.Errorf("database connection is nil or wrong type")
 	}
 	
 	// Start transaction

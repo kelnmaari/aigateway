@@ -359,3 +359,61 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 	return result, errors
 }
 
+// ============================================================================
+// Convenience functions for processor
+// ============================================================================
+
+// GetSystemPrompt returns the system prompt, optionally with custom additions
+func GetSystemPrompt(customPrompt string) string {
+	if customPrompt != "" {
+		return SystemPrompt + "\n\nAdditional instructions:\n" + customPrompt
+	}
+	return SystemPrompt
+}
+
+// ParseAnalysisResponse parses LLM response into AnalysisResultParsed
+func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
+	parser := NewJSONParser()
+	
+	// First try to parse as full AnalysisResult
+	fullResult, err := parser.ParseAnalysisResult(response)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert to simplified format for processor
+	result := &AnalysisResultParsed{
+		Summary: fullResult.Summary,
+		Score:   fullResult.OverallScore,
+		Issues:  make([]Issue, 0),
+		Suggestions: make([]SuggestionItem, 0),
+	}
+	
+	// Extract issues from file reviews
+	for _, fileReview := range fullResult.FileReviews {
+		for _, lineIssue := range fileReview.LineIssues {
+			result.Issues = append(result.Issues, Issue{
+				FilePath:   fileReview.FilePath,
+				Line:       lineIssue.Line,
+				EndLine:    lineIssue.EndLine,
+				Severity:   lineIssue.Severity,
+				Category:   lineIssue.Category,
+				Message:    lineIssue.Message,
+				Suggestion: lineIssue.Suggestion,
+			})
+		}
+	}
+	
+	// Convert suggestions
+	for _, suggestion := range fullResult.Suggestions {
+		result.Suggestions = append(result.Suggestions, SuggestionItem{
+			Type:        suggestion.Category,
+			Title:       suggestion.Title,
+			Description: suggestion.Description,
+			Priority:    suggestion.Priority,
+		})
+	}
+	
+	return result, nil
+}
+

@@ -664,9 +664,10 @@ func (h *GitLabAdminHandler) RetryReview(c *gin.Context) {
 	// Create new job
 	job := &models.GitLabAnalysisJob{
 		ReviewID:      id,
-		IntegrationID: "", // Will be filled from project
+		IntegrationID: review.IntegrationID,
 		ProjectID:     review.ProjectID,
 		MRIID:         review.MRIID,
+		MRTitle:       review.MRTitle,
 		Status:        models.GitLabJobStatusPending,
 		Priority:      models.GitLabReviewPriorityNormal,
 		MaxRetries:    3,

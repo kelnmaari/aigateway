@@ -421,7 +421,11 @@ func (s *PostgresStore) UpdateReviewStatus(ctx context.Context, id string, statu
 }
 
 func (s *PostgresStore) UpdateReviewResult(ctx context.Context, id string, result *models.GitLabReviewResult, noteID int64, discussionID string) error {
-	resultJSON, _ := json.Marshal(result)
+	var resultJSON interface{} = nil
+	if result != nil {
+		data, _ := json.Marshal(result)
+		resultJSON = data
+	}
 	query := "UPDATE gitlab_mr_reviews SET review_result = $1, note_id = $2, discussion_id = $3, status = $4, completed_at = $5, updated_at = $6 WHERE id = $7"
 	now := time.Now()
 	_, err := s.db.ExecContext(ctx, query, resultJSON, noteID, discussionID, models.GitLabReviewStatusCompleted, now, now, id)
@@ -432,7 +436,7 @@ func (s *PostgresStore) UpdateReviewResult(ctx context.Context, id string, resul
 }
 
 func (s *PostgresStore) UpdateReviewMetrics(ctx context.Context, id string, filesAnalyzed, linesChanged, issuesFound int, processingTimeMs int64, tokensUsed int, model string) error {
-	query := "UPDATE gitlab_mr_reviews SET files_analyzed = $1, lines_changed = $2, issues_found = $3, processing_time_ms = $4, tokens_used = $5, model = $6, updated_at = $7 WHERE id = $8"
+	query := "UPDATE gitlab_mr_reviews SET files_analyzed = $1, lines_changed = $2, issues_found = $3, processing_time_ms = $4, tokens_used = $5, model_used = $6, updated_at = $7 WHERE id = $8"
 	_, err := s.db.ExecContext(ctx, query, filesAnalyzed, linesChanged, issuesFound, processingTimeMs, tokensUsed, model, time.Now(), id)
 	return err
 }
@@ -455,17 +459,28 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 		job.ID = uuid.New().String()
 	}
 
+	// Validate required UUID fields
+	if job.ReviewID == "" {
+		return fmt.Errorf("review_id is required")
+	}
+	if job.IntegrationID == "" {
+		return fmt.Errorf("integration_id is required")
+	}
+	if job.ProjectID == "" {
+		return fmt.Errorf("project_id is required")
+	}
+
 	now := time.Now()
 	job.CreatedAt = now
 	job.UpdatedAt = now
 
-	var configJSON []byte
+	var configJSON interface{} = nil
 	if job.Config != nil {
-		var err error
-		configJSON, err = json.Marshal(job.Config)
+		data, err := json.Marshal(job.Config)
 		if err != nil {
 			return fmt.Errorf("marshal config: %w", err)
 		}
+		configJSON = data
 	}
 
 	query := `
@@ -1050,9 +1065,17 @@ func (s *PostgresStore) CreateWebhookEvent(ctx context.Context, event *models.Gi
 	}
 	event.ReceivedAt = time.Now()
 
-	payloadJSON, err := json.Marshal(event.Payload)
-	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
+	// Payload is already a JSON string, pass it directly or nil if empty
+	var payloadJSON interface{} = nil
+	if event.Payload != "" {
+		// Validate it's valid JSON before storing
+		if json.Valid([]byte(event.Payload)) {
+			payloadJSON = []byte(event.Payload)
+		} else {
+			// Wrap non-JSON string as JSON string
+			data, _ := json.Marshal(event.Payload)
+			payloadJSON = data
+		}
 	}
 
 	query := `
@@ -1062,7 +1085,7 @@ func (s *PostgresStore) CreateWebhookEvent(ctx context.Context, event *models.Gi
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
-	_, err = s.db.ExecContext(ctx, query,
+	_, err := s.db.ExecContext(ctx, query,
 		event.ID,
 		event.IntegrationID,
 		event.EventType,
@@ -1115,9 +1138,8 @@ func (s *PostgresStore) GetWebhookEvent(ctx context.Context, integrationID strin
 	}
 
 	if len(payloadJSON) > 0 {
-		if err := json.Unmarshal(payloadJSON, &event.Payload); err != nil {
-			// Ignore JSON errors
-		}
+		// Store raw JSON as string
+		event.Payload = string(payloadJSON)
 	}
 	if processedAt.Valid {
 		event.ProcessedAt = &processedAt.Time

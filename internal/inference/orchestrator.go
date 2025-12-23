@@ -343,9 +343,15 @@ func (o *Orchestrator) ListModels() []*ModelInstance {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	result := make([]*ModelInstance, 0, len(o.models))
-	for _, inst := range o.models {
+	for alias, inst := range o.models {
+		o.logger.WithFields(logrus.Fields{
+			"alias":    alias,
+			"status":   inst.Status,
+			"endpoint": inst.Endpoint,
+		}).Debug("ListModels: model in orchestrator")
 		result = append(result, inst)
 	}
+	o.logger.WithField("total", len(result)).Debug("ListModels: returning models")
 	return result
 }
 

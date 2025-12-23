@@ -125,24 +125,32 @@ func (r *Router) GetModel(alias string) (endpoint string, running bool) {
 	}).Debug("GetModel: searching for model by alias")
 
 	for _, m := range models {
+		// Get endpoint from Handle (primary source) or fallback to direct Endpoint field
+		modelEndpoint := ""
+		if m.Handle != nil && m.Handle.Endpoint != "" {
+			modelEndpoint = m.Handle.Endpoint
+		} else if m.Endpoint != "" {
+			modelEndpoint = m.Endpoint
+		}
+
 		logger.WithFields(logrus.Fields{
-			"model_alias":  m.Spec.Alias,
-			"model_status": m.Status,
-			"model_endpoint": m.Endpoint,
+			"model_alias":    m.Spec.Alias,
+			"model_status":   m.Status,
+			"model_endpoint": modelEndpoint,
 		}).Debug("GetModel: checking model")
 
 		if m.Spec.Alias == alias {
-			if m.Status == StatusRunning && m.Endpoint != "" {
+			if m.Status == StatusRunning && modelEndpoint != "" {
 				logger.WithFields(logrus.Fields{
 					"alias":    alias,
-					"endpoint": m.Endpoint,
+					"endpoint": modelEndpoint,
 				}).Debug("GetModel: found running model")
-				return m.Endpoint, true
+				return modelEndpoint, true
 			}
 			logger.WithFields(logrus.Fields{
 				"alias":    alias,
 				"status":   m.Status,
-				"endpoint": m.Endpoint,
+				"endpoint": modelEndpoint,
 			}).Debug("GetModel: model found but not running or no endpoint")
 			return "", false
 		}
@@ -160,38 +168,54 @@ func (r *Router) GetModel(alias string) (endpoint string, running bool) {
 func (r *Router) GetRunningEmbeddingModel() (alias string, endpoint string, found bool) {
 	models := r.mgr.svc.ListModels()
 	logger := r.mgr.svc.logger
-	
+
 	logger.WithField("model_count", len(models)).Debug("Looking for embedding model")
-	
+
+	// Helper to get endpoint from model (Handle.Endpoint or Endpoint field)
+	getEndpoint := func(m *ModelInstance) string {
+		if m.Handle != nil && m.Handle.Endpoint != "" {
+			return m.Handle.Endpoint
+		}
+		return m.Endpoint
+	}
+
 	// First pass: look for TEI provider (dedicated embedding inference)
 	for _, m := range models {
+		modelEndpoint := getEndpoint(m)
 		logger.WithFields(logrus.Fields{
 			"alias":        m.Spec.Alias,
 			"provider":     m.Spec.Provider,
 			"status":       m.Status,
-			"endpoint":     m.Endpoint,
+			"endpoint":     modelEndpoint,
 			"capabilities": m.Spec.Capabilities,
 		}).Debug("Checking model for embedding capability")
-		
-		if m.Status == StatusRunning && m.Endpoint != "" && m.Spec.Provider == ProviderTEI {
-			logger.WithField("alias", m.Spec.Alias).Debug("Found TEI embedding model")
-			return m.Spec.Alias, m.Endpoint, true
+
+		if m.Status == StatusRunning && modelEndpoint != "" && m.Spec.Provider == ProviderTEI {
+			logger.WithFields(logrus.Fields{
+				"alias":    m.Spec.Alias,
+				"endpoint": modelEndpoint,
+			}).Debug("Found TEI embedding model")
+			return m.Spec.Alias, modelEndpoint, true
 		}
 	}
-	
+
 	// Second pass: look for models with "embeddings" capability
 	for _, m := range models {
-		if m.Status != StatusRunning || m.Endpoint == "" {
+		modelEndpoint := getEndpoint(m)
+		if m.Status != StatusRunning || modelEndpoint == "" {
 			continue
 		}
 		for _, cap := range m.Spec.Capabilities {
 			if cap == "embeddings" {
-				logger.WithField("alias", m.Spec.Alias).Debug("Found model with embeddings capability")
-				return m.Spec.Alias, m.Endpoint, true
+				logger.WithFields(logrus.Fields{
+					"alias":    m.Spec.Alias,
+					"endpoint": modelEndpoint,
+				}).Debug("Found model with embeddings capability")
+				return m.Spec.Alias, modelEndpoint, true
 			}
 		}
 	}
-	
+
 	logger.Debug("No running embedding model found")
 	return "", "", false
 }

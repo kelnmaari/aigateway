@@ -38,6 +38,10 @@ import (
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
+	gitlabProcessor "aigateway/internal/gitlab/processor"
+	gitlabStorage "aigateway/internal/gitlab/storage"
+	gitlabWebhook "aigateway/internal/gitlab/webhook"
+	gitlabWorker "aigateway/internal/gitlab/worker"
 	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
 	"aigateway/internal/inference"
@@ -56,10 +60,6 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
-	gitlabProcessor "aigateway/internal/gitlab/processor"
-	gitlabStorage "aigateway/internal/gitlab/storage"
-	gitlabWebhook "aigateway/internal/gitlab/webhook"
-	gitlabWorker "aigateway/internal/gitlab/worker"
 	"aigateway/internal/web"
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
@@ -541,9 +541,9 @@ func (r *Router) setupRoutes() {
 	r.setupMCPRoutes()         // MCP Servers Catalog (v1.4.5)
 	r.setupGPURoutes()         // GPU Monitoring (v1.9.3)
 	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
-	r.setupUIRoutes()         // HTMX UI Routes (v2.6.0)
-	r.setupGitLabRoutes()     // GitLab Integration routes (v3.1.0)
-	r.setupInferenceRoutes()  // Inference v4 system routes
+	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
+	r.setupGitLabRoutes()      // GitLab Integration routes (v3.1.0)
+	r.setupInferenceRoutes()   // Inference v4 system routes
 }
 
 // setupInferenceRoutes registers minimal inference v4 endpoints (system).
@@ -552,7 +552,7 @@ func (r *Router) setupInferenceRoutes() {
 		return
 	}
 	group := r.engine.Group("/api/system/inference")
-	
+
 	// Use JWT authentication for admin UI access (like other admin routes)
 	if r.jwtManager != nil && r.db != nil {
 		r.logger.Info("Inference routes: Using JWT authentication with admin role check")
@@ -594,7 +594,7 @@ func (r *Router) setupInferenceRoutes() {
 
 	// OpenAI-compatible proxy routes for inference v4 providers
 	r.setupInferenceProxyRoutes()
-	
+
 	// HuggingFace JSON API for model browser (v3.3.0+)
 	r.setupHuggingFaceAPIRoutes()
 }
@@ -604,7 +604,7 @@ func (r *Router) setupHuggingFaceAPIRoutes() {
 	if r.hfClient == nil || r.engine == nil {
 		return
 	}
-	
+
 	hfGroup := r.engine.Group("/api/huggingface")
 	if r.jwtManager != nil && r.db != nil {
 		hfGroup.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
@@ -620,7 +620,7 @@ func (r *Router) setupHuggingFaceAPIRoutes() {
 			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 				limit = l
 			}
-			
+
 			filters := huggingface.ModelFilters{
 				Search: query,
 				Author: author,
@@ -630,16 +630,16 @@ func (r *Router) setupHuggingFaceAPIRoutes() {
 			if tag != "" {
 				filters.Tags = []string{tag}
 			}
-			
+
 			models, err := r.hfClient.SearchModels(c.Request.Context(), filters)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			c.JSON(http.StatusOK, gin.H{"models": models})
 		})
-		
+
 		// Get model info with files
 		hfGroup.GET("/models/:repo/*subpath", func(c *gin.Context) {
 			repo := c.Param("repo")
@@ -647,16 +647,16 @@ func (r *Router) setupHuggingFaceAPIRoutes() {
 			if subpath != "" && subpath != "/" {
 				repo = repo + subpath
 			}
-			
+
 			info, err := r.hfClient.GetModelInfo(c.Request.Context(), repo)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			c.JSON(http.StatusOK, info)
 		})
-		
+
 		// Get popular GGUF models
 		hfGroup.GET("/popular", func(c *gin.Context) {
 			filters := huggingface.ModelFilters{
@@ -664,23 +664,23 @@ func (r *Router) setupHuggingFaceAPIRoutes() {
 				Sort:  "downloads",
 				Limit: 50,
 			}
-			
+
 			models, err := r.hfClient.SearchModels(c.Request.Context(), filters)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			c.JSON(http.StatusOK, gin.H{"models": models})
 		})
-		
+
 		// Start download
 		hfGroup.POST("/download", func(c *gin.Context) {
 			if r.hfDownloader == nil {
 				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Downloader not configured"})
 				return
 			}
-			
+
 			var req struct {
 				ModelID   string `json:"model_id"`
 				Filename  string `json:"filename"`
@@ -691,13 +691,13 @@ func (r *Router) setupHuggingFaceAPIRoutes() {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			download, err := r.hfDownloader.StartDownload(req.ModelID, req.Filename, req.TotalSize, req.SHA256)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			c.JSON(http.StatusOK, gin.H{"download_id": download.ID, "message": "Download started"})
 		})
 	}
@@ -993,7 +993,7 @@ func (r *Router) setupUIRoutes() {
 
 			// Statistics
 			yzma.GET("/stats", r.yzmaUIHandler.GetStats)
-			
+
 			// Model metadata (v3.2.0+)
 			yzma.GET("/metadata/*model_path", r.yzmaUIHandler.GetModelMetadata)
 
@@ -1163,10 +1163,10 @@ func (r *Router) setupSystemRoutes() {
 			})
 			system.GET("/yzma/gpu", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{
-					"available":   false,
-					"device_name": "N/A (yzma disabled)",
+					"available":    false,
+					"device_name":  "N/A (yzma disabled)",
 					"cuda_version": "",
-					"message":     "yzma inference backend is disabled, using Docker-based inference",
+					"message":      "yzma inference backend is disabled, using Docker-based inference",
 				})
 			})
 			system.GET("/yzma/health", func(c *gin.Context) {
@@ -1259,7 +1259,7 @@ func (r *Router) setupAuthRoutes() {
 		authPublic.POST("/register", r.authHandler.Register)
 		authPublic.POST("/login", r.authHandler.Login)
 		authPublic.POST("/refresh", r.authHandler.RefreshToken)
-		
+
 		// Auth providers status (for UI to show SSO buttons)
 		authPublic.GET("/providers", func(c *gin.Context) {
 			c.JSON(200, gin.H{
@@ -1730,7 +1730,7 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
 			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		} else if r.config.Auth.Enabled && r.authenticator != nil {
 			// API Key auth
@@ -1740,7 +1740,7 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/gpu", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
 			v1.GET("/yzma/health", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		} else {
 			// No auth
@@ -1750,7 +1750,7 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
 			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		}
 	} else {
@@ -2677,10 +2677,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		infCacheMax = dockerCfg.CacheMaxBytes
 		infDockerBin = dockerCfg.DockerBin
 		logger.WithFields(logrus.Fields{
-			"hf_cache":       infHFCache,
-			"gguf_cache":     infGGUFCache,
-			"trt_engines":    infTRTDir,
-			"max_running":    infMaxRunning,
+			"hf_cache":         infHFCache,
+			"gguf_cache":       infGGUFCache,
+			"trt_engines":      infTRTDir,
+			"max_running":      infMaxRunning,
 			"default_provider": dockerCfg.DefaultProvider,
 		}).Info("Using Docker-based inference (v3.3.0+)")
 	} else {
@@ -2751,10 +2751,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		// Periodic cache metrics refresh
 		r.inferenceMgr.StartCacheGaugeUpdater(context.Background(), time.Minute)
 		logger.WithFields(logrus.Fields{
-			"hf_cache":    infHFCache,
-			"gguf_cache":  infGGUFCache,
+			"hf_cache":     infHFCache,
+			"gguf_cache":   infGGUFCache,
 			"max_download": maxConcurrent,
-			"use_docker":  true,
+			"use_docker":   true,
 		}).Info("Inference v4 service initialized")
 	}
 
@@ -2842,7 +2842,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			"from_inference":   cfg.Inference.Yzma.TensorSplit,
 			"from_yzma":        cfg.Yzma.TensorSplit,
 		}).Debug("🔍 Parsing tensor_split from config")
-		
+
 		if tensorSplitStr != "" {
 			parts := strings.Split(tensorSplitStr, ",")
 			for _, part := range parts {
@@ -3000,7 +3000,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					logger.Error("Failed to create GitLab PostgresStore")
 					return
 				}
-				
+
 				glHandler := handlers.NewGitLabAdminHandler(glStore, gitlabLogger)
 				if glHandler == nil {
 					logger.Error("Failed to create GitLabAdminHandler")
@@ -3020,7 +3020,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					logger.Error("Failed to create GitLabWebhookHandler")
 					return
 				}
-				
+
 				// Get or create internal API key for GitLab workers
 				gitlabAPIKey := r.getOrCreateGitLabAPIKey(context.Background(), gitlabLogger)
 				if gitlabAPIKey == "" {
@@ -3028,29 +3028,29 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 				} else {
 					gitlabLogger.WithField("key_prefix", gitlabAPIKey[:20]+"...").Info("✅ GitLab API key ready for workers")
 				}
-				
+
 				// Create processor and worker pool
 				processorCfg := gitlabProcessor.ProcessorConfig{
 					LLMBaseURL:   fmt.Sprintf("http://localhost:%d", cfg.Server.Port), // Use self as LLM endpoint
-					LLMAPIKey:    gitlabAPIKey,                                         // Auto-generated API key
+					LLMAPIKey:    gitlabAPIKey,                                        // Auto-generated API key
 					EmbeddingURL: fmt.Sprintf("http://localhost:%d", cfg.Server.Port),
 					Timeout:      10 * time.Minute,
 				}
 				processor := gitlabProcessor.NewProcessor(glStore, nil, processorCfg, gitlabLogger) // RAG optional
-				
+
 				poolCfg := gitlabWorker.DefaultPoolConfig()
 				if cfg.GitLab.Workers > 0 {
 					poolCfg.WorkerCount = cfg.GitLab.Workers
 				}
 				r.gitlabWorkerPool = gitlabWorker.NewPool(glStore, processor, gitlabLogger, poolCfg)
-				
+
 				// Connect worker pool to handler for stats
 				r.gitlabHandler.SetWorkerPool(r.gitlabWorkerPool)
-				
+
 				// Start worker pool
 				r.gitlabWorkerPool.Start()
 				gitlabLogger.WithField("workers", poolCfg.WorkerCount).Info("✅ GitLab worker pool started")
-				
+
 				// Note: Webhook route registered in setupGitLabRoutes (after engine is created)
 				gitlabLogger.Info("✅ GitLab Integration handler initialized")
 				logger.Info("✅ GitLab Integration handler initialized (logs: logs/gitlab.log)")
@@ -3147,26 +3147,26 @@ func (r *Router) Shutdown(ctx context.Context) error {
 // getOrCreateGitLabAPIKey returns existing or creates new API key for GitLab workers
 func (r *Router) getOrCreateGitLabAPIKey(parentCtx context.Context, logger *logrus.Logger) string {
 	const gitlabKeyName = "GitlabJobsApiKey"
-	
+
 	logger.Info("🔑 Starting GitLab API key creation/retrieval...")
-	
+
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
-	
+
 	if r.db == nil {
 		logger.Warn("Database not available, cannot create GitLab API key")
 		return ""
 	}
-	
+
 	// List all API keys and find by name
 	keys, err := r.db.ListAPIKeys(ctx)
 	if err != nil {
 		logger.WithError(err).Error("Failed to list API keys")
 		return ""
 	}
-	
+
 	logger.WithField("total_keys", len(keys)).Debug("Listed existing API keys")
-	
+
 	// Find existing key - we need to regenerate since we can't recover plain key from hash
 	for _, key := range keys {
 		if key.Name == gitlabKeyName {
@@ -3178,7 +3178,7 @@ func (r *Router) getOrCreateGitLabAPIKey(parentCtx context.Context, logger *logr
 			break
 		}
 	}
-	
+
 	// Generate new key
 	plainKey := generateSecureAPIKey()
 	keyHash, err := models.HashAPIKey(plainKey)
@@ -3186,52 +3186,53 @@ func (r *Router) getOrCreateGitLabAPIKey(parentCtx context.Context, logger *logr
 		logger.WithError(err).Error("Failed to hash API key")
 		return ""
 	}
-	
+
 	// Create new key owned by system user
 	systemUserID := "system" // Created by migration 093
 	apiKey := &models.APIKey{
-		ID:          "gitlab-workers-key", // Fixed ID for easy identification
+		ID:          "gitlab", // Must match extracted keyID from sk-proj-gitlab-<random>
 		Name:        gitlabKeyName,
 		Description: "Internal API key for GitLab MR analysis workers (auto-generated)",
 		KeyHash:     keyHash,
 		KeyPrefix:   plainKey[:12] + "...",
-		UserID:      &systemUserID,                              // Owned by system user
-		TenantID:    nil,                                        // No tenant binding
-		Scope:       models.APIKeyScopePersonal,                 // Personal key of system user
-		Status:      models.APIKeyStatusActive,                  // Must be active!
-		Models:      []string{"*"},                              // Access to all models
-		Permissions: []string{"chat", "models", "embeddings"},   // Required permissions
+		UserID:      &systemUserID,                            // Owned by system user
+		TenantID:    nil,                                      // No tenant binding
+		Scope:       models.APIKeyScopePersonal,               // Personal key of system user
+		Status:      models.APIKeyStatusActive,                // Must be active!
+		Models:      []string{"*"},                            // Access to all models
+		Permissions: []string{"chat", "models", "embeddings"}, // Required permissions
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	
+
 	if err := r.db.CreateAPIKey(ctx, apiKey); err != nil {
 		logger.WithError(err).Error("❌ Failed to create GitLab API key - check if system user exists (migration 093)")
 		// Also log to main logger
 		r.logger.WithError(err).Error("❌ Failed to create GitLab API key - check if system user exists (migration 093)")
 		return ""
 	}
-	
+
 	logger.WithFields(logrus.Fields{
 		"key_id":     apiKey.ID,
 		"key_name":   apiKey.Name,
 		"key_prefix": apiKey.KeyPrefix,
 	}).Info("✅ Created GitLab API key for workers")
 	r.logger.WithField("key_id", apiKey.ID).Info("✅ Created GitLab API key for workers")
-	
+
 	return plainKey
 }
 
 // generateSecureAPIKey generates a secure random API key
-// bcrypt has a 72 byte limit, so we use 24 random bytes = 48 hex chars
-// Total: "sk-gl-" (6) + 48 = 54 bytes (well under 72)
+// Format: sk-proj-<keyid>-<random> where keyid=gitlab and random is hex
+// bcrypt has a 72 byte limit, so we use 16 random bytes = 32 hex chars
+// Total: "sk-proj-gitlab-" (15) + 32 = 47 bytes (well under 72)
 func generateSecureAPIKey() string {
-	b := make([]byte, 24) // 24 bytes = 48 hex characters
+	b := make([]byte, 16) // 16 bytes = 32 hex characters
 	if _, err := rand.Read(b); err != nil {
 		// Fallback to less secure but working method
-		return fmt.Sprintf("sk-gl-%d", time.Now().UnixNano())
+		return fmt.Sprintf("sk-proj-gitlab-%d", time.Now().UnixNano())
 	}
-	return "sk-gl-" + hex.EncodeToString(b)
+	return "sk-proj-gitlab-" + hex.EncodeToString(b)
 }
 
 // setupMCPRoutes настраивает MCP servers catalog endpoints (v1.4.5)
@@ -3575,13 +3576,13 @@ func (r *Router) setupGitLabRoutes() {
 		// Settings, Analytics, Feedback stubs
 		adminGitlab.GET("/settings", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
-				"auto_review_enabled":      true,
-				"default_analysis_model":   "",
-				"default_embedding_model":  "",
-				"max_files_per_mr":         50,
-				"max_lines_per_file":       1000,
-				"webhook_secret_rotation":  false,
-				"notification_email":       "",
+				"auto_review_enabled":     true,
+				"default_analysis_model":  "",
+				"default_embedding_model": "",
+				"max_files_per_mr":        50,
+				"max_lines_per_file":      1000,
+				"webhook_secret_rotation": false,
+				"notification_email":      "",
 			})
 		})
 		adminGitlab.PUT("/settings", func(c *gin.Context) {

@@ -1354,18 +1354,21 @@ func (s *PostgresStore) GetAnalytics(ctx context.Context, days int) (*models.Git
 		WHERE created_at >= $1
 	`
 
+	// PostgreSQL AVG returns NUMERIC which cannot be directly scanned to int64
+	var avgProcessing float64
 	err := s.db.QueryRowContext(ctx, totalsQuery, cutoff).Scan(
 		&analytics.TotalReviews,
 		&analytics.CompletedReviews,
 		&analytics.FailedReviews,
 		&analytics.PendingReviews,
-		&analytics.AvgProcessingMs,
+		&avgProcessing,
 		&analytics.TotalIssuesFound,
 		&analytics.TotalTokensUsed,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query totals: %w", err)
 	}
+	analytics.AvgProcessingMs = int64(avgProcessing)
 
 	// Get reviews by day
 	dayQuery := `

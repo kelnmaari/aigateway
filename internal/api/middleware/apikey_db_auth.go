@@ -167,6 +167,13 @@ func extractKeyID(apiKey string) string {
 	if len(parts) < 3 || parts[0] != "sk" {
 		return ""
 	}
+
+	// Новый формат: sk-proj-<keyid>-<random>
+	// parts[0] = "sk", parts[1] = "proj", parts[2] = keyid, parts[3+] = random
+	if parts[1] == "proj" && len(parts) >= 4 {
+		return parts[2]
+	}
+
+	// Старый формат: sk-<keyid>-<random>
 	return parts[1]
 }
-

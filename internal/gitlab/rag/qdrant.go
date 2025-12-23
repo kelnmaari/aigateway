@@ -154,11 +154,25 @@ func (c *QdrantClient) UpsertPoints(ctx context.Context, points []Point) error {
 
 // Search performs a vector similarity search
 func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, filter map[string]interface{}) ([]SearchResult, error) {
+	// Validate input vector
+	if len(vector) == 0 {
+		c.logger.Warn("Qdrant search: empty vector provided, skipping")
+		return nil, nil
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"input_vector_len": len(vector),
+		"limit":            limit,
+		"has_filter":       filter != nil,
+	}).Debug("Qdrant search: starting")
+
 	// Convert float32 to float64 for better JSON precision
 	vector64 := make([]float64, len(vector))
 	for i, v := range vector {
 		vector64[i] = float64(v)
 	}
+
+	c.logger.WithField("output_vector_len", len(vector64)).Debug("Qdrant search: vector converted")
 
 	body := map[string]interface{}{
 		"vector":       vector64, // Use float64 for better JSON compatibility

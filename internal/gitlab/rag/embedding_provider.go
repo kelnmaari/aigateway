@@ -382,12 +382,21 @@ func (p *DynamicEmbeddingProvider) getBaseURLForModel(modelAlias string) (string
 
 // GenerateEmbeddingWithModel creates embedding using specific model alias
 func (p *DynamicEmbeddingProvider) GenerateEmbeddingWithModel(ctx context.Context, text string, modelAlias string) ([]float32, error) {
+	// Check for empty text before calling API
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return nil, fmt.Errorf("cannot generate embedding for empty text")
+	}
+
 	embeddings, err := p.GenerateEmbeddingsWithModel(ctx, []string{text}, modelAlias)
 	if err != nil {
 		return nil, err
 	}
 	if len(embeddings) == 0 {
 		return nil, fmt.Errorf("no embeddings returned")
+	}
+	if embeddings[0] == nil || len(embeddings[0]) == 0 {
+		return nil, fmt.Errorf("empty embedding returned for text")
 	}
 	return embeddings[0], nil
 }
@@ -467,6 +476,16 @@ func (p *DynamicEmbeddingProvider) GenerateEmbeddingsWithModel(ctx context.Conte
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	// Log what we got from the API
+	if len(result.Data) > 0 {
+		p.logger.WithFields(logrus.Fields{
+			"embeddings_count": len(result.Data),
+			"first_dim":        len(result.Data[0].Embedding),
+		}).Debug("Received embeddings from API")
+	} else {
+		p.logger.Warn("API returned empty embeddings data")
 	}
 
 	// Build result array matching filtered texts

@@ -191,6 +191,18 @@ func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectI
 		return nil, fmt.Errorf("generate query embedding: %w", err)
 	}
 
+	// Validate embedding before search
+	if embedding == nil || len(embedding) == 0 {
+		s.logger.WithField("query_len", len(query)).Debug("Empty embedding generated, skipping search")
+		return nil, nil
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"embedding_dim": len(embedding),
+		"project_id":    projectID,
+		"limit":         limit,
+	}).Debug("Searching for similar code with embedding")
+
 	// Search in Qdrant
 	results, err := s.qdrant.SearchByProject(ctx, embedding, projectID, limit)
 	if err != nil {

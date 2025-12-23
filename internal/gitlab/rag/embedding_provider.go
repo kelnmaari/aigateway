@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -397,14 +398,30 @@ func (p *DynamicEmbeddingProvider) GenerateEmbeddingsWithModel(ctx context.Conte
 		return nil, nil
 	}
 
+	// Filter out empty texts - TEI requires non-empty inputs
+	var filteredTexts []string
+	var originalIndices []int
+	for i, text := range texts {
+		trimmed := strings.TrimSpace(text)
+		if trimmed != "" {
+			filteredTexts = append(filteredTexts, trimmed)
+			originalIndices = append(originalIndices, i)
+		}
+	}
+
+	if len(filteredTexts) == 0 {
+		// All texts were empty, return nil embeddings
+		return make([][]float32, len(texts)), nil
+	}
+
 	baseURL, err := p.getBaseURLForModel(modelAlias)
 	if err != nil {
 		return nil, err
 	}
 
-	// Use OpenAI-compatible API format
+	// Use OpenAI-compatible API format - use filtered texts
 	reqBody := map[string]interface{}{
-		"input": texts,
+		"input": filteredTexts,
 		"model": "default",
 	}
 
@@ -452,15 +469,24 @@ func (p *DynamicEmbeddingProvider) GenerateEmbeddingsWithModel(ctx context.Conte
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	embeddings := make([][]float32, len(texts))
+	// Build result array matching filtered texts
+	filteredEmbeddings := make([][]float32, len(filteredTexts))
 	for _, item := range result.Data {
-		if item.Index < len(embeddings) {
-			embeddings[item.Index] = item.Embedding
+		if item.Index < len(filteredEmbeddings) {
+			filteredEmbeddings[item.Index] = item.Embedding
+		}
+	}
+
+	// Map back to original indices
+	embeddings := make([][]float32, len(texts))
+	for i, origIdx := range originalIndices {
+		if i < len(filteredEmbeddings) {
+			embeddings[origIdx] = filteredEmbeddings[i]
 		}
 	}
 
 	p.logger.WithFields(logrus.Fields{
-		"count":      len(embeddings),
+		"count":      len(filteredTexts),
 		"modelAlias": modelAlias,
 	}).Debug("Embeddings with model override generated successfully")
 

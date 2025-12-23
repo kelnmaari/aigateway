@@ -363,7 +363,7 @@ func (p *Processor) analyzeWithLLM(
 	return result, llmResponse.Usage.TotalTokens, nil
 }
 
-// buildAnalysisPrompt builds the analysis prompt
+// buildAnalysisPrompt builds the analysis prompt using the structured template
 func (p *Processor) buildAnalysisPrompt(
 	project *models.GitLabProject,
 	diffs []client.Diff,
@@ -372,26 +372,85 @@ func (p *Processor) buildAnalysisPrompt(
 ) string {
 	var sb strings.Builder
 	
-	sb.WriteString("Analyze the following code changes:\n\n")
+	sb.WriteString("## Code Changes to Review\n\n")
 	
 	// Add diff content
 	for _, diff := range diffs {
-		sb.WriteString(fmt.Sprintf("### File: %s\n", diff.NewPath))
-		sb.WriteString("```\n")
+		changeStatus := "Modified"
+		if diff.NewFile {
+			changeStatus = "New file"
+		} else if diff.DeletedFile {
+			changeStatus = "Deleted"
+		}
+		
+		sb.WriteString(fmt.Sprintf("### File: `%s` (%s)\n", diff.NewPath, changeStatus))
+		sb.WriteString("```diff\n")
 		sb.WriteString(diff.Diff)
 		sb.WriteString("\n```\n\n")
 	}
 	
 	// Add RAG context if available
 	if len(ragContext) > 0 {
-		sb.WriteString("\n### Related code context:\n")
+		sb.WriteString("\n## Related Code Context (from existing codebase)\n")
+		sb.WriteString("Use this context to understand patterns and conventions in the codebase:\n\n")
 		for _, chunk := range ragContext {
-			sb.WriteString(fmt.Sprintf("From %s:\n", chunk.FilePath))
-			sb.WriteString("```\n")
+			sb.WriteString(fmt.Sprintf("### From `%s`:\n", chunk.FilePath))
+			sb.WriteString(fmt.Sprintf("```%s\n", chunk.Language))
 			sb.WriteString(chunk.Content)
 			sb.WriteString("\n```\n\n")
 		}
 	}
+	
+	// Add response format instructions
+	sb.WriteString(`
+## Required Response Format
+
+Respond with a valid JSON object in this EXACT structure:
+
+{
+  "summary": "Brief overall assessment in 1-2 sentences",
+  "overall_score": 85,
+  "categories": [
+    {"name": "security", "score": 90, "issues": 0, "details": "Brief finding"},
+    {"name": "bugs", "score": 80, "issues": 1, "details": "Brief finding"},
+    {"name": "style", "score": 85, "issues": 2, "details": "Brief finding"},
+    {"name": "performance", "score": 90, "issues": 0, "details": "Brief finding"}
+  ],
+  "file_reviews": [
+    {
+      "file_path": "path/to/file.go",
+      "score": 80,
+      "summary": "Brief file summary",
+      "line_issues": [
+        {
+          "line": 42,
+          "severity": "warning",
+          "category": "security",
+          "message": "What the issue is",
+          "suggestion": "How to fix it"
+        }
+      ]
+    }
+  ],
+  "suggestions": [
+    {
+      "category": "best_practice",
+      "title": "Suggestion title",
+      "description": "Detailed suggestion",
+      "priority": "medium"
+    }
+  ]
+}
+
+IMPORTANT:
+- Score is 0-100 (higher is better)
+- severity: "critical", "warning", "info", or "suggestion"
+- category: "security", "bugs", "style", "performance", or "best_practice"
+- priority: "high", "medium", or "low"
+- Only include file_reviews for files with actual issues
+- If no issues found, return empty arrays with high scores
+- Respond with ONLY valid JSON, no markdown wrapping
+`)
 	
 	return sb.String()
 }

@@ -31,7 +31,6 @@ type Processor struct {
 	// LLM configuration
 	llmBaseURL      string
 	llmAPIKey       string
-	embeddingURL    string
 	httpClient      *http.Client
 	
 	// Cache of GitLab clients per integration
@@ -40,10 +39,9 @@ type Processor struct {
 
 // ProcessorConfig configuration for processor
 type ProcessorConfig struct {
-	LLMBaseURL    string
-	LLMAPIKey     string // API key for LLM requests (use internal key)
-	EmbeddingURL  string
-	Timeout       time.Duration
+	LLMBaseURL string
+	LLMAPIKey  string // API key for LLM requests (use internal key)
+	Timeout    time.Duration
 }
 
 // NewProcessor creates a new job processor
@@ -66,7 +64,6 @@ func NewProcessor(
 		logger:         logger,
 		llmAPIKey:      cfg.LLMAPIKey,
 		llmBaseURL:     cfg.LLMBaseURL,
-		embeddingURL:   cfg.EmbeddingURL,
 		httpClient:     &http.Client{Timeout: timeout},
 		clients:        make(map[string]*client.Client),
 	}

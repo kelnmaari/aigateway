@@ -451,4 +451,15 @@ gitlab:
   max_lines_per_file: 2000 # Maximum lines per file
   review_timeout: 5m # Timeout for single review
   enable_rag: true # Enable RAG for context-aware reviews
+  
+  # RAG configuration for GitLab code review
+  # Note: Qdrant settings are taken from main "rag.vector_store" section above
+  rag:
+    # Embedding model alias (optional - if empty, auto-detects any running TEI model)
+    # The model must be started via Admin -> Models before RAG can be used
+    # Example models: "bge-m3", "e5-large", "nomic-embed", "gte-large"
+    # embedding_model_alias: "bge-m3"  # Uncomment to specify explicit model
+    
+    # Optional: override collection name (default: "gitlab_code_embeddings")
+    # collection_name: "gitlab_code_embeddings"
 

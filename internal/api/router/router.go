@@ -39,6 +39,7 @@ import (
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
 	gitlabProcessor "aigateway/internal/gitlab/processor"
+	gitlabRAG "aigateway/internal/gitlab/rag"
 	gitlabStorage "aigateway/internal/gitlab/storage"
 	gitlabWebhook "aigateway/internal/gitlab/webhook"
 	gitlabWorker "aigateway/internal/gitlab/worker"
@@ -3029,14 +3030,91 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					gitlabLogger.WithField("key_prefix", gitlabAPIKey[:20]+"...").Info("✅ GitLab API key ready for workers")
 				}
 
+				// Initialize RAG service if enabled
+				// Uses main RAG config (config.RAG) for Qdrant settings
+				// Uses GitLab-specific embedding_model_alias for dynamic embedding resolution (optional - auto-detect if empty)
+				var ragService *gitlabRAG.RAGService
+				if cfg.GitLab.EnableRAG {
+					// Check if Qdrant is configured in main RAG config
+					qdrantURL := cfg.RAG.VectorStore.Qdrant.URL
+					if qdrantURL == "" && cfg.RAG.VectorStore.Type == "qdrant" {
+						qdrantURL = cfg.RAG.VectorStore.ConnectionString
+					}
+
+					if qdrantURL == "" {
+						gitlabLogger.Warn("RAG enabled but Qdrant not configured in main rag.vector_store section")
+					} else {
+						gitlabLogger.Info("🔍 Initializing RAG for GitLab code review...")
+
+						// Create dynamic embedding provider (resolves URL from inference registry at runtime)
+						// If EmbeddingModelAlias is empty, it will auto-detect any running embedding model
+						embeddingCfg := gitlabRAG.DynamicEmbeddingConfig{
+							ModelAlias: cfg.GitLab.RAG.EmbeddingModelAlias, // Empty = auto-detect
+							Timeout:    60 * time.Second,
+						}
+						// Use inference router as model instance provider
+						var embedder gitlabRAG.EmbeddingProvider
+						if r.inferenceRouter != nil {
+							embedder = gitlabRAG.NewDynamicEmbeddingProvider(embeddingCfg, r.inferenceRouter, gitlabLogger)
+							if cfg.GitLab.RAG.EmbeddingModelAlias != "" {
+								gitlabLogger.WithField("model_alias", cfg.GitLab.RAG.EmbeddingModelAlias).Info("Using dynamic embedding provider (explicit model)")
+							} else {
+								gitlabLogger.Info("Using dynamic embedding provider (auto-detect any running embedding model)")
+							}
+						} else {
+							gitlabLogger.Warn("Inference router not available, RAG embedding will not work")
+						}
+
+						// Get vector dimensions from main RAG config
+						vectorSize := cfg.RAG.VectorStore.Dimensions
+						if vectorSize == 0 {
+							vectorSize = cfg.RAG.Embeddings.Dimensions
+						}
+						if vectorSize == 0 {
+							vectorSize = 768 // Default for most embedding models (BERT-based)
+						}
+
+						// Collection name: GitLab-specific or default
+						collection := cfg.GitLab.RAG.CollectionName
+						if collection == "" {
+							collection = "gitlab_code_embeddings"
+						}
+
+						ragCfg := gitlabRAG.RAGConfig{
+							Enabled: true,
+							Qdrant: gitlabRAG.QdrantConfig{
+								URL:        qdrantURL,
+								APIKey:     "", // Use main RAG config if needed
+								Collection: collection,
+								VectorSize: vectorSize,
+								Timeout:    30 * time.Second,
+								Enabled:    true,
+							},
+						}
+
+						if embedder != nil {
+							ragService = gitlabRAG.NewRAGService(ragCfg, embedder, gitlabLogger)
+							if err := ragService.Initialize(context.Background()); err != nil {
+								gitlabLogger.WithError(err).Warn("Failed to initialize RAG, continuing without it")
+								ragService = nil
+							} else {
+								gitlabLogger.WithFields(logrus.Fields{
+									"qdrant_url":  qdrantURL,
+									"collection":  collection,
+									"vector_size": vectorSize,
+								}).Info("✅ RAG service initialized for GitLab")
+							}
+						}
+					}
+				}
+
 				// Create processor and worker pool
 				processorCfg := gitlabProcessor.ProcessorConfig{
-					LLMBaseURL:   fmt.Sprintf("http://localhost:%d", cfg.Server.Port), // Use self as LLM endpoint
-					LLMAPIKey:    gitlabAPIKey,                                        // Auto-generated API key
-					EmbeddingURL: fmt.Sprintf("http://localhost:%d", cfg.Server.Port),
-					Timeout:      10 * time.Minute,
+					LLMBaseURL: fmt.Sprintf("http://localhost:%d", cfg.Server.Port), // Use self as LLM endpoint
+					LLMAPIKey:  gitlabAPIKey,                                        // Auto-generated API key
+					Timeout:    10 * time.Minute,
 				}
-				processor := gitlabProcessor.NewProcessor(glStore, nil, processorCfg, gitlabLogger) // RAG optional
+				processor := gitlabProcessor.NewProcessor(glStore, ragService, processorCfg, gitlabLogger)
 
 				poolCfg := gitlabWorker.DefaultPoolConfig()
 				if cfg.GitLab.Workers > 0 {

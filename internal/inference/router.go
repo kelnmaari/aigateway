@@ -111,6 +111,51 @@ func (r *Router) ListModels() []*ModelInstance {
 	return r.mgr.svc.ListModels()
 }
 
+// GetModel returns a specific model instance by alias and whether it's running.
+// Used for dynamic URL resolution (e.g., embedding model endpoints).
+func (r *Router) GetModel(alias string) (endpoint string, running bool) {
+	models := r.mgr.svc.ListModels()
+	for _, m := range models {
+		if m.Spec.Alias == alias {
+			if m.Status == StatusRunning && m.Endpoint != "" {
+				return m.Endpoint, true
+			}
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// GetRunningEmbeddingModel finds a running embedding model automatically.
+// It looks for models with:
+// 1. Provider = TEI (Text Embeddings Inference)
+// 2. Or capability "embeddings"
+// Returns the first running embedding model found.
+func (r *Router) GetRunningEmbeddingModel() (alias string, endpoint string, found bool) {
+	models := r.mgr.svc.ListModels()
+	
+	// First pass: look for TEI provider (dedicated embedding inference)
+	for _, m := range models {
+		if m.Status == StatusRunning && m.Endpoint != "" && m.Spec.Provider == ProviderTEI {
+			return m.Spec.Alias, m.Endpoint, true
+		}
+	}
+	
+	// Second pass: look for models with "embeddings" capability
+	for _, m := range models {
+		if m.Status != StatusRunning || m.Endpoint == "" {
+			continue
+		}
+		for _, cap := range m.Spec.Capabilities {
+			if cap == "embeddings" {
+				return m.Spec.Alias, m.Endpoint, true
+			}
+		}
+	}
+	
+	return "", "", false
+}
+
 // Evict stops container and removes model from list (keeps artifacts on disk).
 func (r *Router) Evict(ctx context.Context, alias string) error {
 	return r.mgr.Evict(ctx, alias)

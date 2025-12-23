@@ -56,6 +56,22 @@ type GitLabConfig struct {
 
 	// EnableRAG enables RAG for context-aware reviews
 	EnableRAG bool `mapstructure:"enable_rag"`
+
+	// RAG configuration for GitLab code review
+	RAG GitLabRAGConfig `mapstructure:"rag"`
+}
+
+// GitLabRAGConfig configures RAG specifically for GitLab code review
+// Note: Uses main config.RAG.VectorStore for Qdrant settings
+type GitLabRAGConfig struct {
+	// EmbeddingModelAlias specifies the embedding model to use (resolved dynamically from inference registry)
+	// Example: "bge-m3", "e5-large", "nomic-embed"
+	// The model must be running via Admin -> Models before GitLab RAG can be used
+	EmbeddingModelAlias string `mapstructure:"embedding_model_alias"`
+	
+	// CollectionName overrides default collection name for GitLab code embeddings
+	// If empty, uses "gitlab_code_embeddings"
+	CollectionName string `mapstructure:"collection_name"`
 }
 
 // InferenceConfig represents unified inference backend configuration (v3.0.6+)

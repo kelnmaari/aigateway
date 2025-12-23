@@ -65,7 +65,7 @@ func NewQdrantClient(config QdrantConfig, logger *logrus.Logger) *QdrantClient {
 // Point represents a vector point in Qdrant
 type Point struct {
 	ID      string                 `json:"id"`
-	Vector  []float32              `json:"vector"`
+	Vector  []float64              `json:"vector"` // Use float64 for JSON compatibility
 	Payload map[string]interface{} `json:"payload"`
 }
 
@@ -154,9 +154,15 @@ func (c *QdrantClient) UpsertPoints(ctx context.Context, points []Point) error {
 
 // Search performs a vector similarity search
 func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, filter map[string]interface{}) ([]SearchResult, error) {
+	// Convert float32 to float64 for better JSON precision
+	vector64 := make([]float64, len(vector))
+	for i, v := range vector {
+		vector64[i] = float64(v)
+	}
+
 	body := map[string]interface{}{
-		"vector":      vector,
-		"limit":       limit,
+		"vector":       vector64, // Use float64 for better JSON compatibility
+		"limit":        limit,
 		"with_payload": true,
 	}
 
@@ -166,6 +172,9 @@ func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, 
 
 	resp, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/search", c.config.Collection), body)
 	if err != nil {
+		// If search fails with unnamed vector format, the collection might have been created differently
+		// Log the error for debugging
+		c.logger.WithError(err).Debug("Search failed, collection may need recreation")
 		return nil, fmt.Errorf("search: %w", err)
 	}
 
@@ -307,5 +316,15 @@ func (c *QdrantClient) request(ctx context.Context, method, path string, body in
 // IsEnabled returns whether Qdrant integration is enabled
 func (c *QdrantClient) IsEnabled() bool {
 	return c.config.Enabled
+}
+
+// Float32ToFloat64 converts float32 slice to float64 slice
+// Used for Qdrant API compatibility
+func Float32ToFloat64(f32 []float32) []float64 {
+	f64 := make([]float64, len(f32))
+	for i, v := range f32 {
+		f64[i] = float64(v)
+	}
+	return f64
 }
 

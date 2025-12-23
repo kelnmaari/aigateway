@@ -91,7 +91,7 @@ func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error 
 
 	point := Point{
 		ID:     pointID,
-		Vector: embedding,
+		Vector: Float32ToFloat64(embedding),
 		Payload: map[string]interface{}{
 			"project_id":    chunk.ProjectID,
 			"file_path":     chunk.FilePath,
@@ -138,7 +138,7 @@ func (s *RAGService) IndexCodeChunks(ctx context.Context, chunks []CodeChunk) er
 		pointID := generatePointID(chunk.ProjectID, chunk.FilePath, chunk.ChunkIndex)
 		points[i] = Point{
 			ID:     pointID,
-			Vector: embeddings[i],
+			Vector: Float32ToFloat64(embeddings[i]),
 			Payload: map[string]interface{}{
 				"project_id":    chunk.ProjectID,
 				"file_path":     chunk.FilePath,

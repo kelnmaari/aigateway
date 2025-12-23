@@ -254,6 +254,7 @@ func setupErrorLogHook(cfg config.LoggingConfig, formatter logrus.Formatter) *Er
 }
 
 // NewFileLogger создает отдельный logger для вывода в конкретный файл
+// Поддерживает ротацию при старте (переименование в -previous) и по размеру (lumberjack)
 func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
 	logger := logrus.New()
 	
@@ -280,13 +281,19 @@ func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
 		}
 	}
 	
-	// Настройка ротации логов
+	// 🔄 Ротация предыдущего лога при старте (как у основного логгера)
+	if err := rotatePreviousLog(filePath); err != nil {
+		// Не критично - продолжаем работу
+		logrus.WithError(err).WithField("file", filePath).Debug("Failed to rotate previous log")
+	}
+	
+	// Настройка ротации логов по размеру
 	fileWriter := &lumberjack.Logger{
 		Filename:   filePath,
-		MaxSize:    100, // MB
-		MaxBackups: 5,
-		MaxAge:     30, // days
-		Compress:   true,
+		MaxSize:    50,   // MB - ротация при достижении 50MB
+		MaxBackups: 3,    // Хранить 3 старых файла
+		MaxAge:     14,   // Удалять старше 14 дней
+		Compress:   true, // Сжимать старые логи
 	}
 	
 	// Multi-writer: file + stdout

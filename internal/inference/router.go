@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Router resolves specs by alias or capability and ensures model is prepared/launched.
@@ -133,10 +135,22 @@ func (r *Router) GetModel(alias string) (endpoint string, running bool) {
 // Returns the first running embedding model found.
 func (r *Router) GetRunningEmbeddingModel() (alias string, endpoint string, found bool) {
 	models := r.mgr.svc.ListModels()
+	logger := r.mgr.svc.logger
+	
+	logger.WithField("model_count", len(models)).Debug("Looking for embedding model")
 	
 	// First pass: look for TEI provider (dedicated embedding inference)
 	for _, m := range models {
+		logger.WithFields(logrus.Fields{
+			"alias":        m.Spec.Alias,
+			"provider":     m.Spec.Provider,
+			"status":       m.Status,
+			"endpoint":     m.Endpoint,
+			"capabilities": m.Spec.Capabilities,
+		}).Debug("Checking model for embedding capability")
+		
 		if m.Status == StatusRunning && m.Endpoint != "" && m.Spec.Provider == ProviderTEI {
+			logger.WithField("alias", m.Spec.Alias).Debug("Found TEI embedding model")
 			return m.Spec.Alias, m.Endpoint, true
 		}
 	}
@@ -148,11 +162,13 @@ func (r *Router) GetRunningEmbeddingModel() (alias string, endpoint string, foun
 		}
 		for _, cap := range m.Spec.Capabilities {
 			if cap == "embeddings" {
+				logger.WithField("alias", m.Spec.Alias).Debug("Found model with embeddings capability")
 				return m.Spec.Alias, m.Endpoint, true
 			}
 		}
 	}
 	
+	logger.Debug("No running embedding model found")
 	return "", "", false
 }
 

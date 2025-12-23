@@ -156,7 +156,13 @@ func (p *Processor) ProcessJob(ctx context.Context, job *models.GitLabAnalysisJo
 	// Step 3: Generate embeddings and search for context (if RAG enabled)
 	var contextChunks []rag.CodeChunk
 	if p.ragService != nil && p.ragService.IsEnabled() {
-		p.logger.Debug("Searching for relevant context using embeddings")
+		// Use project-specific embedding model if configured
+		embeddingModel := job.EmbeddingModelID
+		if embeddingModel != "" {
+			p.logger.WithField("embedding_model", embeddingModel).Debug("Searching for relevant context using project-specific embedding model")
+		} else {
+			p.logger.Debug("Searching for relevant context using default embedding model")
+		}
 		
 		// Build list of changed files
 		var changedFiles []rag.ChangedFile
@@ -167,7 +173,8 @@ func (p *Processor) ProcessJob(ctx context.Context, job *models.GitLabAnalysisJo
 			})
 		}
 		
-		contextChunks, err = p.ragService.GetContextForReview(ctx, project.ID, changedFiles, 5)
+		// Pass embedding model alias from project configuration
+		contextChunks, err = p.ragService.GetContextForReview(ctx, project.ID, changedFiles, 5, embeddingModel)
 		if err != nil {
 			p.logger.WithError(err).Warn("Failed to get context, continuing without RAG")
 		}

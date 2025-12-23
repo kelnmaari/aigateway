@@ -20,6 +20,18 @@ type EmbeddingProvider interface {
 	GenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
 }
 
+// EmbeddingProviderWithModelOverride extends EmbeddingProvider with ability to use specific model
+type EmbeddingProviderWithModelOverride interface {
+	EmbeddingProvider
+
+	// GenerateEmbeddingWithModel creates embedding using specific model alias
+	// If modelAlias is empty, uses default behavior (configured model or auto-detect)
+	GenerateEmbeddingWithModel(ctx context.Context, text string, modelAlias string) ([]float32, error)
+
+	// GenerateEmbeddingsWithModel creates embeddings using specific model alias
+	GenerateEmbeddingsWithModel(ctx context.Context, texts []string, modelAlias string) ([][]float32, error)
+}
+
 // RAGService provides RAG capabilities for code review
 type RAGService struct {
 	qdrant    *QdrantClient
@@ -153,13 +165,28 @@ func (s *RAGService) IndexCodeChunks(ctx context.Context, chunks []CodeChunk) er
 }
 
 // FindSimilarCode finds code chunks similar to the given query
-func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectID string, limit int) ([]CodeChunk, error) {
+// FindSimilarCode finds code similar to the query
+// If embeddingModelAlias is non-empty and embedder supports model override, uses that model
+func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectID string, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
 	if !s.enabled {
 		return nil, nil
 	}
 
-	// Generate embedding for query
-	embedding, err := s.embedder.GenerateEmbedding(ctx, query)
+	// Generate embedding for query - use model override if provided and supported
+	var embedding []float32
+	var err error
+
+	if embeddingModelAlias != "" {
+		if overrideProvider, ok := s.embedder.(EmbeddingProviderWithModelOverride); ok {
+			embedding, err = overrideProvider.GenerateEmbeddingWithModel(ctx, query, embeddingModelAlias)
+		} else {
+			// Fallback to default if provider doesn't support override
+			s.logger.WithField("model", embeddingModelAlias).Debug("Embedder doesn't support model override, using default")
+			embedding, err = s.embedder.GenerateEmbedding(ctx, query)
+		}
+	} else {
+		embedding, err = s.embedder.GenerateEmbedding(ctx, query)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("generate query embedding: %w", err)
 	}
@@ -194,13 +221,13 @@ func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectI
 }
 
 // FindRelatedCode finds code related to the given file path
-func (s *RAGService) FindRelatedCode(ctx context.Context, projectID, filePath string, content string, limit int) ([]CodeChunk, error) {
+func (s *RAGService) FindRelatedCode(ctx context.Context, projectID, filePath string, content string, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
 	if !s.enabled {
 		return nil, nil
 	}
 
 	// Use the file content as query
-	return s.FindSimilarCode(ctx, content, projectID, limit)
+	return s.FindSimilarCode(ctx, content, projectID, limit, embeddingModelAlias)
 }
 
 // DeleteProjectIndex removes all indexed code for a project
@@ -222,9 +249,14 @@ func (s *RAGService) DeleteFileIndex(ctx context.Context, projectID, filePath st
 }
 
 // GetContextForReview retrieves relevant code context for MR review
-func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, changedFiles []ChangedFile, limit int) ([]CodeChunk, error) {
+// embeddingModelAlias is optional - if provided, uses that specific model for embeddings
+func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, changedFiles []ChangedFile, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
 	if !s.enabled || len(changedFiles) == 0 {
 		return nil, nil
+	}
+
+	if embeddingModelAlias != "" {
+		s.logger.WithField("embedding_model", embeddingModelAlias).Debug("Using project-specific embedding model")
 	}
 
 	allChunks := make([]CodeChunk, 0)
@@ -232,7 +264,7 @@ func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, 
 
 	for _, file := range changedFiles {
 		// Find similar code for the changed content
-		chunks, err := s.FindSimilarCode(ctx, file.Diff, projectID, limit/len(changedFiles)+1)
+		chunks, err := s.FindSimilarCode(ctx, file.Diff, projectID, limit/len(changedFiles)+1, embeddingModelAlias)
 		if err != nil {
 			s.logger.WithError(err).WithField("file", file.Path).Warn("Failed to find similar code")
 			continue

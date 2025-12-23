@@ -140,9 +140,34 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 	return svc, nil
 }
 
-// recoverRunningContainers discovers already running inference containers and adds them to the registry.
+// RegisterSavedSpecs registers model specs from saved models (from ModelStore)
+// This should be called after NewService to update recovered instances with full specs
+func (s *Service) RegisterSavedSpecs(specs []ModelSpec) {
+	updated := 0
+	for _, spec := range specs {
+		s.registry.Register(spec)
+		// Also update any already recovered instances with full spec
+		if s.orch.UpdateInstanceSpec(spec.Alias, spec) {
+			updated++
+			s.logger.WithFields(logrus.Fields{
+				"alias":        spec.Alias,
+				"provider":     spec.Provider,
+				"capabilities": spec.Capabilities,
+			}).Debug("Updated recovered instance with full spec")
+		}
+	}
+	if len(specs) > 0 {
+		s.logger.WithFields(logrus.Fields{
+			"total":   len(specs),
+			"updated": updated,
+		}).Info("📚 Registered saved model specs")
+	}
+}
+
+// RecoverRunningContainers discovers already running inference containers and adds them to the registry.
 // This allows the server to recover state after restart without stopping running models.
-func (s *Service) recoverRunningContainers() {
+// Call RegisterSavedSpecs before this to ensure full specs (with capabilities) are available.
+func (s *Service) RecoverRunningContainers() {
 	if s.dockerRuntime == nil {
 		return
 	}
@@ -164,12 +189,22 @@ func (s *Service) recoverRunningContainers() {
 	s.logger.WithField("count", len(discovered)).Info("🔄 Recovering running inference containers")
 
 	for _, dc := range discovered {
-		// Create minimal spec for the discovered container
-		spec := ModelSpec{
-			Alias:    dc.ModelAlias,
-			Provider: dc.Provider,
+		// Try to get full spec from registry (registered from saved models)
+		spec, found := s.registry.Get(dc.ModelAlias)
+		if !found {
+			// Fallback to minimal spec if not in registry
+			spec = ModelSpec{
+				Alias:    dc.ModelAlias,
+				Provider: dc.Provider,
+			}
+			s.registry.Register(spec)
+			s.logger.WithField("alias", dc.ModelAlias).Debug("Using minimal spec for recovered container (not in saved models)")
+		} else {
+			s.logger.WithFields(logrus.Fields{
+				"alias":        dc.ModelAlias,
+				"capabilities": spec.Capabilities,
+			}).Debug("Using full spec from saved models for recovered container")
 		}
-		s.registry.Register(spec)
 
 		// Add to orchestrator's running instances
 		inst := &ModelInstance{
@@ -182,12 +217,21 @@ func (s *Service) recoverRunningContainers() {
 		s.orch.AddRecoveredInstance(dc.ModelAlias, inst)
 
 		s.logger.WithFields(logrus.Fields{
-			"alias":     dc.ModelAlias,
-			"provider":  dc.Provider,
-			"endpoint":  dc.Endpoint,
-			"container": dc.ID[:12],
+			"alias":        dc.ModelAlias,
+			"provider":     spec.Provider,
+			"capabilities": spec.Capabilities,
+			"endpoint":     dc.Endpoint,
+			"container":    dc.ID[:12],
 		}).Info("✅ Recovered running model")
 	}
+}
+
+// recoverRunningContainers is called internally during NewService (before ModelStore is available)
+// It creates minimal specs. Full recovery happens via RecoverRunningContainers after ModelStore loads.
+func (s *Service) recoverRunningContainers() {
+	// Defer to public method - but at this point saved specs are not yet loaded
+	// This provides basic recovery; full recovery with capabilities happens later
+	s.RecoverRunningContainers()
 }
 
 // LoadAndStart prepares artifacts and starts container based on provider.

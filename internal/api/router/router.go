@@ -2735,6 +2735,16 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			r.inferenceModelStore = modelStore
 			r.inferenceHandler.SetModelStore(modelStore)
 			logger.Info("Inference model store initialized")
+
+			// Register saved specs to update recovered instances with full specs (capabilities, etc.)
+			savedModels := modelStore.List()
+			if len(savedModels) > 0 {
+				specs := make([]inference.ModelSpec, 0, len(savedModels))
+				for _, sm := range savedModels {
+					specs = append(specs, sm.ToSpec())
+				}
+				infSvc.RegisterSavedSpecs(specs)
+			}
 		}
 		// Idle stop using legacy preload.unload_after if set
 		idleAfter := cfg.Models.Preload.UnloadAfter

@@ -88,6 +88,29 @@ func (o *Orchestrator) AddRecoveredInstance(alias string, inst *ModelInstance) {
 	}).Debug("Added recovered instance to orchestrator")
 }
 
+// UpdateInstanceSpec updates the spec for an existing instance.
+// Used when saved models are loaded after container recovery.
+func (o *Orchestrator) UpdateInstanceSpec(alias string, spec ModelSpec) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	inst, ok := o.models[alias]
+	if !ok {
+		return false
+	}
+
+	// Update spec with full info from saved models
+	inst.Spec = spec
+
+	o.logger.WithFields(logrus.Fields{
+		"alias":        alias,
+		"provider":     spec.Provider,
+		"capabilities": spec.Capabilities,
+	}).Debug("Updated instance spec from saved models")
+
+	return true
+}
+
 // PrepareModel ensures artifacts are present locally according to spec.
 // For HF format without specific file, providers (vLLM, SGLang, TGI) download via HF Hub themselves.
 // If model is already running with same basic config, return it.

@@ -357,6 +357,13 @@ func (p *DynamicEmbeddingProvider) getBaseURLForModel(modelAlias string) (string
 
 	// Get endpoint for the specific model
 	endpoint, running := p.instanceGetter.GetModel(modelAlias)
+
+	p.logger.WithFields(logrus.Fields{
+		"alias":    modelAlias,
+		"endpoint": endpoint,
+		"running":  running,
+	}).Debug("GetModel result for embedding override")
+
 	if !running {
 		return "", fmt.Errorf("embedding model '%s' is not running", modelAlias)
 	}

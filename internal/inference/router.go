@@ -117,14 +117,38 @@ func (r *Router) ListModels() []*ModelInstance {
 // Used for dynamic URL resolution (e.g., embedding model endpoints).
 func (r *Router) GetModel(alias string) (endpoint string, running bool) {
 	models := r.mgr.svc.ListModels()
+	logger := r.mgr.svc.logger
+
+	logger.WithFields(logrus.Fields{
+		"requested_alias": alias,
+		"total_models":    len(models),
+	}).Debug("GetModel: searching for model by alias")
+
 	for _, m := range models {
+		logger.WithFields(logrus.Fields{
+			"model_alias":  m.Spec.Alias,
+			"model_status": m.Status,
+			"model_endpoint": m.Endpoint,
+		}).Debug("GetModel: checking model")
+
 		if m.Spec.Alias == alias {
 			if m.Status == StatusRunning && m.Endpoint != "" {
+				logger.WithFields(logrus.Fields{
+					"alias":    alias,
+					"endpoint": m.Endpoint,
+				}).Debug("GetModel: found running model")
 				return m.Endpoint, true
 			}
+			logger.WithFields(logrus.Fields{
+				"alias":    alias,
+				"status":   m.Status,
+				"endpoint": m.Endpoint,
+			}).Debug("GetModel: model found but not running or no endpoint")
 			return "", false
 		}
 	}
+
+	logger.WithField("alias", alias).Debug("GetModel: model not found")
 	return "", false
 }
 

@@ -523,6 +523,7 @@ type SavedModelResponse struct {
 	VLLMGPUUtilization   float64                `json:"vllm_gpu_utilization,omitempty"`
 	LlamaMainGPU         int                    `json:"llama_main_gpu,omitempty"`
 	LlamaNGPULayers      int                    `json:"llama_n_gpu_layers,omitempty"`
+	LlamaTensorSplit     string                 `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel int                    `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64                `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          int                    `json:"tgi_num_shard,omitempty"`
@@ -555,6 +556,7 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 			VLLMGPUUtilization:   m.VLLMGPUUtilization,
 			LlamaMainGPU:         m.LlamaMainGPU,
 			LlamaNGPULayers:      m.LlamaNGPULayers,
+			LlamaTensorSplit:     m.LlamaTensorSplit,
 			SGLangTensorParallel: m.SGLangTensorParallel,
 			SGLangMemFraction:    m.SGLangMemFraction,
 			TGINumShard:          m.TGINumShard,
@@ -646,6 +648,81 @@ func (h *InferenceHandler) PostSetAutoStart(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"alias": alias, "auto_start": enabled})
+}
+
+// UpdateSavedRequest represents request to update a saved model configuration.
+type UpdateSavedRequest struct {
+	VLLMTensorParallel   *int     `json:"vllm_tensor_parallel,omitempty"`
+	VLLMMaxModelLen      *int     `json:"vllm_max_model_len,omitempty"`
+	VLLMGPUUtilization   *float64 `json:"vllm_gpu_utilization,omitempty"`
+	LlamaMainGPU         *int     `json:"llama_main_gpu,omitempty"`
+	LlamaNGPULayers      *int     `json:"llama_n_gpu_layers,omitempty"`
+	LlamaTensorSplit     *string  `json:"llama_tensor_split,omitempty"`
+	SGLangTensorParallel *int     `json:"sglang_tensor_parallel,omitempty"`
+	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
+	TGINumShard          *int     `json:"tgi_num_shard,omitempty"`
+	GPUDevice            *string  `json:"gpu_device,omitempty"`
+}
+
+// PostUpdateSaved updates a saved model configuration.
+// POST /api/system/inference/update-saved?alias=...
+func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
+	if h.modelStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model store not configured"})
+		return
+	}
+
+	alias := c.Query("alias")
+	if alias == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "alias is required"})
+		return
+	}
+
+	var req UpdateSavedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.modelStore.Update(alias, func(m *inference.SavedModel) {
+		if req.VLLMTensorParallel != nil {
+			m.VLLMTensorParallel = *req.VLLMTensorParallel
+		}
+		if req.VLLMMaxModelLen != nil {
+			m.VLLMMaxModelLen = *req.VLLMMaxModelLen
+		}
+		if req.VLLMGPUUtilization != nil {
+			m.VLLMGPUUtilization = *req.VLLMGPUUtilization
+		}
+		if req.LlamaMainGPU != nil {
+			m.LlamaMainGPU = *req.LlamaMainGPU
+		}
+		if req.LlamaNGPULayers != nil {
+			m.LlamaNGPULayers = *req.LlamaNGPULayers
+		}
+		if req.LlamaTensorSplit != nil {
+			m.LlamaTensorSplit = *req.LlamaTensorSplit
+		}
+		if req.SGLangTensorParallel != nil {
+			m.SGLangTensorParallel = *req.SGLangTensorParallel
+		}
+		if req.SGLangMemFraction != nil {
+			m.SGLangMemFraction = *req.SGLangMemFraction
+		}
+		if req.TGINumShard != nil {
+			m.TGINumShard = *req.TGINumShard
+		}
+		if req.GPUDevice != nil {
+			m.GPUDevice = *req.GPUDevice
+		}
+	})
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "updated", "alias": alias})
 }
 
 // DockerImageStatus represents the status of a Docker image

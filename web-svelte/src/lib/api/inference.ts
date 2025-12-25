@@ -117,9 +117,23 @@ export interface SavedModel {
 	vllm_gpu_utilization?: number;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
+	llama_tensor_split?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	tgi_num_shard?: number;
+}
+
+export interface UpdateSavedRequest {
+	vllm_tensor_parallel?: number;
+	vllm_max_model_len?: number;
+	vllm_gpu_utilization?: number;
+	llama_main_gpu?: number;
+	llama_n_gpu_layers?: number;
+	llama_tensor_split?: string;
+	sglang_tensor_parallel?: number;
+	sglang_mem_fraction?: number;
+	tgi_num_shard?: number;
+	gpu_device?: string;
 }
 
 export interface LoadRequest {
@@ -208,6 +222,9 @@ export const inferenceApi = {
 	
 	setAutoStart: (alias: string, enabled: boolean) => 
 		api.post<{ alias: string; auto_start: boolean }>(`/api/system/inference/auto-start?alias=${encodeURIComponent(alias)}&enabled=${enabled}`),
+	
+	updateSaved: (alias: string, params: UpdateSavedRequest) =>
+		api.post<{ status: string; alias: string }>(`/api/system/inference/update-saved?alias=${encodeURIComponent(alias)}`, params),
 
 	// Repository downloads (v3.3.x+) - download all model files locally
 	downloadRepository: (modelId: string) => 

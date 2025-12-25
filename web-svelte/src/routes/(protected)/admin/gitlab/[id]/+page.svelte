@@ -64,6 +64,7 @@
 	let editChunkOverlap = $state('200');
 	let editMaxFilesPerMR = $state('50');
 	let editMaxLinesPerFile = $state('1000');
+	let editMaxReviewTokens = $state('8192');
 	let editSkipDraftMRs = $state(true);
 	let editSkipBots = $state(true);
 	let editCollectionName = $state('');
@@ -88,6 +89,7 @@
 	let formChunkOverlap = $state('200');
 	let formMaxFilesPerMR = $state('50');
 	let formMaxLinesPerFile = $state('1000');
+	let formMaxReviewTokens = $state('8192');
 	let formSkipDraftMRs = $state(true);
 	let formSkipBots = $state(true);
 	let showAdvancedSettings = $state(false);
@@ -183,6 +185,7 @@
 		formChunkOverlap = '200';
 		formMaxFilesPerMR = '50';
 		formMaxLinesPerFile = '1000';
+		formMaxReviewTokens = '8192';
 		formSkipDraftMRs = true;
 		formSkipBots = true;
 		showAdvancedSettings = false;
@@ -221,10 +224,13 @@
 		const maxFiles = parseInt(formMaxFilesPerMR, 10);
 		const maxLines = parseInt(formMaxLinesPerFile, 10);
 		
+		const maxReviewTokens = parseInt(formMaxReviewTokens, 10);
+		
 		if (!isNaN(chunkSize) && chunkSize !== 4000) settings.chunk_size = chunkSize;
 		if (!isNaN(chunkOverlap) && chunkOverlap !== 200) settings.chunk_overlap = chunkOverlap;
 		if (!isNaN(maxFiles) && maxFiles !== 50) settings.max_files_per_mr = maxFiles;
 		if (!isNaN(maxLines) && maxLines !== 1000) settings.max_lines_per_file = maxLines;
+		if (!isNaN(maxReviewTokens) && maxReviewTokens !== 8192) settings.max_review_tokens = maxReviewTokens;
 		if (!formSkipDraftMRs) settings.skip_draft_mrs = false;
 		if (!formSkipBots) settings.skip_bots = false;
 
@@ -364,6 +370,7 @@
 		editChunkOverlap = String(project.settings?.chunk_overlap || 200);
 		editMaxFilesPerMR = String(project.settings?.max_files_per_mr || 50);
 		editMaxLinesPerFile = String(project.settings?.max_lines_per_file || 1000);
+		editMaxReviewTokens = String(project.settings?.max_review_tokens || 8192);
 		editSkipDraftMRs = project.settings?.skip_draft_mrs ?? true;
 		editSkipBots = project.settings?.skip_bots ?? true;
 		editCollectionName = project.settings?.collection_name || '';
@@ -400,6 +407,7 @@
 					chunk_overlap: parseInt(editChunkOverlap) || 200,
 					max_files_per_mr: parseInt(editMaxFilesPerMR) || 50,
 					max_lines_per_file: parseInt(editMaxLinesPerFile) || 1000,
+					max_review_tokens: parseInt(editMaxReviewTokens) || 8192,
 					skip_draft_mrs: editSkipDraftMRs,
 					skip_bots: editSkipBots,
 					collection_name: editCollectionName || undefined
@@ -978,6 +986,19 @@
 									class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 								/>
 							</div>
+							<div>
+								<label for="add-max-review-tokens" class="mb-1.5 block text-sm font-medium">Max Review Tokens</label>
+								<input
+									id="add-max-review-tokens"
+									type="number"
+									bind:value={formMaxReviewTokens}
+									min="1024"
+									max="128000"
+									step="1024"
+									class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+								/>
+								<p class="mt-1 text-xs text-muted-foreground">Max tokens for LLM review response</p>
+							</div>
 						</div>
 						<div class="flex items-center gap-6">
 							<label class="flex items-center gap-2">
@@ -1260,6 +1281,19 @@
 								bind:value={editMaxLinesPerFile}
 								class="mt-1 w-full rounded-md border bg-background px-3 py-2"
 							/>
+						</div>
+						<div>
+							<label for="edit-max-review-tokens" class="text-sm font-medium">{m.admin_project_max_review_tokens()}</label>
+							<input
+								id="edit-max-review-tokens"
+								type="number"
+								bind:value={editMaxReviewTokens}
+								min="1024"
+								max="128000"
+								step="1024"
+								class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+							/>
+							<p class="mt-1 text-xs text-muted-foreground">{m.admin_project_max_review_tokens_hint()}</p>
 						</div>
 					</div>
 					<div class="mt-3 flex gap-4">

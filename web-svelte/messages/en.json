@@ -650,6 +650,8 @@
 	"admin_project_chunk_overlap": "Chunk Overlap",
 	"admin_project_max_files": "Max Files per MR",
 	"admin_project_max_lines": "Max Lines per File",
+	"admin_project_max_review_tokens": "Max Review Tokens",
+	"admin_project_max_review_tokens_hint": "Maximum tokens for LLM review response (default: 8192)",
 	"admin_project_skip_drafts": "Skip Draft MRs",
 	"admin_project_skip_bots": "Skip Bot MRs",
 	"admin_project_index": "Index Repository",

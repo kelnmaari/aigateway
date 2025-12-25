@@ -297,6 +297,18 @@ func (p *Processor) analyzeWithLLM(
 		modelID = "default"
 	}
 	
+	// Determine max_tokens from project settings or use default
+	maxTokens := project.Settings.MaxReviewTokens
+	if maxTokens <= 0 {
+		maxTokens = 8192 // Default
+	}
+	
+	p.logger.WithFields(logrus.Fields{
+		"model":      modelID,
+		"max_tokens": maxTokens,
+		"configured": project.Settings.MaxReviewTokens,
+	}).Debug("LLM analysis config")
+	
 	requestBody := map[string]interface{}{
 		"model": modelID,
 		"messages": []map[string]string{
@@ -304,7 +316,7 @@ func (p *Processor) analyzeWithLLM(
 			{"role": "user", "content": prompt},
 		},
 		"temperature": 0.3,
-		"max_tokens":  4096,
+		"max_tokens":  maxTokens,
 	}
 	
 	bodyBytes, _ := json.Marshal(requestBody)
@@ -350,14 +362,30 @@ func (p *Processor) analyzeWithLLM(
 		return nil, 0, fmt.Errorf("no response from LLM")
 	}
 	
+	rawContent := llmResponse.Choices[0].Message.Content
+	
+	// Log raw response for debugging (truncated)
+	logContent := rawContent
+	if len(logContent) > 500 {
+		logContent = logContent[:500] + "...[truncated]"
+	}
+	p.logger.WithFields(logrus.Fields{
+		"response_len":  len(rawContent),
+		"tokens_used":   llmResponse.Usage.TotalTokens,
+		"response_start": logContent,
+	}).Debug("LLM raw response received")
+	
 	// Parse LLM response
-	result, err := analyzer.ParseAnalysisResponse(llmResponse.Choices[0].Message.Content)
+	result, err := analyzer.ParseAnalysisResponse(rawContent)
 	if err != nil {
-		p.logger.WithError(err).Warn("Failed to parse structured response, using raw text")
-		result = &analyzer.AnalysisResultParsed{
-			Summary: llmResponse.Choices[0].Message.Content,
-			Score:   70,
-		}
+		p.logger.WithError(err).WithField("raw_response", rawContent).Warn("Failed to parse structured response")
+		// Return error instead of silent fallback
+		return nil, 0, fmt.Errorf("failed to parse LLM response: %w (content length: %d)", err, len(rawContent))
+	}
+	
+	// Validate parsed result
+	if result.Score == 0 && len(result.Issues) == 0 && len(result.Suggestions) == 0 {
+		p.logger.WithField("raw_response", rawContent).Warn("LLM returned empty analysis - check model response")
 	}
 	
 	return result, llmResponse.Usage.TotalTokens, nil

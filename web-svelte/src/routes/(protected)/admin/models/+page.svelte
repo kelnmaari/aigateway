@@ -103,6 +103,21 @@
 	let selectedHealth = $state<{status: string; response_time_ms?: number; error?: string} | null>(null);
 	let logsInterval: ReturnType<typeof setInterval> | null = null;
 
+	// Edit saved model modal state
+	let editingSavedModel = $state<SavedModel | null>(null);
+	let editSavedForm = $state({
+		vllm_tensor_parallel: 1,
+		vllm_max_model_len: 0,
+		vllm_gpu_utilization: 0.9,
+		llama_main_gpu: 0,
+		llama_n_gpu_layers: -1,
+		llama_tensor_split: '',
+		sglang_tensor_parallel: 1,
+		sglang_mem_fraction: 0.9,
+		tgi_num_shard: 1,
+		gpu_device: ''
+	});
+
 	let form = $state<LoadRequest>({
 		alias: '',
 		provider: 'vllm',
@@ -708,6 +723,34 @@
 		}
 	}
 
+	function openEditSavedModal(saved: SavedModel) {
+		editingSavedModel = saved;
+		editSavedForm = {
+			vllm_tensor_parallel: saved.vllm_tensor_parallel || 1,
+			vllm_max_model_len: saved.vllm_max_model_len || 0,
+			vllm_gpu_utilization: saved.vllm_gpu_utilization || 0.9,
+			llama_main_gpu: saved.llama_main_gpu || 0,
+			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
+			llama_tensor_split: saved.llama_tensor_split || '',
+			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
+			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,
+			tgi_num_shard: saved.tgi_num_shard || 1,
+			gpu_device: saved.gpu_device || ''
+		};
+	}
+
+	async function saveEditedModel() {
+		if (!editingSavedModel) return;
+		try {
+			await inferenceApi.updateSaved(editingSavedModel.alias, editSavedForm);
+			showMsg(`Model ${editingSavedModel.alias} updated`, 'success');
+			editingSavedModel = null;
+			await loadSavedModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Failed to update model', 'error');
+		}
+	}
+
 	async function loadSavedModelConfig(saved: SavedModel) {
 		try {
 			const req: LoadRequest = {
@@ -1167,6 +1210,13 @@
 										{#if !isRunning}
 											<button class="px-2 py-1 text-xs rounded border bg-primary/10 text-primary hover:bg-primary/20" onclick={() => loadSavedModelConfig(saved)}>Load</button>
 										{/if}
+										<button 
+											class="px-2 py-1 text-xs rounded border hover:bg-muted"
+											onclick={() => openEditSavedModal(saved)}
+											title="Edit parameters"
+										>
+											⚙️
+										</button>
 										<button 
 											class="px-2 py-1 text-xs rounded border hover:bg-muted" 
 											onclick={() => toggleAutoStart(saved)}
@@ -1761,3 +1811,103 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Edit Saved Model Modal -->
+{#if editingSavedModel}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" tabindex="-1" role="dialog" aria-modal="true" onkeydown={(e) => e.key === 'Escape' && (editingSavedModel = null)}>
+		<div class="bg-background rounded-lg shadow-xl w-full max-w-lg p-6">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-lg font-semibold">Edit: {editingSavedModel.alias}</h3>
+				<button class="text-muted-foreground hover:text-foreground" onclick={() => editingSavedModel = null}>✕</button>
+			</div>
+			
+			<div class="text-sm text-muted-foreground mb-4">
+				Provider: <span class="font-medium text-foreground">{editingSavedModel.provider}</span>
+			</div>
+
+			<div class="space-y-4 max-h-[60vh] overflow-y-auto">
+				<!-- Common GPU Device -->
+				<div>
+					<label for="edit-gpu-device" class="block text-sm font-medium mb-1">GPU Device</label>
+					<input id="edit-gpu-device" type="text" class="w-full px-3 py-2 rounded border bg-background" 
+						placeholder="e.g., 0 or 0,1"
+						bind:value={editSavedForm.gpu_device} />
+					<p class="text-xs text-muted-foreground mt-1">Comma-separated GPU indices</p>
+				</div>
+
+				<!-- Provider-specific settings -->
+				{#if editingSavedModel.provider === 'vllm'}
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="edit-vllm-tp" class="block text-sm font-medium mb-1">Tensor Parallel</label>
+							<input id="edit-vllm-tp" type="number" min="1" class="w-full px-3 py-2 rounded border bg-background" 
+								bind:value={editSavedForm.vllm_tensor_parallel} />
+						</div>
+						<div>
+							<label for="edit-vllm-len" class="block text-sm font-medium mb-1">Max Model Length</label>
+							<input id="edit-vllm-len" type="number" min="0" class="w-full px-3 py-2 rounded border bg-background" 
+								placeholder="0 = auto"
+								bind:value={editSavedForm.vllm_max_model_len} />
+						</div>
+					</div>
+					<div>
+						<label for="edit-vllm-util" class="block text-sm font-medium mb-1">GPU Memory Utilization</label>
+						<input id="edit-vllm-util" type="number" step="0.05" min="0.1" max="1.0" class="w-full px-3 py-2 rounded border bg-background" 
+							bind:value={editSavedForm.vllm_gpu_utilization} />
+						<p class="text-xs text-muted-foreground mt-1">0.1 - 1.0 (default: 0.9)</p>
+					</div>
+				{:else if editingSavedModel.provider === 'sglang'}
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="edit-sglang-tp" class="block text-sm font-medium mb-1">Tensor Parallel</label>
+							<input id="edit-sglang-tp" type="number" min="1" class="w-full px-3 py-2 rounded border bg-background" 
+								bind:value={editSavedForm.sglang_tensor_parallel} />
+						</div>
+						<div>
+							<label for="edit-sglang-mem" class="block text-sm font-medium mb-1">Memory Fraction</label>
+							<input id="edit-sglang-mem" type="number" step="0.05" min="0.1" max="1.0" class="w-full px-3 py-2 rounded border bg-background" 
+								bind:value={editSavedForm.sglang_mem_fraction} />
+						</div>
+					</div>
+				{:else if editingSavedModel.provider === 'tgi'}
+					<div>
+						<label for="edit-tgi-shards" class="block text-sm font-medium mb-1">Num Shards</label>
+						<input id="edit-tgi-shards" type="number" min="1" class="w-full px-3 py-2 rounded border bg-background" 
+							bind:value={editSavedForm.tgi_num_shard} />
+						<p class="text-xs text-muted-foreground mt-1">Number of GPUs to shard across</p>
+					</div>
+				{:else if editingSavedModel.provider === 'llama.cpp'}
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="edit-llama-main" class="block text-sm font-medium mb-1">Main GPU</label>
+							<input id="edit-llama-main" type="number" min="0" class="w-full px-3 py-2 rounded border bg-background" 
+								bind:value={editSavedForm.llama_main_gpu} />
+						</div>
+						<div>
+							<label for="edit-llama-layers" class="block text-sm font-medium mb-1">N GPU Layers</label>
+							<input id="edit-llama-layers" type="number" min="-1" class="w-full px-3 py-2 rounded border bg-background" 
+								bind:value={editSavedForm.llama_n_gpu_layers} />
+							<p class="text-xs text-muted-foreground mt-1">-1 = all layers</p>
+						</div>
+					</div>
+					<div>
+						<label for="edit-llama-split" class="block text-sm font-medium mb-1">Tensor Split</label>
+						<input id="edit-llama-split" type="text" class="w-full px-3 py-2 rounded border bg-background" 
+							placeholder="e.g., 0.5,0.5"
+							bind:value={editSavedForm.llama_tensor_split} />
+						<p class="text-xs text-muted-foreground mt-1">Comma-separated split ratios for multi-GPU</p>
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex justify-end gap-2 mt-6 pt-4 border-t">
+				<button class="px-4 py-2 rounded border hover:bg-muted" onclick={() => editingSavedModel = null}>
+					Cancel
+				</button>
+				<button class="px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90" onclick={saveEditedModel}>
+					Save Changes
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

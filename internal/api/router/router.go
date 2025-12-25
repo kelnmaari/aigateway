@@ -598,6 +598,7 @@ func (r *Router) setupInferenceRoutes() {
 		group.POST("/save", r.inferenceHandler.PostSaveModel)
 		group.POST("/delete-saved", r.inferenceHandler.PostDeleteSaved)
 		group.POST("/auto-start", r.inferenceHandler.PostSetAutoStart)
+		group.POST("/update-saved", r.inferenceHandler.PostUpdateSaved)
 		// Docker image management
 		group.GET("/docker-images", r.inferenceHandler.GetDockerImages)
 		group.POST("/docker-images/pull", r.inferenceHandler.PostPullDockerImage)

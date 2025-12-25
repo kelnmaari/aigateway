@@ -650,6 +650,8 @@
 	"admin_project_chunk_overlap": "Перекрытие чанков",
 	"admin_project_max_files": "Макс. файлов в MR",
 	"admin_project_max_lines": "Макс. строк в файле",
+	"admin_project_max_review_tokens": "Макс. токенов ревью",
+	"admin_project_max_review_tokens_hint": "Максимум токенов для ответа LLM (по умолчанию: 8192)",
 	"admin_project_skip_drafts": "Пропускать черновики",
 	"admin_project_skip_bots": "Пропускать ботов",
 	"admin_project_index": "Индексировать репозиторий",

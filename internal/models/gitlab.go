@@ -170,6 +170,9 @@ type GitLabProjectSettings struct {
 	SkipDraftMRs    bool `json:"skip_draft_mrs,omitempty"`     // Skip WIP/Draft MRs
 	SkipBots        bool `json:"skip_bots,omitempty"`          // Skip bot-created MRs
 
+	// LLM settings
+	MaxReviewTokens int `json:"max_review_tokens,omitempty"` // Max tokens for LLM response, default: 8192
+
 	// Chunking settings
 	ChunkSize    int `json:"chunk_size,omitempty"`    // Default: 1000 tokens
 	ChunkOverlap int `json:"chunk_overlap,omitempty"` // Default: 100 tokens

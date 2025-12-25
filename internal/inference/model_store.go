@@ -2,6 +2,7 @@ package inference
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -116,6 +117,21 @@ func (s *ModelStore) Delete(alias string) error {
 	defer s.mu.Unlock()
 
 	delete(s.models, alias)
+	return s.persist()
+}
+
+// Update updates an existing saved model configuration.
+func (s *ModelStore) Update(alias string, updateFn func(*SavedModel)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, ok := s.models[alias]
+	if !ok {
+		return fmt.Errorf("model not found: %s", alias)
+	}
+
+	updateFn(&existing)
+	s.models[alias] = existing
 	return s.persist()
 }
 

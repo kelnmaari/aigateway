@@ -75,11 +75,17 @@ func DefaultConfig() IndexerConfig {
 }
 
 // Indexer handles repository indexing for RAG
+// ProjectStore interface for updating project index status
+type ProjectStore interface {
+	UpdateProjectIndexStatus(ctx context.Context, projectID, status string, chunksCount int64) error
+}
+
 type Indexer struct {
 	config     IndexerConfig
 	ragService *rag.RAGService
 	chunker    *chunker.CodeChunker
 	logger     *logrus.Logger
+	store      ProjectStore // For persisting index status to DB
 
 	// Track indexing status per project+branch
 	statusMu sync.RWMutex
@@ -124,6 +130,11 @@ func (i *Indexer) GetClient(integrationID string) (*client.Client, bool) {
 	return c, ok
 }
 
+// SetStore sets the project store for persisting index status
+func (i *Indexer) SetStore(store ProjectStore) {
+	i.store = store
+}
+
 // statusKey generates a key for status map
 func statusKey(projectID, branch string) string {
 	return fmt.Sprintf("%s:%s", projectID, branch)
@@ -146,11 +157,27 @@ func (i *Indexer) GetStatus(projectID, branch string) *IndexInfo {
 	}
 }
 
-// setStatus updates indexing status
+// setStatus updates indexing status in memory and optionally in DB
 func (i *Indexer) setStatus(projectID, branch string, info *IndexInfo) {
 	i.statusMu.Lock()
-	defer i.statusMu.Unlock()
 	i.status[statusKey(projectID, branch)] = info
+	i.statusMu.Unlock()
+
+	// Persist to DB if store is available
+	if i.store != nil && (info.Status == IndexStatusCompleted || info.Status == IndexStatusFailed) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := i.store.UpdateProjectIndexStatus(ctx, projectID, string(info.Status), int64(info.ChunksTotal)); err != nil {
+			i.logger.WithError(err).WithField("project_id", projectID).Warn("Failed to persist index status to DB")
+		} else {
+			i.logger.WithFields(logrus.Fields{
+				"project_id": projectID,
+				"status":     info.Status,
+				"chunks":     info.ChunksTotal,
+			}).Debug("Index status persisted to DB")
+		}
+	}
 }
 
 // IndexRequest holds parameters for indexing

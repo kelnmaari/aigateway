@@ -3167,6 +3167,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					}
 
 					r.gitlabIndexer = gitlabIndexer.NewIndexer(ragService, indexerLogger)
+					r.gitlabIndexer.SetStore(glStore) // Enable DB persistence for index status
 					r.gitlabIndexerHandler = handlers.NewGitLabIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
 					r.gitlabUserIndexerHandler = handlers.NewGitLabUserIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
 

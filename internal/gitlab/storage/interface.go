@@ -74,6 +74,9 @@ type ProjectStore interface {
 	
 	// DeleteProjectsByIntegration deletes all projects for an integration
 	DeleteProjectsByIntegration(ctx context.Context, integrationID string) error
+	
+	// UpdateProjectIndexStatus updates the index status and chunks count for a project
+	UpdateProjectIndexStatus(ctx context.Context, projectID, status string, chunksCount int64) error
 }
 
 // ReviewStore manages MR reviews

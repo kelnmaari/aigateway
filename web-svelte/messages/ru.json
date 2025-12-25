@@ -731,6 +731,9 @@
 	"admin_users_disable": "Отключить пользователя",
 	"admin_users_enable": "Включить пользователя",
 	"admin_users_delete": "Удалить пользователя",
+	"admin_users_make_admin": "Назначить админом",
+	"admin_users_remove_admin": "Снять права админа",
+	"admin_users_toggle_admin_failed": "Не удалось изменить роль",
 	"admin_users_showing": "Показано {from}–{to} из {total}",
 	"admin_users_administrator": "Администратор",
 

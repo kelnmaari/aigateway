@@ -731,6 +731,9 @@
 	"admin_users_disable": "Disable User",
 	"admin_users_enable": "Enable User",
 	"admin_users_delete": "Delete User",
+	"admin_users_make_admin": "Make Admin",
+	"admin_users_remove_admin": "Remove Admin",
+	"admin_users_toggle_admin_failed": "Failed to update admin role",
 	"admin_users_showing": "Showing {from} to {to} of {total} users",
 	"admin_users_administrator": "Administrator",
 

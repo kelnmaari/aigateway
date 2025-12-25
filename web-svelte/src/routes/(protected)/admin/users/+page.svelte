@@ -10,6 +10,7 @@
 		Key,
 		Loader2,
 		Shield,
+		ShieldOff,
 		X,
 		Eye,
 		EyeOff
@@ -108,6 +109,18 @@
 		} catch (error) {
 			console.error('Failed to toggle user status:', error);
 			alert(m.alert_failed_update_status());
+		}
+		showMenuFor = null;
+	}
+
+	async function toggleAdminRole(user: AdminUser) {
+		const newIsAdmin = !user.is_admin;
+		try {
+			await adminApi.updateUser(user.id, { is_admin: newIsAdmin });
+			users = users.map((u) => (u.id === user.id ? { ...u, is_admin: newIsAdmin } : u));
+		} catch (error) {
+			console.error('Failed to toggle admin role:', error);
+			alert(m.admin_users_toggle_admin_failed?.() || 'Failed to update admin role');
 		}
 		showMenuFor = null;
 	}
@@ -262,6 +275,18 @@
 
 								{#if showMenuFor === user.id}
 									<div class="absolute right-4 top-full z-10 mt-1 w-48 rounded-lg border border-border bg-popover py-1 shadow-lg">
+										<button
+											onclick={() => toggleAdminRole(user)}
+											class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+										>
+											{#if user.is_admin}
+												<ShieldOff class="h-4 w-4" />
+												{m.admin_users_remove_admin()}
+											{:else}
+												<Shield class="h-4 w-4" />
+												{m.admin_users_make_admin()}
+											{/if}
+										</button>
 										<button
 											onclick={() => toggleUserStatus(user)}
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"

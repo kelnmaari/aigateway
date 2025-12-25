@@ -200,13 +200,15 @@ func (p *PostgreSQLDB) UpdateUser(ctx context.Context, user *models.User) error 
 		return fmt.Errorf("failed to marshal preferences: %w", err)
 	}
 
-	// Serialize metadata to JSON if present
+	// Serialize metadata to JSON (empty object if nil)
 	var metadataJSON []byte
 	if user.Metadata != nil {
 		metadataJSON, err = json.Marshal(user.Metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
+	} else {
+		metadataJSON = []byte("{}")
 	}
 
 	query := `

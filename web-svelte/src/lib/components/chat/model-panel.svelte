@@ -25,11 +25,13 @@
 	let showParams = $state(false);
 
 	const presets = [
-		{ id: 'creative', label: m.chat_preset_creative, icon: Sparkles, color: 'text-purple-500' },
-		{ id: 'balanced', label: m.chat_preset_balanced, icon: Scale, color: 'text-blue-500' },
-		{ id: 'precise', label: m.chat_preset_precise, icon: Target, color: 'text-green-500' },
-		{ id: 'coding', label: m.chat_preset_coding, icon: Code, color: 'text-orange-500' }
+		{ id: 'creative', label: m.chat_preset_creative, desc: m.chat_preset_creative_desc, icon: Sparkles, color: 'text-purple-500' },
+		{ id: 'balanced', label: m.chat_preset_balanced, desc: m.chat_preset_balanced_desc, icon: Scale, color: 'text-blue-500' },
+		{ id: 'precise', label: m.chat_preset_precise, desc: m.chat_preset_precise_desc, icon: Target, color: 'text-green-500' },
+		{ id: 'coding', label: m.chat_preset_coding, desc: m.chat_preset_coding_desc, icon: Code, color: 'text-orange-500' }
 	] as const;
+
+	let activePreset = $state<string | null>(null);
 </script>
 
 <div class="border-b border-border bg-card/50 px-4 py-3">
@@ -54,13 +56,14 @@
 		<div class="hidden items-center gap-1 md:flex">
 			{#each presets as preset}
 				<button
-					onclick={() => onPreset(preset.id)}
+					onclick={() => { onPreset(preset.id); activePreset = preset.id; }}
 					class={cn(
-						'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+						'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
 						'hover:bg-accent',
+						activePreset === preset.id ? 'bg-accent ring-1 ring-border' : '',
 						preset.color
 					)}
-					title={preset.label()}
+					title={preset.desc()}
 				>
 					<preset.icon class="h-3.5 w-3.5" />
 					<span class="hidden lg:inline">{preset.label()}</span>
@@ -162,12 +165,14 @@
 			<div class="mt-4 flex flex-wrap gap-2 md:hidden">
 				{#each presets as preset}
 					<button
-						onclick={() => onPreset(preset.id)}
+						onclick={() => { onPreset(preset.id); activePreset = preset.id; }}
 						class={cn(
 							'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
 							'border border-border hover:bg-accent',
+							activePreset === preset.id ? 'bg-accent ring-1 ring-primary' : '',
 							preset.color
 						)}
+						title={preset.desc()}
 					>
 						<preset.icon class="h-3.5 w-3.5" />
 						{preset.label()}

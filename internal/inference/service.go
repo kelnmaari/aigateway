@@ -237,6 +237,38 @@ func (s *Service) recoverRunningContainers() {
 // LoadAndStart prepares artifacts and starts container based on provider.
 func (s *Service) LoadAndStart(ctx context.Context, spec ModelSpec) (*ModelInstance, error) {
 	s.registry.Register(spec)
+
+	// For providers that require LocalPath (llama.cpp, TRT-LLM), prepare artifacts first
+	if spec.Provider == ProviderLlamaCPP || spec.Provider == ProviderTRTLLM {
+		if spec.LocalPath == "" {
+			s.logger.WithFields(logrus.Fields{
+				"alias":    spec.Alias,
+				"provider": spec.Provider,
+				"hf_repo":  spec.HFRepo,
+				"hf_file":  spec.HFFile,
+				"gguf_url": spec.GGUFURL,
+				"format":   spec.Format,
+			}).Debug("Preparing artifacts for provider")
+			
+			// Download GGUF/TRT artifacts to get LocalPath
+			prepInst, err := s.orch.PrepareModel(ctx, spec)
+			if err != nil {
+				return nil, fmt.Errorf("prepare artifacts: %w", err)
+			}
+			spec.LocalPath = prepInst.Spec.LocalPath
+			s.logger.WithFields(logrus.Fields{
+				"alias":      spec.Alias,
+				"provider":   spec.Provider,
+				"local_path": spec.LocalPath,
+			}).Debug("Artifacts prepared, LocalPath set")
+			
+			// Double-check LocalPath was actually set
+			if spec.LocalPath == "" {
+				return nil, fmt.Errorf("failed to prepare artifacts: LocalPath is empty (check hf_repo, hf_file, or gguf_url)")
+			}
+		}
+	}
+
 	var req ContainerStartRequest
 	switch spec.Provider {
 	case ProviderVLLM:

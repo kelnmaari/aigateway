@@ -3,6 +3,7 @@
 	import { authStore } from '$lib';
 	import { api } from '$lib/api';
 	import { cn, formatNumber, formatRelativeTime } from '$lib/utils';
+	import * as m from '$lib/paraglide/messages';
 	import {
 		MessageSquare,
 		Key,
@@ -107,13 +108,13 @@
 	<title>Dashboard - AIGateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-8">
 		<h1 class="text-2xl font-bold text-foreground">
-			Welcome back, {authStore.user?.full_name || authStore.user?.username}
+			{m.dashboard_welcome({ name: authStore.user?.full_name || authStore.user?.username || '' })}
 		</h1>
-		<p class="mt-1 text-muted-foreground">Here's what's happening with your AI gateway</p>
+		<p class="mt-1 text-muted-foreground">{m.dashboard_welcome_desc()}</p>
 	</div>
 
 	{#if loading}
@@ -144,8 +145,8 @@
 			<!-- Quick Actions -->
 			<Card.Root>
 				<Card.Header>
-					<Card.Title>Quick Actions</Card.Title>
-					<Card.Description>Get started with common tasks</Card.Description>
+					<Card.Title>{m.dashboard_quick_actions_title()}</Card.Title>
+					<Card.Description>{m.dashboard_quick_actions_desc()}</Card.Description>
 				</Card.Header>
 				<Card.Content class="grid gap-3">
 					<a
@@ -300,7 +301,7 @@
 						<div class="space-y-2">
 							{#each tenants as tenant}
 								<a
-									href="/tenants/{tenant.id}"
+									href="/tenants"
 									class="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-accent"
 								>
 									<div class="flex items-center gap-3">

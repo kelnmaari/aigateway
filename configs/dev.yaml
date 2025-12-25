@@ -248,6 +248,16 @@ logging:
   error_log_max_age: 90       # days (keep errors longer)
   error_log_compress: true
 
+  # Separate HTTP log file (detailed HTTP request logs)
+  # Allows keeping main log clean while preserving detailed HTTP debugging info
+  http_log_enabled: true
+  http_log_file_path: "logs/http.log"
+
+  # Separate metrics log file (GPU metrics, performance metrics)
+  # Prevents flooding main log with periodic debug metrics
+  metrics_log_enabled: true
+  metrics_log_file_path: "logs/metrics.log"
+
 models:
   # Модель по умолчанию для embeddings
   # Используется когда:

@@ -3,6 +3,7 @@
 	import { User, Bot, Copy, Check, Brain, ChevronDown, ChevronRight } from 'lucide-svelte';
 	import { cn, copyToClipboard as copyText } from '$lib/utils';
 	import type { Message } from '$lib/stores/chat.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
 		messages: Message[];
@@ -180,7 +181,7 @@
 									class="flex w-full items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-left text-sm transition-colors hover:bg-purple-500/20"
 								>
 									<Brain class="h-4 w-4 text-purple-500" />
-									<span class="font-medium text-purple-500">Thinking</span>
+									<span class="font-medium text-purple-500">{m.chat_thinking()}</span>
 									{#if expandedThinking.has(message.id)}
 										<ChevronDown class="ml-auto h-4 w-4 text-purple-500" />
 									{:else}
@@ -204,7 +205,7 @@
 						{:else if parsed.isThinking}
 							<div class="flex items-center gap-2 text-sm text-muted-foreground">
 								<Brain class="h-4 w-4 animate-pulse text-purple-500" />
-								<span>Thinking...</span>
+								<span>{m.chat_thinking_progress()}</span>
 							</div>
 						{/if}
 					{/if}
@@ -216,7 +217,7 @@
 							'absolute -bottom-2 right-2 rounded-md bg-background/80 p-1.5 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100',
 							message.role === 'user' ? '-left-2 right-auto' : ''
 						)}
-						title="Copy"
+						title={m.chat_copy_message()}
 					>
 						{#if copiedId === message.id}
 							<Check class="h-3.5 w-3.5 text-green-500" />
@@ -245,7 +246,7 @@
 						<div class="mb-3">
 							<div class="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-sm">
 								<Brain class="h-4 w-4 animate-pulse text-purple-500" />
-								<span class="font-medium text-purple-500">Thinking...</span>
+								<span class="font-medium text-purple-500">{m.chat_thinking_progress()}</span>
 							</div>
 							<div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-muted-foreground">
 								<pre class="whitespace-pre-wrap font-sans">{streamParsed.thinking}</pre>
@@ -258,7 +259,7 @@
 						<div class="mb-3">
 							<div class="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm">
 								<Brain class="h-4 w-4 text-green-500" />
-								<span class="font-medium text-green-500">Thought complete</span>
+								<span class="font-medium text-green-500">{m.chat_thought_complete()}</span>
 							</div>
 						</div>
 					{/if}

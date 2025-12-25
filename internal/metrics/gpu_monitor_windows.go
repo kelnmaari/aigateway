@@ -12,8 +12,16 @@ import (
 
 // GPUMonitor заглушка для Windows (NVML недоступен)
 type GPUMonitor struct {
-	logger  *logrus.Logger
-	enabled bool
+	logger        *logrus.Logger
+	metricsLogger *logrus.Logger // Отдельный логгер для метрик (не используется на Windows)
+	enabled       bool
+}
+
+// SetMetricsLogger устанавливает отдельный логгер для метрик (no-op на Windows)
+func (m *GPUMonitor) SetMetricsLogger(logger *logrus.Logger) {
+	if m != nil {
+		m.metricsLogger = logger
+	}
 }
 
 // GPUMetrics содержит метрики GPU

@@ -88,8 +88,9 @@ func main() {
 		fmt.Printf("📋 Configuration auto-detected\n")
 	}
 
-	// Настройка логирования
-	appLogger := logger.Setup(cfg)
+	// Настройка логирования (с отдельными файлами для HTTP и metrics)
+	loggers := logger.SetupAll(cfg)
+	appLogger := loggers.Main
 	appLogger.WithField("version", version.Version).
 		WithField("git_commit", version.GitCommit).
 		WithField("build_date", version.BuildDate).
@@ -305,6 +306,11 @@ func main() {
 			GCPercentage:         cfg.Observability.Performance.GCPercentage,
 		})
 
+		// Устанавливаем отдельный логгер для метрик (если настроен)
+		if loggers.Metrics != nil {
+			perfMonitor.SetMetricsLogger(loggers.Metrics)
+		}
+
 		// Start performance monitor in background
 		monitorCtx, monitorCancel := context.WithCancel(context.Background())
 		defer monitorCancel()
@@ -342,6 +348,10 @@ func main() {
 		appLogger.WithError(err).Error("Failed to initialize GPU monitor")
 		// Не критичная ошибка, продолжаем
 	} else if gpuMonitor != nil {
+		// Устанавливаем отдельный логгер для метрик (если настроен)
+		if loggers.Metrics != nil {
+			gpuMonitor.SetMetricsLogger(loggers.Metrics)
+		}
 		gpuMonitor.Start()
 		// Note: gpuMonitor.Stop() called explicitly in shutdown section
 		appLogger.Info("✅ GPU Monitor initialized successfully")
@@ -584,6 +594,8 @@ func main() {
 	appRouter, err = router.NewWithOptions(router.NewOptions{
 		Config:               cfg,
 		Logger:               appLogger,
+		HTTPLogger:           loggers.HTTP,         // Отдельный файл для HTTP логов (может быть nil)
+		MetricsLogger:        loggers.Metrics,      // Отдельный файл для GPU/performance метрик (может быть nil)
 		Version:              version.Version,
 		Database:             db,                   // Может быть nil для legacy mode
 		JWTManager:           jwtManager,           // Может быть nil для legacy mode

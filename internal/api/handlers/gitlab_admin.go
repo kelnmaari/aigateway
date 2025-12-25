@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"aigateway/internal/gitlab/client"
+	"aigateway/internal/gitlab/rag"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/models"
 	mainStorage "aigateway/internal/storage"
@@ -24,11 +25,17 @@ type WorkerPoolStats interface {
 	GetWorkerCounts() (total, active, idle int)
 }
 
+// QdrantStatsProvider provides index statistics from Qdrant
+type QdrantStatsProvider interface {
+	GetCollectionStats(ctx context.Context, collectionName string) (*rag.CollectionStats, error)
+}
+
 type GitLabAdminHandler struct {
-	store      storage.Store
-	mainDB     mainStorage.Database // For accessing model registry
-	workerPool WorkerPoolStats      // Worker pool for queue stats
-	logger     *logrus.Logger
+	store         storage.Store
+	mainDB        mainStorage.Database   // For accessing model registry
+	workerPool    WorkerPoolStats        // Worker pool for queue stats
+	qdrantStats   QdrantStatsProvider    // For index stats
+	logger        *logrus.Logger
 }
 
 // NewGitLabAdminHandler creates a new GitLab admin handler
@@ -47,6 +54,11 @@ func (h *GitLabAdminHandler) SetWorkerPool(pool WorkerPoolStats) {
 // SetMainDB sets the main database for model access
 func (h *GitLabAdminHandler) SetMainDB(db mainStorage.Database) {
 	h.mainDB = db
+}
+
+// SetQdrantStats sets the Qdrant stats provider for index statistics
+func (h *GitLabAdminHandler) SetQdrantStats(qs QdrantStatsProvider) {
+	h.qdrantStats = qs
 }
 
 // ============================================================================
@@ -347,6 +359,18 @@ func (h *GitLabAdminHandler) ListProjects(c *gin.Context) {
 		h.logger.WithError(err).Error("Failed to list projects")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list projects"})
 		return
+	}
+
+	// Enrich projects with index statistics from Qdrant
+	if h.qdrantStats != nil {
+		for i := range projects {
+			collectionName := projects[i].GetCollectionName()
+			stats, err := h.qdrantStats.GetCollectionStats(ctx, collectionName)
+			if err == nil && stats != nil {
+				projects[i].IndexChunks = stats.PointsCount
+				projects[i].IndexVectors = stats.VectorsCount
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

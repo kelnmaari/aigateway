@@ -3,6 +3,8 @@ package models
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -79,6 +81,7 @@ type GitLabProject struct {
 	GitLabProjectID   int64                `json:"gitlab_project_id" db:"gitlab_project_id"`
 	Name              string               `json:"name" db:"name"`
 	PathWithNamespace string               `json:"path_with_namespace" db:"path_with_namespace"`
+	DefaultBranch     string               `json:"default_branch" db:"default_branch"` // Target branch for indexing
 	WebhookID         *int64               `json:"webhook_id,omitempty" db:"webhook_id"`
 	Status            GitLabProjectStatus  `json:"status" db:"status"`
 	AutoReview        bool                 `json:"auto_review" db:"auto_review"`
@@ -91,12 +94,59 @@ type GitLabProject struct {
 	ReviewPrompt      string               `json:"review_prompt,omitempty" db:"review_prompt"`
 	Settings          GitLabProjectSettings `json:"settings" db:"settings"`
 	
+	// Indexing status
+	IndexStatus       string               `json:"index_status,omitempty" db:"index_status"` // pending, in_progress, completed, failed
+	LastIndexedAt     *time.Time           `json:"last_indexed_at,omitempty" db:"last_indexed_at"`
+	
 	CreatedAt         time.Time            `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time            `json:"updated_at" db:"updated_at"`
 	
 	// Computed fields (not stored)
-	IntegrationName   string               `json:"integration_name,omitempty" db:"-"`
-	ReviewCount       int                  `json:"review_count,omitempty" db:"-"`
+	IntegrationName string `json:"integration_name,omitempty" db:"-"`
+	ReviewCount     int    `json:"review_count,omitempty" db:"-"`
+	
+	// Index statistics (computed from Qdrant)
+	IndexChunks     int64  `json:"index_chunks,omitempty" db:"-"`
+	IndexVectors    int64  `json:"index_vectors,omitempty" db:"-"`
+}
+
+// GetCollectionName returns the Qdrant collection name for this project.
+// If Settings.CollectionName is set, it is returned.
+// Otherwise, generates collection name from PathWithNamespace or Name.
+func (p *GitLabProject) GetCollectionName() string {
+	if p.Settings.CollectionName != "" {
+		return p.Settings.CollectionName
+	}
+	// Generate from path_with_namespace (e.g., "group/project" -> "group-project")
+	name := p.PathWithNamespace
+	if name == "" {
+		name = p.Name
+	}
+	return SanitizeCollectionName(name)
+}
+
+// SanitizeCollectionName converts a project name to a valid Qdrant collection name.
+// Converts to lowercase, replaces spaces and special characters with "-".
+func SanitizeCollectionName(name string) string {
+	// Lowercase
+	name = strings.ToLower(name)
+	// Replace / with -
+	name = strings.ReplaceAll(name, "/", "-")
+	// Replace spaces with -
+	name = strings.ReplaceAll(name, " ", "-")
+	// Replace special characters with -
+	re := regexp.MustCompile(`[^a-z0-9_-]`)
+	name = re.ReplaceAllString(name, "-")
+	// Remove consecutive dashes
+	re = regexp.MustCompile(`-+`)
+	name = re.ReplaceAllString(name, "-")
+	// Trim leading/trailing dashes
+	name = strings.Trim(name, "-")
+	// Prefix with "gitlab-" for clarity
+	if name == "" {
+		name = "default"
+	}
+	return "gitlab-" + name
 }
 
 // GitLabProjectStatus represents the status of a GitLab project
@@ -113,20 +163,23 @@ type GitLabProjectSettings struct {
 	// File Filters
 	IncludePatterns []string `json:"include_patterns,omitempty"` // ["*.go", "*.ts", "*.py"]
 	ExcludePatterns []string `json:"exclude_patterns,omitempty"` // ["vendor/*", "node_modules/*", "*.min.js"]
-	
+
 	// Analysis settings
-	MaxFilesPerMR    int  `json:"max_files_per_mr,omitempty"`    // Default: 50
-	MaxLinesPerFile  int  `json:"max_lines_per_file,omitempty"`  // Default: 2000
-	SkipDraftMRs     bool `json:"skip_draft_mrs,omitempty"`      // Skip WIP/Draft MRs
-	SkipBots         bool `json:"skip_bots,omitempty"`           // Skip bot-created MRs
-	
+	MaxFilesPerMR   int  `json:"max_files_per_mr,omitempty"`   // Default: 50
+	MaxLinesPerFile int  `json:"max_lines_per_file,omitempty"` // Default: 2000
+	SkipDraftMRs    bool `json:"skip_draft_mrs,omitempty"`     // Skip WIP/Draft MRs
+	SkipBots        bool `json:"skip_bots,omitempty"`          // Skip bot-created MRs
+
 	// Chunking settings
-	ChunkSize        int  `json:"chunk_size,omitempty"`          // Default: 1000 tokens
-	ChunkOverlap     int  `json:"chunk_overlap,omitempty"`       // Default: 100 tokens
-	
+	ChunkSize    int `json:"chunk_size,omitempty"`    // Default: 1000 tokens
+	ChunkOverlap int `json:"chunk_overlap,omitempty"` // Default: 100 tokens
+
 	// Branch filters
-	TargetBranches   []string `json:"target_branches,omitempty"` // Only review MRs to these branches
-	IgnoreBranches   []string `json:"ignore_branches,omitempty"` // Never review MRs from these branches
+	TargetBranches []string `json:"target_branches,omitempty"` // Only review MRs to these branches
+	IgnoreBranches []string `json:"ignore_branches,omitempty"` // Never review MRs from these branches
+
+	// Qdrant Collection (auto-generated from project name if empty)
+	CollectionName string `json:"collection_name,omitempty"` // Qdrant collection for code embeddings
 }
 
 // Scan implements sql.Scanner for GitLabProjectSettings

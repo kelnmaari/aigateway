@@ -18,6 +18,9 @@
 	import { chatApi } from '$lib/api';
 	import { cn, formatRelativeTime, copyToClipboard as copyText } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { IconButton } from '$lib/components/ui/icon-button';
+	import { FormLabel } from '$lib/components/ui/form-label';
+	import { Tooltip } from '$lib/components/ui/tooltip';
 	import * as m from '$lib/paraglide/messages';
 
 	// Modals
@@ -143,7 +146,7 @@
 	}
 
 	async function handleDeleteKey(keyId: string) {
-		if (!confirm('Are you sure you want to delete this API key?')) return;
+		if (!confirm(m.confirm_delete_apikey())) return;
 
 		try {
 			if (apiKeysStore.activeTab === 'personal') {
@@ -155,7 +158,7 @@
 			}
 		} catch (error) {
 			console.error('Failed to delete key:', error);
-			alert('Failed to delete API key');
+			alert(m.alert_failed_delete_apikey());
 		}
 	}
 
@@ -185,16 +188,16 @@
 	<title>{m.nav_apiKeys()} | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-8 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">{m.nav_apiKeys()}</h1>
-			<p class="mt-1 text-muted-foreground">Manage your API keys for accessing the AI Gateway</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.apikeys_title()}</h1>
+			<p class="mt-1 text-muted-foreground">{m.apikeys_subtitle()}</p>
 		</div>
 		<Button onclick={openCreateModal}>
 			<Plus class="mr-2 h-4 w-4" />
-			{m.common_create()} Key
+			{m.apikeys_create()}
 		</Button>
 	</div>
 
@@ -268,10 +271,10 @@
 							{m.common_name()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Key
+							{m.table_key()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Models
+							{m.table_models()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
 							{m.common_created()}
@@ -300,21 +303,20 @@
 									<code class="rounded bg-muted px-2 py-1 font-mono text-xs">
 										{maskKey(key.key_prefix)}
 									</code>
-									<button
-										type="button"
-										class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-										title="Copy prefix"
-										onclick={() => copyText(key.key_prefix || '')}
-									>
-										<Copy class="h-3.5 w-3.5" />
-									</button>
+								<IconButton
+									tooltip={m.tooltip_copy()}
+									size="sm"
+									onclick={() => copyText(key.key_prefix || '')}
+								>
+									<Copy />
+								</IconButton>
 								</div>
 							</td>
 							<td class="px-4 py-3">
 								{#if key.all_models}
-									<span class="text-sm text-muted-foreground">All models</span>
+									<span class="text-sm text-muted-foreground">{m.table_all_models()}</span>
 								{:else}
-									<span class="text-sm text-muted-foreground">{key.models?.length || 0} models</span>
+									<span class="text-sm text-muted-foreground">{key.models?.length || 0} {m.table_models().toLowerCase()}</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
@@ -333,13 +335,14 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 text-right">
-								<button
+								<IconButton
+									tooltip={m.tooltip_delete()}
+									tooltipTitle={m.apikeys_revoke()}
+									variant="destructive"
 									onclick={() => handleDeleteKey(key.id)}
-									class="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-									title="Delete key"
 								>
-									<Trash2 class="h-4 w-4" />
-								</button>
+									<Trash2 />
+								</IconButton>
 							</td>
 						</tr>
 					{/each}
@@ -354,7 +357,10 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showCreateModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showCreateModal = false)}
 		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
 			<div class="mb-4 flex items-center justify-between">
@@ -374,32 +380,32 @@
 					</div>
 				{/if}
 
-				<div class="space-y-2">
-					<label for="key-name" class="text-sm font-medium">Name *</label>
+				<div>
+					<FormLabel label={m.form_apikey_name()} description={m.form_apikey_name_desc()} required for="key-name" />
 					<input
 						id="key-name"
 						type="text"
 						bind:value={keyName}
-						placeholder="My API Key"
+						placeholder={m.placeholder_apikey_name()}
 						required
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					/>
 				</div>
 
-				<div class="space-y-2">
-					<label for="key-desc" class="text-sm font-medium">Description</label>
+				<div>
+					<FormLabel label={m.form_apikey_description()} description={m.form_apikey_description_desc()} for="key-desc" />
 					<input
 						id="key-desc"
 						type="text"
 						bind:value={keyDescription}
-						placeholder="Optional description"
+						placeholder={m.placeholder_org_desc()}
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					/>
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">
-					<div class="space-y-2">
-						<label for="key-rpm" class="text-sm font-medium">Requests/Minute</label>
+					<div>
+						<FormLabel label={m.form_apikey_rpm()} description={m.form_apikey_rpm_desc()} for="key-rpm" />
 						<input
 							id="key-rpm"
 							type="number"
@@ -409,8 +415,8 @@
 							class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						/>
 					</div>
-					<div class="space-y-2">
-						<label for="key-rph" class="text-sm font-medium">Requests/Hour</label>
+					<div>
+						<FormLabel label={m.form_apikey_rph()} description={m.form_apikey_rph_desc()} for="key-rph" />
 						<input
 							id="key-rph"
 							type="number"

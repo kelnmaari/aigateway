@@ -124,22 +124,27 @@ func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*Model
 			o.mu.Unlock()
 			return existing, nil
 		}
+		// If existing has LocalPath and status is Ready, return it
+		// This handles re-loading already prepared models
+		if existing.Spec.LocalPath != "" && existing.Status == StatusReady {
+			o.mu.Unlock()
+			return existing, nil
+		}
 		// Model exists but not running - check if user wants different parameters
 		// Only replace if there are meaningful parameter changes
 		if existing.Spec.Provider != spec.Provider ||
 			existing.Spec.VLLMGPUUtilization != spec.VLLMGPUUtilization ||
 			existing.Spec.VLLMMaxModelLen != spec.VLLMMaxModelLen ||
-			existing.Spec.VLLMTensorParallel != spec.VLLMTensorParallel {
+			existing.Spec.VLLMTensorParallel != spec.VLLMTensorParallel ||
+			existing.Spec.LocalPath == "" { // Force re-prepare if no LocalPath
 			o.logger.WithFields(logrus.Fields{
-				"alias":                    spec.Alias,
-				"old_gpu_util":             existing.Spec.VLLMGPUUtilization,
-				"new_gpu_util":             spec.VLLMGPUUtilization,
-				"old_max_model_len":        existing.Spec.VLLMMaxModelLen,
-				"new_max_model_len":        spec.VLLMMaxModelLen,
-			}).Info("Replacing model spec with new parameters")
+				"alias":          spec.Alias,
+				"old_local_path": existing.Spec.LocalPath,
+				"status":         existing.Status,
+			}).Info("Re-preparing model (no LocalPath or different params)")
 			delete(o.models, spec.Alias)
 		} else {
-			// Same params - return existing (allows restart of stopped model)
+			// Same params and has LocalPath - return existing
 			o.mu.Unlock()
 			return existing, nil
 		}

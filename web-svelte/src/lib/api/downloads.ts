@@ -67,13 +67,14 @@ export const downloadsApi = {
 		return api.get<HuggingFaceSearchResponse>(`/api/ui/huggingface/search?${params}`);
 	},
 
-	getPopularModels: (provider: string = 'all') => {
+	getPopularModels: (provider: string = 'all', limit: number = 30, page: number = 1) => {
 		const params = new URLSearchParams();
 		if (provider && provider !== 'all') {
 			params.set('provider', provider);
 		}
-		const queryStr = params.toString();
-		return api.get<HuggingFaceSearchResponse>(`/api/ui/huggingface/popular${queryStr ? '?' + queryStr : ''}`);
+		params.set('limit', limit.toString());
+		params.set('page', page.toString());
+		return api.get<HuggingFaceSearchResponse>(`/api/ui/huggingface/popular?${params}`);
 	},
 
 	// Ollama pull (via yzma)

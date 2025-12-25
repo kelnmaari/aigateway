@@ -92,16 +92,21 @@ type CodeChunkPayload struct {
 	LastUpdated   int64  `json:"last_updated"`
 }
 
-// EnsureCollection creates the collection if it doesn't exist
+// EnsureCollection creates the collection if it doesn't exist (uses default collection)
 func (c *QdrantClient) EnsureCollection(ctx context.Context) error {
+	return c.EnsureCollectionNamed(ctx, c.config.Collection)
+}
+
+// EnsureCollectionNamed creates the specified collection if it doesn't exist
+func (c *QdrantClient) EnsureCollectionNamed(ctx context.Context, collectionName string) error {
 	// Check if collection exists
-	exists, err := c.collectionExists(ctx)
+	exists, err := c.collectionExistsNamed(ctx, collectionName)
 	if err != nil {
 		return fmt.Errorf("check collection exists: %w", err)
 	}
 
 	if exists {
-		c.logger.WithField("collection", c.config.Collection).Debug("Collection already exists")
+		c.logger.WithField("collection", collectionName).Debug("Collection already exists")
 		return nil
 	}
 
@@ -113,28 +118,38 @@ func (c *QdrantClient) EnsureCollection(ctx context.Context) error {
 		},
 	}
 
-	_, err = c.request(ctx, "PUT", fmt.Sprintf("/collections/%s", c.config.Collection), body)
+	_, err = c.request(ctx, "PUT", fmt.Sprintf("/collections/%s", collectionName), body)
 	if err != nil {
 		return fmt.Errorf("create collection: %w", err)
 	}
 
-	c.logger.WithField("collection", c.config.Collection).Info("Created Qdrant collection")
+	c.logger.WithField("collection", collectionName).Info("Created Qdrant collection")
 	return nil
 }
 
-// collectionExists checks if the collection exists
+// collectionExists checks if the default collection exists
 func (c *QdrantClient) collectionExists(ctx context.Context) (bool, error) {
-	resp, err := c.request(ctx, "GET", fmt.Sprintf("/collections/%s", c.config.Collection), nil)
+	return c.collectionExistsNamed(ctx, c.config.Collection)
+}
+
+// collectionExistsNamed checks if the specified collection exists
+func (c *QdrantClient) collectionExistsNamed(ctx context.Context, collectionName string) (bool, error) {
+	resp, err := c.request(ctx, "GET", fmt.Sprintf("/collections/%s", collectionName), nil)
 	if err != nil {
 		// 404 means collection doesn't exist
 		return false, nil
 	}
-	
+
 	return resp != nil, nil
 }
 
-// UpsertPoints inserts or updates points in the collection
+// UpsertPoints inserts or updates points in the default collection
 func (c *QdrantClient) UpsertPoints(ctx context.Context, points []Point) error {
+	return c.UpsertPointsToCollection(ctx, c.config.Collection, points)
+}
+
+// UpsertPointsToCollection inserts or updates points in the specified collection
+func (c *QdrantClient) UpsertPointsToCollection(ctx context.Context, collectionName string, points []Point) error {
 	if len(points) == 0 {
 		return nil
 	}
@@ -143,17 +158,25 @@ func (c *QdrantClient) UpsertPoints(ctx context.Context, points []Point) error {
 		"points": points,
 	}
 
-	_, err := c.request(ctx, "PUT", fmt.Sprintf("/collections/%s/points", c.config.Collection), body)
+	_, err := c.request(ctx, "PUT", fmt.Sprintf("/collections/%s/points", collectionName), body)
 	if err != nil {
 		return fmt.Errorf("upsert points: %w", err)
 	}
 
-	c.logger.WithField("count", len(points)).Debug("Upserted points to Qdrant")
+	c.logger.WithFields(logrus.Fields{
+		"collection": collectionName,
+		"count":      len(points),
+	}).Debug("Upserted points to Qdrant")
 	return nil
 }
 
-// Search performs a vector similarity search
+// Search performs a vector similarity search in the default collection
 func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, filter map[string]interface{}) ([]SearchResult, error) {
+	return c.SearchInCollection(ctx, c.config.Collection, vector, limit, filter)
+}
+
+// SearchInCollection performs a vector similarity search in the specified collection
+func (c *QdrantClient) SearchInCollection(ctx context.Context, collectionName string, vector []float32, limit int, filter map[string]interface{}) ([]SearchResult, error) {
 	// Validate input vector
 	if len(vector) == 0 {
 		c.logger.Warn("Qdrant search: empty vector provided, skipping")
@@ -161,6 +184,7 @@ func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, 
 	}
 
 	c.logger.WithFields(logrus.Fields{
+		"collection":       collectionName,
 		"input_vector_len": len(vector),
 		"limit":            limit,
 		"has_filter":       filter != nil,
@@ -184,7 +208,7 @@ func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, 
 		body["filter"] = filter
 	}
 
-	resp, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/search", c.config.Collection), body)
+	resp, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/search", collectionName), body)
 	if err != nil {
 		// If search fails with unnamed vector format, the collection might have been created differently
 		// Log the error for debugging
@@ -202,8 +226,13 @@ func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, 
 	return searchResp.Result, nil
 }
 
-// SearchByProject searches for similar code chunks within a project
+// SearchByProject searches for similar code chunks within a project (default collection)
 func (c *QdrantClient) SearchByProject(ctx context.Context, vector []float32, projectID string, limit int) ([]SearchResult, error) {
+	return c.SearchByProjectInCollection(ctx, c.config.Collection, vector, projectID, limit)
+}
+
+// SearchByProjectInCollection searches for similar code chunks within a project in specified collection
+func (c *QdrantClient) SearchByProjectInCollection(ctx context.Context, collectionName string, vector []float32, projectID string, limit int) ([]SearchResult, error) {
 	filter := map[string]interface{}{
 		"must": []map[string]interface{}{
 			{
@@ -213,11 +242,16 @@ func (c *QdrantClient) SearchByProject(ctx context.Context, vector []float32, pr
 		},
 	}
 
-	return c.Search(ctx, vector, limit, filter)
+	return c.SearchInCollection(ctx, collectionName, vector, limit, filter)
 }
 
-// DeleteByProject deletes all points for a project
+// DeleteByProject deletes all points for a project (default collection)
 func (c *QdrantClient) DeleteByProject(ctx context.Context, projectID string) error {
+	return c.DeleteByProjectInCollection(ctx, c.config.Collection, projectID)
+}
+
+// DeleteByProjectInCollection deletes all points for a project in specified collection
+func (c *QdrantClient) DeleteByProjectInCollection(ctx context.Context, collectionName, projectID string) error {
 	body := map[string]interface{}{
 		"filter": map[string]interface{}{
 			"must": []map[string]interface{}{
@@ -229,17 +263,25 @@ func (c *QdrantClient) DeleteByProject(ctx context.Context, projectID string) er
 		},
 	}
 
-	_, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/delete", c.config.Collection), body)
+	_, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/delete", collectionName), body)
 	if err != nil {
 		return fmt.Errorf("delete by project: %w", err)
 	}
 
-	c.logger.WithField("project_id", projectID).Info("Deleted project embeddings from Qdrant")
+	c.logger.WithFields(logrus.Fields{
+		"collection": collectionName,
+		"project_id": projectID,
+	}).Info("Deleted project embeddings from Qdrant")
 	return nil
 }
 
-// DeleteByFile deletes all points for a specific file
+// DeleteByFile deletes all points for a specific file (default collection)
 func (c *QdrantClient) DeleteByFile(ctx context.Context, projectID, filePath string) error {
+	return c.DeleteByFileInCollection(ctx, c.config.Collection, projectID, filePath)
+}
+
+// DeleteByFileInCollection deletes all points for a specific file in specified collection
+func (c *QdrantClient) DeleteByFileInCollection(ctx context.Context, collectionName, projectID, filePath string) error {
 	body := map[string]interface{}{
 		"filter": map[string]interface{}{
 			"must": []map[string]interface{}{
@@ -255,7 +297,7 @@ func (c *QdrantClient) DeleteByFile(ctx context.Context, projectID, filePath str
 		},
 	}
 
-	_, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/delete", c.config.Collection), body)
+	_, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/delete", collectionName), body)
 	if err != nil {
 		return fmt.Errorf("delete by file: %w", err)
 	}
@@ -263,9 +305,43 @@ func (c *QdrantClient) DeleteByFile(ctx context.Context, projectID, filePath str
 	return nil
 }
 
-// GetCollectionInfo returns information about the collection
+// DeleteByProjectBranch deletes all points for a specific project+branch combination
+func (c *QdrantClient) DeleteByProjectBranch(ctx context.Context, projectID, branch string) error {
+	body := map[string]interface{}{
+		"filter": map[string]interface{}{
+			"must": []map[string]interface{}{
+				{
+					"key":   "project_id",
+					"match": map[string]interface{}{"value": projectID},
+				},
+				{
+					"key":   "branch_name",
+					"match": map[string]interface{}{"value": branch},
+				},
+			},
+		},
+	}
+
+	_, err := c.request(ctx, "POST", fmt.Sprintf("/collections/%s/points/delete", c.config.Collection), body)
+	if err != nil {
+		return fmt.Errorf("delete by project+branch: %w", err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"project_id": projectID,
+		"branch":     branch,
+	}).Info("Deleted project+branch embeddings from Qdrant")
+	return nil
+}
+
+// GetCollectionInfo returns information about the default collection
 func (c *QdrantClient) GetCollectionInfo(ctx context.Context) (map[string]interface{}, error) {
-	resp, err := c.request(ctx, "GET", fmt.Sprintf("/collections/%s", c.config.Collection), nil)
+	return c.GetCollectionInfoNamed(ctx, c.config.Collection)
+}
+
+// GetCollectionInfoNamed returns information about a specific collection
+func (c *QdrantClient) GetCollectionInfoNamed(ctx context.Context, collectionName string) (map[string]interface{}, error) {
+	resp, err := c.request(ctx, "GET", fmt.Sprintf("/collections/%s", collectionName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("get collection info: %w", err)
 	}
@@ -276,6 +352,42 @@ func (c *QdrantClient) GetCollectionInfo(ctx context.Context) (map[string]interf
 	}
 
 	return info, nil
+}
+
+// CollectionStats holds collection statistics
+type CollectionStats struct {
+	PointsCount   int64 `json:"points_count"`
+	VectorsCount  int64 `json:"vectors_count"`
+	SegmentsCount int   `json:"segments_count"`
+	Status        string `json:"status"`
+}
+
+// GetCollectionStats returns statistics for a collection
+func (c *QdrantClient) GetCollectionStats(ctx context.Context, collectionName string) (*CollectionStats, error) {
+	info, err := c.GetCollectionInfoNamed(ctx, collectionName)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &CollectionStats{}
+	
+	// Parse result.points_count, result.vectors_count, etc.
+	if result, ok := info["result"].(map[string]interface{}); ok {
+		if pc, ok := result["points_count"].(float64); ok {
+			stats.PointsCount = int64(pc)
+		}
+		if vc, ok := result["vectors_count"].(float64); ok {
+			stats.VectorsCount = int64(vc)
+		}
+		if sc, ok := result["segments_count"].(float64); ok {
+			stats.SegmentsCount = int(sc)
+		}
+		if st, ok := result["status"].(string); ok {
+			stats.Status = st
+		}
+	}
+
+	return stats, nil
 }
 
 // HealthCheck checks if Qdrant is healthy

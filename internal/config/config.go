@@ -404,6 +404,14 @@ type LoggingConfig struct {
 	AuthLogEnabled  bool   `mapstructure:"auth_log_enabled"`   // Enable separate auth log file
 	AuthLogFilePath string `mapstructure:"auth_log_file_path"` // Path to auth log file
 
+	// HTTP log file (separate file for HTTP request logs)
+	HTTPLogEnabled  bool   `mapstructure:"http_log_enabled"`   // Enable separate HTTP log file
+	HTTPLogFilePath string `mapstructure:"http_log_file_path"` // Path to HTTP log file (default: logs/http.log)
+
+	// Metrics log file (separate file for GPU/performance metrics)
+	MetricsLogEnabled  bool   `mapstructure:"metrics_log_enabled"`   // Enable separate metrics log file
+	MetricsLogFilePath string `mapstructure:"metrics_log_file_path"` // Path to metrics log file (default: logs/metrics.log)
+
 	// Structured fields для JSON логирования
 	StructuredFields map[string]string `mapstructure:"structured_fields"`
 }
@@ -863,6 +871,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "text")
 	v.SetDefault("logging.output", "stdout")
+	v.SetDefault("logging.http_log_enabled", true)
+	v.SetDefault("logging.http_log_file_path", "logs/http.log")
+	v.SetDefault("logging.metrics_log_enabled", true)
+	v.SetDefault("logging.metrics_log_file_path", "logs/metrics.log")
 
 	// Auth defaults
 	v.SetDefault("auth.enabled", false)

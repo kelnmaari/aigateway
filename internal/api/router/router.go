@@ -38,6 +38,7 @@ import (
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
+	gitlabIndexer "aigateway/internal/gitlab/indexer"
 	gitlabProcessor "aigateway/internal/gitlab/processor"
 	gitlabRAG "aigateway/internal/gitlab/rag"
 	gitlabStorage "aigateway/internal/gitlab/storage"
@@ -86,11 +87,13 @@ func (a *apiKeyDatabaseAdapter) GetAPIKey(ctx context.Context, keyID string) (in
 
 // Router представляет HTTP роутер приложения с опциональным API Key Management
 type Router struct {
-	config  *config.Config
-	logger  *logrus.Logger
-	engine  *gin.Engine
-	version string       // Версия сервера
-	tracer  trace.Tracer // OpenTelemetry tracer (v1.6.0+)
+	config        *config.Config
+	logger        *logrus.Logger
+	httpLogger    *logrus.Logger // Отдельный логгер для детальных HTTP логов (в http.log)
+	metricsLogger *logrus.Logger // Отдельный логгер для GPU/performance метрик (в metrics.log)
+	engine        *gin.Engine
+	version       string       // Версия сервера
+	tracer        trace.Tracer // OpenTelemetry tracer (v1.6.0+)
 
 	// API Key Management компоненты (опциональные)
 	storage       storage.APIKeyStorage
@@ -232,15 +235,20 @@ type Router struct {
 	frameworkHandler *framework.Handler // Framework asset handler
 
 	// GitLab Integration (v3.1.0+)
-	gitlabHandler        *handlers.GitLabAdminHandler   // GitLab admin handler
-	gitlabWebhookHandler *handlers.GitLabWebhookHandler // GitLab webhook handler
-	gitlabWorkerPool     *gitlabWorker.Pool             // GitLab worker pool for MR analysis
+	gitlabHandler            *handlers.GitLabAdminHandler       // GitLab admin handler
+	gitlabWebhookHandler     *handlers.GitLabWebhookHandler     // GitLab webhook handler
+	gitlabWorkerPool         *gitlabWorker.Pool                 // GitLab worker pool for MR analysis
+	gitlabIndexerHandler     *handlers.GitLabIndexerHandler     // GitLab indexer handler (admin)
+	gitlabUserIndexerHandler *handlers.GitLabUserIndexerHandler // GitLab indexer handler (user-level)
+	gitlabIndexer            *gitlabIndexer.Indexer             // GitLab repository indexer
 }
 
 // NewOptions содержит опции для создания роутера
 type NewOptions struct {
 	Config               *config.Config
 	Logger               *logrus.Logger
+	HTTPLogger           *logrus.Logger                    // Опциональный логгер для HTTP запросов (отдельный файл)
+	MetricsLogger        *logrus.Logger                    // Опциональный логгер для GPU/performance метрик (отдельный файл)
 	Version              string
 	Database             storage.Database                  // Опциональная база данных для user auth
 	JWTManager           *jwt.Manager                      // Опциональный JWT manager
@@ -269,6 +277,8 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 	r := &Router{
 		config:               opts.Config,
 		logger:               opts.Logger,
+		httpLogger:           opts.HTTPLogger,
+		metricsLogger:        opts.MetricsLogger,
 		version:              opts.Version,
 		db:                   opts.Database,
 		jwtManager:           opts.JWTManager,
@@ -485,7 +495,11 @@ func (r *Router) setupMiddleware() {
 
 	// Metrics Collector middleware для historical metrics (Phase 12.1)
 	if r.metricsStorage != nil {
-		r.engine.Use(middleware.MetricsCollector(r.metricsStorage, r.logger))
+		r.engine.Use(middleware.MetricsCollectorWithConfig(middleware.MetricsCollectorConfig{
+			Storage:        r.metricsStorage,
+			Logger:         r.logger,
+			DetailedLogger: r.httpLogger, // HTTP метрики в отдельный файл
+		}))
 	}
 
 	// Request Tracker middleware для monitoring (TUI-04)
@@ -495,8 +509,9 @@ func (r *Router) setupMiddleware() {
 
 	// Structured logging middleware
 	loggingConfig := middleware.LoggingConfig{
-		Logger:    r.logger,
-		SkipPaths: []string{"/health", "/healthz", "/ready", "/api/stats", "/api/config", r.config.Metrics.PrometheusPath}, // Пропускаем health checks, stats, config и metrics
+		Logger:         r.logger,
+		DetailedLogger: r.httpLogger, // Детальные HTTP логи в отдельный файл
+		SkipPaths:      []string{"/health", "/healthz", "/ready", "/api/stats", "/api/config", r.config.Metrics.PrometheusPath}, // Пропускаем health checks, stats, config и metrics
 	}
 	r.engine.Use(middleware.RequestLogging(loggingConfig))
 
@@ -3139,6 +3154,30 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 				r.gitlabWorkerPool.Start()
 				gitlabLogger.WithField("workers", poolCfg.WorkerCount).Info("✅ GitLab worker pool started")
 
+				// Initialize repository indexer for RAG with dedicated log file
+				if ragService != nil {
+					// Connect RAG service to handler for index statistics
+					r.gitlabHandler.SetQdrantStats(ragService)
+					
+					// Create dedicated logger for indexer with log rotation
+					indexerLogger := internalLogger.NewFileLogger("logs/gitlab-indexer.log", cfg.Logging.Level)
+					if indexerLogger == nil {
+						indexerLogger = gitlabLogger // Fallback to gitlab logger
+						gitlabLogger.Warn("Failed to create indexer logger, using gitlab logger")
+					}
+
+					r.gitlabIndexer = gitlabIndexer.NewIndexer(ragService, indexerLogger)
+					r.gitlabIndexerHandler = handlers.NewGitLabIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
+					r.gitlabUserIndexerHandler = handlers.NewGitLabUserIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
+
+					// Set onMerge callback for webhook handler to trigger reindexing
+					if r.gitlabWebhookHandler != nil {
+						r.gitlabWebhookHandler.SetOnMergeCallback(r.gitlabIndexerHandler.HandleMergeEvent)
+					}
+
+					gitlabLogger.Info("✅ GitLab repository indexer initialized for RAG (logs: logs/gitlab-indexer.log)")
+				}
+
 				// Note: Webhook route registered in setupGitLabRoutes (after engine is created)
 				gitlabLogger.Info("✅ GitLab Integration handler initialized")
 				logger.Info("✅ GitLab Integration handler initialized (logs: logs/gitlab.log)")
@@ -3545,6 +3584,13 @@ func (r *Router) setupGitLabRoutes() {
 		adminGitlab.DELETE("/projects/:project_id", r.gitlabHandler.DeleteProject)
 		adminGitlab.POST("/projects/:project_id/webhook", r.gitlabHandler.SetupWebhook)
 
+		// Project Indexing (RAG)
+		if r.gitlabIndexerHandler != nil {
+			adminGitlab.POST("/projects/:project_id/index", r.gitlabIndexerHandler.IndexProject)
+			adminGitlab.GET("/projects/:project_id/index/status", r.gitlabIndexerHandler.GetIndexStatus)
+			adminGitlab.DELETE("/projects/:project_id/index", r.gitlabIndexerHandler.DeleteIndex)
+		}
+
 		// Reviews
 		adminGitlab.GET("/reviews", r.gitlabHandler.ListReviews)
 		adminGitlab.GET("/reviews/:id", r.gitlabHandler.GetReview)
@@ -3735,6 +3781,24 @@ func (r *Router) setupGitLabRoutes() {
 	userGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
+
+	// User-level Project Indexing (with ownership check)
+	if r.gitlabUserIndexerHandler != nil {
+		userGitlab.POST("/projects/:project_id/index", r.gitlabUserIndexerHandler.IndexProject)
+		userGitlab.GET("/projects/:project_id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
+		userGitlab.DELETE("/projects/:project_id/index", r.gitlabUserIndexerHandler.DeleteIndex)
+	} else {
+		userGitlab.POST("/projects/:project_id/index", func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		})
+		userGitlab.GET("/projects/:project_id/index/status", func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		})
+		userGitlab.DELETE("/projects/:project_id/index", func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		})
+	}
+
 	userGitlab.GET("/reviews", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 	})

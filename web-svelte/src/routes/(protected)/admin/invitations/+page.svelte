@@ -42,7 +42,7 @@
 			invitations = response.invitations || [];
 		} catch (error) {
 			console.error('Failed to load invitations:', error);
-			toast.error('Failed to load invitations');
+			toast.error(m.toast_failed_load({ item: m.admin_invitations_title() }));
 		} finally {
 			isLoading = false;
 		}
@@ -72,62 +72,62 @@
 			});
 			invitations = [response.invitation, ...invitations];
 			showCreateModal = false;
-			toast.success('Invitation created');
+			toast.success(m.toast_invitation_created());
 			// Copy link to clipboard
 			if (response.invitation_link) {
 				const copied = await copyToClipboard(response.invitation_link);
 				if (copied) {
-					toast.success('Link copied to clipboard');
+					toast.success(m.toast_link_copied());
 				}
 			}
 		} catch (error) {
 			console.error('Failed to create invitation:', error);
-			toast.error('Failed to create invitation');
+			toast.error(m.toast_failed_create({ item: m.admin_invitations_title() }));
 		} finally {
 			isCreating = false;
 		}
 	}
 
 	async function handleRevoke(invitation: Invitation) {
-		if (!confirm('Revoke this invitation?')) return;
+		if (!confirm(m.confirm_revoke_invitation())) return;
 
 		try {
 			await adminApi.revokeInvitation(invitation.id);
 			invitations = invitations.filter((i) => i.id !== invitation.id);
-			toast.success('Invitation revoked');
+			toast.success(m.toast_invitation_revoked());
 		} catch (error) {
 			console.error('Failed to revoke:', error);
-			toast.error('Failed to revoke invitation');
+			toast.error(m.toast_failed_revoke({ item: m.admin_invitations_title() }));
 		}
 	}
 
 	async function copyLink(invitation: Invitation) {
 		if (!invitation.token) {
-			toast.error('No token available');
+			toast.error(m.toast_no_token());
 			return;
 		}
 		const link = `${window.location.origin}/register?token=${invitation.token}`;
 		const copied = await copyToClipboard(link);
 		if (copied) {
 			copiedId = invitation.id;
-			toast.success('Link copied to clipboard');
+			toast.success(m.toast_link_copied());
 			setTimeout(() => (copiedId = null), 2000);
 		} else {
-			toast.error('Failed to copy link');
+			toast.error(m.toast_failed_copy());
 		}
 	}
 
 	function getStatusBadge(invitation: Invitation) {
 		if (invitation.revoked_at) {
-			return { text: 'Revoked', class: 'bg-gray-500/10 text-gray-500' };
+			return { text: m.admin_invitations_revoked(), class: 'bg-gray-500/10 text-gray-500' };
 		}
 		if (invitation.used_at || invitation.current_uses >= invitation.max_uses) {
-			return { text: 'Used', class: 'bg-green-500/10 text-green-500' };
+			return { text: m.admin_invitations_used(), class: 'bg-green-500/10 text-green-500' };
 		}
 		if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
-			return { text: 'Expired', class: 'bg-red-500/10 text-red-500' };
+			return { text: m.admin_invitations_expired(), class: 'bg-red-500/10 text-red-500' };
 		}
-		return { text: 'Active', class: 'bg-blue-500/10 text-blue-500' };
+		return { text: m.common_active(), class: 'bg-blue-500/10 text-blue-500' };
 	}
 	
 	function isInvitationActive(invitation: Invitation): boolean {
@@ -146,8 +146,8 @@
 	<!-- Header -->
 	<div class="mb-6 flex items-center justify-between">
 		<div>
-			<h2 class="text-xl font-semibold">Invitations</h2>
-			<p class="text-sm text-muted-foreground">Manage user invitation links</p>
+			<h2 class="text-xl font-semibold">{m.admin_invitations_title()}</h2>
+			<p class="text-sm text-muted-foreground">{m.admin_invitations_subtitle()}</p>
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={loadInvitations} disabled={isLoading}>
@@ -156,7 +156,7 @@
 			</Button>
 			<Button onclick={openCreateModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Create Invitation
+				{m.admin_invitations_create()}
 			</Button>
 		</div>
 	</div>
@@ -169,11 +169,11 @@
 	{:else if invitations.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
 			<Mail class="mx-auto h-12 w-12 text-muted-foreground/40" />
-			<p class="mt-4 text-lg font-medium">No invitations</p>
-			<p class="mt-1 text-muted-foreground">Create an invitation to allow new users to register</p>
+			<p class="mt-4 text-lg font-medium">{m.admin_invitations_empty()}</p>
+			<p class="mt-1 text-muted-foreground">{m.admin_invitations_empty_desc()}</p>
 			<Button class="mt-6" onclick={openCreateModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Create Invitation
+				{m.admin_invitations_create()}
 			</Button>
 		</div>
 	{:else}
@@ -181,10 +181,10 @@
 			<table class="w-full">
 				<thead class="border-b border-border bg-muted/50">
 					<tr>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Email / Token</th>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Status</th>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Uses</th>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Expires</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.admin_invitations_email()}</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.common_status()}</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.admin_invitations_uses()}</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.admin_invitations_expires()}</th>
 						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">{m.common_actions()}</th>
 					</tr>
 				</thead>
@@ -215,7 +215,7 @@
 								{invitation.current_uses || 0} / {invitation.max_uses || 1}
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
-								{invitation.expires_at ? formatRelativeTime(invitation.expires_at) : 'Never'}
+								{invitation.expires_at ? formatRelativeTime(invitation.expires_at) : m.admin_invitations_never()}
 							</td>
 							<td class="px-4 py-3 text-right">
 								<div class="flex justify-end gap-1">
@@ -256,7 +256,9 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showCreateModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showCreateModal = false)}
 		role="dialog"
+		aria-modal="true"
 		tabindex="-1"
 	>
 		<div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
@@ -281,8 +283,8 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium">Role</label>
-					<div class="flex gap-2">
+					<span class="text-sm font-medium">Role</span>
+					<div class="flex gap-2" role="radiogroup" aria-label="Role selection">
 						<button
 							type="button"
 							onclick={() => (newRole = 'user')}
@@ -307,8 +309,9 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium">Expires In</label>
+					<label for="invite-expires" class="text-sm font-medium">Expires In</label>
 					<select
+						id="invite-expires"
 						bind:value={newExpiresIn}
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					>

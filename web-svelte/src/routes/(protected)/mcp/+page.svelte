@@ -191,7 +191,7 @@
 			servers = servers.map((s) => (s.id === server.id ? { ...s, status: 'running' } : s));
 		} catch (error) {
 			console.error('Failed to start server:', error);
-			alert('Failed to start server');
+			alert(m.alert_failed_start_server());
 		}
 	}
 
@@ -201,12 +201,12 @@
 			servers = servers.map((s) => (s.id === server.id ? { ...s, status: 'stopped' } : s));
 		} catch (error) {
 			console.error('Failed to stop server:', error);
-			alert('Failed to stop server');
+			alert(m.alert_failed_stop_server());
 		}
 	}
 
 	async function handleDeleteServer(server: MCPServer) {
-		if (!confirm(`Delete MCP server "${server.name}"?`)) return;
+		if (!confirm(m.confirm_delete_mcp({ name: server.name }))) return;
 
 		try {
 			await mcpApi.deleteServer(server.id);
@@ -214,7 +214,7 @@
 			totalServers--;
 		} catch (error) {
 			console.error('Failed to delete server:', error);
-			alert('Failed to delete server');
+			alert(m.alert_failed_delete_server());
 		}
 	}
 
@@ -290,12 +290,12 @@
 	<title>{m.admin_mcp()} Servers | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-6 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">MCP Servers Catalog</h1>
-			<p class="mt-1 text-muted-foreground">Model Context Protocol servers directory</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.mcp_title()}</h1>
+			<p class="mt-1 text-muted-foreground">{m.mcp_subtitle()}</p>
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={() => loadServers()} disabled={isLoading}>
@@ -305,7 +305,7 @@
 			{#if isAdmin}
 				<Button onclick={openCreateModal}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Server
+					{m.mcp_add_server()}
 				</Button>
 			{/if}
 		</div>
@@ -319,7 +319,7 @@
 				<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 				<input
 					type="text"
-					placeholder="Search servers by name, description or tags..."
+					placeholder={m.mcp_search()}
 					class="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					bind:value={searchQuery}
 					oninput={debouncedSearch}
@@ -328,14 +328,14 @@
 
 			<!-- Category Filter -->
 			<div class="flex items-center gap-2">
-				<label for="category-filter" class="text-sm text-muted-foreground">Category:</label>
+				<label for="category-filter" class="text-sm text-muted-foreground">{m.mcp_category()}:</label>
 				<select
 					id="category-filter"
 					bind:value={categoryFilter}
 					onchange={() => { currentPage = 0; loadServers(); }}
 					class="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 				>
-					<option value="">All Categories</option>
+					<option value="">{m.mcp_all_categories()}</option>
 					{#each categories as cat}
 						<option value={cat}>{formatCategory(cat)}</option>
 					{/each}
@@ -509,7 +509,7 @@
 							id="server-name"
 							type="text"
 							bind:value={serverName}
-							placeholder="My MCP Server"
+							placeholder={m.placeholder_server_name()}
 							required
 							class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						/>
@@ -521,7 +521,7 @@
 							id="server-desc"
 							bind:value={serverDescription}
 							rows="2"
-							placeholder="What this server does..."
+							placeholder={m.placeholder_server_desc()}
 							class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						></textarea>
 					</div>

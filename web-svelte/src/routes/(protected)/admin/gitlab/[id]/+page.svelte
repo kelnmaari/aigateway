@@ -27,6 +27,7 @@
 	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import * as m from '$lib/paraglide/messages';
 
 	let integration = $state<GitLabIntegration | null>(null);
 	let projects = $state<GitLabProject[]>([]);
@@ -47,9 +48,31 @@
 	// Modals
 	let showAddProjectModal = $state(false);
 	let showProjectDetailModal = $state(false);
+	let showEditProjectModal = $state(false);
 	let showReviewDetailModal = $state(false);
 	let selectedProject = $state<GitLabProject | null>(null);
 	let selectedReview = $state<GitLabReview | null>(null);
+
+	// Edit Project form
+	let editAnalysisModelId = $state('');
+	let editEmbeddingModelId = $state('');
+	let editAutoReview = $state(true);
+	let editReviewPrompt = $state('');
+	let editIncludePatterns = $state('');
+	let editExcludePatterns = $state('');
+	let editChunkSize = $state('4000');
+	let editChunkOverlap = $state('200');
+	let editMaxFilesPerMR = $state('50');
+	let editMaxLinesPerFile = $state('1000');
+	let editSkipDraftMRs = $state(true);
+	let editSkipBots = $state(true);
+	let editCollectionName = $state('');
+	let editStatus = $state<'active' | 'disabled'>('active');
+	let isSaving = $state(false);
+	let saveError = $state('');
+
+	// Indexing state
+	let indexingProjects = $state<Set<string>>(new Set());
 
 	// Add Project form
 	let formGitLabProjectId = $state('');
@@ -232,14 +255,14 @@
 			const result = await gitlabApi.setupWebhook(project.id, webhookUrl);
 			// Refresh projects
 			await loadProjects();
-			alert(`Webhook created with ID: ${result.webhook_id}`);
+			alert(m.alert_webhook_created({ id: result.webhook_id }));
 		} catch (error) {
-			alert('Failed to setup webhook: ' + (error instanceof Error ? error.message : 'Unknown error'));
+			alert(m.alert_failed_webhook() + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
 		}
 	}
 
 	async function handleDeleteProject(project: GitLabProject) {
-		if (!confirm(`Remove project "${project.path_with_namespace}" from integration?`)) {
+		if (!confirm(m.confirm_remove_project({ name: project.path_with_namespace }))) {
 			return;
 		}
 
@@ -248,8 +271,68 @@
 			projects = projects.filter((p) => p.id !== project.id);
 			totalProjects--;
 		} catch (error) {
-			alert('Failed to delete project');
+			alert(m.alert_failed_delete_project());
 		}
+	}
+
+	async function handleStartIndexing(project: GitLabProject) {
+		if (indexingProjects.has(project.id)) return;
+
+		const force = project.index_status === 'completed';
+		if (force && !confirm(m.confirm_reindex_project({ name: project.name }))) {
+			return;
+		}
+
+		indexingProjects = new Set([...indexingProjects, project.id]);
+
+		try {
+			await gitlabApi.startIndexing(project.id, { 
+				branch: project.default_branch || 'main',
+				force 
+			});
+			
+			// Poll for status updates
+			pollIndexStatus(project.id);
+		} catch (error) {
+			console.error('Failed to start indexing:', error);
+			indexingProjects = new Set([...indexingProjects].filter(id => id !== project.id));
+			alert(m.alert_failed_indexing());
+		}
+	}
+
+	async function pollIndexStatus(projectId: string) {
+		const maxAttempts = 60; // 5 minutes max
+		let attempts = 0;
+
+		const poll = async () => {
+			try {
+				const status = await gitlabApi.getIndexStatus(projectId);
+				
+				// Update project in list
+				projects = projects.map(p => {
+					if (p.id === projectId) {
+						return { 
+							...p, 
+							index_status: status.status as GitLabProject['index_status'],
+							last_indexed_at: status.last_indexed 
+						};
+					}
+					return p;
+				});
+
+				if (status.status === 'in_progress' && attempts < maxAttempts) {
+					attempts++;
+					setTimeout(poll, 5000); // Poll every 5 seconds
+				} else {
+					// Done or failed
+					indexingProjects = new Set([...indexingProjects].filter(id => id !== projectId));
+				}
+			} catch {
+				indexingProjects = new Set([...indexingProjects].filter(id => id !== projectId));
+			}
+		};
+
+		poll();
 	}
 
 	async function handleRetryReview(review: GitLabReview) {
@@ -258,13 +341,78 @@
 			// Refresh reviews
 			await loadReviews();
 		} catch (error) {
-			alert('Failed to retry review');
+			alert(m.alert_failed_retry_review());
 		}
 	}
 
 	function viewProjectDetails(project: GitLabProject) {
 		selectedProject = project;
 		showProjectDetailModal = true;
+	}
+
+	function openEditProject(project: GitLabProject) {
+		selectedProject = project;
+		// Populate edit form with current values
+		editAnalysisModelId = project.analysis_model_id || '';
+		editEmbeddingModelId = project.embedding_model_id || '';
+		editAutoReview = project.auto_review;
+		editReviewPrompt = project.review_prompt || '';
+		editStatus = project.status as 'active' | 'disabled';
+		editIncludePatterns = project.settings?.include_patterns?.join(', ') || '';
+		editExcludePatterns = project.settings?.exclude_patterns?.join(', ') || '';
+		editChunkSize = String(project.settings?.chunk_size || 4000);
+		editChunkOverlap = String(project.settings?.chunk_overlap || 200);
+		editMaxFilesPerMR = String(project.settings?.max_files_per_mr || 50);
+		editMaxLinesPerFile = String(project.settings?.max_lines_per_file || 1000);
+		editSkipDraftMRs = project.settings?.skip_draft_mrs ?? true;
+		editSkipBots = project.settings?.skip_bots ?? true;
+		editCollectionName = project.settings?.collection_name || '';
+		saveError = '';
+		showEditProjectModal = true;
+	}
+
+	async function saveProjectChanges() {
+		if (!selectedProject) return;
+
+		isSaving = true;
+		saveError = '';
+
+		try {
+			const includePatterns = editIncludePatterns
+				.split(',')
+				.map(p => p.trim())
+				.filter(p => p);
+			const excludePatterns = editExcludePatterns
+				.split(',')
+				.map(p => p.trim())
+				.filter(p => p);
+
+			await gitlabApi.updateProject(selectedProject.id, {
+				auto_review: editAutoReview,
+				status: editStatus,
+				analysis_model_id: editAnalysisModelId || undefined,
+				embedding_model_id: editEmbeddingModelId || undefined,
+				review_prompt: editReviewPrompt || undefined,
+				settings: {
+					include_patterns: includePatterns.length > 0 ? includePatterns : undefined,
+					exclude_patterns: excludePatterns.length > 0 ? excludePatterns : undefined,
+					chunk_size: parseInt(editChunkSize) || 4000,
+					chunk_overlap: parseInt(editChunkOverlap) || 200,
+					max_files_per_mr: parseInt(editMaxFilesPerMR) || 50,
+					max_lines_per_file: parseInt(editMaxLinesPerFile) || 1000,
+					skip_draft_mrs: editSkipDraftMRs,
+					skip_bots: editSkipBots,
+					collection_name: editCollectionName || undefined
+				}
+			});
+
+			showEditProjectModal = false;
+			await loadProjects();
+		} catch (error) {
+			saveError = error instanceof Error ? error.message : 'Failed to save changes';
+		} finally {
+			isSaving = false;
+		}
 	}
 
 	function viewReviewDetails(review: GitLabReview) {
@@ -327,7 +475,7 @@
 		{#if activeTab === 'projects'}
 			<Button onclick={openAddProjectModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Add Project
+				{m.common_add()} {m.admin_project_projects_tab()}
 			</Button>
 		{/if}
 	</div>
@@ -344,7 +492,7 @@
 			)}
 		>
 			<FileCode class="inline-block mr-2 h-4 w-4" />
-			Projects ({totalProjects})
+			{m.admin_project_projects_tab()} ({totalProjects})
 		</button>
 		<button
 			onclick={() => switchTab('reviews')}
@@ -356,7 +504,7 @@
 			)}
 		>
 			<BarChart3 class="inline-block mr-2 h-4 w-4" />
-			Reviews ({totalReviews})
+			{m.admin_project_reviews_tab()} ({totalReviews})
 		</button>
 	</div>
 
@@ -377,20 +525,20 @@
 			onchange={() => { currentPage = 0; activeTab === 'projects' ? loadProjects() : loadReviews(); }}
 			class="h-10 rounded-md border bg-background px-3 text-sm"
 		>
-			<option value="">All Statuses</option>
+			<option value="">{m.admin_gitlab_all_statuses()}</option>
 			{#if activeTab === 'projects'}
-				<option value="active">Active</option>
-				<option value="disabled">Disabled</option>
+				<option value="active">{m.common_active()}</option>
+				<option value="disabled">{m.common_disabled()}</option>
 			{:else}
-				<option value="pending">Pending</option>
-				<option value="analyzing">Analyzing</option>
-				<option value="completed">Completed</option>
-				<option value="failed">Failed</option>
+				<option value="pending">{m.admin_gitlab_pending()}</option>
+				<option value="analyzing">{m.admin_gitlab_processing()}</option>
+				<option value="completed">{m.admin_queue_completed()}</option>
+				<option value="failed">{m.admin_gitlab_failed()}</option>
 			{/if}
 		</select>
 		<Button variant="outline" onclick={() => { searchQuery = ''; statusFilter = ''; currentPage = 0; activeTab === 'projects' ? loadProjects() : loadReviews(); }}>
 			<RefreshCw class="mr-2 h-4 w-4" />
-			Reset
+			{m.common_reset()}
 		</Button>
 	</div>
 
@@ -420,6 +568,7 @@
 							<th class="px-4 py-3 font-medium">Status</th>
 							<th class="px-4 py-3 font-medium">Auto Review</th>
 							<th class="px-4 py-3 font-medium">Webhook</th>
+							<th class="px-4 py-3 font-medium">Index</th>
 							<th class="px-4 py-3 font-medium">Reviews</th>
 							<th class="px-4 py-3 font-medium">Actions</th>
 						</tr>
@@ -432,13 +581,13 @@
 									<div class="text-sm text-muted-foreground">{project.path_with_namespace}</div>
 								</td>
 								<td class="px-4 py-3">
-									<div class="flex items-center gap-2">
-										<svelte:component
-											this={getStatusIcon(project.status)}
-											class={cn('h-4 w-4', getStatusColor(project.status))}
-										/>
-										<span class="text-sm capitalize">{project.status}</span>
-									</div>
+									{#if true}
+										{@const StatusIcon = getStatusIcon(project.status)}
+										<div class="flex items-center gap-2">
+											<StatusIcon class={cn('h-4 w-4', getStatusColor(project.status))} />
+											<span class="text-sm capitalize">{project.status}</span>
+										</div>
+									{/if}
 								</td>
 								<td class="px-4 py-3">
 									<span class={cn('text-sm', project.auto_review ? 'text-green-500' : 'text-muted-foreground')}>
@@ -462,16 +611,56 @@
 									{/if}
 								</td>
 								<td class="px-4 py-3">
+								{#if indexingProjects.has(project.id)}
+									<span class="flex items-center gap-1 text-sm text-yellow-500">
+										<Loader2 class="h-4 w-4 animate-spin" />
+										Indexing...
+									</span>
+								{:else if project.index_status === 'completed'}
+									<div class="flex flex-col">
+										<span class="flex items-center gap-1 text-sm text-green-500">
+											<CheckCircle class="h-4 w-4" />
+											{project.last_indexed_at ? formatRelativeTime(project.last_indexed_at) : 'Ready'}
+										</span>
+										{#if project.index_chunks && project.index_chunks > 0}
+											<span class="text-xs text-muted-foreground">{project.index_chunks.toLocaleString()} chunks</span>
+										{/if}
+									</div>
+								{:else if project.index_status === 'failed'}
+									<span class="flex items-center gap-1 text-sm text-red-500">
+										<XCircle class="h-4 w-4" />
+										Failed
+									</span>
+								{:else}
+									<span class="text-sm text-muted-foreground">Not indexed</span>
+								{/if}
+								</td>
+								<td class="px-4 py-3">
 									<span class="text-sm">{project.review_count || 0}</span>
 								</td>
 								<td class="px-4 py-3">
 									<div class="flex items-center gap-2">
+										<button
+											onclick={() => handleStartIndexing(project)}
+											class="rounded p-1.5 hover:bg-muted"
+											title={project.index_status === 'completed' ? 'Reindex' : 'Start Indexing'}
+											disabled={indexingProjects.has(project.id)}
+										>
+											<RefreshCw class={cn('h-4 w-4', indexingProjects.has(project.id) && 'animate-spin')} />
+										</button>
 										<button
 											onclick={() => viewProjectDetails(project)}
 											class="rounded p-1.5 hover:bg-muted"
 											title="View Details"
 										>
 											<Eye class="h-4 w-4" />
+										</button>
+										<button
+											onclick={() => openEditProject(project)}
+											class="rounded p-1.5 hover:bg-muted"
+											title="Edit Settings"
+										>
+											<Settings class="h-4 w-4" />
 										</button>
 										<button
 											onclick={() => handleDeleteProject(project)}
@@ -517,13 +706,13 @@
 									</div>
 								</td>
 								<td class="px-4 py-3">
-									<div class="flex items-center gap-2">
-										<svelte:component
-											this={getStatusIcon(review.status)}
-											class={cn('h-4 w-4', getStatusColor(review.status))}
-										/>
-										<span class="text-sm capitalize">{review.status}</span>
-									</div>
+									{#if true}
+										{@const ReviewStatusIcon = getStatusIcon(review.status)}
+										<div class="flex items-center gap-2">
+											<ReviewStatusIcon class={cn('h-4 w-4', getStatusColor(review.status))} />
+											<span class="text-sm capitalize">{review.status}</span>
+										</div>
+									{/if}
 									{#if review.error}
 										<p class="mt-1 text-xs text-red-500 truncate max-w-[200px]" title={review.error}>
 											{review.error}
@@ -582,7 +771,7 @@
 		{#if totalPages > 1}
 			<div class="flex items-center justify-between border-t px-4 py-3">
 				<p class="text-sm text-muted-foreground">
-					Page {currentPage + 1} of {totalPages}
+					{m.pagination_page({ current: currentPage + 1, total: totalPages })}
 				</p>
 				<div class="flex items-center gap-2">
 					<Button
@@ -591,7 +780,7 @@
 						disabled={currentPage === 0}
 						onclick={() => { currentPage--; activeTab === 'projects' ? loadProjects() : loadReviews(); }}
 					>
-						Previous
+						{m.pagination_previous()}
 					</Button>
 					<Button
 						variant="outline"
@@ -599,7 +788,7 @@
 						disabled={currentPage >= totalPages - 1}
 						onclick={() => { currentPage++; activeTab === 'projects' ? loadProjects() : loadReviews(); }}
 					>
-						Next
+						{m.pagination_next()}
 					</Button>
 				</div>
 			</div>
@@ -612,13 +801,15 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showAddProjectModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showAddProjectModal = false)}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="w-full max-w-lg rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
 			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-lg font-semibold">Add GitLab Project</h3>
-				<button onclick={() => (showAddProjectModal = false)} class="rounded p-1 hover:bg-muted">
+				<h3 class="text-lg font-semibold">{m.modal_add_project()}</h3>
+				<button onclick={() => (showAddProjectModal = false)} class="rounded p-1 hover:bg-muted" title={m.common_close()}>
 					<X class="h-5 w-5" />
 				</button>
 			</div>
@@ -631,41 +822,44 @@
 
 			<div class="space-y-4">
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">GitLab Project ID *</label>
+					<label for="add-project-id" class="mb-1.5 block text-sm font-medium">{m.modal_gitlab_project_id()} *</label>
 					<input
+						id="add-project-id"
 						type="number"
 						bind:value={formGitLabProjectId}
 						placeholder="12345"
 						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 					/>
 					<p class="mt-1 text-xs text-muted-foreground">
-						Find this in GitLab: Settings → General → Project ID
+						{m.modal_gitlab_project_id_hint()}
 					</p>
 				</div>
 
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">Analysis Model ID *</label>
+					<label for="add-analysis-model" class="mb-1.5 block text-sm font-medium">{m.modal_analysis_model()} *</label>
 					<input
+						id="add-analysis-model"
 						type="text"
 						bind:value={formAnalysisModelId}
 						placeholder="model-uuid-here"
 						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 					/>
 					<p class="mt-1 text-xs text-muted-foreground">
-						LLM model to use for code analysis
+						{m.modal_analysis_model_hint()}
 					</p>
 				</div>
 
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">Embedding Model ID (optional)</label>
+					<label for="add-embedding-model" class="mb-1.5 block text-sm font-medium">{m.modal_embedding_model()} ({m.modal_optional()})</label>
 					<input
+						id="add-embedding-model"
 						type="text"
 						bind:value={formEmbeddingModelId}
 						placeholder="model-uuid-here"
 						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 					/>
 					<p class="mt-1 text-xs text-muted-foreground">
-						Model for code embeddings (RAG context)
+						{m.modal_embedding_model_hint()}
 					</p>
 				</div>
 
@@ -677,18 +871,19 @@
 						class="h-4 w-4 rounded border"
 					/>
 					<label for="autoReview" class="text-sm font-medium">
-						Enable Auto Review
+						{m.modal_auto_review()}
 					</label>
 				</div>
 				<p class="text-xs text-muted-foreground -mt-2">
-					Automatically analyze new MRs when created or updated
+					{m.modal_auto_review_hint()}
 				</p>
 
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">Custom Review Prompt (optional)</label>
+					<label for="add-review-prompt" class="mb-1.5 block text-sm font-medium">Custom Review Prompt (optional)</label>
 					<textarea
+						id="add-review-prompt"
 						bind:value={formReviewPrompt}
-						placeholder="Custom instructions for the AI reviewer..."
+						placeholder={m.placeholder_review_prompt()}
 						rows="4"
 						class="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 					></textarea>
@@ -697,8 +892,9 @@
 				<!-- Include/Exclude Patterns (GITLAB-055c) -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="mb-1.5 block text-sm font-medium">Include Patterns</label>
+						<label for="add-include-patterns" class="mb-1.5 block text-sm font-medium">Include Patterns</label>
 						<textarea
+							id="add-include-patterns"
 							bind:value={formIncludePatterns}
 							placeholder="*.go&#10;*.ts&#10;src/**/*.js"
 							rows="3"
@@ -709,8 +905,9 @@
 						</p>
 					</div>
 					<div>
-						<label class="mb-1.5 block text-sm font-medium">Exclude Patterns</label>
+						<label for="add-exclude-patterns" class="mb-1.5 block text-sm font-medium">Exclude Patterns</label>
 						<textarea
+							id="add-exclude-patterns"
 							bind:value={formExcludePatterns}
 							placeholder="*.min.js&#10;vendor/**&#10;*.lock"
 							rows="3"
@@ -729,15 +926,16 @@
 					class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
 				>
 					<Settings class="h-4 w-4" />
-					{showAdvancedSettings ? 'Hide' : 'Show'} Advanced Settings
+					{showAdvancedSettings ? m.common_hide() : m.common_show()} {m.settings_title()}
 				</button>
 
 				{#if showAdvancedSettings}
 					<div class="rounded-md border bg-muted/50 p-4 space-y-4">
 						<div class="grid grid-cols-2 gap-4">
 							<div>
-								<label class="mb-1.5 block text-sm font-medium">Chunk Size (tokens)</label>
+								<label for="add-chunk-size" class="mb-1.5 block text-sm font-medium">Chunk Size (tokens)</label>
 								<input
+									id="add-chunk-size"
 									type="number"
 									bind:value={formChunkSize}
 									min="500"
@@ -746,8 +944,9 @@
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-sm font-medium">Chunk Overlap (tokens)</label>
+								<label for="add-chunk-overlap" class="mb-1.5 block text-sm font-medium">Chunk Overlap (tokens)</label>
 								<input
+									id="add-chunk-overlap"
 									type="number"
 									bind:value={formChunkOverlap}
 									min="0"
@@ -758,8 +957,9 @@
 						</div>
 						<div class="grid grid-cols-2 gap-4">
 							<div>
-								<label class="mb-1.5 block text-sm font-medium">Max Files per MR</label>
+								<label for="add-max-files" class="mb-1.5 block text-sm font-medium">Max Files per MR</label>
 								<input
+									id="add-max-files"
 									type="number"
 									bind:value={formMaxFilesPerMR}
 									min="1"
@@ -768,8 +968,9 @@
 								/>
 							</div>
 							<div>
-								<label class="mb-1.5 block text-sm font-medium">Max Lines per File</label>
+								<label for="add-max-lines" class="mb-1.5 block text-sm font-medium">Max Lines per File</label>
 								<input
+									id="add-max-lines"
 									type="number"
 									bind:value={formMaxLinesPerFile}
 									min="100"
@@ -820,8 +1021,10 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showProjectDetailModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showProjectDetailModal = false)}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="w-full max-w-2xl rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
 			<div class="flex items-center justify-between mb-4">
@@ -834,59 +1037,263 @@
 			<div class="space-y-4">
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<span class="text-sm text-muted-foreground">Path:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_project_path()}:</span>
 						<p class="font-mono text-sm">{selectedProject.path_with_namespace}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">GitLab ID:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_project_gitlab_id()}:</span>
 						<p class="font-mono text-sm">{selectedProject.gitlab_project_id}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Status:</span>
+						<span class="text-sm text-muted-foreground">{m.common_status()}:</span>
 						<p class={cn('text-sm capitalize', getStatusColor(selectedProject.status))}>
 							{selectedProject.status}
 						</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Auto Review:</span>
-						<p class="text-sm">{selectedProject.auto_review ? 'Enabled' : 'Disabled'}</p>
+						<span class="text-sm text-muted-foreground">{m.modal_auto_review()}:</span>
+						<p class="text-sm">{selectedProject.auto_review ? m.modal_enabled() : m.modal_disabled()}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Analysis Model:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_analysis_model()}:</span>
 						<p class="font-mono text-sm">{selectedProject.analysis_model_id || '-'}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Embedding Model:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_embedding_model()}:</span>
 						<p class="font-mono text-sm">{selectedProject.embedding_model_id || '-'}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Webhook ID:</span>
-						<p class="font-mono text-sm">{selectedProject.webhook_id || 'Not configured'}</p>
+						<span class="text-sm text-muted-foreground">{m.modal_project_webhook_id()}:</span>
+						<p class="font-mono text-sm">{selectedProject.webhook_id || m.modal_project_webhook_not_configured()}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Reviews:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_project_reviews_count()}:</span>
 						<p class="text-sm">{selectedProject.review_count || 0}</p>
 					</div>
 				</div>
 
 				{#if selectedProject.review_prompt}
 					<div>
-						<span class="text-sm text-muted-foreground">Custom Prompt:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_project_custom_prompt()}:</span>
 						<pre class="mt-1 p-3 bg-muted rounded-md text-sm whitespace-pre-wrap">{selectedProject.review_prompt}</pre>
 					</div>
 				{/if}
 
 				{#if selectedProject.settings}
 					<div>
-						<span class="text-sm text-muted-foreground">Settings:</span>
+						<span class="text-sm text-muted-foreground">{m.modal_project_settings()}:</span>
 						<pre class="mt-1 p-3 bg-muted rounded-md text-sm overflow-auto">{JSON.stringify(selectedProject.settings, null, 2)}</pre>
 					</div>
 				{/if}
 			</div>
 
-			<div class="mt-6 flex justify-end">
+			<div class="mt-6 flex justify-end gap-2">
 				<Button variant="outline" onclick={() => (showProjectDetailModal = false)}>
-					Close
+					{m.common_close()}
+				</Button>
+				<Button onclick={() => { showProjectDetailModal = false; openEditProject(selectedProject); }}>
+					<Settings class="mr-2 h-4 w-4" />
+					{m.common_edit()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Edit Project Modal -->
+{#if showEditProjectModal && selectedProject}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		onclick={(e) => e.target === e.currentTarget && (showEditProjectModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showEditProjectModal = false)}
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+	>
+		<div class="w-full max-w-2xl rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-lg font-semibold">{m.modal_edit_project()}: {selectedProject.name}</h3>
+				<button onclick={() => (showEditProjectModal = false)} class="rounded p-1 hover:bg-muted" title={m.common_close()}>
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if saveError}
+				<div class="mb-4 rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+					{saveError}
+				</div>
+			{/if}
+
+			<div class="space-y-4">
+				<!-- Status -->
+				<div>
+					<label for="edit-status" class="text-sm font-medium">{m.common_status()}</label>
+					<select
+						id="edit-status"
+						bind:value={editStatus}
+						class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+					>
+						<option value="active">{m.common_active()}</option>
+						<option value="disabled">{m.common_disabled()}</option>
+					</select>
+				</div>
+
+				<!-- Auto Review -->
+				<div class="flex items-center gap-2">
+					<input
+						type="checkbox"
+						id="editAutoReview"
+						bind:checked={editAutoReview}
+						class="rounded border-gray-300"
+					/>
+					<label for="editAutoReview" class="text-sm font-medium">{m.modal_auto_review()}</label>
+				</div>
+
+				<!-- Models -->
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="edit-analysis-model" class="text-sm font-medium">{m.modal_analysis_model()}</label>
+						<input
+							id="edit-analysis-model"
+							type="text"
+							bind:value={editAnalysisModelId}
+							placeholder="e.g., qwen-coder"
+							class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+						/>
+					</div>
+					<div>
+						<label for="edit-embedding-model" class="text-sm font-medium">{m.modal_embedding_model()}</label>
+						<input
+							id="edit-embedding-model"
+							type="text"
+							bind:value={editEmbeddingModelId}
+							placeholder="e.g., bge-m3"
+							class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+						/>
+					</div>
+				</div>
+
+				<!-- Review Prompt -->
+				<div>
+					<label for="edit-review-prompt" class="text-sm font-medium">{m.admin_project_review_prompt()}</label>
+					<textarea
+						id="edit-review-prompt"
+						bind:value={editReviewPrompt}
+						placeholder={m.placeholder_review_prompt()}
+						rows="3"
+						class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+					></textarea>
+				</div>
+
+				<!-- Qdrant Collection -->
+				<div>
+					<label for="edit-collection" class="text-sm font-medium">{m.admin_project_collection()}</label>
+					<input
+						id="edit-collection"
+						type="text"
+						bind:value={editCollectionName}
+						placeholder={m.placeholder_webhook_secret()}
+						class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+					/>
+				</div>
+
+				<!-- File Patterns -->
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="edit-include-patterns" class="text-sm font-medium">{m.admin_project_include_patterns()}</label>
+						<input
+							id="edit-include-patterns"
+							type="text"
+							bind:value={editIncludePatterns}
+							placeholder="*.go, *.ts, *.py"
+							class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+						/>
+					</div>
+					<div>
+						<label for="edit-exclude-patterns" class="text-sm font-medium">{m.admin_project_exclude_patterns()}</label>
+						<input
+							id="edit-exclude-patterns"
+							type="text"
+							bind:value={editExcludePatterns}
+							placeholder="vendor/*, node_modules/*"
+							class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+						/>
+					</div>
+				</div>
+
+				<!-- Advanced Settings -->
+				<div class="border rounded-md p-4">
+					<h4 class="font-medium mb-3">{m.settings_title()}</h4>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="edit-chunk-size" class="text-sm font-medium">{m.admin_project_chunk_size()}</label>
+							<input
+								id="edit-chunk-size"
+								type="number"
+								bind:value={editChunkSize}
+								class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+							/>
+						</div>
+						<div>
+							<label for="edit-chunk-overlap" class="text-sm font-medium">{m.admin_project_chunk_overlap()}</label>
+							<input
+								id="edit-chunk-overlap"
+								type="number"
+								bind:value={editChunkOverlap}
+								class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+							/>
+						</div>
+						<div>
+							<label for="edit-max-files" class="text-sm font-medium">{m.admin_project_max_files()}</label>
+							<input
+								id="edit-max-files"
+								type="number"
+								bind:value={editMaxFilesPerMR}
+								class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+							/>
+						</div>
+						<div>
+							<label for="edit-max-lines" class="text-sm font-medium">{m.admin_project_max_lines()}</label>
+							<input
+								id="edit-max-lines"
+								type="number"
+								bind:value={editMaxLinesPerFile}
+								class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+							/>
+						</div>
+					</div>
+					<div class="mt-3 flex gap-4">
+						<div class="flex items-center gap-2">
+							<input
+								type="checkbox"
+								id="editSkipDraftMRs"
+								bind:checked={editSkipDraftMRs}
+								class="rounded border-gray-300"
+							/>
+							<label for="editSkipDraftMRs" class="text-sm">{m.admin_project_skip_drafts()}</label>
+						</div>
+						<div class="flex items-center gap-2">
+							<input
+								type="checkbox"
+								id="editSkipBots"
+								bind:checked={editSkipBots}
+								class="rounded border-gray-300"
+							/>
+							<label for="editSkipBots" class="text-sm">{m.admin_project_skip_bots()}</label>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="mt-6 flex justify-end gap-2">
+				<Button variant="outline" onclick={() => (showEditProjectModal = false)} disabled={isSaving}>
+					{m.common_cancel()}
+				</Button>
+				<Button onclick={saveProjectChanges} disabled={isSaving}>
+					{#if isSaving}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{/if}
+					{m.common_save()}
 				</Button>
 			</div>
 		</div>
@@ -898,8 +1305,10 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showReviewDetailModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showReviewDetailModal = false)}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="w-full max-w-3xl rounded-lg bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
 			<div class="flex items-center justify-between mb-4">
@@ -912,56 +1321,56 @@
 			<div class="space-y-4">
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
 					<div>
-						<span class="text-sm text-muted-foreground">Status:</span>
+						<span class="text-sm text-muted-foreground">{m.common_status()}:</span>
 						<p class={cn('text-sm capitalize', getStatusColor(selectedReview.status))}>
 							{selectedReview.status}
 						</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Author:</span>
+						<span class="text-sm text-muted-foreground">{m.review_author()}:</span>
 						<p class="text-sm">{selectedReview.mr_author}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Branch:</span>
+						<span class="text-sm text-muted-foreground">{m.review_branch()}:</span>
 						<p class="text-sm font-mono">{selectedReview.source_branch} → {selectedReview.target_branch}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Files Analyzed:</span>
+						<span class="text-sm text-muted-foreground">{m.review_files_analyzed()}:</span>
 						<p class="text-sm">{selectedReview.files_analyzed}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Lines Changed:</span>
+						<span class="text-sm text-muted-foreground">{m.review_lines_changed()}:</span>
 						<p class="text-sm">{selectedReview.lines_changed}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Issues Found:</span>
+						<span class="text-sm text-muted-foreground">{m.review_issues_found()}:</span>
 						<p class={cn('text-sm', selectedReview.issues_found > 0 ? 'text-yellow-500 font-medium' : 'text-green-500')}>
 							{selectedReview.issues_found}
 						</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Processing Time:</span>
+						<span class="text-sm text-muted-foreground">{m.review_processing_time()}:</span>
 						<p class="text-sm">{selectedReview.processing_time_ms ? `${(selectedReview.processing_time_ms / 1000).toFixed(2)}s` : '-'}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Tokens Used:</span>
+						<span class="text-sm text-muted-foreground">{m.review_tokens_used()}:</span>
 						<p class="text-sm">{selectedReview.tokens_used || '-'}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Model:</span>
+						<span class="text-sm text-muted-foreground">{m.review_model()}:</span>
 						<p class="text-sm font-mono">{selectedReview.model_used || '-'}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Retry Count:</span>
+						<span class="text-sm text-muted-foreground">{m.review_retry_count()}:</span>
 						<p class="text-sm">{selectedReview.retry_count}</p>
 					</div>
 					<div>
-						<span class="text-sm text-muted-foreground">Created:</span>
+						<span class="text-sm text-muted-foreground">{m.review_created()}:</span>
 						<p class="text-sm">{formatRelativeTime(selectedReview.created_at)}</p>
 					</div>
 					{#if selectedReview.completed_at}
 						<div>
-							<span class="text-sm text-muted-foreground">Completed:</span>
+							<span class="text-sm text-muted-foreground">{m.review_completed()}:</span>
 							<p class="text-sm">{formatRelativeTime(selectedReview.completed_at)}</p>
 						</div>
 					{/if}
@@ -976,12 +1385,12 @@
 
 				{#if selectedReview.review_result}
 					<div>
-						<span class="text-sm font-medium">Review Summary:</span>
+						<span class="text-sm font-medium">{m.review_summary()}:</span>
 						<div class="mt-2 rounded-md bg-muted p-4">
 							<p class="text-sm">{selectedReview.review_result.summary}</p>
 							{#if selectedReview.review_result.overall_score !== undefined}
 								<div class="mt-2 flex items-center gap-2">
-									<span class="text-sm text-muted-foreground">Score:</span>
+									<span class="text-sm text-muted-foreground">{m.review_score()}:</span>
 									<span class={cn(
 										'text-sm font-medium',
 										selectedReview.review_result.overall_score >= 80 ? 'text-green-500' :
@@ -996,13 +1405,13 @@
 
 					{#if selectedReview.review_result.categories?.length}
 						<div>
-							<span class="text-sm font-medium">Categories:</span>
+							<span class="text-sm font-medium">{m.review_categories()}:</span>
 							<div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
 								{#each selectedReview.review_result.categories as category}
 									<div class="rounded-md border p-2">
 										<p class="text-sm font-medium">{category.name}</p>
 										<p class="text-xs text-muted-foreground">
-											Score: {category.score}/100 · {category.issue_count} issues
+											{m.review_score()}: {category.score}/100 · {category.issue_count} {m.review_issues()}
 										</p>
 									</div>
 								{/each}
@@ -1014,12 +1423,12 @@
 
 			<div class="mt-6 flex justify-end gap-3">
 				<Button variant="outline" onclick={() => (showReviewDetailModal = false)}>
-					Close
+					{m.common_close()}
 				</Button>
 				<a href={selectedReview.mr_url} target="_blank">
 					<Button>
 						<ExternalLink class="mr-2 h-4 w-4" />
-						Open in GitLab
+						{m.table_open_gitlab()}
 					</Button>
 				</a>
 			</div>

@@ -80,7 +80,7 @@
 					type="button"
 					onclick={handleStop}
 					class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-colors hover:bg-destructive/90"
-					title="Stop generating"
+					title={m.chat_stop_generating()}
 				>
 					<Square class="h-4 w-4" />
 				</button>
@@ -106,7 +106,7 @@
 		</div>
 
 		<p class="mt-2 text-center text-xs text-muted-foreground">
-			Press Enter to send, Shift+Enter for new line
+			{m.chat_enter_hint()}
 		</p>
 	</div>
 </form>

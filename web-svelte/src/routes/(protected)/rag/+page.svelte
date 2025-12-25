@@ -21,6 +21,8 @@
 	import { ragApi, type RAGSource } from '$lib/api/rag';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { IconButton } from '$lib/components/ui/icon-button';
+	import { FormLabel } from '$lib/components/ui/form-label';
 	import * as m from '$lib/paraglide/messages';
 
 	let sources = $state<RAGSource[]>([]);
@@ -216,7 +218,7 @@
 			sources = sources.map((s) => (s.id === source.id ? { ...s, status: 'indexing' } : s));
 		} catch (error) {
 			console.error('Failed to reindex:', error);
-			alert('Failed to start reindexing');
+			alert(m.alert_failed_reindex());
 		}
 	}
 
@@ -235,7 +237,7 @@
 			sourceToDelete = null;
 		} catch (error) {
 			console.error('Failed to delete:', error);
-			alert('Failed to delete source');
+			alert(m.alert_failed_delete_source());
 		}
 	}
 
@@ -288,12 +290,12 @@
 	<title>{m.nav_rag()} | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-8 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">RAG Data Sources</h1>
-			<p class="mt-1 text-muted-foreground">Manage knowledge sources for Retrieval-Augmented Generation</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.rag_title()}</h1>
+			<p class="mt-1 text-muted-foreground">{m.rag_subtitle()}</p>
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={loadSources} disabled={isLoading}>
@@ -302,7 +304,7 @@
 			</Button>
 			<Button onclick={openCreateModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Add Data Source
+				{m.rag_add_source()}
 			</Button>
 		</div>
 	</div>
@@ -315,11 +317,11 @@
 	{:else if sources.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
 			<Database class="mx-auto h-12 w-12 text-muted-foreground/40" />
-			<p class="mt-4 text-lg font-medium">No RAG sources yet</p>
-			<p class="mt-1 text-muted-foreground">Add your first knowledge source to enable RAG</p>
+			<p class="mt-4 text-lg font-medium">{m.rag_no_sources()}</p>
+			<p class="mt-1 text-muted-foreground">{m.rag_no_sources_desc()}</p>
 			<Button class="mt-6" onclick={openCreateModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Add Data Source
+				{m.rag_add_source()}
 			</Button>
 		</div>
 	{:else}
@@ -328,11 +330,11 @@
 				<thead class="border-b border-border bg-muted/50">
 					<tr>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.common_name()}</th>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Type</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.rag_type()}</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.common_status()}</th>
-						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Last Sync</th>
-						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Chunks</th>
-						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Tokens</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">{m.rag_last_sync()}</th>
+						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">{m.rag_chunks()}</th>
+						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">{m.rag_tokens()}</th>
 						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">{m.common_actions()}</th>
 					</tr>
 				</thead>
@@ -356,10 +358,13 @@
 							</td>
 							<td class="px-4 py-3 text-sm capitalize">{source.type}</td>
 							<td class="px-4 py-3">
+								{#if true}
+								{@const StatusIcon = statusInfo.icon}
 								<span class={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium', statusInfo.bg, statusInfo.class)}>
-									<svelte:component this={statusInfo.icon} class={cn('h-3 w-3', source.status === 'indexing' && 'animate-spin')} />
+									<StatusIcon class={cn('h-3 w-3', source.status === 'indexing' && 'animate-spin')} />
 									{statusInfo.label}
 								</span>
+							{/if}
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
 								{source.last_indexed_at ? formatRelativeTime(source.last_indexed_at) : 'Never'}
@@ -444,8 +449,9 @@
 					</div>
 
 					<div>
-						<label class="mb-1.5 block text-sm font-medium">Source Type *</label>
+						<label for="source-type" class="mb-1.5 block text-sm font-medium">Source Type *</label>
 						<select
+							id="source-type"
 							bind:value={sourceType}
 							class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						>
@@ -558,7 +564,7 @@
 									id="db-query"
 									bind:value={dbQuery}
 									rows="3"
-									placeholder="SELECT id, title, content FROM documents"
+									placeholder={m.placeholder_sql_query()}
 									class="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm"
 								></textarea>
 							</div>

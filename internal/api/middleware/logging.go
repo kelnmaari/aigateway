@@ -12,8 +12,9 @@ import (
 // LoggingConfig конфигурация middleware логирования
 type LoggingConfig struct {
 	Logger            *logrus.Logger
-	SkipPaths         []string // Пути, которые не нужно логировать
-	EnableRequestBody bool     // Логировать тело запроса (опасно для production)
+	DetailedLogger    *logrus.Logger // Логгер для детальных логов (в отдельный файл)
+	SkipPaths         []string       // Пути, которые не нужно логировать
+	EnableRequestBody bool           // Логировать тело запроса (опасно для production)
 }
 
 // RequestLogging создает middleware для structured логирования HTTP запросов
@@ -23,6 +24,9 @@ func RequestLogging(config LoggingConfig) gin.HandlerFunc {
 		logger = logrus.StandardLogger()
 	}
 
+	// Отдельный логгер для детальных логов (если настроен)
+	detailedLogger := config.DetailedLogger
+
 	skipPaths := make(map[string]bool)
 	for _, path := range config.SkipPaths {
 		skipPaths[path] = true
@@ -30,7 +34,7 @@ func RequestLogging(config LoggingConfig) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		
+
 		// Пропускаем логирование для определенных путей и UI endpoints (v3.0.6+)
 		if skipPaths[path] || strings.HasPrefix(path, "/api/ui/") {
 			c.Next()
@@ -56,34 +60,61 @@ func RequestLogging(config LoggingConfig) gin.HandlerFunc {
 			path = path + "?" + raw
 		}
 
-		// Создаем structured log entry
-		entry := logger.WithFields(logrus.Fields{
-			"timestamp":   start,
-			"latency":     latency,
-			"latency_ms":  float64(latency.Nanoseconds()) / 1e6,
-			"method":      method,
-			"path":        path,
-			"status_code": statusCode,
-			"body_size":   bodySize,
-			"client_ip":   clientIP,
-			"user_agent":  userAgent,
-		})
+		// Детальные логи в отдельный файл (http.log) если настроен
+		if detailedLogger != nil {
+			detailedEntry := detailedLogger.WithFields(logrus.Fields{
+				"timestamp":   start,
+				"latency":     latency,
+				"latency_ms":  float64(latency.Nanoseconds()) / 1e6,
+				"method":      method,
+				"path":        path,
+				"status_code": statusCode,
+				"body_size":   bodySize,
+				"client_ip":   clientIP,
+				"user_agent":  userAgent,
+			})
 
-		// Добавляем дополнительные поля если есть ошибки
-		if len(c.Errors) > 0 {
-			entry = entry.WithField("errors", c.Errors.String())
+			if len(c.Errors) > 0 {
+				detailedEntry = detailedEntry.WithField("errors", c.Errors.String())
+			}
+
+			switch {
+			case statusCode >= 500:
+				detailedEntry.Error("HTTP request processed with server error")
+			case statusCode >= 400:
+				detailedEntry.Warn("HTTP request processed with client error")
+			case statusCode >= 300:
+				detailedEntry.Info("HTTP request processed with redirect")
+			default:
+				detailedEntry.Info("HTTP request processed successfully")
+			}
 		}
 
-		// Определяем уровень логирования по статус коду
-		switch {
-		case statusCode >= 500:
-			entry.Error("HTTP request processed with server error")
-		case statusCode >= 400:
-			entry.Warn("HTTP request processed with client error")
-		case statusCode >= 300:
-			entry.Info("HTTP request processed with redirect")
-		default:
-			entry.Info("HTTP request processed successfully")
+		// Краткие логи в основной файл (только для ошибок или если нет отдельного логгера)
+		if detailedLogger == nil || statusCode >= 400 {
+			entry := logger.WithFields(logrus.Fields{
+				"method":    method,
+				"path":      path,
+				"status":    statusCode,
+				"client_ip": clientIP,
+				"latency":   latency.String(),
+			})
+
+			if len(c.Errors) > 0 {
+				entry = entry.WithField("errors", c.Errors.String())
+			}
+
+			switch {
+			case statusCode >= 500:
+				entry.Error("HTTP 5xx")
+			case statusCode >= 400:
+				entry.Warn("HTTP 4xx")
+			default:
+				// Если нет отдельного логгера - логируем все; иначе - только ошибки
+				if detailedLogger == nil {
+					entry.Info("HTTP request")
+				}
+			}
 		}
 	}
 }

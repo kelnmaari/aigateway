@@ -93,6 +93,7 @@ type ModelFilters struct {
 	Sort         string   // Sort by: "downloads", "likes", "trending", "createdAt"
 	Direction    int      // Sort direction: -1 (desc), 1 (asc)
 	Limit        int      // Results limit (default: 30, max: 100)
+	Page         int      // Page number for pagination (1-based)
 	CardData     bool     // Include model card data
 	Config       bool     // Include config data
 	FullResponse bool     // Return full model info
@@ -241,6 +242,12 @@ func (c *Client) SearchModels(ctx context.Context, filters ModelFilters) ([]Mode
 	}
 	params.Add("limit", fmt.Sprintf("%d", limit))
 	
+	// Pagination - HuggingFace uses skip for offset
+	if filters.Page > 1 {
+		skip := (filters.Page - 1) * limit
+		params.Add("skip", fmt.Sprintf("%d", skip))
+	}
+	
 	// Full response
 	if filters.FullResponse {
 		params.Add("full", "true")
@@ -256,9 +263,10 @@ func (c *Client) SearchModels(ctx context.Context, filters ModelFilters) ([]Mode
 	reqURL := fmt.Sprintf("%s%s?%s", c.baseURL, APIEndpoint, params.Encode())
 	
 	c.logger.WithFields(logrus.Fields{
-		"url":    reqURL,
-		"search": filters.Search,
-		"tags":   filters.Tags,
+		"url":     reqURL,
+		"search":  filters.Search,
+		"tags":    filters.Tags,
+		"library": filters.Library,
 	}).Debug("Searching Hugging Face models")
 	
 	var models []ModelInfo
@@ -394,9 +402,20 @@ func (c *Client) enrichModelInfo(model *ModelInfo) {
 	ggufFiles := []File{}
 	var totalSize int64
 	
+	// Check for GGUF indicators
+	hasGGUFTag := false
+	for _, tag := range model.Tags {
+		if strings.ToLower(tag) == "gguf" {
+			hasGGUFTag = true
+			break
+		}
+	}
+	
 	c.logger.WithFields(logrus.Fields{
-		"model_id":      model.ID,
+		"model_id":       model.ID,
 		"siblings_count": len(model.Siblings),
+		"library":        model.Library,
+		"has_gguf_tag":   hasGGUFTag,
 	}).Debug("Enriching model info")
 	
 	for i, file := range model.Siblings {
@@ -430,8 +449,36 @@ func (c *Client) enrichModelInfo(model *ModelInfo) {
 	}
 	
 	model.GGUFFiles = ggufFiles
-	model.HasGGUF = len(ggufFiles) > 0
 	model.TotalSize = totalSize
+	
+	// Determine HasGGUF: from files if available, otherwise from library/tags/ID
+	if len(ggufFiles) > 0 {
+		model.HasGGUF = true
+	} else if len(model.Siblings) == 0 {
+		// No files in response (search results) - check multiple indicators
+		libraryLower := strings.ToLower(model.Library)
+		idLower := strings.ToLower(model.ID)
+		
+		// Check library_name contains gguf (can be "gguf", "llama.cpp", etc.)
+		if strings.Contains(libraryLower, "gguf") || libraryLower == "llama.cpp" || libraryLower == "ggml" {
+			model.HasGGUF = true
+		}
+		
+		// Check tags for "gguf"
+		if !model.HasGGUF {
+			for _, tag := range model.Tags {
+				if strings.ToLower(tag) == "gguf" {
+					model.HasGGUF = true
+					break
+				}
+			}
+		}
+		
+		// Check model ID contains GGUF (e.g., "TheBloke/Llama-2-7B-GGUF")
+		if !model.HasGGUF && strings.Contains(idLower, "gguf") {
+			model.HasGGUF = true
+		}
+	}
 	
 	// Extract parameter size from tags
 	for _, tag := range model.Tags {
@@ -575,13 +622,13 @@ func extractDescriptionFromReadme(readme string) string {
 func (c *Client) ListGGUFModels(ctx context.Context, search string, limit int) ([]ModelInfo, error) {
 	filters := ModelFilters{
 		Search:       search,
-		Tags:         []string{"gguf"},
+		Library:      "gguf", // Use library filter instead of tag for better coverage
 		Sort:         "downloads",
 		Direction:    -1,
 		Limit:        limit,
 		FullResponse: true,
 	}
-	
+
 	return c.SearchModels(ctx, filters)
 }
 

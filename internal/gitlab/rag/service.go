@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -115,54 +116,6 @@ func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error 
 	return nil
 }
 
-// IndexCodeChunks indexes multiple code chunks in batch
-func (s *RAGService) IndexCodeChunks(ctx context.Context, chunks []CodeChunk) error {
-	if !s.enabled || len(chunks) == 0 {
-		return nil
-	}
-
-	// Generate embeddings in batch
-	contents := make([]string, len(chunks))
-	for i, chunk := range chunks {
-		contents[i] = chunk.Content
-	}
-
-	embeddings, err := s.embedder.GenerateEmbeddings(ctx, contents)
-	if err != nil {
-		return fmt.Errorf("generate embeddings: %w", err)
-	}
-
-	// Create points
-	points := make([]Point, len(chunks))
-	for i, chunk := range chunks {
-		pointID := generatePointID(chunk.ProjectID, chunk.FilePath, chunk.ChunkIndex)
-		points[i] = Point{
-			ID:     pointID,
-			Vector: Float32ToFloat64(embeddings[i]),
-			Payload: map[string]interface{}{
-				"project_id":    chunk.ProjectID,
-				"file_path":     chunk.FilePath,
-				"chunk_index":   chunk.ChunkIndex,
-				"language":      chunk.Language,
-				"content":       chunk.Content,
-				"start_line":    chunk.StartLine,
-				"end_line":      chunk.EndLine,
-				"function_name": chunk.FunctionName,
-				"class_name":    chunk.ClassName,
-				"commit_sha":    chunk.CommitSHA,
-				"branch_name":   chunk.BranchName,
-				"last_updated":  chunk.LastUpdated,
-			},
-		}
-	}
-
-	if err := s.qdrant.UpsertPoints(ctx, points); err != nil {
-		return fmt.Errorf("upsert points: %w", err)
-	}
-
-	s.logger.WithField("count", len(chunks)).Info("Indexed code chunks")
-	return nil
-}
 
 // FindSimilarCode finds code chunks similar to the given query
 // FindSimilarCode finds code similar to the query
@@ -260,6 +213,128 @@ func (s *RAGService) DeleteFileIndex(ctx context.Context, projectID, filePath st
 	return s.qdrant.DeleteByFile(ctx, projectID, filePath)
 }
 
+// DeleteProjectBranchIndex removes all indexed code for a project+branch combination
+func (s *RAGService) DeleteProjectBranchIndex(ctx context.Context, projectID, branch string) error {
+	if !s.enabled {
+		return nil
+	}
+
+	return s.qdrant.DeleteByProjectBranch(ctx, projectID, branch)
+}
+
+// IndexCodeChunks indexes multiple code chunks in batch with optional embedding model override (default collection)
+func (s *RAGService) IndexCodeChunks(ctx context.Context, chunks []CodeChunk, embeddingModelAlias string) error {
+	return s.IndexCodeChunksToCollection(ctx, "", chunks, embeddingModelAlias)
+}
+
+// IndexCodeChunksToCollection indexes multiple code chunks to specified collection
+// If collectionName is empty, uses default collection from config
+func (s *RAGService) IndexCodeChunksToCollection(ctx context.Context, collectionName string, chunks []CodeChunk, embeddingModelAlias string) error {
+	if !s.enabled || len(chunks) == 0 {
+		return nil
+	}
+
+	// Extract content for batch embedding
+	contents := make([]string, 0, len(chunks))
+	validIndices := make([]int, 0, len(chunks))
+
+	for i, chunk := range chunks {
+		if strings.TrimSpace(chunk.Content) != "" {
+			contents = append(contents, chunk.Content)
+			validIndices = append(validIndices, i)
+		}
+	}
+
+	if len(contents) == 0 {
+		return nil
+	}
+
+	// Generate embeddings in batch
+	var embeddings [][]float32
+	var err error
+
+	if embeddingModelAlias != "" {
+		if overrideProvider, ok := s.embedder.(EmbeddingProviderWithModelOverride); ok {
+			embeddings, err = overrideProvider.GenerateEmbeddingsWithModel(ctx, contents, embeddingModelAlias)
+		} else {
+			embeddings, err = s.embedder.GenerateEmbeddings(ctx, contents)
+		}
+	} else {
+		embeddings, err = s.embedder.GenerateEmbeddings(ctx, contents)
+	}
+	if err != nil {
+		return fmt.Errorf("generate embeddings: %w", err)
+	}
+
+	// Create points for Qdrant
+	points := make([]Point, 0, len(embeddings))
+	for i, embedding := range embeddings {
+		if embedding == nil || len(embedding) == 0 {
+			continue
+		}
+
+		chunkIdx := validIndices[i]
+		chunk := chunks[chunkIdx]
+
+		pointID := generatePointID(chunk.ProjectID, chunk.FilePath, chunk.ChunkIndex)
+
+		// Convert LastUpdated to unix timestamp for storage
+		lastUpdated := chunk.LastUpdated.Unix()
+		if chunk.LastUpdated.IsZero() {
+			lastUpdated = time.Now().Unix()
+		}
+
+		point := Point{
+			ID:     pointID,
+			Vector: Float32ToFloat64(embedding),
+			Payload: map[string]interface{}{
+				"project_id":    chunk.ProjectID,
+				"file_path":     chunk.FilePath,
+				"chunk_index":   chunk.ChunkIndex,
+				"language":      chunk.Language,
+				"content":       chunk.Content,
+				"start_line":    chunk.StartLine,
+				"end_line":      chunk.EndLine,
+				"function_name": chunk.FunctionName,
+				"class_name":    chunk.ClassName,
+				"commit_sha":    chunk.CommitSHA,
+				"branch_name":   chunk.BranchName,
+				"last_updated":  lastUpdated,
+			},
+		}
+		points = append(points, point)
+	}
+
+	if len(points) == 0 {
+		return nil
+	}
+
+	// Upsert to Qdrant (use specified collection or default)
+	if collectionName != "" {
+		if err := s.qdrant.UpsertPointsToCollection(ctx, collectionName, points); err != nil {
+			return fmt.Errorf("upsert points to %s: %w", collectionName, err)
+		}
+	} else {
+		if err := s.qdrant.UpsertPoints(ctx, points); err != nil {
+			return fmt.Errorf("upsert points: %w", err)
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"points":     len(points),
+		"collection": collectionName,
+	}).Debug("Indexed code chunks")
+	return nil
+}
+
+// EnsureCollectionNamed creates the specified collection if it doesn't exist
+func (s *RAGService) EnsureCollectionNamed(ctx context.Context, collectionName string) error {
+	if !s.enabled || s.qdrant == nil {
+		return nil
+	}
+	return s.qdrant.EnsureCollectionNamed(ctx, collectionName)
+}
+
 // GetContextForReview retrieves relevant code context for MR review
 // embeddingModelAlias is optional - if provided, uses that specific model for embeddings
 func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, changedFiles []ChangedFile, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
@@ -322,19 +397,19 @@ func (s *RAGService) HealthCheck(ctx context.Context) error {
 
 // CodeChunk represents a chunk of code for indexing
 type CodeChunk struct {
-	ProjectID    string  `json:"project_id"`
-	FilePath     string  `json:"file_path"`
-	ChunkIndex   int     `json:"chunk_index"`
-	Language     string  `json:"language"`
-	Content      string  `json:"content"`
-	StartLine    int     `json:"start_line"`
-	EndLine      int     `json:"end_line"`
-	FunctionName string  `json:"function_name,omitempty"`
-	ClassName    string  `json:"class_name,omitempty"`
-	CommitSHA    string  `json:"commit_sha,omitempty"`
-	BranchName   string  `json:"branch_name,omitempty"`
-	LastUpdated  int64   `json:"last_updated,omitempty"`
-	Score        float32 `json:"score,omitempty"` // Similarity score (for search results)
+	ProjectID    string    `json:"project_id"`
+	FilePath     string    `json:"file_path"`
+	ChunkIndex   int       `json:"chunk_index"`
+	Language     string    `json:"language"`
+	Content      string    `json:"content"`
+	StartLine    int       `json:"start_line"`
+	EndLine      int       `json:"end_line"`
+	FunctionName string    `json:"function_name,omitempty"`
+	ClassName    string    `json:"class_name,omitempty"`
+	CommitSHA    string    `json:"commit_sha,omitempty"`
+	BranchName   string    `json:"branch_name,omitempty"`
+	LastUpdated  time.Time `json:"last_updated,omitempty"`
+	Score        float32   `json:"score,omitempty"` // Similarity score (for search results)
 }
 
 // ChangedFile represents a file changed in an MR
@@ -396,5 +471,13 @@ func FormatContextForPrompt(chunks []CodeChunk) string {
 	}
 
 	return sb.String()
+}
+
+// GetCollectionStats returns statistics for a specific collection
+func (s *RAGService) GetCollectionStats(ctx context.Context, collectionName string) (*CollectionStats, error) {
+	if !s.enabled || s.qdrant == nil {
+		return nil, fmt.Errorf("rag service not enabled")
+	}
+	return s.qdrant.GetCollectionStats(ctx, collectionName)
 }
 

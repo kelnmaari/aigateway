@@ -6,6 +6,7 @@
 	import { authApi } from '$lib/api';
 	import { cn } from '$lib/utils';
 	import { Eye, EyeOff, Loader2, CheckCircle, XCircle } from 'lucide-svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	// Get invitation token from URL if present
 	let invitationToken = $state('');
@@ -34,7 +35,8 @@
 		passwordRequirements.minLength &&
 			passwordRequirements.hasUppercase &&
 			passwordRequirements.hasLowercase &&
-			passwordRequirements.hasNumber
+			passwordRequirements.hasNumber &&
+			passwordRequirements.hasSpecial
 	);
 
 	const passwordsMatch = $derived(password === confirmPassword && password.length > 0);
@@ -111,7 +113,7 @@
 </script>
 
 <svelte:head>
-	<title>Register - AIGateway</title>
+	<title>{m.auth_register()} - AIGateway</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
@@ -123,8 +125,8 @@
 			>
 				🤖
 			</div>
-			<h1 class="text-2xl font-bold text-foreground">Create Account</h1>
-			<p class="mt-2 text-muted-foreground">Join AIGateway</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.auth_create_account()}</h1>
+			<p class="mt-2 text-muted-foreground">{m.auth_join()}</p>
 		</div>
 
 		<!-- Register Form -->
@@ -132,7 +134,7 @@
 			{#if validatingInvitation}
 				<div class="flex items-center justify-center gap-2 py-8 text-muted-foreground">
 					<Loader2 class="h-5 w-5 animate-spin" />
-					Validating invitation...
+					{m.auth_validating()}
 				</div>
 			{:else}
 				<form onsubmit={handleSubmit} class="space-y-4">
@@ -144,12 +146,12 @@
 
 					{#if invitationEmail}
 						<div class="rounded-lg bg-primary/10 p-3 text-sm text-primary">
-							Registering with invitation for: {invitationEmail}
+							{m.auth_register_with_invitation({ email: invitationEmail })}
 						</div>
 					{/if}
 
 					<div class="space-y-2">
-						<label for="username" class="text-sm font-medium text-foreground"> Username </label>
+						<label for="username" class="text-sm font-medium text-foreground">{m.auth_username()}</label>
 						<input
 							id="username"
 							type="text"
@@ -166,12 +168,12 @@
 							)}
 						/>
 						<p class="text-xs text-muted-foreground">
-							Letters, numbers, underscores and dashes only
+							{m.auth_username_hint()}
 						</p>
 					</div>
 
 					<div class="space-y-2">
-						<label for="email" class="text-sm font-medium text-foreground"> Email </label>
+						<label for="email" class="text-sm font-medium text-foreground">{m.auth_email()}</label>
 						<input
 							id="email"
 							type="email"
@@ -190,13 +192,13 @@
 
 					<div class="space-y-2">
 						<label for="fullname" class="text-sm font-medium text-foreground">
-							Full Name <span class="text-muted-foreground">(optional)</span>
+							{m.auth_fullName()} <span class="text-muted-foreground">({m.auth_optional()})</span>
 						</label>
 						<input
 							id="fullname"
 							type="text"
 							bind:value={fullName}
-							placeholder="John Doe"
+							placeholder={m.placeholder_full_name()}
 							class={cn(
 								'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
 								'placeholder:text-muted-foreground',
@@ -206,13 +208,13 @@
 					</div>
 
 					<div class="space-y-2">
-						<label for="password" class="text-sm font-medium text-foreground"> Password </label>
+						<label for="password" class="text-sm font-medium text-foreground">{m.auth_password()}</label>
 						<div class="relative">
 							<input
 								id="password"
 								type={showPassword ? 'text' : 'password'}
 								bind:value={password}
-								placeholder="Create a strong password"
+								placeholder={m.placeholder_strong_password()}
 								required
 								minlength="8"
 								class={cn(
@@ -243,7 +245,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.minLength ? 'text-green-500' : 'text-muted-foreground'}>
-									At least 8 characters
+									{m.auth_pass_min_length()}
 								</span>
 							</div>
 							<div class="flex items-center gap-1.5">
@@ -253,7 +255,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasUppercase ? 'text-green-500' : 'text-muted-foreground'}>
-									One uppercase letter
+									{m.auth_pass_uppercase()}
 								</span>
 							</div>
 							<div class="flex items-center gap-1.5">
@@ -263,7 +265,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasLowercase ? 'text-green-500' : 'text-muted-foreground'}>
-									One lowercase letter
+									{m.auth_pass_lowercase()}
 								</span>
 							</div>
 							<div class="flex items-center gap-1.5">
@@ -273,7 +275,17 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasNumber ? 'text-green-500' : 'text-muted-foreground'}>
-									One number
+									{m.auth_pass_number()}
+								</span>
+							</div>
+							<div class="flex items-center gap-1.5">
+								{#if passwordRequirements.hasSpecial}
+									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+								{:else}
+									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+								{/if}
+								<span class={passwordRequirements.hasSpecial ? 'text-green-500' : 'text-muted-foreground'}>
+									{m.auth_pass_special()}
 								</span>
 							</div>
 						</div>
@@ -281,13 +293,13 @@
 
 					<div class="space-y-2">
 						<label for="confirm-password" class="text-sm font-medium text-foreground">
-							Confirm Password
+							{m.auth_confirmPassword()}
 						</label>
 						<input
 							id="confirm-password"
 							type="password"
 							bind:value={confirmPassword}
-							placeholder="Confirm your password"
+							placeholder={m.placeholder_confirm_password()}
 							required
 							class={cn(
 								'w-full rounded-lg border bg-background px-3 py-2 text-sm',
@@ -299,20 +311,20 @@
 							)}
 						/>
 						{#if confirmPassword.length > 0 && !passwordsMatch}
-							<p class="text-xs text-destructive">Passwords do not match</p>
+							<p class="text-xs text-destructive">{m.auth_passwords_no_match()}</p>
 						{/if}
 					</div>
 
 					{#if !invitationToken}
 						<div class="space-y-2">
 							<label for="invitation" class="text-sm font-medium text-foreground">
-								Invitation Code <span class="text-muted-foreground">(if required)</span>
+								{m.auth_invitation_code()} <span class="text-muted-foreground">({m.auth_invitation_required()})</span>
 							</label>
 							<input
 								id="invitation"
 								type="text"
 								bind:value={invitationToken}
-								placeholder="Enter invitation code"
+								placeholder={m.placeholder_invitation_code()}
 								class={cn(
 									'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
 									'placeholder:text-muted-foreground',
@@ -333,23 +345,23 @@
 					>
 						{#if loading}
 							<Loader2 class="h-4 w-4 animate-spin" />
-							Creating account...
+							{m.auth_creating()}
 						{:else}
-							Create Account
+							{m.auth_create_account()}
 						{/if}
 					</button>
 				</form>
 			{/if}
 
 			<div class="mt-6 text-center text-sm text-muted-foreground">
-				Already have an account?
-				<a href="/login" class="font-medium text-primary hover:underline">Sign in</a>
+				{m.auth_hasAccount()}
+				<a href="/login" class="font-medium text-primary hover:underline">{m.auth_login()}</a>
 			</div>
 		</div>
 
 		<!-- Footer -->
 		<p class="mt-8 text-center text-xs text-muted-foreground">
-			By creating an account, you agree to our Terms of Service
+			{m.auth_agree_terms()}
 		</p>
 	</div>
 </div>

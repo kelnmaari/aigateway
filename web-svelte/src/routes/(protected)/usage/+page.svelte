@@ -55,12 +55,12 @@
 	<title>{m.nav_usage()} | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-8 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">{m.nav_usage()}</h1>
-			<p class="mt-1 text-muted-foreground">Track your API usage and token consumption</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.usage_title()}</h1>
+			<p class="mt-1 text-muted-foreground">{m.usage_subtitle()}</p>
 		</div>
 		<div class="flex items-center gap-2">
 			<!-- Period Selector -->

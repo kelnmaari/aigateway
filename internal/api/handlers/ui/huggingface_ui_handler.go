@@ -67,8 +67,9 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	var library string
 	switch providerFilter {
 	case "llama.cpp":
-		// GGUF models for llama.cpp
-		tags = append(tags, "gguf")
+		// GGUF models for llama.cpp - use library filter instead of tag
+		// Many GGUF repos don't have the "gguf" tag but are indexed as gguf library
+		library = "gguf"
 	case "vllm", "sglang", "tgi":
 		// Transformer models for vLLM/SGLang/TGI
 		tags = append(tags, "text-generation")
@@ -113,6 +114,15 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		}
 		h.renderError(c, "Failed to search models: "+err.Error())
 		return
+	}
+	
+	// For llama.cpp filter, library=gguf was already passed to API
+	// All returned models should be GGUF models, mark them as such
+	if providerFilter == "llama.cpp" {
+		for i := range models {
+			models[i].HasGGUF = true // API with library=gguf only returns GGUF models
+		}
+		h.logger.WithField("count", len(models)).Debug("Marked all models as GGUF (library=gguf filter applied)")
 	}
 	
 	// Check if JSON response is requested (SvelteKit frontend)
@@ -283,6 +293,18 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	category := c.DefaultQuery("category", "all")
 	providerFilter := c.DefaultQuery("provider", "all")
 	
+	// Pagination parameters
+	limitStr := c.DefaultQuery("limit", "30")
+	pageStr := c.DefaultQuery("page", "1")
+	limit, _ := strconv.Atoi(limitStr)
+	page, _ := strconv.Atoi(pageStr)
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	if page <= 0 {
+		page = 1
+	}
+	
 	var search string
 	var additionalTags []string
 	
@@ -312,7 +334,8 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	var library string
 	switch providerFilter {
 	case "llama.cpp":
-		baseTags = []string{"gguf"}
+		// Use library=gguf instead of tag for better coverage
+		library = "gguf"
 	case "vllm", "sglang", "tgi":
 		baseTags = []string{"text-generation"}
 		library = "transformers"
@@ -329,7 +352,8 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		Library:      library,
 		Sort:         "downloads",
 		Direction:    -1,
-		Limit:        20,
+		Limit:        limit,
+		Page:         page,
 		FullResponse: true,
 		CardData:     true,
 	}
@@ -344,6 +368,14 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		}
 		h.renderError(c, "Failed to load popular models: "+err.Error())
 		return
+	}
+	
+	// For llama.cpp filter, library=gguf was already passed to API
+	// All returned models are GGUF models, mark them as such
+	if providerFilter == "llama.cpp" {
+		for i := range models {
+			models[i].HasGGUF = true
+		}
 	}
 	
 	// Check if JSON response is requested (SvelteKit frontend)

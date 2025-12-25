@@ -3,6 +3,7 @@ package inference
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -41,6 +42,9 @@ type DockerRuntime struct {
 
 	// Log streaming goroutine cancellation
 	logCancels map[string]context.CancelFunc
+
+	// Track images currently being pulled
+	pullingImages sync.Map // image name -> struct{}{}
 }
 
 // DockerRuntimeConfig holds runtime options.
@@ -368,6 +372,18 @@ func newDockerAPIClient() (*client.Client, error) {
 	return client.NewClientWithOpts(client.WithHost(host), client.WithAPIVersionNegotiation())
 }
 
+// pullProgress represents Docker pull progress message
+type pullProgress struct {
+	Status         string `json:"status"`
+	ID             string `json:"id"`
+	Progress       string `json:"progress"`
+	ProgressDetail struct {
+		Current int64 `json:"current"`
+		Total   int64 `json:"total"`
+	} `json:"progressDetail"`
+	Error string `json:"error"`
+}
+
 func (r *DockerRuntime) pullImageAPI(ctx context.Context, image string) error {
 	if image == "" {
 		return fmt.Errorf("image is empty")
@@ -378,12 +394,43 @@ func (r *DockerRuntime) pullImageAPI(ctx context.Context, image string) error {
 		return fmt.Errorf("docker api pull: %w", err)
 	}
 	defer out.Close()
-	// Must read the entire response to wait for pull completion
-	buf := make([]byte, 8192)
+
+	// Parse and log progress
+	decoder := json.NewDecoder(out)
+	lastLog := time.Now()
 	for {
-		_, readErr := out.Read(buf)
-		if readErr != nil {
-			break
+		var progress pullProgress
+		if err := decoder.Decode(&progress); err != nil {
+			if err == io.EOF {
+				break
+			}
+			// Continue on parse errors
+			continue
+		}
+
+		// Check for error in response
+		if progress.Error != "" {
+			return fmt.Errorf("docker pull error: %s", progress.Error)
+		}
+
+		// Log progress periodically (every 5 seconds) to avoid spam
+		if time.Since(lastLog) >= 5*time.Second {
+			if progress.ProgressDetail.Total > 0 {
+				pct := float64(progress.ProgressDetail.Current) / float64(progress.ProgressDetail.Total) * 100
+				r.logger.WithFields(logrus.Fields{
+					"image":    image,
+					"layer":    progress.ID,
+					"status":   progress.Status,
+					"progress": fmt.Sprintf("%.1f%%", pct),
+				}).Debug("Docker image pull progress")
+			} else if progress.Status != "" {
+				r.logger.WithFields(logrus.Fields{
+					"image":  image,
+					"layer":  progress.ID,
+					"status": progress.Status,
+				}).Debug("Docker image pull progress")
+			}
+			lastLog = time.Now()
 		}
 	}
 	r.logger.WithField("image", image).Info("Docker image pulled successfully")
@@ -666,6 +713,10 @@ func formatSize(bytes int64) string {
 
 // PullImage pulls a Docker image. This is a blocking operation.
 func (r *DockerRuntime) PullImage(image string) error {
+	// Mark image as pulling
+	r.pullingImages.Store(image, struct{}{})
+	defer r.pullingImages.Delete(image)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -673,6 +724,12 @@ func (r *DockerRuntime) PullImage(image string) error {
 		return r.pullImageAPI(ctx, image)
 	}
 	return r.pullImageCLI(ctx, image)
+}
+
+// IsPulling returns true if the image is currently being pulled.
+func (r *DockerRuntime) IsPulling(image string) bool {
+	_, ok := r.pullingImages.Load(image)
+	return ok
 }
 
 // DiscoveredContainer holds info about a discovered running container.

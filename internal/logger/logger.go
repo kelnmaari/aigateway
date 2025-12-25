@@ -257,7 +257,7 @@ func setupErrorLogHook(cfg config.LoggingConfig, formatter logrus.Formatter) *Er
 // Поддерживает ротацию при старте (переименование в -previous) и по размеру (lumberjack)
 func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
 	logger := logrus.New()
-	
+
 	// Настройка уровня логирования
 	level, err := logrus.ParseLevel(levelStr)
 	if err != nil {
@@ -265,13 +265,13 @@ func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
 		level = logrus.InfoLevel
 	}
 	logger.SetLevel(level)
-	
+
 	// Форматирование логов
 	logger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05",
 	})
-	
+
 	// Создаем директорию если не существует
 	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -280,13 +280,13 @@ func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
 			return logger
 		}
 	}
-	
+
 	// 🔄 Ротация предыдущего лога при старте (как у основного логгера)
 	if err := rotatePreviousLog(filePath); err != nil {
 		// Не критично - продолжаем работу
 		logrus.WithError(err).WithField("file", filePath).Debug("Failed to rotate previous log")
 	}
-	
+
 	// Настройка ротации логов по размеру
 	fileWriter := &lumberjack.Logger{
 		Filename:   filePath,
@@ -295,10 +295,94 @@ func NewFileLogger(filePath string, levelStr string) *logrus.Logger {
 		MaxAge:     14,   // Удалять старше 14 дней
 		Compress:   true, // Сжимать старые логи
 	}
-	
+
 	// Multi-writer: file + stdout
 	multiWriter := io.MultiWriter(fileWriter, os.Stdout)
 	logger.SetOutput(multiWriter)
-	
+
 	return logger
+}
+
+// NewFileOnlyLogger создает logger который пишет ТОЛЬКО в файл (без stdout)
+// Используется для HTTP и Metrics логов чтобы не засорять основной вывод
+func NewFileOnlyLogger(filePath string, levelStr string) *logrus.Logger {
+	logger := logrus.New()
+
+	// Настройка уровня логирования
+	level, err := logrus.ParseLevel(levelStr)
+	if err != nil {
+		level = logrus.DebugLevel
+	}
+	logger.SetLevel(level)
+
+	// Форматирование логов
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05",
+	})
+
+	// Создаем директорию если не существует
+	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			logrus.WithError(err).Warn("Failed to create log directory for separate log")
+			// Возвращаем nil logger - не критично
+			logger.SetOutput(io.Discard)
+			return logger
+		}
+	}
+
+	// 🔄 Ротация предыдущего лога при старте
+	if err := rotatePreviousLog(filePath); err != nil {
+		logrus.WithError(err).WithField("file", filePath).Debug("Failed to rotate previous log")
+	}
+
+	// Настройка ротации логов по размеру
+	fileWriter := &lumberjack.Logger{
+		Filename:   filePath,
+		MaxSize:    100,  // MB
+		MaxBackups: 5,    // Хранить 5 старых файлов
+		MaxAge:     7,    // Удалять старше 7 дней
+		Compress:   true, // Сжимать старые логи
+	}
+
+	// Только файл, без stdout
+	logger.SetOutput(fileWriter)
+
+	return logger
+}
+
+// Loggers содержит все логгеры приложения
+type Loggers struct {
+	Main    *logrus.Logger // Основной логгер
+	HTTP    *logrus.Logger // Логгер для HTTP запросов (отдельный файл)
+	Metrics *logrus.Logger // Логгер для GPU/performance метрик (отдельный файл)
+}
+
+// SetupAll настраивает все логгеры согласно конфигурации
+func SetupAll(cfg *config.Config) *Loggers {
+	loggers := &Loggers{
+		Main: Setup(cfg),
+	}
+
+	// HTTP логгер
+	if cfg.Logging.HTTPLogEnabled {
+		httpLogPath := cfg.Logging.HTTPLogFilePath
+		if httpLogPath == "" {
+			httpLogPath = "logs/http.log"
+		}
+		loggers.HTTP = NewFileOnlyLogger(httpLogPath, cfg.Logging.Level)
+		loggers.Main.WithField("http_log_file", httpLogPath).Info("Separate HTTP log file configured")
+	}
+
+	// Metrics логгер (GPU + performance)
+	if cfg.Logging.MetricsLogEnabled {
+		metricsLogPath := cfg.Logging.MetricsLogFilePath
+		if metricsLogPath == "" {
+			metricsLogPath = "logs/metrics.log"
+		}
+		loggers.Metrics = NewFileOnlyLogger(metricsLogPath, cfg.Logging.Level)
+		loggers.Main.WithField("metrics_log_file", metricsLogPath).Info("Separate metrics log file configured")
+	}
+
+	return loggers
 }

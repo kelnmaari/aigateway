@@ -33,6 +33,7 @@ export interface GitLabProject {
   gitlab_project_id: number;
   name: string;
   path_with_namespace: string;
+  default_branch?: string;
   webhook_id?: number;
   status: 'active' | 'disabled' | 'error';
   auto_review: boolean;
@@ -40,10 +41,27 @@ export interface GitLabProject {
   embedding_model_id: string;
   review_prompt?: string;
   settings: GitLabProjectSettings;
+  index_status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+  last_indexed_at?: string;
   created_at: string;
   updated_at: string;
   integration_name?: string;
   review_count?: number;
+  // Index statistics (computed from Qdrant)
+  index_chunks?: number;
+  index_vectors?: number;
+}
+
+export interface GitLabIndexStatus {
+  project_id: string;
+  branch: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  files_indexed: number;
+  chunks_total: number;
+  last_indexed?: string;
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export interface GitLabProjectSettings {
@@ -57,6 +75,7 @@ export interface GitLabProjectSettings {
   chunk_overlap?: number;
   target_branches?: string[];
   ignore_branches?: string[];
+  collection_name?: string; // Qdrant collection name
 }
 
 export interface GitLabReview {
@@ -308,6 +327,29 @@ export const gitlabApi = {
       method: 'POST',
       body: { webhook_url: webhookUrl },
     });
+  },
+
+  // Indexing
+  async startIndexing(projectId: string, options?: { branch?: string; force?: boolean }): Promise<{ 
+    message: string; 
+    project_id: string; 
+    branch: string; 
+    status: string 
+  }> {
+    return apiRequest(`/projects/${projectId}/index`, {
+      method: 'POST',
+      body: options || {},
+    });
+  },
+
+  async getIndexStatus(projectId: string, branch?: string): Promise<GitLabIndexStatus> {
+    const params = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+    return apiRequest(`/projects/${projectId}/index/status${params}`);
+  },
+
+  async deleteIndex(projectId: string, branch?: string): Promise<{ message: string }> {
+    const params = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+    return apiRequest(`/projects/${projectId}/index${params}`, { method: 'DELETE' });
   },
 
   // Reviews

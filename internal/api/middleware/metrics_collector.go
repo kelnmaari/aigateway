@@ -13,9 +13,24 @@ import (
 	"aigateway/internal/metrics"
 )
 
+// MetricsCollectorConfig конфигурация для MetricsCollector middleware
+type MetricsCollectorConfig struct {
+	Storage        *metrics.MetricsStorage
+	Logger         *logrus.Logger // Основной логгер (для ошибок)
+	DetailedLogger *logrus.Logger // Логгер для детальных метрик (в отдельный файл)
+}
+
 // MetricsCollector middleware собирает детальные метрики для каждого запроса
 // и записывает их в MetricsStorage для historical analysis
 func MetricsCollector(storage *metrics.MetricsStorage, logger *logrus.Logger) gin.HandlerFunc {
+	return MetricsCollectorWithConfig(MetricsCollectorConfig{
+		Storage: storage,
+		Logger:  logger,
+	})
+}
+
+// MetricsCollectorWithConfig middleware с расширенной конфигурацией
+func MetricsCollectorWithConfig(cfg MetricsCollectorConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Пропускаем health checks, stats endpoints, UI endpoints и статические файлы
 		path := c.Request.URL.Path
@@ -24,7 +39,7 @@ func MetricsCollector(storage *metrics.MetricsStorage, logger *logrus.Logger) gi
 			path == "/api/metrics/history" || path == "/api/metrics/recent" ||
 			path == "/api/metrics/stats" || path == "/api/metrics/stats/all" ||
 			path == "/ws" ||
-			strings.HasPrefix(path, "/api/ui/") {  // v3.0.6+: Skip UI endpoints
+			strings.HasPrefix(path, "/api/ui/") { // v3.0.6+: Skip UI endpoints
 			c.Next()
 			return
 		}
@@ -32,8 +47,8 @@ func MetricsCollector(storage *metrics.MetricsStorage, logger *logrus.Logger) gi
 		startTime := time.Now()
 
 		// Увеличиваем счетчик активных запросов
-		storage.IncrementActiveRequests()
-		defer storage.DecrementActiveRequests()
+		cfg.Storage.IncrementActiveRequests()
+		defer cfg.Storage.DecrementActiveRequests()
 
 		// Измеряем размер запроса
 		var requestSize int64
@@ -63,26 +78,32 @@ func MetricsCollector(storage *metrics.MetricsStorage, logger *logrus.Logger) gi
 
 		// Записываем метрики (в миллисекундах с дробной частью)
 		latencyMs := float64(latency.Microseconds()) / 1000.0
-		storage.RecordLatency(int64(latencyMs))
-		storage.RecordRequestSize(requestSize)
-		storage.RecordResponseSize(responseSize)
+		cfg.Storage.RecordLatency(int64(latencyMs))
+		cfg.Storage.RecordRequestSize(requestSize)
+		cfg.Storage.RecordResponseSize(responseSize)
 
 		// Подсчитываем успешные и ошибочные запросы
 		if statusCode >= 200 && statusCode < 300 {
-			storage.IncrementRequestCount()
+			cfg.Storage.IncrementRequestCount()
 		} else if statusCode >= 400 {
-			storage.IncrementErrorCount()
+			cfg.Storage.IncrementErrorCount()
 		}
 
-		// Логируем для отладки
-		logger.WithFields(logrus.Fields{
-			"method":        c.Request.Method,
-			"path":          path,
-			"status":        statusCode,
-			"latency_ms":    latencyMs,
-			"request_size":  requestSize,
-			"response_size": responseSize,
-		}).Info("Metrics collected")
+		// Детальные логи в отдельный файл (если настроен)
+		logTarget := cfg.DetailedLogger
+		if logTarget == nil {
+			logTarget = cfg.Logger
+		}
+		if logTarget != nil {
+			logTarget.WithFields(logrus.Fields{
+				"method":        c.Request.Method,
+				"path":          path,
+				"status":        statusCode,
+				"latency_ms":    latencyMs,
+				"request_size":  requestSize,
+				"response_size": responseSize,
+			}).Debug("Metrics collected")
+		}
 	}
 }
 

@@ -679,6 +679,7 @@ func (h *InferenceHandler) GetDockerImages(c *gin.Context) {
 		exists, size := runtime.ImageExists(images[i].Image)
 		images[i].Exists = exists
 		images[i].Size = size
+		images[i].Pulling = runtime.IsPulling(images[i].Image)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"images": images})
@@ -699,12 +700,26 @@ func (h *InferenceHandler) PostPullDockerImage(c *gin.Context) {
 		return
 	}
 
+	// Check if already pulling
+	if runtime.IsPulling(image) {
+		c.JSON(http.StatusConflict, gin.H{"error": "image is already being pulled", "image": image})
+		return
+	}
+
 	// Pull in background and return immediately
 	go func() {
+		h.logger.WithField("image", image).Info("Starting Docker image pull")
+		startTime := time.Now()
 		if err := runtime.PullImage(image); err != nil {
-			h.logger.WithError(err).WithField("image", image).Error("Failed to pull Docker image")
+			h.logger.WithError(err).WithFields(map[string]interface{}{
+				"image":    image,
+				"duration": time.Since(startTime).String(),
+			}).Error("Failed to pull Docker image")
 		} else {
-			h.logger.WithField("image", image).Info("Docker image pulled successfully")
+			h.logger.WithFields(map[string]interface{}{
+				"image":    image,
+				"duration": time.Since(startTime).String(),
+			}).Info("Docker image pulled successfully")
 		}
 	}()
 

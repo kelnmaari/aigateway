@@ -129,7 +129,7 @@
 							<span class="w-full border-t"></span>
 						</div>
 						<div class="relative flex justify-center text-xs uppercase">
-							<span class="bg-background px-2 text-muted-foreground">or</span>
+							<span class="bg-background px-2 text-muted-foreground">{m.auth_or()}</span>
 						</div>
 					</div>
 
@@ -141,7 +141,7 @@
 						disabled={isLoading}
 					>
 						<KeyRound class="mr-2 h-4 w-4" />
-						Login with SSO
+						{m.auth_login_with_sso()}
 					</Button>
 				{/if}
 

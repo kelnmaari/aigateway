@@ -49,14 +49,14 @@
 	}
 
 	async function handleRevokeKey(key: AdminAPIKey) {
-		if (!confirm(`Revoke API key "${key.name}"?`)) return;
+		if (!confirm(m.admin_apikeys_revoke_confirm({ name: key.name }))) return;
 
 		try {
 			await api.patch(`/api/admin/keys/${key.id}/revoke`, {});
 			keys = keys.filter((k) => k.id !== key.id);
 		} catch (error) {
 			console.error('Failed to revoke key:', error);
-			alert('Failed to revoke API key');
+			alert(m.alert_failed_revoke_apikey());
 		}
 		showMenuFor = null;
 	}
@@ -69,13 +69,13 @@
 
 <div class="space-y-6">
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-		<h2 class="text-lg font-semibold">All API Keys</h2>
+		<h2 class="text-lg font-semibold">{m.admin_apikeys_title()}</h2>
 		<form onsubmit={(e) => { e.preventDefault(); handleSearch(); }} class="relative">
 			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 			<input
 				type="text"
 				bind:value={search}
-				placeholder="Search keys..."
+				placeholder={m.admin_apikeys_search()}
 				class="w-64 rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 			/>
 		</form>
@@ -88,7 +88,7 @@
 	{:else if keys.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
 			<Key class="mx-auto h-12 w-12 text-muted-foreground/40" />
-			<p class="mt-4 text-muted-foreground">No API keys found</p>
+			<p class="mt-4 text-muted-foreground">{m.admin_apikeys_empty()}</p>
 		</div>
 	{:else}
 		<div class="overflow-hidden rounded-lg border border-border">
@@ -99,16 +99,16 @@
 							{m.common_name()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Key
+							{m.admin_apikeys_key()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Owner
+							{m.admin_apikeys_owner()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
 							{m.common_status()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Last Used
+							{m.admin_apikeys_last_used()}
 						</th>
 						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">
 							{m.common_actions()}
@@ -142,7 +142,7 @@
 								{:else if key.username}
 									{key.username}
 								{:else}
-									<span class="text-muted-foreground">Unknown</span>
+									<span class="text-muted-foreground">{m.admin_apikeys_unknown()}</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3">
@@ -158,7 +158,7 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
-								{key.last_used_at ? formatRelativeTime(key.last_used_at) : 'Never'}
+								{key.last_used_at ? formatRelativeTime(key.last_used_at) : m.admin_users_never()}
 							</td>
 							<td class="relative px-4 py-3 text-right">
 								<button
@@ -175,7 +175,7 @@
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
 										>
 											<Trash2 class="h-4 w-4" />
-											Revoke Key
+											{m.admin_apikeys_revoke()}
 										</button>
 									</div>
 								{/if}

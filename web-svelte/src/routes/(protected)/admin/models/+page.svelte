@@ -4,6 +4,7 @@
 	import { api } from '$lib/api/client';
 	import { downloadsApi } from '$lib/api/downloads';
 	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
+	import * as m from '$lib/paraglide/messages';
 	
 	// GPU devices for selection
 	let gpuDevices: GPUDevice[] = $state([]);
@@ -88,6 +89,12 @@
 	let hfSelectedModel = $state<HFModel | null>(null);
 	let hfModelFiles = $state<any[]>([]);
 	let hfRepoDebounce: ReturnType<typeof setTimeout> | undefined;
+	
+	// Pagination state
+	let hfCurrentPage = $state(1);
+	let hfHasMore = $state(true);
+	let hfLoadingMore = $state(false);
+	const HF_PAGE_SIZE = 30;
 	
 	// Selected model for details panel
 	let selectedModel = $state<ModelInfo | null>(null);
@@ -349,16 +356,36 @@
 		}
 	}
 	
-	async function loadPopularHF() {
-		hfSearching = true;
+	async function loadPopularHF(reset: boolean = true) {
+		if (reset) {
+			hfCurrentPage = 1;
+			hfPopularModels = [];
+			hfHasMore = true;
+			hfSearching = true;
+		} else {
+			hfLoadingMore = true;
+		}
 		try {
-			const res = await downloadsApi.getPopularModels(hfProviderFilter);
-			hfPopularModels = res.models || [];
+			const res = await downloadsApi.getPopularModels(hfProviderFilter, HF_PAGE_SIZE, hfCurrentPage);
+			const newModels = res.models || [];
+			if (reset) {
+				hfPopularModels = newModels;
+			} else {
+				hfPopularModels = [...hfPopularModels, ...newModels];
+			}
+			hfHasMore = newModels.length >= HF_PAGE_SIZE;
 		} catch (e: any) {
 			console.error('Failed to load popular models:', e);
 		} finally {
 			hfSearching = false;
+			hfLoadingMore = false;
 		}
+	}
+	
+	async function loadMoreModels() {
+		if (hfLoadingMore || !hfHasMore) return;
+		hfCurrentPage++;
+		await loadPopularHF(false);
 	}
 	
 	// Reload when provider filter changes
@@ -710,7 +737,7 @@
 	}
 
 	async function deleteModelArtifacts(alias: string) {
-		if (!confirm(`Удалить файлы модели ${alias}?`)) return;
+		if (!confirm(m.confirm_delete_model({ name: alias }))) return;
 		try {
 			await inferenceApi.deleteArtifacts(alias);
 			showMsg(`Артефакты ${alias} удалены`, 'success');
@@ -788,7 +815,7 @@
 	}
 
 	async function clearAllCache() {
-		if (!confirm(`Are you sure you want to clear ALL cache (${formatSize(totalCacheSize)})?\n\nThis will delete all downloaded models and cannot be undone.`)) {
+		if (!confirm(m.confirm_clear_cache({ size: formatSize(totalCacheSize) }))) {
 			return;
 		}
 		busy = true;
@@ -823,7 +850,7 @@
 	}
 
 	async function deleteTRTEngine(modelId: string) {
-		if (!confirm(`Удалить TRT engine для ${modelId}?`)) return;
+		if (!confirm(m.confirm_delete_trt({ name: modelId }))) return;
 		try {
 			await inferenceApi.deleteTRTEngine(modelId);
 			showMsg('TRT engine удалён', 'success');
@@ -879,8 +906,8 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold">Inference Models</h1>
-			<p class="text-sm text-muted-foreground">Multi-provider: vLLM, SGLang, TGI, TensorRT-LLM, llama.cpp</p>
+			<h1 class="text-2xl font-bold">{m.admin_models_title()}</h1>
+			<p class="text-sm text-muted-foreground">{m.admin_models_subtitle()}</p>
 		</div>
 		<button class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" onclick={refreshAll}>
 			Refresh
@@ -1166,7 +1193,7 @@
 						{:else}
 							{#each (models || []) as m}
 								{@const isSaved = savedModels.some(s => s.alias === m.alias)}
-								<div class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-4" onclick={() => selectModel(m)}>
+								<div class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-4" role="button" tabindex="0" onclick={() => selectModel(m)} onkeydown={(e) => e.key === 'Enter' && selectModel(m)}>
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-2">
 											<span class="font-semibold">{m.alias}</span>
@@ -1325,7 +1352,7 @@
 						<input 
 							type="text" 
 							class="w-full border rounded-md pl-10 pr-4 py-2 bg-background"
-							placeholder="Search {hfProviderFilters.find(c => c.id === hfProviderFilter)?.label || 'models'}..."
+							placeholder={m.placeholder_search_models()}
 							bind:value={hfSearchQuery}
 							onkeydown={(e) => e.key === 'Enter' && searchHF()}
 						/>
@@ -1376,7 +1403,10 @@
 						{#each getFilteredHFModels(hfSearchResults.length > 0 ? hfSearchResults : hfPopularModels) as m}
 							<div 
 								class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-3 {hfSelectedModel?.id === m.id ? 'bg-primary/10' : ''}"
+								role="button"
+								tabindex="0"
 								onclick={() => selectHFModel(m)}
+								onkeydown={(e) => e.key === 'Enter' && selectHFModel(m)}
 							>
 								<div class="flex-1 min-w-0">
 									<div class="font-medium truncate">{m.id}</div>
@@ -1425,6 +1455,24 @@
 								{/if}
 							</div>
 						{/each}
+						
+						<!-- Load More button -->
+						{#if hfSearchResults.length === 0 && hfHasMore && hfPopularModels.length > 0}
+							<div class="px-4 py-3 border-t">
+								<button
+									class="w-full py-2 px-4 rounded bg-muted hover:bg-muted/80 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+									onclick={loadMoreModels}
+									disabled={hfLoadingMore}
+								>
+									{#if hfLoadingMore}
+										<Loader2 class="h-4 w-4 animate-spin" />
+										{m.common_loading()}
+									{:else}
+										{m.common_loadMore()}
+									{/if}
+								</button>
+							</div>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -1476,6 +1524,15 @@
 											</div>
 										</div>
 									{/each}
+								</div>
+							</div>
+						{:else if hfProviderFilter === 'llama.cpp'}
+							<div class="p-3 rounded bg-yellow-500/10 border border-yellow-500/30 text-sm">
+								<div class="font-medium text-yellow-600 dark:text-yellow-400 mb-1">No GGUF files found</div>
+								<div class="text-muted-foreground text-xs">
+									This model doesn't contain GGUF quantized files. 
+									Use <strong>vLLM</strong> or <strong>SGLang</strong> provider instead, 
+									or find a GGUF quantized version (e.g., from TheBloke).
 								</div>
 							</div>
 						{/if}

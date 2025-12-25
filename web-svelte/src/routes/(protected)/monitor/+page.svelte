@@ -86,12 +86,12 @@
 	<title>System Monitor | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-8 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">System Monitor</h1>
-			<p class="mt-1 text-muted-foreground">Real-time system metrics and performance</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.monitor_title()}</h1>
+			<p class="mt-1 text-muted-foreground">{m.monitor_subtitle()}</p>
 		</div>
 		<Button variant="outline" onclick={loadMetrics} disabled={isLoading}>
 			<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />

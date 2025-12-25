@@ -79,7 +79,7 @@
 	}
 
 	async function handleDeleteConversation(id: string) {
-		if (!confirm('Delete this conversation?')) return;
+		if (!confirm(m.confirm_delete_conversation())) return;
 
 		try {
 			await chatApi.deleteConversation(id);
@@ -95,7 +95,7 @@
 
 	async function handleSendMessage(content: string) {
 		if (!chatStore.selectedModel) {
-			alert('Please select a model first');
+			alert(m.alert_select_model());
 			return;
 		}
 

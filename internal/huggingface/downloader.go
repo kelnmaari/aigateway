@@ -143,6 +143,38 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 	}
 	d.logger.WithField("dir", filepath.Dir(absDestPath)).Info("📂 Directory created/verified")
 
+	// Check if file already exists and is complete
+	if info, err := os.Stat(destPath); err == nil {
+		existingSize := info.Size()
+		if existingSize >= totalSize {
+			d.logger.WithFields(logrus.Fields{
+				"download_id":   downloadID,
+				"file_size":     existingSize,
+				"expected_size": totalSize,
+			}).Info("✅ File already exists and is complete, skipping download")
+			
+			now := time.Now()
+			return &Download{
+				ID:             downloadID,
+				ModelID:        modelID,
+				Filename:       filename,
+				DestPath:       destPath,
+				TotalSize:      totalSize,
+				DownloadedSize: totalSize,
+				Status:         DownloadStatusCompleted,
+				Progress:       100.0,
+				StartedAt:      &now,
+				CompletedAt:    &now,
+				Mu:             sync.RWMutex{},
+			}, nil
+		}
+		d.logger.WithFields(logrus.Fields{
+			"download_id":   downloadID,
+			"file_size":     existingSize,
+			"expected_size": totalSize,
+		}).Info("⚠️ File exists but incomplete, will re-download")
+	}
+
 	// Check for partial download
 	var downloadedSize int64
 	partPath := destPath + ".part"

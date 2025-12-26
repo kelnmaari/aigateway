@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -12,15 +13,41 @@ import (
 // Router resolves specs by alias or capability and ensures model is prepared/launched.
 type Router struct {
 	mgr *Manager
+	
+	// Per-alias locks to prevent concurrent container starts for same model
+	aliasLocks   map[string]*sync.Mutex
+	aliasLocksMu sync.Mutex
 }
 
 // NewRouter creates a Router for a Manager.
 func NewRouter(mgr *Manager) *Router {
-	return &Router{mgr: mgr}
+	return &Router{
+		mgr:        mgr,
+		aliasLocks: make(map[string]*sync.Mutex),
+	}
+}
+
+// getAliasLock returns or creates a mutex for the given alias
+func (r *Router) getAliasLock(alias string) *sync.Mutex {
+	r.aliasLocksMu.Lock()
+	defer r.aliasLocksMu.Unlock()
+	
+	if lock, ok := r.aliasLocks[alias]; ok {
+		return lock
+	}
+	lock := &sync.Mutex{}
+	r.aliasLocks[alias] = lock
+	return lock
 }
 
 // EnsureBySpec registers and launches a spec directly.
+// Uses per-alias locking to prevent multiple container starts for the same model.
 func (r *Router) EnsureBySpec(ctx context.Context, spec ModelSpec) (*ModelInstance, error) {
+	// Serialize access per alias to prevent race conditions
+	lock := r.getAliasLock(spec.Alias)
+	lock.Lock()
+	defer lock.Unlock()
+	
 	r.mgr.svc.RegisterSpec(spec)
 	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
@@ -30,11 +57,18 @@ func (r *Router) EnsureBySpec(ctx context.Context, spec ModelSpec) (*ModelInstan
 }
 
 // EnsureByAlias resolves alias and ensures container is running.
+// Uses per-alias locking to prevent multiple container starts for the same model.
 func (r *Router) EnsureByAlias(ctx context.Context, alias string) (*ModelInstance, error) {
 	spec, err := r.mgr.ResolveByAlias(alias)
 	if err != nil {
 		return nil, err
 	}
+	
+	// Serialize access per alias
+	lock := r.getAliasLock(alias)
+	lock.Lock()
+	defer lock.Unlock()
+	
 	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
 		r.mgr.touch(alias)
@@ -43,11 +77,18 @@ func (r *Router) EnsureByAlias(ctx context.Context, alias string) (*ModelInstanc
 }
 
 // EnsureByCapability picks first spec with capability and ensures it runs.
+// Uses per-alias locking to prevent multiple container starts for the same model.
 func (r *Router) EnsureByCapability(ctx context.Context, cap Capability) (*ModelInstance, error) {
 	spec, err := r.mgr.ResolveByCapability(cap)
 	if err != nil {
 		return nil, err
 	}
+	
+	// Serialize access per alias
+	lock := r.getAliasLock(spec.Alias)
+	lock.Lock()
+	defer lock.Unlock()
+	
 	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
 		r.mgr.touch(spec.Alias)

@@ -804,10 +804,12 @@ func (h *InferenceHandler) PostPullDockerImage(c *gin.Context) {
 }
 
 // POST /api/system/inference/download-repo
-// Downloads all files for a HuggingFace repository locally for offline use.
+// Downloads files for a HuggingFace repository locally for offline use.
+// If filename is specified, downloads only that file. Otherwise downloads all model files.
 func (h *InferenceHandler) PostDownloadRepository(c *gin.Context) {
 	var req struct {
-		ModelID string `json:"model_id" binding:"required"`
+		ModelID  string `json:"model_id" binding:"required"`
+		Filename string `json:"filename"` // Optional: specific file to download
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -820,6 +822,36 @@ func (h *InferenceHandler) PostDownloadRepository(c *gin.Context) {
 		return
 	}
 
+	// If specific filename provided, download only that file
+	if req.Filename != "" {
+		h.logger.WithFields(logrus.Fields{
+			"model_id": req.ModelID,
+			"filename": req.Filename,
+		}).Info("Starting single file download")
+
+		repoDownload, err := downloader.DownloadSingleFile(c.Request.Context(), req.ModelID, req.Filename)
+		if err != nil {
+			h.logger.WithError(err).WithFields(logrus.Fields{
+				"model_id": req.ModelID,
+				"filename": req.Filename,
+			}).Error("Failed to start file download")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusAccepted, gin.H{
+			"message":     "File download started",
+			"model_id":    req.ModelID,
+			"filename":    req.Filename,
+			"download_id": repoDownload.ID,
+			"total_files": repoDownload.TotalFiles,
+			"total_size":  repoDownload.TotalSize,
+			"local_path":  repoDownload.LocalPath,
+		})
+		return
+	}
+
+	// Download all model files
 	h.logger.WithField("model_id", req.ModelID).Info("Starting repository download")
 
 	repoDownload, err := downloader.DownloadRepository(c.Request.Context(), req.ModelID)
@@ -852,11 +884,13 @@ func (h *InferenceHandler) GetRepoDownloads(c *gin.Context) {
 	c.JSON(http.StatusOK, downloads)
 }
 
-// GET /api/system/inference/repo-downloads/:model_id
+// POST /api/system/inference/repo-downloads/status
 // Gets status of a specific repository download.
 func (h *InferenceHandler) GetRepoDownloadStatus(c *gin.Context) {
-	modelID := c.Param("model_id")
-	if modelID == "" {
+	var req struct {
+		ModelID string `json:"model_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "model_id is required"})
 		return
 	}
@@ -867,11 +901,57 @@ func (h *InferenceHandler) GetRepoDownloadStatus(c *gin.Context) {
 		return
 	}
 
-	repo, found := downloader.GetRepoDownload(modelID)
+	repo, found := downloader.GetRepoDownload(req.ModelID)
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"error": "download not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, repo)
+}
+
+// POST /api/system/inference/repo-downloads/cancel
+// @Summary Cancel repository download
+func (h *InferenceHandler) CancelRepoDownload(c *gin.Context) {
+	var req struct {
+		ModelID string `json:"model_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model_id is required"})
+		return
+	}
+	
+	downloader := h.router.GetDownloader()
+	if downloader == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "downloader not configured"})
+		return
+	}
+
+	if err := downloader.CancelRepoDownload(req.ModelID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "cancelled", "model_id": req.ModelID})
+}
+
+// POST /api/system/inference/repo-downloads/remove
+// @Summary Remove repository download from list
+func (h *InferenceHandler) RemoveRepoDownload(c *gin.Context) {
+	var req struct {
+		ModelID string `json:"model_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model_id is required"})
+		return
+	}
+	
+	downloader := h.router.GetDownloader()
+	if downloader == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "downloader not configured"})
+		return
+	}
+
+	downloader.RemoveRepoDownload(req.ModelID)
+	c.JSON(http.StatusOK, gin.H{"status": "removed", "model_id": req.ModelID})
 }

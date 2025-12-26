@@ -570,6 +570,26 @@
 		}
 	}
 
+	async function cancelRepoDownload(modelId: string) {
+		if (!confirm(`Cancel download of ${modelId}?`)) return;
+		try {
+			await inferenceApi.cancelRepoDownload(modelId);
+			await loadRepoDownloads();
+		} catch (e: any) {
+			console.error('Failed to cancel download:', e);
+			alert('Failed to cancel download: ' + (e.message || e));
+		}
+	}
+
+	async function removeRepoDownload(modelId: string) {
+		try {
+			await inferenceApi.removeRepoDownload(modelId);
+			repoDownloads = repoDownloads.filter(d => d.model_id !== modelId);
+		} catch (e: any) {
+			console.error('Failed to remove download:', e);
+		}
+	}
+
 	async function loadTRTEngines() {
 		try {
 			trtEngines = (await inferenceApi.listTRTEngines()) || [];
@@ -615,8 +635,13 @@
 			} else {
 				// Download repository locally instead of just preparing
 				if (form.hf_repo) {
-					await inferenceApi.downloadRepository(form.hf_repo);
-					showMsg('Скачивание модели началось. Смотрите вкладку Downloads.', 'success');
+					// If specific file selected (e.g., GGUF), download only that file
+					const filename = form.hf_file?.trim() || undefined;
+					await inferenceApi.downloadRepository(form.hf_repo, filename);
+					const msg = filename 
+						? `Скачивание файла ${filename} началось. Смотрите вкладку Downloads.`
+						: 'Скачивание модели началось. Смотрите вкладку Downloads.';
+					showMsg(msg, 'success');
 					activeTab = 'downloads';
 					await loadRepoDownloads();
 				} else {
@@ -1784,15 +1809,35 @@
 										<div class="text-xs text-muted-foreground mt-1">📁 {dl.local_path}</div>
 									{/if}
 								</div>
-								<span class={`text-xs px-2 py-1 rounded font-medium ${
-									dl.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
-									dl.status === 'downloading' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
-									dl.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
-									'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
-								}`}>
-									{dl.status === 'downloading' ? '⏳ ' : dl.status === 'completed' ? '✅ ' : dl.status === 'failed' ? '❌ ' : ''}
-									{dl.status}
-								</span>
+								<div class="flex items-center gap-2">
+									{#if dl.status === 'downloading'}
+										<button 
+											class="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+											onclick={() => cancelRepoDownload(dl.model_id)}
+											title="Cancel download"
+										>
+											✕ Cancel
+										</button>
+									{:else if dl.status === 'completed' || dl.status === 'failed' || dl.status === 'cancelled'}
+										<button 
+											class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/20"
+											onclick={() => removeRepoDownload(dl.model_id)}
+											title="Remove from list"
+										>
+											✕
+										</button>
+									{/if}
+									<span class={`text-xs px-2 py-1 rounded font-medium ${
+										dl.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+										dl.status === 'downloading' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+										dl.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+										dl.status === 'cancelled' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
+										'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
+									}`}>
+										{dl.status === 'downloading' ? '⏳ ' : dl.status === 'completed' ? '✅ ' : dl.status === 'failed' ? '❌ ' : dl.status === 'cancelled' ? '🚫 ' : ''}
+										{dl.status}
+									</span>
+								</div>
 							</div>
 							<!-- Progress bar -->
 							{#if dl.status === 'downloading'}

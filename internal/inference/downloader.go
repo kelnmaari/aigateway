@@ -197,6 +197,14 @@ func (d *ModelDownloader) DownloadRepository(ctx context.Context, modelID string
 	return d.hfDownloader.DownloadRepository(ctx, modelID)
 }
 
+// DownloadSingleFile downloads a specific file from a HuggingFace repository.
+func (d *ModelDownloader) DownloadSingleFile(ctx context.Context, modelID, filename string) (*huggingface.RepoDownload, error) {
+	if d.hfDownloader == nil {
+		return nil, fmt.Errorf("HuggingFace downloader not configured")
+	}
+	return d.hfDownloader.DownloadSingleFile(ctx, modelID, filename)
+}
+
 // GetRepoDownload returns status of a repository download.
 func (d *ModelDownloader) GetRepoDownload(modelID string) (*huggingface.RepoDownload, bool) {
 	if d.hfDownloader == nil {
@@ -211,6 +219,22 @@ func (d *ModelDownloader) ListRepoDownloads() []*huggingface.RepoDownload {
 		return nil
 	}
 	return d.hfDownloader.ListRepoDownloads()
+}
+
+// CancelRepoDownload cancels a repository download.
+func (d *ModelDownloader) CancelRepoDownload(modelID string) error {
+	if d.hfDownloader == nil {
+		return fmt.Errorf("downloader not configured")
+	}
+	return d.hfDownloader.CancelRepoDownload(modelID)
+}
+
+// RemoveRepoDownload removes a repository download from the list.
+func (d *ModelDownloader) RemoveRepoDownload(modelID string) {
+	if d.hfDownloader == nil {
+		return
+	}
+	d.hfDownloader.RemoveRepoDownload(modelID)
 }
 
 // waitForDownload blocks until download completes or fails.

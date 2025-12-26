@@ -869,6 +869,180 @@ func (d *Downloader) ListRepoDownloads() []*RepoDownload {
 	return result
 }
 
+// DownloadSingleFile downloads a specific file from a HuggingFace repository
+func (d *Downloader) DownloadSingleFile(ctx context.Context, modelID, filename string) (*RepoDownload, error) {
+	// Check if already downloading this repo
+	repoDownloads.RLock()
+	if existing, ok := repoDownloads.m[modelID]; ok {
+		if existing.Status == DownloadStatusDownloading || existing.Status == DownloadStatusPending {
+			repoDownloads.RUnlock()
+			return existing, nil
+		}
+	}
+	repoDownloads.RUnlock()
+
+	// Get file info from HuggingFace
+	modelInfo, err := d.client.GetModelInfo(ctx, modelID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model info: %w", err)
+	}
+
+	// Find the requested file
+	var targetFile *File
+	for _, f := range modelInfo.Siblings {
+		if f.Filename == filename {
+			targetFile = &f
+			break
+		}
+	}
+
+	if targetFile == nil {
+		return nil, fmt.Errorf("file %s not found in repository %s", filename, modelID)
+	}
+
+	// Get file size
+	var fileSize int64
+	var sha string
+	if targetFile.LFS != nil {
+		fileSize = targetFile.LFS.Size
+		sha = targetFile.LFS.OID
+	} else {
+		fileSize = targetFile.Size
+	}
+
+	// Create repo download tracker for single file
+	now := time.Now()
+	repoDownload := &RepoDownload{
+		ID:         generateDownloadID(modelID, filename),
+		ModelID:    modelID,
+		Status:     DownloadStatusDownloading,
+		TotalFiles: 1,
+		TotalSize:  fileSize,
+		StartedAt:  &now,
+		LocalPath:  filepath.Join(d.downloadsDir, modelID),
+		Files:      make([]*Download, 0, 1),
+	}
+
+	repoDownloads.Lock()
+	repoDownloads.m[modelID] = repoDownload
+	repoDownloads.Unlock()
+
+	d.logger.WithFields(logrus.Fields{
+		"model_id":   modelID,
+		"filename":   filename,
+		"file_size":  fileSize,
+		"local_path": repoDownload.LocalPath,
+	}).Info("Starting single file download")
+
+	// Start download in background
+	go func() {
+		download, err := d.StartDownload(modelID, filename, fileSize, sha)
+		if err != nil {
+			d.logger.WithError(err).WithField("file", filename).Error("Failed to start file download")
+			repoDownload.mu.Lock()
+			repoDownload.Status = DownloadStatusFailed
+			repoDownload.FailedFiles = 1
+			repoDownload.Error = err.Error()
+			repoDownload.mu.Unlock()
+			return
+		}
+
+		repoDownload.mu.Lock()
+		repoDownload.Files = append(repoDownload.Files, download)
+		repoDownload.mu.Unlock()
+
+		// Wait for download to complete
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-d.ctx.Done():
+				repoDownload.mu.Lock()
+				repoDownload.Status = DownloadStatusCancelled
+				repoDownload.Error = "downloader shutdown"
+				repoDownload.mu.Unlock()
+				return
+			case <-ticker.C:
+				download.Mu.RLock()
+				status := download.Status
+				downloaded := download.DownloadedSize
+				download.Mu.RUnlock()
+
+				repoDownload.mu.Lock()
+				repoDownload.DownloadedSize = downloaded
+				if repoDownload.TotalSize > 0 {
+					repoDownload.Progress = float64(downloaded) / float64(repoDownload.TotalSize) * 100
+				}
+
+				if status == DownloadStatusCompleted {
+					repoDownload.Status = DownloadStatusCompleted
+					repoDownload.CompletedFiles = 1
+					repoDownload.Progress = 100
+					now := time.Now()
+					repoDownload.CompletedAt = &now
+					repoDownload.mu.Unlock()
+
+					d.logger.WithFields(logrus.Fields{
+						"model_id":   modelID,
+						"filename":   filename,
+						"local_path": repoDownload.LocalPath,
+					}).Info("Single file download completed")
+					return
+				} else if status == DownloadStatusFailed || status == DownloadStatusCancelled {
+					repoDownload.Status = status
+					repoDownload.FailedFiles = 1
+					if status == DownloadStatusFailed {
+						repoDownload.Error = "download failed"
+					} else {
+						repoDownload.Error = "download cancelled"
+					}
+					repoDownload.mu.Unlock()
+					return
+				}
+				repoDownload.mu.Unlock()
+			}
+		}
+	}()
+
+	return repoDownload, nil
+}
+
+// CancelRepoDownload cancels a repository download and all its file downloads
+func (d *Downloader) CancelRepoDownload(modelID string) error {
+	repoDownloads.Lock()
+	repo, ok := repoDownloads.m[modelID]
+	if !ok {
+		repoDownloads.Unlock()
+		return fmt.Errorf("repository download not found: %s", modelID)
+	}
+	
+	// Mark as cancelled
+	repo.mu.Lock()
+	repo.Status = DownloadStatusCancelled
+	repo.Error = "cancelled by user"
+	files := repo.Files
+	repo.mu.Unlock()
+	repoDownloads.Unlock()
+	
+	// Cancel all individual file downloads
+	for _, file := range files {
+		if file != nil && (file.Status == DownloadStatusDownloading || file.Status == DownloadStatusPending) {
+			_ = d.CancelDownload(file.ID)
+		}
+	}
+	
+	d.logger.WithField("model_id", modelID).Info("Repository download cancelled")
+	return nil
+}
+
+// RemoveRepoDownload removes a repository download from the list
+func (d *Downloader) RemoveRepoDownload(modelID string) {
+	repoDownloads.Lock()
+	delete(repoDownloads.m, modelID)
+	repoDownloads.Unlock()
+}
+
 // shouldDownloadFile determines if a file should be downloaded for model loading
 func shouldDownloadFile(filename string) bool {
 	// Always download these

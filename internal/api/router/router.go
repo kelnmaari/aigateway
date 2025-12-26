@@ -605,7 +605,9 @@ func (r *Router) setupInferenceRoutes() {
 		// Repository download (v3.3.x+) - download all model files locally
 		group.POST("/download-repo", r.inferenceHandler.PostDownloadRepository)
 		group.GET("/repo-downloads", r.inferenceHandler.GetRepoDownloads)
-		group.GET("/repo-downloads/:model_id", r.inferenceHandler.GetRepoDownloadStatus)
+		group.POST("/repo-downloads/status", r.inferenceHandler.GetRepoDownloadStatus)  // POST because model_id contains /
+		group.POST("/repo-downloads/cancel", r.inferenceHandler.CancelRepoDownload)
+		group.POST("/repo-downloads/remove", r.inferenceHandler.RemoveRepoDownload)
 	}
 	r.logger.Info("Inference v4 routes configured")
 

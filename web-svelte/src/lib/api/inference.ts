@@ -227,13 +227,23 @@ export const inferenceApi = {
 		api.post<{ status: string; alias: string }>(`/api/system/inference/update-saved?alias=${encodeURIComponent(alias)}`, params),
 
 	// Repository downloads (v3.3.x+) - download all model files locally
-	downloadRepository: (modelId: string) => 
-		api.post<RepoDownloadResponse>('/api/system/inference/download-repo', { model_id: modelId }),
+	// If filename is provided, downloads only that specific file
+	downloadRepository: (modelId: string, filename?: string) => 
+		api.post<RepoDownloadResponse>('/api/system/inference/download-repo', { 
+			model_id: modelId,
+			filename: filename || undefined
+		}),
 	
 	listRepoDownloads: () => api.get<RepoDownload[]>('/api/system/inference/repo-downloads'),
 	
 	getRepoDownloadStatus: (modelId: string) => 
-		api.get<RepoDownload>(`/api/system/inference/repo-downloads/${encodeURIComponent(modelId)}`),
+		api.post<RepoDownload>('/api/system/inference/repo-downloads/status', { model_id: modelId }),
+	
+	cancelRepoDownload: (modelId: string) =>
+		api.post('/api/system/inference/repo-downloads/cancel', { model_id: modelId }),
+	
+	removeRepoDownload: (modelId: string) =>
+		api.post('/api/system/inference/repo-downloads/remove', { model_id: modelId }),
 };
 
 // Repository download types

@@ -753,6 +753,55 @@
 		}
 	}
 
+	// Save config directly (without loading)
+	async function saveConfig(andDownload: boolean = false) {
+		busy = true;
+		msg = '';
+		try {
+			const config = {
+				alias: form.alias.trim(),
+				provider: form.provider,
+				format: form.format,
+				hf_repo: form.hf_repo?.trim(),
+				hf_file: form.hf_file?.trim(),
+				hf_revision: form.hf_revision?.trim(),
+				gguf_url: form.gguf_url?.trim(),
+				capabilities: form.capabilities,
+				gpu_device: form.gpu_device?.trim(),
+				auto_start: false,
+				vllm_tensor_parallel: form.vllm_tensor_parallel,
+				vllm_max_model_len: form.vllm_max_model_len,
+				vllm_gpu_utilization: form.vllm_gpu_utilization,
+				llama_main_gpu: form.llama_main_gpu,
+				llama_tensor_split: form.llama_tensor_split,
+				llama_n_gpu_layers: form.llama_n_gpu_layers,
+				llama_ctx_size: form.llama_ctx_size,
+				llama_n_parallel: form.llama_n_parallel,
+				llama_flash_attn: form.llama_flash_attn,
+				sglang_tensor_parallel: form.sglang_tensor_parallel,
+				sglang_mem_fraction: form.sglang_mem_fraction,
+				tgi_num_shard: form.tgi_num_shard
+			};
+			
+			await inferenceApi.createSaved(config);
+			showMsg(`Конфигурация ${config.alias} сохранена`, 'success');
+			
+			if (andDownload && form.hf_repo) {
+				const filename = form.hf_file?.trim() || undefined;
+				await inferenceApi.downloadRepository(form.hf_repo, filename);
+				showMsg(`Конфигурация сохранена и скачивание началось`, 'success');
+				activeTab = 'downloads';
+				await loadRepoDownloads();
+			}
+			
+			await loadSavedModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка сохранения', 'error');
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function stopModel(alias: string) {
 		try {
 			await inferenceApi.stop(alias);
@@ -1361,12 +1410,18 @@
 						</div>
 					{/if}
 
-					<div class="flex gap-2 pt-2">
+					<div class="flex flex-wrap gap-2 pt-2">
 						<button class="px-4 py-2 rounded bg-primary text-primary-foreground disabled:opacity-50" onclick={() => submit(true)} disabled={busy}>
 							Load & Start
 						</button>
-						<button class="px-4 py-2 rounded border hover:bg-muted disabled:opacity-50" onclick={() => submit(false)} disabled={busy}>
-							Download Local
+						<button class="px-4 py-2 rounded border hover:bg-muted disabled:opacity-50" onclick={() => saveConfig(false)} disabled={busy}>
+							Save Config
+						</button>
+						<button class="px-4 py-2 rounded border hover:bg-muted disabled:opacity-50" onclick={() => saveConfig(true)} disabled={busy}>
+							Download & Save
+						</button>
+						<button class="px-4 py-2 rounded border hover:bg-muted disabled:opacity-50 text-muted-foreground" onclick={() => submit(false)} disabled={busy}>
+							Download Only
 						</button>
 					</div>
 				</div>

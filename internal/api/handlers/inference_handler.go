@@ -755,6 +755,86 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "updated", "alias": alias})
 }
 
+// CreateSavedRequest represents a request to create a saved model configuration directly.
+type CreateSavedRequest struct {
+	Alias              string   `json:"alias" binding:"required"`
+	Provider           string   `json:"provider" binding:"required"`
+	Format             string   `json:"format"`
+	HFRepo             string   `json:"hf_repo"`
+	HFFile             string   `json:"hf_file"`
+	HFRevision         string   `json:"hf_revision"`
+	GGUFURL            string   `json:"gguf_url"`
+	Capabilities       []string `json:"capabilities"`
+	GPUDevice          string   `json:"gpu_device"`
+	AutoStart          bool     `json:"auto_start"`
+	VLLMTensorParallel int      `json:"vllm_tensor_parallel"`
+	VLLMMaxModelLen    int      `json:"vllm_max_model_len"`
+	VLLMGPUUtilization float64  `json:"vllm_gpu_utilization"`
+	LlamaMainGPU       int      `json:"llama_main_gpu"`
+	LlamaTensorSplit   string   `json:"llama_tensor_split"`
+	LlamaNGPULayers    int      `json:"llama_n_gpu_layers"`
+	LlamaCtxSize       int      `json:"llama_ctx_size"`
+	LlamaNParallel     int      `json:"llama_n_parallel"`
+	LlamaFlashAttn     bool     `json:"llama_flash_attn"`
+	SGLangTensorParallel int    `json:"sglang_tensor_parallel"`
+	SGLangMemFraction  float64  `json:"sglang_mem_fraction"`
+	TGINumShard        int      `json:"tgi_num_shard"`
+}
+
+// PostCreateSaved creates a new saved model configuration directly from form data.
+// POST /api/system/inference/create-saved
+func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
+	if h.modelStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model store not configured"})
+		return
+	}
+
+	var req CreateSavedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Convert capabilities from strings
+	var caps []inference.Capability
+	for _, c := range req.Capabilities {
+		caps = append(caps, inference.Capability(c))
+	}
+
+	// Create saved model directly
+	saved := inference.SavedModel{
+		Alias:              req.Alias,
+		Provider:           inference.ProviderKind(req.Provider),
+		Format:             inference.ModelFormat(req.Format),
+		HFRepo:             req.HFRepo,
+		HFFile:             req.HFFile,
+		HFRevision:         req.HFRevision,
+		GGUFURL:            req.GGUFURL,
+		Capabilities:       caps,
+		GPUDevice:          req.GPUDevice,
+		AutoStart:          req.AutoStart,
+		VLLMTensorParallel: req.VLLMTensorParallel,
+		VLLMMaxModelLen:    req.VLLMMaxModelLen,
+		VLLMGPUUtilization: req.VLLMGPUUtilization,
+		LlamaMainGPU:       req.LlamaMainGPU,
+		LlamaTensorSplit:   req.LlamaTensorSplit,
+		LlamaNGPULayers:    req.LlamaNGPULayers,
+		LlamaCtxSize:       req.LlamaCtxSize,
+		LlamaNParallel:     req.LlamaNParallel,
+		LlamaFlashAttn:     req.LlamaFlashAttn,
+		SGLangTensorParallel: req.SGLangTensorParallel,
+		SGLangMemFraction:  req.SGLangMemFraction,
+		TGINumShard:        req.TGINumShard,
+	}
+
+	if err := h.modelStore.Save(saved); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "created", "alias": req.Alias, "auto_start": req.AutoStart})
+}
+
 // DockerImageStatus represents the status of a Docker image
 type DockerImageStatus struct {
 	Provider string `json:"provider"`

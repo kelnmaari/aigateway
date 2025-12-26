@@ -145,6 +145,31 @@ export interface UpdateSavedRequest {
 	gpu_device?: string;
 }
 
+export interface CreateSavedRequest {
+	alias: string;
+	provider: Provider;
+	format: Format;
+	hf_repo?: string;
+	hf_file?: string;
+	hf_revision?: string;
+	gguf_url?: string;
+	capabilities?: Capability[];
+	gpu_device?: string;
+	auto_start?: boolean;
+	vllm_tensor_parallel?: number;
+	vllm_max_model_len?: number;
+	vllm_gpu_utilization?: number;
+	llama_main_gpu?: number;
+	llama_tensor_split?: string;
+	llama_n_gpu_layers?: number;
+	llama_ctx_size?: number;
+	llama_n_parallel?: number;
+	llama_flash_attn?: boolean;
+	sglang_tensor_parallel?: number;
+	sglang_mem_fraction?: number;
+	tgi_num_shard?: number;
+}
+
 export interface LoadRequest {
 	alias: string;
 	provider: Provider;
@@ -237,6 +262,10 @@ export const inferenceApi = {
 	
 	updateSaved: (alias: string, params: UpdateSavedRequest) =>
 		api.post<{ status: string; alias: string }>(`/api/system/inference/update-saved?alias=${encodeURIComponent(alias)}`, params),
+	
+	// Create saved model configuration directly (without loading)
+	createSaved: (config: CreateSavedRequest) =>
+		api.post<{ status: string; alias: string; auto_start: boolean }>('/api/system/inference/create-saved', config),
 
 	// Repository downloads (v3.3.x+) - download all model files locally
 	// If filename is provided, downloads only that specific file

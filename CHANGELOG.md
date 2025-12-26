@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.2] - 2025-12-26
+
+### Changed
+
+- **About Page Layout**: увеличена ширина страницы до 1600px
+- **Repository Links**: ссылки обновлены на GitLab (https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy)
+
+### Fixed
+
+- **LLM Review Suggestions**: промпты обновлены для запроса примеров кода в предложениях по исправлению
+
 ## [4.0.0] - 2025-12-26
 
 ### Added

@@ -34,7 +34,7 @@ variables:
       # Branch build: sanitize branch name (replace / and _ with .)
       BRANCH_SAFE=$(echo "$CI_COMMIT_REF_NAME" | tr '/' '.' | tr '_' '.' | tr '-' '.' | cut -c1-20)
       export RPM_VERSION="${BASE_VERSION}"
-      export RPM_RELEASE="${BRANCH_SAFE}.${CI_JOB_ID}"
+      export RPM_RELEASE="${BRANC'H_SAFE}.${CI_JOB_ID}"
       export BUILD_VERSION="${RPM_VERSION}-${BRANCH_SAFE}-${CI_JOB_ID}"
     fi
     echo "BUILD_VERSION=$BUILD_VERSION"

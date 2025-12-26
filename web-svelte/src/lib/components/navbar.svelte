@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import { authStore, themeStore } from '$lib';
 	import { cn } from '$lib/utils';
 	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
+	import { api } from '$lib/api/client';
 	import {
 		Home,
 		MessageSquare,
@@ -23,7 +25,8 @@
 		FolderOpen,
 		Database,
 		Server,
-		GitBranch
+		GitBranch,
+		Info
 	} from 'lucide-svelte';
 	import { Tooltip } from '$lib/components/ui/tooltip';
 
@@ -31,6 +34,7 @@
 
 	let mobileMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
+	let appVersion = $state('');
 
 	const navItems = [
 		{ href: '/dashboard', label: () => m.nav_dashboard(), icon: Home },
@@ -81,6 +85,15 @@
 		const current = getLocale();
 		return current === 'en' ? 'English' : 'Русский';
 	}
+	
+	onMount(async () => {
+		try {
+			const info = await api.get<{ version: string }>('/api/system/info');
+			appVersion = info.version || '';
+		} catch {
+			appVersion = '';
+		}
+	});
 </script>
 
 <svelte:window
@@ -215,7 +228,21 @@
 								{m.nav_settings()}
 							</a>
 
+							<a
+								href="/about"
+								onclick={closeMenus}
+								class="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+							>
+								<Info class="h-4 w-4" />
+								{m.nav_about()}
+							</a>
+
 							<div class="border-t border-border">
+								{#if appVersion}
+									<div class="px-4 py-2 text-xs text-muted-foreground">
+										v{appVersion}
+									</div>
+								{/if}
 								<button
 									onclick={handleLogout}
 									class="flex w-full items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10"

@@ -80,6 +80,7 @@ type ModelSpecLog struct {
 
 	// llama.cpp specific
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers,omitempty"`
+	LlamaCtxSize     int    `json:"llama_ctx_size,omitempty"`
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
 	LlamaTensorSplit string `json:"llama_tensor_split,omitempty"`
 }
@@ -144,6 +145,7 @@ func (pl *ProviderLogger) LogLaunch(spec ModelSpec, req ContainerStartRequest) {
 			TGIMaxInputLen:       spec.TGIMaxInputLen,
 			TGIMaxTotalTokens:    spec.TGIMaxTotalTokens,
 			LlamaNGPULayers:      spec.LlamaNGPULayers,
+			LlamaCtxSize:         spec.LlamaCtxSize,
 			LlamaMainGPU:         spec.LlamaMainGPU,
 			LlamaTensorSplit:     spec.LlamaTensorSplit,
 		},

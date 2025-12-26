@@ -55,6 +55,7 @@ type LoadRequest struct {
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
 	LlamaTensorSplit string `json:"llama_tensor_split"`
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers"`
+	LlamaCtxSize     int    `json:"llama_ctx_size"` // Context size (default: 2048)
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel"`
@@ -96,6 +97,7 @@ type ModelsResponse struct {
 	LlamaMainGPU         int     `json:"llama_main_gpu,omitempty"`
 	LlamaTensorSplit     string  `json:"llama_tensor_split,omitempty"`
 	LlamaNGPULayers      int     `json:"llama_n_gpu_layers,omitempty"`
+	LlamaCtxSize         int     `json:"llama_ctx_size,omitempty"`
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64 `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
@@ -139,6 +141,7 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		LlamaMainGPU:       req.LlamaMainGPU,
 		LlamaTensorSplit:   req.LlamaTensorSplit,
 		LlamaNGPULayers:    req.LlamaNGPULayers,
+		LlamaCtxSize:       req.LlamaCtxSize,
 		// SGLang
 		SGLangTensorParallel: req.SGLangTensorParallel,
 		SGLangDataParallel:   req.SGLangDataParallel,
@@ -358,6 +361,7 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 			LlamaMainGPU:         m.Spec.LlamaMainGPU,
 			LlamaTensorSplit:     m.Spec.LlamaTensorSplit,
 			LlamaNGPULayers:      m.Spec.LlamaNGPULayers,
+			LlamaCtxSize:         m.Spec.LlamaCtxSize,
 			SGLangTensorParallel: m.Spec.SGLangTensorParallel,
 			SGLangMemFraction:    m.Spec.SGLangMemFraction,
 			TGINumShard:          m.Spec.TGINumShard,
@@ -523,6 +527,7 @@ type SavedModelResponse struct {
 	VLLMGPUUtilization   float64                `json:"vllm_gpu_utilization,omitempty"`
 	LlamaMainGPU         int                    `json:"llama_main_gpu,omitempty"`
 	LlamaNGPULayers      int                    `json:"llama_n_gpu_layers,omitempty"`
+	LlamaCtxSize         int                    `json:"llama_ctx_size,omitempty"`
 	LlamaTensorSplit     string                 `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel int                    `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64                `json:"sglang_mem_fraction,omitempty"`
@@ -556,6 +561,7 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 			VLLMGPUUtilization:   m.VLLMGPUUtilization,
 			LlamaMainGPU:         m.LlamaMainGPU,
 			LlamaNGPULayers:      m.LlamaNGPULayers,
+			LlamaCtxSize:         m.LlamaCtxSize,
 			LlamaTensorSplit:     m.LlamaTensorSplit,
 			SGLangTensorParallel: m.SGLangTensorParallel,
 			SGLangMemFraction:    m.SGLangMemFraction,
@@ -657,6 +663,7 @@ type UpdateSavedRequest struct {
 	VLLMGPUUtilization   *float64 `json:"vllm_gpu_utilization,omitempty"`
 	LlamaMainGPU         *int     `json:"llama_main_gpu,omitempty"`
 	LlamaNGPULayers      *int     `json:"llama_n_gpu_layers,omitempty"`
+	LlamaCtxSize         *int     `json:"llama_ctx_size,omitempty"`
 	LlamaTensorSplit     *string  `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel *int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
@@ -699,6 +706,9 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		}
 		if req.LlamaNGPULayers != nil {
 			m.LlamaNGPULayers = *req.LlamaNGPULayers
+		}
+		if req.LlamaCtxSize != nil {
+			m.LlamaCtxSize = *req.LlamaCtxSize
 		}
 		if req.LlamaTensorSplit != nil {
 			m.LlamaTensorSplit = *req.LlamaTensorSplit

@@ -31,6 +31,7 @@ export interface ModelInfo {
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
+	llama_ctx_size?: number;
 
 	// SGLang params
 	sglang_tensor_parallel?: number;
@@ -117,6 +118,7 @@ export interface SavedModel {
 	vllm_gpu_utilization?: number;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
+	llama_ctx_size?: number;
 	llama_tensor_split?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
@@ -129,6 +131,7 @@ export interface UpdateSavedRequest {
 	vllm_gpu_utilization?: number;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
+	llama_ctx_size?: number;
 	llama_tensor_split?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
@@ -156,6 +159,7 @@ export interface LoadRequest {
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
+	llama_ctx_size?: number;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	tgi_num_shard?: number;

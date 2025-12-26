@@ -335,6 +335,9 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	if spec.LlamaNGPULayers > 0 {
 		cmd = append(cmd, "--n-gpu-layers", fmt.Sprintf("%d", spec.LlamaNGPULayers))
 	}
+	if spec.LlamaCtxSize > 0 {
+		cmd = append(cmd, "--ctx-size", fmt.Sprintf("%d", spec.LlamaCtxSize))
+	}
 	if spec.LlamaMainGPU > 0 {
 		cmd = append(cmd, "--main-gpu", fmt.Sprintf("%d", spec.LlamaMainGPU))
 	}

@@ -32,6 +32,7 @@ type SavedModel struct {
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
 	LlamaTensorSplit string `json:"llama_tensor_split,omitempty"`
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers,omitempty"`
+	LlamaCtxSize     int    `json:"llama_ctx_size,omitempty"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
@@ -103,6 +104,7 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		LlamaMainGPU:       spec.LlamaMainGPU,
 		LlamaTensorSplit:   spec.LlamaTensorSplit,
 		LlamaNGPULayers:    spec.LlamaNGPULayers,
+		LlamaCtxSize:       spec.LlamaCtxSize,
 		SGLangTensorParallel: spec.SGLangTensorParallel,
 		SGLangMemFraction:  spec.SGLangMemFraction,
 		TGINumShard:        spec.TGINumShard,
@@ -203,6 +205,7 @@ func (m SavedModel) ToSpec() ModelSpec {
 		LlamaMainGPU:       m.LlamaMainGPU,
 		LlamaTensorSplit:   m.LlamaTensorSplit,
 		LlamaNGPULayers:    m.LlamaNGPULayers,
+		LlamaCtxSize:       m.LlamaCtxSize,
 		SGLangTensorParallel: m.SGLangTensorParallel,
 		SGLangMemFraction:  m.SGLangMemFraction,
 		TGINumShard:        m.TGINumShard,

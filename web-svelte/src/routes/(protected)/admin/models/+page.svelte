@@ -111,6 +111,7 @@
 		vllm_gpu_utilization: 0.9,
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
+		llama_ctx_size: 0,
 		llama_tensor_split: '',
 		sglang_tensor_parallel: 1,
 		sglang_mem_fraction: 0.9,
@@ -134,6 +135,7 @@
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
+		llama_ctx_size: 0,
 		sglang_tensor_parallel: 0,
 		sglang_mem_fraction: 0.8,
 		tgi_num_shard: 1
@@ -625,6 +627,7 @@
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
+				llama_ctx_size: form.llama_ctx_size,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
 				tgi_num_shard: form.tgi_num_shard
@@ -684,6 +687,7 @@
 				llama_main_gpu: m.llama_main_gpu,
 				llama_tensor_split: m.llama_tensor_split,
 				llama_n_gpu_layers: m.llama_n_gpu_layers,
+				llama_ctx_size: m.llama_ctx_size,
 				sglang_tensor_parallel: m.sglang_tensor_parallel,
 				sglang_mem_fraction: m.sglang_mem_fraction,
 				tgi_num_shard: m.tgi_num_shard,
@@ -756,6 +760,7 @@
 			vllm_gpu_utilization: saved.vllm_gpu_utilization || 0.9,
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
+			llama_ctx_size: saved.llama_ctx_size || 0,
 			llama_tensor_split: saved.llama_tensor_split || '',
 			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
 			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,
@@ -792,6 +797,7 @@
 				vllm_gpu_utilization: saved.vllm_gpu_utilization,
 				llama_main_gpu: saved.llama_main_gpu,
 				llama_n_gpu_layers: saved.llama_n_gpu_layers,
+				llama_ctx_size: saved.llama_ctx_size,
 				sglang_tensor_parallel: saved.sglang_tensor_parallel,
 				sglang_mem_fraction: saved.sglang_mem_fraction,
 				tgi_num_shard: saved.tgi_num_shard,
@@ -1163,10 +1169,14 @@
 							</label>
 						</div>
 					{:else if form.provider === 'llama.cpp'}
-						<div class="grid gap-3 sm:grid-cols-3 pt-2 border-t">
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-2 border-t">
 							<label class="flex flex-col gap-1 text-sm">
 								<span>n_gpu_layers</span>
 								<input type="number" min="0" class="border rounded px-3 py-2 bg-background" bind:value={form.llama_n_gpu_layers} />
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<span title="Context size (0 = default 2048)">ctx_size</span>
+								<input type="number" min="0" class="border rounded px-3 py-2 bg-background" bind:value={form.llama_ctx_size} placeholder="32768" />
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
 								<span>main_gpu</span>
@@ -1933,6 +1943,13 @@
 							<input id="edit-llama-layers" type="number" min="-1" class="w-full px-3 py-2 rounded border bg-background" 
 								bind:value={editSavedForm.llama_n_gpu_layers} />
 							<p class="text-xs text-muted-foreground mt-1">-1 = all layers</p>
+						</div>
+						<div>
+							<label for="edit-llama-ctx" class="block text-sm font-medium mb-1">Context Size</label>
+							<input id="edit-llama-ctx" type="number" min="0" class="w-full px-3 py-2 rounded border bg-background" 
+								placeholder="32768"
+								bind:value={editSavedForm.llama_ctx_size} />
+							<p class="text-xs text-muted-foreground mt-1">0 = default (2048)</p>
 						</div>
 					</div>
 					<div>

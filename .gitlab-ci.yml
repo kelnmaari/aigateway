@@ -34,7 +34,7 @@ variables:
       # Branch build: sanitize branch name (replace / and _ with .)
       BRANCH_SAFE=$(echo "$CI_COMMIT_REF_NAME" | tr '/' '.' | tr '_' '.' | tr '-' '.' | cut -c1-20)
       export RPM_VERSION="${BASE_VERSION}"
-      export RPM_RELEASE="${BRANC'H_SAFE}.${CI_JOB_ID}"
+      export RPM_RELEASE="${BRANCH_SAFE}.${CI_JOB_ID}"
       export BUILD_VERSION="${RPM_VERSION}-${BRANCH_SAFE}-${CI_JOB_ID}"
     fi
     echo "BUILD_VERSION=$BUILD_VERSION"
@@ -164,7 +164,7 @@ build:binary:
 # PACKAGE STAGE - Build RPMs
 # ==============================================================================
 
-# Build main application RPM
+# Build main application RPM (tags only)
 package:rpm:
   stage: package
   image: rockylinux:9
@@ -207,14 +207,13 @@ package:rpm:
       - dist/*.rpm
     expire_in: 4 weeks
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_TAG  # Only for tags
 
 # ==============================================================================
 # RELEASE STAGE
 # ==============================================================================
 
-# Publish RPM to GitLab Generic Package Registry
+# Publish RPM to GitLab Generic Package Registry (tags only)
 publish:rpm:
   stage: release
   image: curlimages/curl:latest
@@ -222,6 +221,8 @@ publish:rpm:
     - package:rpm
     - job: build:binary
       artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG  # Only for tags
   script:
     - RPM_VERSION=$(cat bin/RPM_VERSION)
     - RPM_RELEASE=$(cat bin/RPM_RELEASE)
@@ -419,9 +420,6 @@ publish:rpm:
       echo ""
       echo "  ${CI_PROJECT_URL}/-/packages"
       echo ""
-  rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
 
 # Create GitLab Release (tags only)
 release:

@@ -123,7 +123,10 @@ build:webui:
   image: node:${NODE_VERSION}-alpine
   before_script:
     - cd web-svelte
-    - npm ci
+    # Use npm install instead of npm ci to resolve platform-specific deps
+    # (package-lock.json may have been generated on Windows)
+    - rm -f package-lock.json
+    - npm install
   script:
     - npm run build
     - ls -la build/

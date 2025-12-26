@@ -151,6 +151,8 @@ export interface SavedModel {
 }
 
 export interface UpdateSavedRequest {
+	capabilities?: Capability[];
+	auto_start?: boolean;
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;

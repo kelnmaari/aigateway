@@ -204,7 +204,25 @@
 
 	// Edit saved model modal state
 	let editingSavedModel = $state<SavedModel | null>(null);
-	let editSavedForm = $state({
+	let editSavedForm = $state<{
+		capabilities: Capability[];
+		auto_start: boolean;
+		vllm_tensor_parallel: number;
+		vllm_max_model_len: number;
+		vllm_gpu_utilization: number;
+		llama_main_gpu: number;
+		llama_n_gpu_layers: number;
+		llama_ctx_size: number;
+		llama_n_parallel: number;
+		llama_flash_attn: boolean;
+		llama_tensor_split: string;
+		sglang_tensor_parallel: number;
+		sglang_mem_fraction: number;
+		tgi_num_shard: number;
+		gpu_device: string;
+	}>({
+		capabilities: ['chat'],
+		auto_start: false,
 		vllm_tensor_parallel: 1,
 		vllm_max_model_len: 0,
 		vllm_gpu_utilization: 0.9,
@@ -956,6 +974,8 @@
 	function openEditSavedModal(saved: SavedModel) {
 		editingSavedModel = saved;
 		editSavedForm = {
+			capabilities: saved.capabilities || ['chat'],
+			auto_start: saved.auto_start || false,
 			vllm_tensor_parallel: saved.vllm_tensor_parallel || 1,
 			vllm_max_model_len: saved.vllm_max_model_len || 0,
 			vllm_gpu_utilization: saved.vllm_gpu_utilization || 0.9,
@@ -970,6 +990,29 @@
 			tgi_num_shard: saved.tgi_num_shard || 1,
 			gpu_device: saved.gpu_device || ''
 		};
+	}
+
+	function toggleEditCapability(cap: Capability) {
+		const caps = editSavedForm.capabilities || [];
+		if (caps.includes(cap)) {
+			// When removing, also remove implied capabilities
+			let toRemove: Capability[] = [cap];
+			if (cap === 'chat') {
+				toRemove = CHAT_IMPLIED_CAPABILITIES;
+			} else if (cap === 'embeddings') {
+				toRemove = EMBEDDING_IMPLIED_CAPABILITIES;
+			}
+			editSavedForm.capabilities = caps.filter(c => !toRemove.includes(c));
+		} else {
+			// When adding, also add implied capabilities
+			let toAdd: Capability[] = [cap];
+			if (cap === 'chat') {
+				toAdd = CHAT_IMPLIED_CAPABILITIES;
+			} else if (cap === 'embeddings') {
+				toAdd = EMBEDDING_IMPLIED_CAPABILITIES;
+			}
+			editSavedForm.capabilities = [...new Set([...caps, ...toAdd])];
+		}
 	}
 
 	async function saveEditedModel() {
@@ -2118,6 +2161,36 @@
 			</div>
 
 			<div class="space-y-4 max-h-[60vh] overflow-y-auto">
+				<!-- Capabilities -->
+				<div>
+					<label class="block text-sm font-medium mb-2">Capabilities</label>
+					<div class="flex flex-wrap gap-2">
+						{#each capabilities as cap}
+							<button 
+								type="button" 
+								class={`px-3 py-1 rounded border text-sm ${(editSavedForm.capabilities || []).includes(cap) ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+								onclick={() => toggleEditCapability(cap)}
+							>
+								{cap}
+							</button>
+						{/each}
+					</div>
+					<p class="text-xs text-muted-foreground mt-1">
+						Click chat → adds autocomplete, edit, apply. Click embeddings → adds rerank.
+					</p>
+				</div>
+
+				<!-- Auto-start -->
+				<div class="flex items-center gap-2">
+					<input 
+						id="edit-auto-start" 
+						type="checkbox" 
+						class="rounded border"
+						bind:checked={editSavedForm.auto_start}
+					/>
+					<label for="edit-auto-start" class="text-sm font-medium">Auto-start on server boot</label>
+				</div>
+
 				<!-- Common GPU Device -->
 				<div>
 					<label for="edit-gpu-device" class="block text-sm font-medium mb-1">GPU Device</label>

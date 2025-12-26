@@ -670,6 +670,7 @@ func (h *InferenceHandler) PostSetAutoStart(c *gin.Context) {
 
 // UpdateSavedRequest represents request to update a saved model configuration.
 type UpdateSavedRequest struct {
+	Capabilities         []string `json:"capabilities,omitempty"` // Model capabilities (chat, embeddings, etc.)
 	VLLMTensorParallel   *int     `json:"vllm_tensor_parallel,omitempty"`
 	VLLMMaxModelLen      *int     `json:"vllm_max_model_len,omitempty"`
 	VLLMGPUUtilization   *float64 `json:"vllm_gpu_utilization,omitempty"`
@@ -683,6 +684,7 @@ type UpdateSavedRequest struct {
 	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          *int     `json:"tgi_num_shard,omitempty"`
 	GPUDevice            *string  `json:"gpu_device,omitempty"`
+	AutoStart            *bool    `json:"auto_start,omitempty"` // Whether to auto-start on boot
 }
 
 // PostUpdateSaved updates a saved model configuration.
@@ -744,6 +746,17 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		}
 		if req.GPUDevice != nil {
 			m.GPUDevice = *req.GPUDevice
+		}
+		if req.Capabilities != nil {
+			// Convert []string to []Capability
+			caps := make([]inference.Capability, len(req.Capabilities))
+			for i, c := range req.Capabilities {
+				caps[i] = inference.Capability(c)
+			}
+			m.Capabilities = caps
+		}
+		if req.AutoStart != nil {
+			m.AutoStart = *req.AutoStart
 		}
 	})
 

@@ -161,8 +161,10 @@ func (r *PerFileReviewer) reviewSingleFile(
 	}
 
 	// Tool calling loop - model will stop calling tools when it has enough context
-	// Limit is just a safety net against infinite loops
+	// Track previous queries to detect loops
 	var finalResponse string
+	seenQueries := make(map[string]int)
+	
 	for i := 0; i < DefaultMaxToolIterations; i++ {
 		response, toolCalls, tokens, err := r.callLLM(ctx, modelID, messages)
 		result.TokensUsed += tokens
@@ -178,7 +180,26 @@ func (r *PerFileReviewer) reviewSingleFile(
 			break
 		}
 
-		// Execute tool calls
+		// Check for repeated tool calls (loop detection)
+		allRepeated := true
+		for _, tc := range toolCalls {
+			key := tc.Function.Name + ":" + tc.Function.Arguments
+			seenQueries[key]++
+			if seenQueries[key] <= 2 {
+				allRepeated = false
+			}
+		}
+		
+		if allRepeated {
+			r.logger.WithField("file", diff.NewPath).Warn("Detected tool call loop, forcing final response")
+			// Add message telling model to give final answer
+			messages = append(messages, map[string]interface{}{
+				"role":    "user",
+				"content": "You've already searched for this. Please provide your final review as JSON now.",
+			})
+			continue
+		}
+
 		r.logger.WithFields(logrus.Fields{
 			"file":       diff.NewPath,
 			"tool_calls": len(toolCalls),
@@ -219,6 +240,13 @@ func (r *PerFileReviewer) reviewSingleFile(
 
 	parsed, err := analyzer.ParseAnalysisResponse(finalResponse)
 	if err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"file":         diff.NewPath,
+			"error":        err.Error(),
+			"response_len": len(finalResponse),
+			"response":     truncateString(finalResponse, 500),
+		}).Warn("Failed to parse file review response")
+		
 		result.Error = fmt.Errorf("parse response: %w", err)
 		result.Summary = "[Parse error] " + truncateString(finalResponse, 200)
 		result.Score = 50
@@ -323,23 +351,27 @@ After gathering necessary context, provide your review as JSON:`)
 }
 
 func (r *PerFileReviewer) getFileReviewSystemPrompt() string {
-	return `You are an expert code reviewer. Review the provided file changes and identify issues.
+	return `You are an expert code reviewer. Your task is to review code changes and output ONLY valid JSON.
 
-You have access to tools that let you search the codebase for context:
-- search_codebase: Find related code by semantic search
-- get_function_definition: Look up how a function is implemented
-- get_type_definition: Look up struct/interface definitions
+## Available Tools
+You can use these tools to gather context (use sparingly, max 2-3 calls):
+- search_codebase: Find related code semantically
+- get_function_definition: Look up function implementation
+- get_type_definition: Look up struct/interface definition
 
-Use these tools when you need to understand:
-- How a function being called works
-- What fields a struct has
-- Project conventions and patterns
-- Related error handling
+## When to Use Tools
+- Only if you genuinely need context about an unfamiliar function/type
+- Do NOT call the same tool twice with similar queries
+- If search returns no useful results, proceed with review anyway
 
-After gathering context, provide a focused review of THIS FILE ONLY.
-Be specific with line numbers. Focus on real issues, not style nitpicks.
+## Output Format
+You MUST respond with valid JSON only. No markdown, no explanations, no text before or after JSON.
 
-Respond with valid JSON only.`
+## Review Guidelines
+- Focus on security, bugs, and logic errors
+- Be specific with line numbers from the diff
+- If no issues found, return empty arrays with score 85-100
+- Do not nitpick style issues`
 }
 
 func (r *PerFileReviewer) getResponseFormat() string {

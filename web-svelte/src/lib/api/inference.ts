@@ -2,7 +2,28 @@
 
 export type Provider = 'vllm' | 'sglang' | 'tgi' | 'tei' | 'tensorrt-llm' | 'llama.cpp';
 export type Format = 'hf' | 'gguf' | 'trt' | 'other';
-export type Capability = 'chat' | 'embeddings' | 'vision';
+
+// Model capabilities based on Continue.dev model roles
+// https://docs.continue.dev/customize/model-roles/00-intro
+export type Capability =
+	// Chat model capabilities (text generation)
+	| 'chat' // Chat conversations
+	| 'autocomplete' // Code autocomplete suggestions
+	| 'edit' // Generate code based on edit prompts
+	| 'apply' // Apply edits to files
+	| 'vision' // Vision/image understanding
+	// Embedding model capabilities
+	| 'embeddings' // Vector embeddings for semantic search
+	| 'rerank' // Rerank vector search results
+	// Additional
+	| 'function-calling' // Tool/function calling
+	| 'code-completion'; // Code completion (legacy)
+
+// Capabilities implied by chat - if model can chat, it can also do these
+export const CHAT_IMPLIED_CAPABILITIES: Capability[] = ['chat', 'autocomplete', 'edit', 'apply'];
+
+// Capabilities implied by embeddings - embedding models can rerank
+export const EMBEDDING_IMPLIED_CAPABILITIES: Capability[] = ['embeddings', 'rerank'];
 
 export interface ModelInfo {
 	alias: string;

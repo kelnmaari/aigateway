@@ -289,12 +289,87 @@ publish:rpm:
     - sed -i "s|__VERSION__|${BUILD_VERSION}|g" /tmp/install.sh
     - sed -i "s|__RPM_NAME__|${RPM_NAME}|g" /tmp/install.sh
     
-    # Upload install script
+    # Upload install script for this version
     - |
-      echo "Uploading: install.sh"
+      echo "Uploading: install.sh (version: ${BUILD_VERSION})"
       curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file "/tmp/install.sh" \
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/${BUILD_VERSION}/install.sh"
+    
+    # Create/update latest install script (always points to newest build)
+    - |
+      cat > /tmp/install-latest.sh << 'SCRIPT'
+      #!/bin/bash
+      set -e
+      
+      GITLAB_URL="https://gitlab.alexue4.dev"
+      PROJECT_ID="146"
+      PACKAGE_NAME="ollama-openai-proxy"
+      
+      echo "╔══════════════════════════════════════════════════════════════╗"
+      echo "║           AIGateway (Ollama OpenAI Proxy) Installer          ║"
+      echo "╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      
+      # Get latest version from GitLab Package Registry
+      echo "→ Finding latest version..."
+      LATEST_VERSION=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&order_by=created_at&sort=desc" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+      
+      if [ -z "$LATEST_VERSION" ]; then
+          echo "Error: Could not determine latest version"
+          exit 1
+      fi
+      
+      echo "   Latest version: ${LATEST_VERSION}"
+      echo ""
+      
+      # Find RPM filename
+      echo "→ Finding RPM package..."
+      RPM_URL="${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${LATEST_VERSION}"
+      RPM_NAME=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&package_version=${LATEST_VERSION}" | grep -o '"file_name":"[^"]*\.rpm"' | head -1 | cut -d'"' -f4)
+      
+      if [ -z "$RPM_NAME" ]; then
+          # Fallback: construct name
+          RPM_NAME="${PACKAGE_NAME}-${LATEST_VERSION}.el9.x86_64.rpm"
+      fi
+      
+      echo "   Package: ${RPM_NAME}"
+      echo ""
+      
+      # Download RPM
+      echo "→ Downloading..."
+      curl -fsSL "${RPM_URL}/${RPM_NAME}" -o "/tmp/${RPM_NAME}"
+      
+      # Install
+      echo "→ Installing..."
+      if command -v dnf &> /dev/null; then
+          sudo dnf install -y "/tmp/${RPM_NAME}"
+      else
+          sudo yum install -y "/tmp/${RPM_NAME}"
+      fi
+      
+      # Cleanup
+      rm -f "/tmp/${RPM_NAME}"
+      
+      echo ""
+      echo "╔══════════════════════════════════════════════════════════════╗"
+      echo "║                    Installation complete!                    ║"
+      echo "╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      echo "Next steps:"
+      echo "  1. Edit config: sudo vim /opt/ollama-openai-proxy/configs/dev.yaml"
+      echo "  2. Start:       sudo systemctl enable --now oop"
+      echo "  3. Status:      sudo systemctl status oop"
+      echo "  4. Logs:        journalctl -u oop -f"
+      echo ""
+      SCRIPT
+    
+    # Upload latest install script
+    - |
+      echo "Uploading: install.sh (latest)"
+      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file "/tmp/install-latest.sh" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/latest/install.sh"
     
     - |
       echo ""
@@ -303,20 +378,16 @@ publish:rpm:
       echo "╚══════════════════════════════════════════════════════════════╝"
       echo ""
       echo "┌──────────────────────────────────────────────────────────────┐"
-      echo "│ Quick Install (one-liner):                                   │"
+      echo "│ Install LATEST (always newest version):                      │"
       echo "└──────────────────────────────────────────────────────────────┘"
       echo ""
-      echo "  curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/${BUILD_VERSION}/install.sh | sudo bash"
+      echo "  curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/latest/install.sh | sudo bash"
       echo ""
       echo "┌──────────────────────────────────────────────────────────────┐"
-      echo "│ Manual Install:                                              │"
+      echo "│ Install THIS version (${BUILD_VERSION}):                     │"
       echo "└──────────────────────────────────────────────────────────────┘"
       echo ""
-      echo "  # Download"
-      echo "  curl -LO https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/${BUILD_VERSION}/${RPM_NAME}"
-      echo ""
-      echo "  # Install"
-      echo "  sudo yum install ./${RPM_NAME}"
+      echo "  curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/${BUILD_VERSION}/install.sh | sudo bash"
       echo ""
       echo "┌──────────────────────────────────────────────────────────────┐"
       echo "│ Browse packages:                                             │"
@@ -349,37 +420,30 @@ release:
       ### Quick Install (Rocky Linux 9 / RHEL 9)
       
       ```bash
-      # One-liner install
-      curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/${CI_COMMIT_TAG#v}/install.sh | sudo bash
+      # Always install latest version
+      curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/latest/install.sh | sudo bash
       ```
       
-      ### Manual Install
+      ### Post-Install
       
       ```bash
-      # Download RPM
-      curl -LO https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/${CI_COMMIT_TAG#v}/ollama-openai-proxy-${CI_COMMIT_TAG#v}-1.el9.x86_64.rpm
-      
-      # Install
-      sudo yum install ./ollama-openai-proxy-*.rpm
-      
       # Configure
       sudo vim /opt/ollama-openai-proxy/configs/dev.yaml
       
       # Start service
       sudo systemctl enable --now oop
       sudo systemctl status oop
+      
+      # View logs
+      journalctl -u oop -f
       ```
       
       ### Upgrade
       
       ```bash
-      # Download new version
-      curl -LO https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/generic/ollama-openai-proxy/${CI_COMMIT_TAG#v}/ollama-openai-proxy-${CI_COMMIT_TAG#v}-1.el9.x86_64.rpm
-      
-      # Upgrade
-      sudo systemctl stop oop
-      sudo yum upgrade ./ollama-openai-proxy-*.rpm
-      sudo systemctl start oop
+      # Same command - will install latest
+      curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/latest/install.sh | sudo bash
+      sudo systemctl restart oop
       ```
       
       ### Package Registry

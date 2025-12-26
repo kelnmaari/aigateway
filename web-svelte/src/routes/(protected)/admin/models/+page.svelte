@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest, type GPUDevice, type SavedModel, type RepoDownload } from '$lib/api/inference';
+	import { inferenceApi, type ModelInfo, type ArtifactInfo, type TRTEngine, type Provider, type Format, type Capability, type LoadRequest, type GPUDevice, type SavedModel, type RepoDownload, CHAT_IMPLIED_CAPABILITIES, EMBEDDING_IMPLIED_CAPABILITIES } from '$lib/api/inference';
 	import { api } from '$lib/api/client';
 	import { downloadsApi } from '$lib/api/downloads';
 	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
@@ -12,7 +12,19 @@
 
 	const providers: Provider[] = ['vllm', 'sglang', 'tgi', 'tei', 'tensorrt-llm', 'llama.cpp'];
 	const formats: Format[] = ['hf', 'gguf', 'trt', 'other'];
-	const capabilities: Capability[] = ['chat', 'embeddings', 'vision'];
+	// Capabilities based on Continue.dev model roles
+	// Chat models: chat, autocomplete, edit, apply
+	// Embedding models: embeddings, rerank
+	const capabilities: Capability[] = [
+		'chat',
+		'autocomplete',
+		'edit',
+		'apply',
+		'vision',
+		'embeddings',
+		'rerank',
+		'function-calling'
+	];
 
 	let models: ModelInfo[] = $state([]);
 	let savedModels: SavedModel[] = $state([]);
@@ -547,7 +559,7 @@
 			form.hf_file = file.rfilename;
 			form.format = 'gguf';
 			form.provider = 'llama.cpp';
-			form.capabilities = ['chat'];
+			form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 		} else {
 			form.hf_file = '';
 			form.format = 'hf';
@@ -558,27 +570,27 @@
 					// If browsing GGUF but selected non-GGUF file, still suggest llama.cpp
 					form.provider = 'llama.cpp';
 					form.format = 'gguf';
-					form.capabilities = ['chat'];
+					form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 					break;
 				case 'vllm':
 					form.provider = 'vllm';
-					form.capabilities = ['chat'];
+					form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 					break;
 				case 'sglang':
 					form.provider = 'sglang';
-					form.capabilities = ['chat'];
+					form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 					break;
 				case 'tgi':
 					form.provider = 'tgi';
-					form.capabilities = ['chat'];
+					form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 					break;
 				case 'embedding':
 					form.provider = 'tei'; // TEI (Text Embeddings Inference) is best for embeddings
-					form.capabilities = ['embeddings'];
+					form.capabilities = [...EMBEDDING_IMPLIED_CAPABILITIES];
 					break;
 				default:
 					form.provider = 'vllm'; // Default
-					form.capabilities = ['chat'];
+					form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 			}
 		}
 		
@@ -1156,9 +1168,24 @@
 	function toggleCapability(cap: Capability) {
 		const caps = form.capabilities || [];
 		if (caps.includes(cap)) {
-			form.capabilities = caps.filter(c => c !== cap);
+			// When removing, also remove implied capabilities
+			let toRemove: Capability[] = [cap];
+			if (cap === 'chat') {
+				toRemove = CHAT_IMPLIED_CAPABILITIES;
+			} else if (cap === 'embeddings') {
+				toRemove = EMBEDDING_IMPLIED_CAPABILITIES;
+			}
+			form.capabilities = caps.filter(c => !toRemove.includes(c));
 		} else {
-			form.capabilities = [...caps, cap];
+			// When adding, also add implied capabilities
+			let toAdd: Capability[] = [cap];
+			if (cap === 'chat') {
+				toAdd = CHAT_IMPLIED_CAPABILITIES;
+			} else if (cap === 'embeddings') {
+				toAdd = EMBEDDING_IMPLIED_CAPABILITIES;
+			}
+			// Merge without duplicates
+			form.capabilities = [...new Set([...caps, ...toAdd])];
 		}
 	}
 

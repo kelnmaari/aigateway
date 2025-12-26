@@ -36,15 +36,46 @@ const (
 )
 
 // ModelCapability представляет возможности модели
+// Capabilities определяют роли модели согласно Continue.dev model roles:
+// https://docs.continue.dev/customize/model-roles/00-intro
 type ModelCapability string
 
 const (
-	CapabilityChat            ModelCapability = "chat"
-	CapabilityEmbeddings      ModelCapability = "embeddings"
-	CapabilityVision          ModelCapability = "vision"
-	CapabilityFunctionCalling ModelCapability = "function-calling"
-	CapabilityCodeCompletion  ModelCapability = "code-completion"
+	// Chat model capabilities (text generation)
+	CapabilityChat         ModelCapability = "chat"         // Chat conversations
+	CapabilityAutocomplete ModelCapability = "autocomplete" // Code autocomplete suggestions
+	CapabilityEdit         ModelCapability = "edit"         // Generate code based on edit prompts
+	CapabilityApply        ModelCapability = "apply"        // Apply edits to files
+	CapabilityVision       ModelCapability = "vision"       // Vision/image understanding
+
+	// Embedding model capabilities
+	CapabilityEmbeddings ModelCapability = "embeddings" // Vector embeddings for semantic search
+	CapabilityRerank     ModelCapability = "rerank"     // Rerank vector search results
+
+	// Additional capabilities
+	CapabilityFunctionCalling ModelCapability = "function-calling" // Tool/function calling
+	CapabilityCodeCompletion  ModelCapability = "code-completion"  // Code completion (legacy, use autocomplete)
 )
+
+// ChatModelCapabilities returns capabilities implied by chat capability.
+// If a model can chat, it can also autocomplete, edit, and apply.
+func ChatModelCapabilities() []ModelCapability {
+	return []ModelCapability{
+		CapabilityChat,
+		CapabilityAutocomplete,
+		CapabilityEdit,
+		CapabilityApply,
+	}
+}
+
+// EmbeddingModelCapabilities returns capabilities implied by embeddings capability.
+// Embedding models can also rerank.
+func EmbeddingModelCapabilities() []ModelCapability {
+	return []ModelCapability{
+		CapabilityEmbeddings,
+		CapabilityRerank,
+	}
+}
 
 // ========================================
 // Model Provider
@@ -65,9 +96,9 @@ type ModelProvider struct {
 	ConfigDB string                 `json:"-" db:"config_json,omitempty"` // For DB serialization
 
 	// Health
-	HealthStatus     ModelHealthStatus `json:"health_status" db:"health_status"`
-	LastHealthCheck  *time.Time        `json:"last_health_check,omitempty" db:"last_health_check"`
-	ErrorMessage     string            `json:"error_message,omitempty" db:"error_message"`
+	HealthStatus    ModelHealthStatus `json:"health_status" db:"health_status"`
+	LastHealthCheck *time.Time        `json:"last_health_check,omitempty" db:"last_health_check"`
+	ErrorMessage    string            `json:"error_message,omitempty" db:"error_message"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
@@ -136,8 +167,8 @@ type ModelRegistry struct {
 	ParametersDB   string                 `json:"-" db:"parameters_json,omitempty"` // For DB serialization
 
 	// Requirements
-	RequiresGPU  bool `json:"requires_gpu" db:"requires_gpu"`
-	MinVRAMGB    *int `json:"min_vram_gb,omitempty" db:"min_vram_gb"`
+	RequiresGPU   bool `json:"requires_gpu" db:"requires_gpu"`
+	MinVRAMGB     *int `json:"min_vram_gb,omitempty" db:"min_vram_gb"`
 	ContextLength *int `json:"context_length,omitempty" db:"context_length"`
 
 	// Status
@@ -228,16 +259,16 @@ func (m *ModelRegistry) UnmarshalFromDB() error {
 
 // CreateModelRegistryRequest представляет запрос на регистрацию модели
 type CreateModelRegistryRequest struct {
-	ModelID      string                 `json:"model_id" binding:"required"`
-	ModelName    string                 `json:"model_name" binding:"required"`
-	ProviderID   string                 `json:"provider_id" binding:"required"`
-	Capabilities []ModelCapability      `json:"capabilities,omitempty"`
-	Parameters   map[string]interface{} `json:"parameters,omitempty"`
-	RequiresGPU  *bool                  `json:"requires_gpu,omitempty"`
-	MinVRAMGB    *int                   `json:"min_vram_gb,omitempty"`
-	ContextLength *int                  `json:"context_length,omitempty"`
-	Description  string                 `json:"description,omitempty"`
-	Tags         []string               `json:"tags,omitempty"`
+	ModelID       string                 `json:"model_id" binding:"required"`
+	ModelName     string                 `json:"model_name" binding:"required"`
+	ProviderID    string                 `json:"provider_id" binding:"required"`
+	Capabilities  []ModelCapability      `json:"capabilities,omitempty"`
+	Parameters    map[string]interface{} `json:"parameters,omitempty"`
+	RequiresGPU   *bool                  `json:"requires_gpu,omitempty"`
+	MinVRAMGB     *int                   `json:"min_vram_gb,omitempty"`
+	ContextLength *int                   `json:"context_length,omitempty"`
+	Description   string                 `json:"description,omitempty"`
+	Tags          []string               `json:"tags,omitempty"`
 }
 
 // UpdateModelRegistryRequest представляет запрос на обновление модели
@@ -256,25 +287,24 @@ type UpdateModelRegistryRequest struct {
 
 // ModelRegistryFilter представляет фильтры для поиска моделей
 type ModelRegistryFilter struct {
-	ProviderID   string              // Фильтр по provider
-	ProviderType ModelProviderType   // Фильтр по типу provider
-	Capabilities []ModelCapability   // Модели с этими capabilities
-	Status       ModelStatus         // Фильтр по статусу
-	HealthStatus ModelHealthStatus   // Фильтр по health
-	RequiresGPU  *bool               // Требуется ли GPU
-	Tag          string              // Фильтр по тегу
-	Limit        int                 // Limit results
-	Offset       int                 // Pagination offset
+	ProviderID   string            // Фильтр по provider
+	ProviderType ModelProviderType // Фильтр по типу provider
+	Capabilities []ModelCapability // Модели с этими capabilities
+	Status       ModelStatus       // Фильтр по статусу
+	HealthStatus ModelHealthStatus // Фильтр по health
+	RequiresGPU  *bool             // Требуется ли GPU
+	Tag          string            // Фильтр по тегу
+	Limit        int               // Limit results
+	Offset       int               // Pagination offset
 }
 
 // ModelRegistryStats представляет статистику registry
 type ModelRegistryStats struct {
-	TotalModels       int                         `json:"total_models"`
-	ActiveModels      int                         `json:"active_models"`
-	HealthyModels     int                         `json:"healthy_models"`
-	TotalProviders    int                         `json:"total_providers"`
-	EnabledProviders  int                         `json:"enabled_providers"`
-	ModelsByProvider  map[string]int              `json:"models_by_provider"`  // provider_name -> count
-	ModelsByCapability map[ModelCapability]int    `json:"models_by_capability"` // capability -> count
+	TotalModels        int                     `json:"total_models"`
+	ActiveModels       int                     `json:"active_models"`
+	HealthyModels      int                     `json:"healthy_models"`
+	TotalProviders     int                     `json:"total_providers"`
+	EnabledProviders   int                     `json:"enabled_providers"`
+	ModelsByProvider   map[string]int          `json:"models_by_provider"`   // provider_name -> count
+	ModelsByCapability map[ModelCapability]int `json:"models_by_capability"` // capability -> count
 }
-

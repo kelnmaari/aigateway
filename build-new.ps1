@@ -116,6 +116,20 @@ function Build-SvelteUI {
             }
         }
         
+        # Clean and regenerate Paraglide messages
+        Write-Info "Regenerating Paraglide messages..."
+        if (Test-Path "src/lib/paraglide") {
+            Remove-Item -Path "src/lib/paraglide" -Recurse -Force
+        }
+        if (Test-Path "project.inlang/cache") {
+            Remove-Item -Path "project.inlang/cache" -Recurse -Force
+        }
+        npx @inlang/paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide
+        if ($LASTEXITCODE -ne 0) {
+            Write-ErrorMsg "Paraglide compilation failed"
+            exit 1
+        }
+        
         # Build
         Write-Info "Running npm build..."
         npm run build

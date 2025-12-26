@@ -208,7 +208,10 @@ type Issue struct {
 
 // SuggestionItem represents an improvement suggestion
 type SuggestionItem struct {
+	FilePath    string `json:"file_path,omitempty"`
+	Line        int    `json:"line,omitempty"`
 	Type        string `json:"type"`
+	Category    string `json:"category,omitempty"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Priority    string `json:"priority"`

@@ -441,24 +441,26 @@ func (r *PerFileReviewer) aggregateResults(results []FileReviewResult) *analyzer
 	totalScore := 0
 	reviewedCount := 0
 
-	for _, r := range results {
-		if r.Error == nil {
-			totalScore += r.Score
+	for _, res := range results {
+		if res.Error == nil {
+			totalScore += res.Score
 			reviewedCount++
 		}
 		
-		// Add file path to each issue if not set
-		for _, issue := range r.Issues {
-			if issue.FilePath == "" {
-				issue.FilePath = r.FilePath
-			}
+		// ALWAYS set file path from the reviewed file (model often ignores instructions)
+		for _, issue := range res.Issues {
+			issue.FilePath = res.FilePath // Force file path
 			allIssues = append(allIssues, issue)
 		}
 		
-		allSuggestions = append(allSuggestions, r.Suggestions...)
+		// ALWAYS set file path for suggestions too
+		for _, sug := range res.Suggestions {
+			sug.FilePath = res.FilePath // Force file path
+			allSuggestions = append(allSuggestions, sug)
+		}
 		
-		if r.Summary != "" {
-			summaries = append(summaries, fmt.Sprintf("**%s**: %s", r.FilePath, r.Summary))
+		if res.Summary != "" {
+			summaries = append(summaries, fmt.Sprintf("**%s**: %s", res.FilePath, res.Summary))
 		}
 	}
 

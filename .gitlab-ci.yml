@@ -1,159 +1,380 @@
-# AI Code Review через Ollama-OpenAI Proxy
-# Адаптировано для Go проекта aigateway-desktop
+# AIGateway (Ollama-OpenAI Proxy) CI/CD Pipeline
+# Build, test, and package for Rocky Linux (RPM)
 
 stages:
-  - analyze
+  - test
+  - build
+  - package
+  - release
 
 variables:
-  # Настройки прокси (используйте GitLab CI/CD Variables)
-  PROXY_URL: "http://176.53.180.178:8085/v1/chat/completions"
-  # PROXY_API_KEY должен быть настроен в Settings → CI/CD → Variables
+  # Go configuration
+  GO_VERSION: "1.23"
+  GOPROXY: "https://proxy.golang.org,direct"
+  CGO_ENABLED: "0"
   
-  # Модели для code review (можно настроить разные для разных задач)
-  # Рекомендуемые модели:
-  #   👑 deepseek-coder:33b - BEST для детального Full MR review (медленнее, но качественнее)
-  #   🏆 qwen2.5-coder:7b - отличный для Go кода, хороший баланс скорость/качество
-  #   ⭐ deepseek-coder:6.7b - быстрый, хороший для коммитов
-  #   ✅ codellama:7b - универсальный
-  #   ⚠️ gpt-oss-tuned:latest - НЕСТАБИЛЬНЫЙ, может возвращать пустые ответы!
+  # Node.js for WebUI
+  NODE_VERSION: "20"
   
-  # Модель для быстрого review последнего коммита (автоматический)
-  COMMIT_REVIEW_MODEL: "gpt-oss-tuned:latest"
-  
-  # Модель для полного детального review MR (мануальный)
-  FULL_MR_REVIEW_MODEL: "gpt-oss-tuned:latest"
+  # RPM repository (optional - for publishing)
+  # RPM_REPO_URL: "https://your-rpm-repo.example.com"
 
-# Общие настройки для review jobs (YAML anchor)
-.review_base:
-  image: alpine:latest
+# Compute version based on context:
+# - Tags: version=X.Y.Z, release=1
+# - Branches: version=X.Y.Z, release=branch.jobid (RPM-safe format)
+.compute_version: &compute_version
+  - |
+    BASE_VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
+    if [ -n "$CI_COMMIT_TAG" ]; then
+      # Release build from tag
+      export RPM_VERSION="${CI_COMMIT_TAG#v}"
+      export RPM_RELEASE="1"
+      export BUILD_VERSION="${RPM_VERSION}"
+    else
+      # Branch build: sanitize branch name (replace / and _ with .)
+      BRANCH_SAFE=$(echo "$CI_COMMIT_REF_NAME" | tr '/' '.' | tr '_' '.' | tr '-' '.' | cut -c1-20)
+      export RPM_VERSION="${BASE_VERSION}"
+      export RPM_RELEASE="${BRANCH_SAFE}.${CI_JOB_ID}"
+      export BUILD_VERSION="${RPM_VERSION}-${BRANCH_SAFE}-${CI_JOB_ID}"
+    fi
+    echo "BUILD_VERSION=$BUILD_VERSION"
+    echo "RPM_VERSION=$RPM_VERSION"
+    echo "RPM_RELEASE=$RPM_RELEASE"
+
+# Cache Go modules and npm packages
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .go/pkg/mod/
+    - web-svelte/node_modules/
+
+# ==============================================================================
+# TEST STAGE
+# ==============================================================================
+
+test:
+  stage: test
+  image: golang:${GO_VERSION}-alpine
   before_script:
-    - apk add --no-cache curl jq bash git
-
-# ============================================================================
-# AI Code Review для Merge Requests
-# ============================================================================
-
-# Job 1: Быстрая проверка последнего коммита (автоматически при push)
-analyze_latest_commit:
-  extends: .review_base
-  stage: analyze
+    - apk add --no-cache git gcc musl-dev
+    - mkdir -p .go
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+    - export PATH="$GOPATH/bin:$PATH"
   script:
-    - chmod +x .gitlab/scripts/review-commit.sh
-    - .gitlab/scripts/review-commit.sh
+    - go mod download
+    - go vet ./...
+    - go test -race -coverprofile=coverage.out ./...
+    - go tool cover -func=coverage.out | tail -1
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.out
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
 
+# ==============================================================================
+# BUILD STAGE
+# ==============================================================================
+
+# Build Go binary for Linux amd64
+build:binary:
+  stage: build
+  image: golang:${GO_VERSION}-alpine
+  before_script:
+    - apk add --no-cache git
+    - mkdir -p .go
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+  script:
+    - *compute_version
+    - BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    - GIT_COMMIT=${CI_COMMIT_SHORT_SHA}
+    - echo "Building version $BUILD_VERSION"
+    - |
+      go build -ldflags "\
+        -X main.Version=${BUILD_VERSION} \
+        -X main.BuildTime=${BUILD_TIME} \
+        -X main.GitCommit=${GIT_COMMIT} \
+        -s -w" \
+        -o bin/server \
+        cmd/server/main.go
+    - chmod +x bin/server
+    - ls -la bin/
+    # Save version info for later stages
+    - echo "$BUILD_VERSION" > bin/BUILD_VERSION
+    - echo "$RPM_VERSION" > bin/RPM_VERSION
+    - echo "$RPM_RELEASE" > bin/RPM_RELEASE
   artifacts:
     paths:
-      - ai-review-commit-*.md
-    expire_in: 30 days
-    when: always
+      - bin/server
+      - bin/BUILD_VERSION
+      - bin/RPM_VERSION
+      - bin/RPM_RELEASE
+    expire_in: 1 week
   rules:
-    - if: '$CI_MERGE_REQUEST_IID'  # Только для MR (автоматически)
-  allow_failure: true
-  timeout: 10m
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
 
-# Job 2: Полный анализ MR (запускается вручную для детального review)
-analyze_full_mr:
-  extends: .review_base
-  stage: analyze
+# Build Svelte WebUI
+build:webui:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - cd web-svelte
+    - npm ci
   script:
-    - chmod +x .gitlab/scripts/review-full-mr.sh
-    - .gitlab/scripts/review-full-mr.sh
-
+    - npm run build
+    - ls -la build/
   artifacts:
     paths:
-      - ai-review-mr-*-full.md
-      - ai-review-mr-*-file-*.md
-    expire_in: 30 days
-    when: always
+      - web-svelte/build/
+    expire_in: 1 week
   rules:
-    - if: '$CI_MERGE_REQUEST_IID'  # Только для MR
-      when: manual  # Запускается вручную
-  allow_failure: true
-  timeout: 40m  # Увеличено для deepseek-coder:33b + file-based анализ (каждый файл отдельно)
-  
-# ============================================================================
-# SETUP INSTRUCTIONS:
-# ============================================================================
-# 
-# 1. Создайте GitLab CI/CD переменные:
-#
-#    a) PROXY_API_KEY (Required):
-#       Settings → CI/CD → Variables → Add Variable
-#       Key: PROXY_API_KEY
-#       Value: ваш API ключ из Ollama-OpenAI Proxy
-#       Flags: [✓] Mask variable, [✓] Protect variable
-#
-#    b) GITLAB_API_TOKEN (Optional):
-#       По умолчанию используется CI_JOB_TOKEN (автоматический).
-#       
-#       Если CI_JOB_TOKEN не работает (GitLab < 15 или ограниченные права):
-#       Создайте Project Access Token:
-#         Settings → Access Tokens → Add new token
-#         Name: ai-review-token
-#         Role: Developer
-#         Scopes: [✓] api, [✓] read_api
-#       
-#       Затем добавьте в CI/CD Variables:
-#       Key: GITLAB_API_TOKEN
-#       Value: (скопированный токен)
-#       Flags: [✓] Mask variable, [✓] Protect variable
-#       
-#       Для включения расширенных прав CI_JOB_TOKEN (GitLab 15+):
-#       Settings → CI/CD → Token Access → 
-#         [✓] Limit access to this project
-#
-# 2. Проверьте доступность прокси:
-#    - Proxy URL должен быть доступен из GitLab Runner
-#    - Если на localhost - использовать внешний IP
-#    - Проверьте firewall правила
-#
-# 3. Настройка модели (опционально):
-#    Измените переменную REVIEW_MODEL на нужную:
-#      - qwen2.5-coder:7b (default, лучший для Go)
-#      - deepseek-coder:6.7b (быстрый)
-#      - codellama:7b (универсальный)
-#
-# 4. Доступные модели можно проверить:
-#    curl http://YOUR_PROXY:8085/v1/models \
-#      -H "Authorization: Bearer $API_KEY"
-#
-# 5. Workflow (Две джобы для разных сценариев):
-#
-#    🚀 Job 1: analyze_latest_commit (АВТОМАТИЧЕСКИ при каждом push)
-#    ──────────────────────────────────────────────────────────────
-#    1. Создаете/обновляете MR в GitLab
-#    2. Pipeline АВТОМАТИЧЕСКИ запускает analyze_latest_commit
-#    3. AI анализирует ТОЛЬКО ПОСЛЕДНИЙ КОММИТ (быстрая проверка)
-#    4. Генерируется MD файл: ai-review-commit-{sha}.md
-#    5. Краткий ТОП-5 review появляется в комментарии к MR
-#    6. Время выполнения: ~1-3 минуты
-#
-#    🔍 Job 2: analyze_full_mr (ВРУЧНУЮ для детального анализа)
-#    ──────────────────────────────────────────────────────────
-#    1. Открываете Pipeline в GitLab CI/CD
-#    2. ВРУЧНУЮ запускаете analyze_full_mr (кнопка ▶️ Play)
-#    3. AI анализирует ВЕСЬ MR целиком (все коммиты)
-#    4. Генерируется MD файл: ai-review-mr-{iid}-full.md
-#    5. Детальный отчет по архитектуре/безопасности/производительности
-#    6. Время выполнения: ~5-10 минут (в зависимости от размера MR)
-#
-# 6. API Endpoints (различия):
-#    - analyze_latest_commit: /repository/commits/{sha}/diff
-#    - analyze_full_mr: /merge_requests/{iid}/changes
-#
-# 7. Prompts (различия):
-#    - analyze_latest_commit: "ТОП-5 замечаний, макс 3000 символов" (краткий)
-#    - analyze_full_mr: "Полный анализ: архитектура, безопасность, производительность" (детальный)
-#
-# 8. Artifacts:
-#    - ai-review-commit-*.md (каждый коммит)
-#    - ai-review-mr-*-full.md (полный MR)
-#    - Срок хранения: 30 дней
-#    - Доступ: Pipeline → Job → Browse artifacts
-#
-# 9. Использование:
-#    - Для daily review → используй analyze_latest_commit (автоматически)
-#    - Перед мержем → запусти analyze_full_mr вручную для финального чека
-#
-# ============================================================================
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
 
+# ==============================================================================
+# PACKAGE STAGE - Build RPMs
+# ==============================================================================
+
+# Build repository configuration RPM (aigateway-repo)
+package:repo-rpm:
+  stage: package
+  image: rockylinux:9
+  before_script:
+    - dnf install -y rpm-build rpmdevtools
+    - rpmdev-setuptree
+  script:
+    - echo "Building repository configuration RPM"
+    
+    # Generate .repo file with actual project ID
+    - |
+      cat > ~/rpmbuild/SOURCES/aigateway.repo << EOF
+      [aigateway]
+      name=AIGateway RPM Repository
+      baseurl=https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/rpm
+      enabled=1
+      gpgcheck=0
+      repo_gpgcheck=0
+      sslverify=1
+      EOF
+    
+    # Copy spec file
+    - cp packaging/rpm/aigateway-repo.spec ~/rpmbuild/SPECS/
+    
+    # Build RPM
+    - rpmbuild -bb ~/rpmbuild/SPECS/aigateway-repo.spec
+    
+    # Copy to artifacts (separate dir to avoid conflicts)
+    - mkdir -p dist-repo
+    - cp ~/rpmbuild/RPMS/noarch/*.rpm dist-repo/
+    - ls -la dist-repo/
+  artifacts:
+    paths:
+      - dist-repo/*.rpm
+    expire_in: 4 weeks
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Build main application RPM
+package:rpm:
+  stage: package
+  image: rockylinux:9
+  needs:
+    - build:binary
+    - build:webui
+  before_script:
+    - dnf install -y rpm-build rpmdevtools
+    - rpmdev-setuptree
+  script:
+    # Read version info from build stage
+    - RPM_VERSION=$(cat bin/RPM_VERSION 2>/dev/null || cat VERSION 2>/dev/null || echo "0.0.0")
+    - RPM_RELEASE=$(cat bin/RPM_RELEASE 2>/dev/null || echo "1")
+    - BUILD_VERSION=$(cat bin/BUILD_VERSION 2>/dev/null || echo "$RPM_VERSION")
+    - echo "Building RPM version=$RPM_VERSION release=$RPM_RELEASE (full=$BUILD_VERSION)"
+    
+    # Copy sources to rpmbuild
+    - cp bin/server ~/rpmbuild/SOURCES/server
+    - cp packaging/rpm/oop.service ~/rpmbuild/SOURCES/
+    - cp packaging/rpm/ollama-openai-proxy.spec ~/rpmbuild/SPECS/
+    
+    # Build RPM with version and release
+    - |
+      rpmbuild \
+        --define "version $RPM_VERSION" \
+        --define "release $RPM_RELEASE" \
+        -bb ~/rpmbuild/SPECS/ollama-openai-proxy.spec
+    
+    # Copy RPM to artifacts
+    - mkdir -p dist
+    - cp ~/rpmbuild/RPMS/*/*.rpm dist/
+    - ls -la dist/
+    
+    # Log built packages
+    - |
+      for f in dist/*.rpm; do
+        echo "Built: $f (version: $RPM_VERSION, release: $RPM_RELEASE)"
+      done
+  artifacts:
+    paths:
+      - dist/*.rpm
+    expire_in: 4 weeks
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ==============================================================================
+# RELEASE STAGE
+# ==============================================================================
+
+# Publish RPMs to GitLab Package Registry (all branches and tags)
+# Uses GitLab's native RPM repository feature (requires GitLab 15.7+)
+publish:rpm:
+  stage: release
+  image: curlimages/curl:latest
+  needs:
+    - package:rpm
+    - package:repo-rpm
+    - job: build:binary
+      artifacts: true
+  script:
+    - RPM_VERSION=$(cat bin/RPM_VERSION)
+    - RPM_RELEASE=$(cat bin/RPM_RELEASE)
+    - BUILD_VERSION=$(cat bin/BUILD_VERSION)
+    
+    - |
+      echo "Publishing RPMs to GitLab Package Registry"
+      echo "  Version: ${RPM_VERSION}"
+      echo "  Release: ${RPM_RELEASE}"
+    
+    # Upload all RPMs to GitLab RPM Repository (yum-compatible)
+    - |
+      for RPM_FILE in dist/*.rpm dist-repo/*.rpm; do
+        if [ -f "$RPM_FILE" ]; then
+          RPM_NAME=$(basename ${RPM_FILE})
+          echo "Uploading: ${RPM_NAME}"
+          curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+               --upload-file "${RPM_FILE}" \
+               "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/rpm/${RPM_NAME}"
+        fi
+      done
+    
+    - |
+      echo ""
+      echo "=============================================="
+      echo " RPMs published successfully!"
+      echo "=============================================="
+      echo ""
+      echo " ┌─────────────────────────────────────────────────────────────┐"
+      echo " │ Quick Start (one-liner):                                    │"
+      echo " └─────────────────────────────────────────────────────────────┘"
+      echo ""
+      echo " curl -LO https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/rpm/aigateway-repo-1.0-1.el9.noarch.rpm"
+      echo " sudo yum install ./aigateway-repo-1.0-1.el9.noarch.rpm"
+      echo " sudo yum install ollama-openai-proxy"
+      echo ""
+      echo " ┌─────────────────────────────────────────────────────────────┐"
+      echo " │ Or manual setup (add to /etc/yum.repos.d/aigateway.repo):   │"
+      echo " └─────────────────────────────────────────────────────────────┘"
+      echo ""
+      echo "[aigateway]"
+      echo "name=AIGateway RPM Repository"
+      echo "baseurl=https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/rpm"
+      echo "enabled=1"
+      echo "gpgcheck=0"
+      echo ""
+      echo " ┌─────────────────────────────────────────────────────────────┐"
+      echo " │ For private projects, use Deploy Token:                     │"
+      echo " └─────────────────────────────────────────────────────────────┘"
+      echo ""
+      echo "baseurl=https://<token_name>:<token>@gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/rpm"
+      echo ""
+      echo " ┌─────────────────────────────────────────────────────────────┐"
+      echo " │ Installation commands:                                      │"
+      echo " └─────────────────────────────────────────────────────────────┘"
+      echo ""
+      echo "# Install latest version"
+      echo "yum install ollama-openai-proxy"
+      echo ""
+      echo "# Install specific version"
+      echo "yum install ollama-openai-proxy-${RPM_VERSION}-${RPM_RELEASE}"
+      echo ""
+      echo "# Update"
+      echo "yum update ollama-openai-proxy"
+      echo ""
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Create GitLab Release with RPM attached (tags only)
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - package:rpm
+    - publish:rpm
+    - job: build:binary
+      artifacts: true
+  script:
+    - TAG_VERSION="${CI_COMMIT_TAG#v}"
+    - echo "Creating release for version ${TAG_VERSION}"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: 'AIGateway $CI_COMMIT_TAG'
+    description: |
+      ## AIGateway $CI_COMMIT_TAG
+      
+      ### Quick Start (Rocky Linux 9)
+      
+      ```bash
+      # Download and install repository configuration
+      curl -LO https://gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/rpm/aigateway-repo-1.0-1.el9.noarch.rpm
+      sudo yum install ./aigateway-repo-1.0-1.el9.noarch.rpm
+      
+      # Install AIGateway
+      sudo yum install ollama-openai-proxy
+      
+      # Configure
+      sudo vim /opt/ollama-openai-proxy/configs/dev.yaml
+      
+      # Start service
+      sudo systemctl enable --now oop
+      ```
+      
+      ### For Private Projects
+      
+      Create a Deploy Token in GitLab (Settings → Repository → Deploy Tokens) with `read_package_registry` permission.
+      
+      Then edit `/etc/yum.repos.d/aigateway.repo`:
+      ```
+      baseurl=https://TOKEN_NAME:TOKEN@gitlab.alexue4.dev/api/v4/projects/${CI_PROJECT_ID}/packages/rpm
+      ```
+      
+      ### Upgrade
+      
+      ```bash
+      sudo yum update ollama-openai-proxy
+      sudo systemctl restart oop
+      ```
+      
+      ### Package Registry
+      
+      Browse all packages: ${CI_PROJECT_URL}/-/packages
+    assets:
+      links:
+        - name: 'Package Registry'
+          url: '${CI_PROJECT_URL}/-/packages'
+          link_type: package
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# ==============================================================================
+# OPTIONAL: AI Code Review (for MRs)
+# ==============================================================================
+
+# Uncomment if you want AI code review on merge requests
+# include:
+#   - local: '.gitlab/ci/ai-review.yml'

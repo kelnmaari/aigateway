@@ -350,10 +350,12 @@ const (
 
 // GitLabSuggestion represents a general suggestion for the MR
 type GitLabSuggestion struct {
-	Type        string `json:"type"`        // "improvement", "best_practice", "documentation"
+	FilePath    string `json:"file_path,omitempty"` // File this suggestion relates to
+	Line        int    `json:"line,omitempty"`      // Line number if applicable
+	Type        string `json:"type"`                // "improvement", "best_practice", "documentation"
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	Priority    string `json:"priority"`    // "high", "medium", "low"
+	Priority    string `json:"priority"` // "high", "medium", "low"
 }
 
 // ============================================================================

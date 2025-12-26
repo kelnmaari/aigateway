@@ -583,6 +583,8 @@ func (p *Processor) buildReviewResult(analysis *analyzer.AnalysisResultParsed, d
 	// Add suggestions
 	for _, suggestion := range analysis.Suggestions {
 		result.Result.Suggestions = append(result.Result.Suggestions, models.GitLabSuggestion{
+			FilePath:    suggestion.FilePath,
+			Line:        suggestion.Line,
 			Type:        suggestion.Type,
 			Title:       suggestion.Title,
 			Description: suggestion.Description,

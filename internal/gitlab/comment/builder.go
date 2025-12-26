@@ -143,7 +143,18 @@ func (b *Builder) writeSuggestions(sb *strings.Builder, suggestions []models.Git
 
 	for _, s := range suggestions {
 		priority := b.priorityBadge(s.Priority)
-		sb.WriteString(fmt.Sprintf("#### %s %s\n\n%s\n\n", priority, s.Title, s.Description))
+		
+		// Include file path if available
+		location := ""
+		if s.FilePath != "" {
+			if s.Line > 0 {
+				location = fmt.Sprintf("`%s:%d` — ", s.FilePath, s.Line)
+			} else {
+				location = fmt.Sprintf("`%s` — ", s.FilePath)
+			}
+		}
+		
+		sb.WriteString(fmt.Sprintf("#### %s %s%s\n\n%s\n\n", priority, location, s.Title, s.Description))
 	}
 
 	if b.collapseSections {

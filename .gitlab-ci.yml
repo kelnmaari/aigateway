@@ -121,11 +121,12 @@ build:binary:
 build:webui:
   stage: build
   image: node:${NODE_VERSION}-alpine
+  cache: []  # Disable cache for this job - platform-specific deps
   before_script:
     - cd web-svelte
-    # Use npm install instead of npm ci to resolve platform-specific deps
-    # (package-lock.json may have been generated on Windows)
-    - rm -f package-lock.json
+    # Clean install for Linux (package-lock.json may have Windows deps)
+    - rm -rf node_modules package-lock.json
+    - npm cache clean --force
     - npm install
   script:
     - npm run build

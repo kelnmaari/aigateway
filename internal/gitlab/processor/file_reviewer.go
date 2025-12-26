@@ -351,7 +351,7 @@ use the available tools to search for related code before making your review.
 
 After gathering necessary context, provide your review as JSON:`)
 	
-	sb.WriteString(r.getResponseFormat())
+	sb.WriteString(r.getResponseFormat(diff.NewPath))
 	
 	return sb.String()
 }
@@ -389,15 +389,15 @@ You MUST respond with valid JSON only. No markdown, no explanations, no text bef
 - Do not nitpick style issues`, langInstruction)
 }
 
-func (r *PerFileReviewer) getResponseFormat() string {
-	return `
+func (r *PerFileReviewer) getResponseFormat(filePath string) string {
+	return fmt.Sprintf(`
 
 {
   "summary": "One sentence summary of this file's changes",
   "score": 85,
   "issues": [
     {
-      "file_path": "path/to/file.go",
+      "file_path": "%s",
       "line": 42,
       "severity": "warning",
       "category": "security",
@@ -407,7 +407,8 @@ func (r *PerFileReviewer) getResponseFormat() string {
   ],
   "suggestions": [
     {
-      "file_path": "path/to/file.go",
+      "file_path": "%s",
+      "line": 100,
       "category": "best_practice",
       "title": "Improvement idea",
       "description": "Details",
@@ -416,13 +417,13 @@ func (r *PerFileReviewer) getResponseFormat() string {
   ]
 }
 
-IMPORTANT:
-- file_path: REQUIRED in every issue and suggestion
-- line: line number from diff (look for @@ markers)
+CRITICAL RULES:
+- file_path: ALWAYS use "%s" (the file being reviewed)
+- line: REQUIRED - get from diff @@ markers (e.g., @@ -10,5 +12,8 @@ means line 12)
 - severity: "critical", "warning", "info"
 - category: "security", "bugs", "style", "performance", "best_practice"
 - priority: "high", "medium", "low"
-- Return empty arrays if no issues found`
+- Return empty arrays if no issues found`, filePath, filePath, filePath)
 }
 
 // aggregateResults combines per-file results into overall review

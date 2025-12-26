@@ -372,11 +372,16 @@ publish:rpm:
       echo "║                    Installation complete!                    ║"
       echo "╚══════════════════════════════════════════════════════════════╝"
       echo ""
-      echo "Next steps:"
-      echo "  1. Edit config: sudo vim /opt/ollama-openai-proxy/configs/dev.yaml"
-      echo "  2. Start:       sudo systemctl enable --now oop"
-      echo "  3. Status:      sudo systemctl status oop"
-      echo "  4. Logs:        journalctl -u oop -f"
+      
+      # Show service status
+      echo "→ Service status:"
+      echo ""
+      sudo systemctl status oop --no-pager 2>/dev/null || echo "  Service not running (first install)"
+      echo ""
+      echo "Commands:"
+      echo "  Start:   sudo systemctl enable --now oop"
+      echo "  Status:  sudo systemctl status oop"
+      echo "  Logs:    journalctl -u oop -f"
       echo ""
       SCRIPT
     

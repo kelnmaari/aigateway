@@ -64,18 +64,50 @@
 			const sysInfo = await api.get<{ version: string; git_commit: string }>('/api/system/info');
 			currentVersion = sysInfo.version || 'unknown';
 			
-			// Get changelogs to find latest version
+			// Fetch latest version from GitLab Package Registry (external source)
+			// This works even without updating the server - checks remote packages
+			try {
+				const gitlabRes = await fetch('https://gitlab.alexue4.dev/api/v4/projects/146/packages?order_by=version&sort=desc&per_page=10', {
+					headers: { 'Accept': 'application/json' }
+				});
+				if (gitlabRes.ok) {
+					const packages = await gitlabRes.json();
+					if (packages && packages.length > 0) {
+						// Find the latest stable version (e.g., "4.0.0", not "4.0.0-feature.xxx")
+						// Stable versions don't have a hyphen after the semver part
+						const stableVersions = packages
+							.map((p: { version: string }) => p.version)
+							.filter((v: string) => /^\d+\.\d+\.\d+$/.test(v))
+							.sort((a: string, b: string) => compareVersions(b, a));
+						
+						if (stableVersions.length > 0) {
+							latestVersion = stableVersions[0];
+						} else {
+							// Fallback to any latest version if no stable found
+							latestVersion = packages[0].version?.replace(/^v/, '') || '';
+						}
+						
+						// Check if update is available
+						if (currentVersion !== 'dev' && currentVersion !== 'unknown' && latestVersion) {
+							hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+							console.log('[Version Check via Package Registry]', { current: currentVersion, latest: latestVersion, hasUpdate });
+						}
+						return; // Success - don't need fallback
+					}
+				}
+			} catch (gitlabErr) {
+				console.warn('GitLab Package Registry unreachable, using local changelogs as fallback');
+			}
+			
+			// Fallback to local changelogs if GitLab is unreachable
 			const changelogsRes = await api.get<{ changelogs: Array<{ version: string }> }>('/api/system/changelogs');
 			const changelogs = changelogsRes.changelogs || [];
-			
 			if (changelogs.length > 0) {
-				// Find the latest version from changelogs
 				const versions = changelogs.map(c => c.version).sort((a, b) => compareVersions(b, a));
 				latestVersion = versions[0];
-				
-				// Check if update is available
 				if (currentVersion !== 'dev' && currentVersion !== 'unknown') {
 					hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+					console.log('[Version Check via Changelogs]', { current: currentVersion, latest: latestVersion, hasUpdate });
 				}
 			}
 		} catch (err) {

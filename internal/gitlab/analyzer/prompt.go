@@ -20,9 +20,10 @@ const SystemPrompt = `You are an expert code reviewer with deep knowledge in sof
 1. Focus on issues that matter - don't nitpick minor style issues
 2. Provide specific line numbers when reporting issues
 3. Explain WHY something is problematic
-4. Suggest concrete fixes when possible
-5. Consider the context of the change
-6. Be constructive and professional
+4. ALWAYS provide concrete code examples showing how to fix the issue
+5. Include "before" and "after" code snippets when applicable
+6. Consider the context of the change
+7. Be constructive and professional
 
 ## Output Format:
 You MUST respond with valid JSON only. No markdown, no explanations outside JSON.`
@@ -113,7 +114,7 @@ Respond with a JSON object in this EXACT structure:
           "severity": "warning",
           "category": "security",
           "message": "What the issue is",
-          "suggestion": "How to fix it"
+          "suggestion": "Replace with corrected code: func example() { /* fixed implementation */ }. This fixes the issue because..."
         }
       ]
     }
@@ -135,7 +136,9 @@ IMPORTANT:
 - priority: "high", "medium", or "low"
 - Only include file_reviews for files with actual issues
 - Be specific with line numbers - they should match the diff
-- If no issues found, set empty arrays and high scores`
+- If no issues found, set empty arrays and high scores
+- ALWAYS include code examples in the suggestion field showing the corrected code
+- Format code examples using triple backticks with language hint`
 
 // BuildReviewPrompt создает промпт для ревью MR
 func BuildReviewPrompt(req *AnalysisRequest) string {
@@ -207,10 +210,12 @@ Respond with JSON containing ONLY this file's review:
       "severity": "warning",
       "category": "security",
       "message": "Issue description",
-      "suggestion": "How to fix"
+      "suggestion": "How to fix: [include corrected code example here]"
     }
   ]
-}`,
+}
+
+IMPORTANT: Always include concrete code examples in the suggestion field showing the corrected implementation.`,
 		change.FilePath,
 		getLanguage(change),
 		change.LinesAdded,

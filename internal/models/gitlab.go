@@ -171,8 +171,9 @@ type GitLabProjectSettings struct {
 	SkipBots        bool `json:"skip_bots,omitempty"`          // Skip bot-created MRs
 
 	// LLM settings
-	MaxReviewTokens int  `json:"max_review_tokens,omitempty"` // Max tokens for LLM response, default: 8192
-	PerFileReview   bool `json:"per_file_review,omitempty"`   // Review each file separately with tool calling
+	MaxReviewTokens int    `json:"max_review_tokens,omitempty"` // Max tokens for LLM response, default: 8192
+	PerFileReview   bool   `json:"per_file_review,omitempty"`   // Review each file separately with tool calling
+	ReviewLanguage  string `json:"review_language,omitempty"`   // Language for review output: "en", "ru", etc.
 
 	// Chunking settings
 	ChunkSize    int `json:"chunk_size,omitempty"`    // Default: 1000 tokens

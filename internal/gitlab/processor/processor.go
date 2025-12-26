@@ -516,12 +516,18 @@ func (p *Processor) analyzePerFile(
 	}
 	
 	// Create per-file reviewer
+	reviewLang := project.Settings.ReviewLanguage
+	if reviewLang == "" {
+		reviewLang = "en"
+	}
+	
 	reviewer := NewPerFileReviewer(
 		p.ragService,
 		project.ID,
 		llmURL,
 		p.llmAPIKey,
 		maxTokens,
+		reviewLang,
 		p.logger,
 	)
 	

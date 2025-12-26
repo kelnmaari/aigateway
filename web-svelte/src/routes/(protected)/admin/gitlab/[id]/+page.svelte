@@ -68,6 +68,7 @@
 	let editSkipDraftMRs = $state(true);
 	let editSkipBots = $state(true);
 	let editPerFileReview = $state(false);
+	let editReviewLanguage = $state('en');
 	let editCollectionName = $state('');
 	let editStatus = $state<'active' | 'disabled'>('active');
 	let isSaving = $state(false);
@@ -375,6 +376,7 @@
 		editSkipDraftMRs = project.settings?.skip_draft_mrs ?? true;
 		editSkipBots = project.settings?.skip_bots ?? true;
 		editPerFileReview = project.settings?.per_file_review ?? false;
+		editReviewLanguage = project.settings?.review_language || 'en';
 		editCollectionName = project.settings?.collection_name || '';
 		saveError = '';
 		showEditProjectModal = true;
@@ -413,6 +415,7 @@
 					skip_draft_mrs: editSkipDraftMRs,
 					skip_bots: editSkipBots,
 					per_file_review: editPerFileReview,
+					review_language: editReviewLanguage,
 					collection_name: editCollectionName || undefined
 				}
 			});
@@ -1328,6 +1331,17 @@
 							<label for="editPerFileReview" class="text-sm" title="Review each file separately with tool calling for better context">
 								Per-file review (with tools)
 							</label>
+						</div>
+						<div class="flex items-center gap-2">
+							<label for="editReviewLanguage" class="text-sm">Review Language:</label>
+							<select
+								id="editReviewLanguage"
+								bind:value={editReviewLanguage}
+								class="rounded border px-2 py-1 bg-background text-sm"
+							>
+								<option value="en">English</option>
+								<option value="ru">Русский</option>
+							</select>
 						</div>
 					</div>
 				</div>

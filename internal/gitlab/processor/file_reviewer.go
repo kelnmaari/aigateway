@@ -39,12 +39,13 @@ type FileReviewResult struct {
 
 // PerFileReviewer reviews MR file by file with tool calling
 type PerFileReviewer struct {
-	tools       *ReviewTools
-	llmBaseURL  string
-	llmAPIKey   string
-	httpClient  *http.Client
-	logger      *logrus.Logger
-	maxTokens   int
+	tools          *ReviewTools
+	llmBaseURL     string
+	llmAPIKey      string
+	httpClient     *http.Client
+	logger         *logrus.Logger
+	maxTokens      int
+	reviewLanguage string // "ru", "en", etc.
 }
 
 // NewPerFileReviewer creates a per-file reviewer
@@ -54,15 +55,20 @@ func NewPerFileReviewer(
 	llmBaseURL string,
 	llmAPIKey string,
 	maxTokens int,
+	reviewLanguage string,
 	logger *logrus.Logger,
 ) *PerFileReviewer {
+	if reviewLanguage == "" {
+		reviewLanguage = "en"
+	}
 	return &PerFileReviewer{
-		tools:      NewReviewTools(ragService, projectID, logger),
-		llmBaseURL: llmBaseURL,
-		llmAPIKey:  llmAPIKey,
-		httpClient: &http.Client{Timeout: 120 * time.Second},
-		logger:     logger,
-		maxTokens:  maxTokens,
+		tools:          NewReviewTools(ragService, projectID, logger),
+		llmBaseURL:     llmBaseURL,
+		llmAPIKey:      llmAPIKey,
+		httpClient:     &http.Client{Timeout: 120 * time.Second},
+		logger:         logger,
+		maxTokens:      maxTokens,
+		reviewLanguage: reviewLanguage,
 	}
 }
 
@@ -351,7 +357,15 @@ After gathering necessary context, provide your review as JSON:`)
 }
 
 func (r *PerFileReviewer) getFileReviewSystemPrompt() string {
-	return `You are an expert code reviewer. Your task is to review code changes and output ONLY valid JSON.
+	langInstruction := "Write all text (summary, messages, suggestions) in English."
+	if r.reviewLanguage == "ru" {
+		langInstruction = "Пиши весь текст (summary, messages, suggestions) на русском языке."
+	}
+	
+	return fmt.Sprintf(`You are an expert code reviewer. Your task is to review code changes and output ONLY valid JSON.
+
+## Language
+%s
 
 ## Available Tools
 You can use these tools to gather context (use sparingly, max 2-3 calls):
@@ -370,8 +384,9 @@ You MUST respond with valid JSON only. No markdown, no explanations, no text bef
 ## Review Guidelines
 - Focus on security, bugs, and logic errors
 - Be specific with line numbers from the diff
+- ALWAYS include "file_path" in each issue (use the file being reviewed)
 - If no issues found, return empty arrays with score 85-100
-- Do not nitpick style issues`
+- Do not nitpick style issues`, langInstruction)
 }
 
 func (r *PerFileReviewer) getResponseFormat() string {
@@ -382,6 +397,7 @@ func (r *PerFileReviewer) getResponseFormat() string {
   "score": 85,
   "issues": [
     {
+      "file_path": "path/to/file.go",
       "line": 42,
       "severity": "warning",
       "category": "security",
@@ -391,6 +407,7 @@ func (r *PerFileReviewer) getResponseFormat() string {
   ],
   "suggestions": [
     {
+      "file_path": "path/to/file.go",
       "category": "best_practice",
       "title": "Improvement idea",
       "description": "Details",
@@ -399,10 +416,13 @@ func (r *PerFileReviewer) getResponseFormat() string {
   ]
 }
 
-severity: "critical", "warning", "info"
-category: "security", "bugs", "style", "performance", "best_practice"
-priority: "high", "medium", "low"
-Return empty arrays if no issues found.`
+IMPORTANT:
+- file_path: REQUIRED in every issue and suggestion
+- line: line number from diff (look for @@ markers)
+- severity: "critical", "warning", "info"
+- category: "security", "bugs", "style", "performance", "best_practice"
+- priority: "high", "medium", "low"
+- Return empty arrays if no issues found`
 }
 
 // aggregateResults combines per-file results into overall review

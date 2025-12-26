@@ -21,15 +21,15 @@ URL:            https://github.com/kelnmaari/ollama-openai-proxy
 # Don't strip binaries
 %define __strip /bin/true
 
-# Requirements
-Requires:       docker
-Requires:       systemd
+# No dependencies - user manages runtime environment
 
 %description
 AIGateway (Ollama OpenAI Proxy) provides an OpenAI-compatible API for local
-LLM inference using Docker-based backends (vLLM, llama.cpp, SGLang, TGI).
+LLM inference using container-based backends (vLLM, llama.cpp, SGLang, TGI).
 Features include multi-tenant support, API key management, GitLab MR reviews,
 and a modern web UI.
+
+Requires container runtime: docker-ce or podman (install separately).
 
 %prep
 # Nothing to prepare - binary is pre-built

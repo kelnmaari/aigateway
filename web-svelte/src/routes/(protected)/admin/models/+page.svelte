@@ -1423,43 +1423,43 @@
 						{#if (models || []).length === 0}
 							<div class="px-4 py-8 text-center text-muted-foreground">No models loaded</div>
 						{:else}
-							{#each (models || []) as m}
-								{@const isSaved = savedModels.some(s => s.alias === m.alias)}
-								<div class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-4" role="button" tabindex="0" onclick={() => selectModel(m)} onkeydown={(e) => e.key === 'Enter' && selectModel(m)}>
+							{#each (models || []) as mdl}
+								{@const isSaved = savedModels.some(s => s.alias === mdl.alias)}
+								<div class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-4" role="button" tabindex="0" onclick={() => selectModel(mdl)} onkeydown={(e) => e.key === 'Enter' && selectModel(mdl)}>
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-2">
-											<span class="font-semibold">{m.alias}</span>
-											{#if m.pinned}
+											<span class="font-semibold">{mdl.alias}</span>
+											{#if mdl.pinned}
 												<span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">pinned</span>
 											{/if}
 											{#if isSaved}
 												<span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">saved</span>
 											{/if}
-											<span class={`text-sm font-medium ${statusColor(m.status)}`}>{m.status}</span>
+											<span class={`text-sm font-medium ${statusColor(mdl.status)}`}>{mdl.status}</span>
 										</div>
 										<div class="text-xs text-muted-foreground mt-1">
-											{m.provider} · {m.format} · {(m.capabilities || []).join(', ') || 'chat'}
+											{mdl.provider} · {mdl.format} · {(mdl.capabilities || []).join(', ') || 'chat'}
 										</div>
-										{#if m.endpoint}
-											<div class="text-xs text-muted-foreground truncate">{m.endpoint}</div>
+										{#if mdl.endpoint}
+											<div class="text-xs text-muted-foreground truncate">{mdl.endpoint}</div>
 										{/if}
-										{#if m.last_error}
-											<div class="text-xs text-red-500 mt-1">{m.last_error}</div>
+										{#if mdl.last_error}
+											<div class="text-xs text-red-500 mt-1">{mdl.last_error}</div>
 										{/if}
 									</div>
 									<div class="flex gap-1 flex-shrink-0">
-										{#if m.status === 'running' || m.status === 'starting'}
-											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); stopModel(m.alias); }}>Stop</button>
-											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); openLogsModal(m.alias); }} title={m.admin_models_logs_title()}>{m.admin_models_logs()}</button>
+										{#if mdl.status === 'running' || mdl.status === 'starting'}
+											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); stopModel(mdl.alias); }}>Stop</button>
+											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); openLogsModal(mdl.alias); }} title={m.admin_models_logs_title()}>{m.admin_models_logs()}</button>
 										{:else}
-											<button class="px-2 py-1 text-xs rounded border bg-green-500/10 text-green-600 hover:bg-green-500/20" onclick={(e) => { e.stopPropagation(); startModel(m); }}>Start</button>
+											<button class="px-2 py-1 text-xs rounded border bg-green-500/10 text-green-600 hover:bg-green-500/20" onclick={(e) => { e.stopPropagation(); startModel(mdl); }}>Start</button>
 										{/if}
 										{#if !isSaved}
-											<button class="px-2 py-1 text-xs rounded border bg-blue-500/10 text-blue-600 hover:bg-blue-500/20" onclick={(e) => { e.stopPropagation(); saveModelConfig(m.alias); }} title="Save config for restart">Save</button>
+											<button class="px-2 py-1 text-xs rounded border bg-blue-500/10 text-blue-600 hover:bg-blue-500/20" onclick={(e) => { e.stopPropagation(); saveModelConfig(mdl.alias); }} title="Save config for restart">Save</button>
 										{/if}
-										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); evictModel(m.alias); }}>Evict</button>
-										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); togglePin(m); }}>
-											{m.pinned ? 'Unpin' : 'Pin'}
+										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); evictModel(mdl.alias); }}>Evict</button>
+										<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); togglePin(mdl); }}>
+											{mdl.pinned ? 'Unpin' : 'Pin'}
 										</button>
 									</div>
 								</div>
@@ -1633,36 +1633,36 @@
 						</h2>
 					</div>
 					<div class="divide-y max-h-[600px] overflow-y-auto">
-						{#each getFilteredHFModels(hfSearchResults.length > 0 ? hfSearchResults : hfPopularModels) as m}
+						{#each getFilteredHFModels(hfSearchResults.length > 0 ? hfSearchResults : hfPopularModels) as hfm}
 							<div 
-								class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-3 {hfSelectedModel?.id === m.id ? 'bg-primary/10' : ''}"
+								class="px-4 py-3 hover:bg-muted/30 cursor-pointer flex items-start gap-3 {hfSelectedModel?.id === hfm.id ? 'bg-primary/10' : ''}"
 								role="button"
 								tabindex="0"
-								onclick={() => selectHFModel(m)}
-								onkeydown={(e) => e.key === 'Enter' && selectHFModel(m)}
+								onclick={() => selectHFModel(hfm)}
+								onkeydown={(e) => e.key === 'Enter' && selectHFModel(hfm)}
 							>
 								<div class="flex-1 min-w-0">
-									<div class="font-medium truncate">{m.id}</div>
+									<div class="font-medium truncate">{hfm.id}</div>
 									<div class="text-xs text-muted-foreground flex flex-wrap gap-2 mt-1">
-										<span>⬇️ {formatNumber(m.downloads || 0)}</span>
-										<span>❤️ {formatNumber(m.likes || 0)}</span>
-										{#if extractModelSizeB(m)}
-											<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-medium">{extractModelSizeB(m)}B</span>
+										<span>⬇️ {formatNumber(hfm.downloads || 0)}</span>
+										<span>❤️ {formatNumber(hfm.likes || 0)}</span>
+										{#if extractModelSizeB(hfm)}
+											<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-medium">{extractModelSizeB(hfm)}B</span>
 										{/if}
-										{#if m.pipeline_tag}
-											<span class="px-1.5 py-0.5 rounded bg-muted text-xs">{m.pipeline_tag}</span>
+										{#if hfm.pipeline_tag}
+											<span class="px-1.5 py-0.5 rounded bg-muted text-xs">{hfm.pipeline_tag}</span>
 										{/if}
 									</div>
-									{#if m.tags?.length}
+									{#if hfm.tags?.length}
 										<div class="flex flex-wrap gap-1 mt-1">
-											{#each m.tags.slice(0, 5) as tag}
+											{#each hfm.tags.slice(0, 5) as tag}
 												<span class="px-1.5 py-0.5 rounded bg-muted/50 text-xs">{tag}</span>
 											{/each}
 										</div>
 									{/if}
 								</div>
 								<a 
-									href="https://huggingface.co/{m.id}" 
+									href="https://huggingface.co/{hfm.id}" 
 									target="_blank" 
 									class="p-1 hover:bg-muted rounded"
 									onclick={(e) => e.stopPropagation()}

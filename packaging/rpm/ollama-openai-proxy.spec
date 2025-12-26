@@ -65,29 +65,21 @@ install -m 644 %{_sourcedir}/oop.service %{buildroot}%{_unitdir}/oop.service
 # Pre-install: nothing special needed
 
 %post
-# Post-install: reload systemd
+# Post-install: reload systemd and restart service
 systemctl daemon-reload
+systemctl reset-failed oop 2>/dev/null || true
+systemctl enable oop 2>/dev/null || true
+systemctl restart oop
 
-# Restart service if it was running (upgrade scenario)
-if systemctl is-active --quiet oop 2>/dev/null; then
-    echo "→ Restarting oop service..."
-    systemctl restart oop
-    sleep 2
-    systemctl status oop --no-pager || true
-else
-    echo ""
-    echo "=============================================="
-    echo " Ollama OpenAI Proxy installed successfully!"
-    echo "=============================================="
-    echo ""
-    echo " Start the service:"
-    echo "    systemctl enable --now oop"
-    echo ""
-    echo " Check status:"
-    echo "    systemctl status oop"
-    echo "    journalctl -u oop -f"
-    echo ""
-fi
+echo ""
+echo "=============================================="
+echo " Ollama OpenAI Proxy installed/updated!"
+echo "=============================================="
+sleep 2
+systemctl status oop --no-pager || true
+echo ""
+echo " Logs: journalctl -u oop -f"
+echo ""
 
 %preun
 # Pre-uninstall: stop service if running

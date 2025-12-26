@@ -136,9 +136,9 @@ build:binary:
         -X main.BuildTime=${BUILD_TIME} \
         -X main.GitCommit=${GIT_COMMIT} \
         -s -w" \
-        -o bin/server \
+        -o bin/aigateway-linux-amd64 \
         cmd/server/main.go
-    - chmod +x bin/server
+    - chmod +x bin/aigateway-linux-amd64
     - ls -la bin/
     
     # Save version info for later stages
@@ -147,7 +147,7 @@ build:binary:
     - echo "$RPM_RELEASE" > bin/RPM_RELEASE
   artifacts:
     paths:
-      - bin/server
+      - bin/aigateway-linux-amd64
       - bin/BUILD_VERSION
       - bin/RPM_VERSION
       - bin/RPM_RELEASE
@@ -177,7 +177,7 @@ package:rpm:
     - echo "Building RPM version=$RPM_VERSION release=$RPM_RELEASE (full=$BUILD_VERSION)"
     
     # Copy sources to rpmbuild
-    - cp bin/server ~/rpmbuild/SOURCES/server
+    - cp bin/aigateway-linux-amd64 ~/rpmbuild/SOURCES/aigateway-linux-amd64
     - cp packaging/rpm/oop.service ~/rpmbuild/SOURCES/
     - cp packaging/rpm/ollama-openai-proxy.spec ~/rpmbuild/SPECS/
     

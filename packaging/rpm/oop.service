@@ -1,16 +1,15 @@
 [Unit]
 Description=Ollama OpenAI Proxy Server (AIGateway)
 Documentation=https://github.com/kelnmaari/ollama-openai-proxy
-After=network.target docker.service
+After=network.target
 Wants=network-online.target
-Requires=docker.service
 
 [Service]
 Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/ollama-openai-proxy
-ExecStart=/opt/ollama-openai-proxy/bin/server -config /opt/ollama-openai-proxy/configs/dev.yaml
+ExecStart=/opt/ollama-openai-proxy/bin/aigateway-linux-amd64 -config /opt/ollama-openai-proxy/configs/dev.yaml
 
 # Environment
 Environment="GIN_MODE=release"

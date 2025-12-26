@@ -46,14 +46,14 @@ mkdir -p %{buildroot}/opt/ollama-openai-proxy/web
 mkdir -p %{buildroot}%{_unitdir}
 
 # Install binary
-install -m 755 %{_sourcedir}/server %{buildroot}/opt/ollama-openai-proxy/bin/server
+install -m 755 %{_sourcedir}/aigateway-linux-amd64 %{buildroot}/opt/ollama-openai-proxy/bin/aigateway-linux-amd64
 
 # Install systemd service
 install -m 644 %{_sourcedir}/oop.service %{buildroot}%{_unitdir}/oop.service
 
 %files
 %defattr(-,root,root,-)
-/opt/ollama-openai-proxy/bin/server
+/opt/ollama-openai-proxy/bin/aigateway-linux-amd64
 %{_unitdir}/oop.service
 %dir /opt/ollama-openai-proxy
 %dir /opt/ollama-openai-proxy/bin

@@ -3,6 +3,9 @@
 # For tags: version=X.Y.Z, release=1
 # For branches: version=X.Y.Z, release=branch.jobid
 
+# Define systemd unit directory
+%define _unitdir /etc/systemd/system
+
 Name:           %{name}
 Version:        %{version}
 Release:        %{release}%{?dist}

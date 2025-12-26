@@ -116,61 +116,68 @@
 	function colorizeLogs(logs: string): string {
 		if (!logs) return '';
 		
+		// Use inline styles because Tailwind JIT doesn't see dynamically generated classes
+		const colors = {
+			gray: '#6b7280',
+			red: '#ef4444',
+			yellow: '#eab308',
+			blue: '#60a5fa',
+			green: '#4ade80',
+			cyan: '#22d3ee',
+			purple: '#a78bfa',
+			orange: '#fb923c',
+			teal: '#2dd4bf',
+			pink: '#f472b6',
+			lime: '#a3e635'
+		};
+		
 		return logs.split('\n').map(line => {
 			let html = escapeHtml(line);
 			
 			// Timestamps: time="..." or [2025-...] or 2025-01-01T...
-			html = html.replace(/(time="[^"]*"|^\[\d{4}-[^\]]+\]|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*)/g, 
-				'<span class="text-gray-500">$1</span>');
+			html = html.replace(/(time=&quot;[^&]*&quot;|^\[\d{4}-[^\]]+\]|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*)/g, 
+				`<span style="color:${colors.gray}">$1</span>`);
 			
 			// Log levels with colors
 			html = html.replace(/\b(level=error|ERROR|ERRO|FATAL|CRITICAL)\b/gi, 
-				'<span class="text-red-500 font-bold">$1</span>');
+				`<span style="color:${colors.red};font-weight:bold">$1</span>`);
 			html = html.replace(/\b(level=warn|WARNING|WARN)\b/gi, 
-				'<span class="text-yellow-500 font-bold">$1</span>');
+				`<span style="color:${colors.yellow};font-weight:bold">$1</span>`);
 			html = html.replace(/\b(level=info|INFO)\b/gi, 
-				'<span class="text-blue-400">$1</span>');
+				`<span style="color:${colors.blue}">$1</span>`);
 			html = html.replace(/\b(level=debug|DEBUG)\b/gi, 
-				'<span class="text-gray-400">$1</span>');
+				`<span style="color:${colors.gray}">$1</span>`);
 			
 			// Success messages
-			html = html.replace(/\b(SUCCESS|OK|READY|LOADED|STARTED|COMPLETED)\b/gi, 
-				'<span class="text-green-400 font-bold">$1</span>');
+			html = html.replace(/\b(SUCCESS|OK|READY|LOADED|STARTED|COMPLETED|loaded|started)\b/g, 
+				`<span style="color:${colors.green};font-weight:bold">$1</span>`);
 			
-			// msg="..." content
-			html = html.replace(/msg="([^"]*)"/g, 
-				'msg="<span class="text-cyan-300">$1</span>"');
+			// msg="..." content (escaped quotes)
+			html = html.replace(/msg=&quot;([^&]*)&quot;/g, 
+				`msg=&quot;<span style="color:${colors.cyan}">$1</span>&quot;`);
 			
-			// Key=value pairs (highlight keys)
-			html = html.replace(/\b([a-z_]+)=([^\s]+)/gi, (match, key, value) => {
-				// Skip already processed level= and msg=
-				if (key === 'level' || key === 'msg' || key === 'time') return match;
-				return `<span class="text-purple-400">${key}</span>=<span class="text-orange-300">${value}</span>`;
+			// Key=value pairs (highlight keys) - avoid already colored spans
+			html = html.replace(/\b([a-z_]+)=([^\s<]+)/gi, (match, key, value) => {
+				if (key === 'level' || key === 'msg' || key === 'time' || key === 'style' || key === 'color') return match;
+				return `<span style="color:${colors.purple}">${key}</span>=<span style="color:${colors.orange}">${value}</span>`;
 			});
 			
-			// Numbers
-			html = html.replace(/\b(\d+\.?\d*)(ms|s|MB|GB|KB|B|%)\b/g, 
-				'<span class="text-yellow-300">$1$2</span>');
+			// Numbers with units
+			html = html.replace(/\b(\d+\.?\d*)(ms|s|MB|GB|KB|MiB|GiB|B|%)\b/g, 
+				`<span style="color:${colors.yellow}">$1$2</span>`);
 			
 			// File paths
-			html = html.replace(/(\/[a-zA-Z0-9_./-]+)/g, 
-				'<span class="text-teal-400">$1</span>');
+			html = html.replace(/(\/[a-zA-Z0-9_.\/-]+)/g, 
+				`<span style="color:${colors.teal}">$1</span>`);
 			
 			// HTTP methods
 			html = html.replace(/\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g, 
-				'<span class="text-pink-400 font-bold">$1</span>');
+				`<span style="color:${colors.pink};font-weight:bold">$1</span>`);
 			
 			// HTTP status codes
-			html = html.replace(/\b(2\d{2})\b/g, '<span class="text-green-400">$1</span>');
-			html = html.replace(/\b(4\d{2})\b/g, '<span class="text-yellow-400">$1</span>');
-			html = html.replace(/\b(5\d{2})\b/g, '<span class="text-red-400">$1</span>');
-			
-			// Quoted strings
-			html = html.replace(/"([^"]+)"/g, (match, content) => {
-				// Skip already processed
-				if (match.includes('class=')) return match;
-				return `"<span class="text-lime-300">${content}</span>"`;
-			});
+			html = html.replace(/\b(2\d{2})\b/g, `<span style="color:${colors.green}">$1</span>`);
+			html = html.replace(/\b(4\d{2})\b/g, `<span style="color:${colors.yellow}">$1</span>`);
+			html = html.replace(/\b(5\d{2})\b/g, `<span style="color:${colors.red}">$1</span>`);
 			
 			return html;
 		}).join('\n');

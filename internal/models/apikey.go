@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -19,6 +20,7 @@ type APIKey struct {
 	Name        string `json:"name"`                  // Человекочитаемое имя
 	Description string `json:"description,omitempty"` // Описание назначения
 	KeyHash     string `json:"key_hash"`              // Хеш ключа (bcrypt)
+	KeyPrefix   string `json:"key_prefix,omitempty"`  // Prefix for display (e.g., "sk-ak_1234...")
 
 	// Владение (Version 1.3.0+: Multi-Tenancy support)
 	UserID   *string     `json:"user_id,omitempty" db:"user_id"`     // ID владельца (User.ID) - для personal keys
@@ -127,6 +129,7 @@ type APIKeyPublic struct {
 	ID            string                 `json:"id"`
 	Name          string                 `json:"name"`
 	Description   string                 `json:"description,omitempty"`
+	KeyPrefix     string                 `json:"key_prefix,omitempty"` // Prefix for display (first ~20 chars)
 	UserID        *string                `json:"user_id,omitempty"`   // Owner user ID (Version 1.3.0+)
 	TenantID      *string                `json:"tenant_id,omitempty"` // Tenant ID (Version 1.3.0+)
 	Scope         APIKeyScope            `json:"scope,omitempty"`     // personal or tenant (Version 1.3.0+)
@@ -204,6 +207,7 @@ func (k *APIKey) ToPublic() APIKeyPublic {
 		ID:            k.ID,
 		Name:          k.Name,
 		Description:   k.Description,
+		KeyPrefix:     k.KeyPrefix,
 		Models:        k.Models,
 		Permissions:   k.Permissions,
 		RateLimits:    k.RateLimits,
@@ -334,6 +338,26 @@ func GenerateAPIKeyWithID(keyID string) (string, error) {
 	// Пример: sk-ak_1728000000_1a2b3c4d-f8e7d6c5b4a39281
 	key := fmt.Sprintf("sk-%s-%s", keyID, hex.EncodeToString(bytes))
 	return key, nil
+}
+
+// ExtractKeyPrefix extracts a safe prefix from the full API key for display
+// Example: "sk-ak_1766117874_ccfe8e02" from full key
+func ExtractKeyPrefix(fullKey string) string {
+	// Take first 25 characters or up to the last dash before random suffix
+	if len(fullKey) <= 25 {
+		return fullKey
+	}
+	// Find the last dash (before random hex suffix)
+	lastDash := strings.LastIndex(fullKey, "-")
+	if lastDash > 10 && lastDash < len(fullKey)-1 {
+		// Include first 8 chars of suffix
+		prefix := fullKey[:lastDash+9]
+		if len(prefix) > 35 {
+			prefix = fullKey[:35]
+		}
+		return prefix
+	}
+	return fullKey[:25]
 }
 
 // HashAPIKey хеширует API ключ для безопасного хранения

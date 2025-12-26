@@ -1,117 +1,119 @@
-# 🚀 AIGateway Platform v3.0
+# 🚀 AIGateway Platform v3.1
 
-> **Local-First AI Infrastructure with VLM Support**  
-> OpenAI-Compatible API • Pure Go Inference • Vision Models • RAG System • Enterprise Security
+> **Enterprise AI Infrastructure with Multi-Provider Inference**  
+> OpenAI-Compatible API • Docker-Based Inference • vLLM/SGLang/TGI • RAG System • Enterprise Security
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0.5-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-3.1.0-brightgreen.svg)](VERSION)
 
 ---
 
 ## 📖 What is AIGateway?
 
-**AIGateway v3.0** is a production-ready, enterprise-grade AI infrastructure platform with **local-first inference** using `yzma` (pure Go, no CGo). Provides unified **OpenAI-compatible API** for GGUF models from Hugging Face, with Vision Language Model (VLM) support, RAG capabilities, and enterprise features.
+**AIGateway v3.1** is a production-ready, enterprise-grade AI infrastructure platform with **multi-provider Docker-based inference**. Provides unified **OpenAI-compatible API** for models from Hugging Face with support for vLLM, SGLang, TGI, and llama.cpp backends.
 
-### 🎯 Why AIGateway v3.0?
+### 🎯 Why AIGateway v3.1?
 
-- **🚀 Local-First Inference**: Pure Go with `yzma` (llama.cpp wrapper) - NO external dependencies!
-- **🖼️ VLM Support**: Vision Language Models (Qwen2.5-VL, LLaVA, Gemma Vision) - analyze images with text
-- **📦 GGUF Models**: Direct Hugging Face integration - download & run any GGUF model
+- **🐳 Docker-Based Inference**: vLLM, SGLang, TGI, llama.cpp — managed via Docker containers
+- **🎮 Multi-GPU Support**: Tensor parallelism, automatic GPU selection, memory recommendations
+- **🔍 HuggingFace Browser**: Search and load models directly from HF Hub with size/provider filters
+- **📦 Format Support**: HF models (BF16/FP16/INT8/INT4), GGUF quantized models
 - **🧠 RAG Built-in**: Retrieval-Augmented Generation with vector search, multimodal documents
 - **🏢 Enterprise-Ready**: Multi-tenancy, RBAC, OIDC/LDAP, audit logging, quotas
-- **⚡ GPU Accelerated**: Automatic GPU offloading (CUDA, Vulkan, Metal) with no configuration
-- **🌐 Modern WebUI**: ChatGPT-like interface with image upload, model management, RAG integration
-- **📊 Observability**: OpenTelemetry, Prometheus, GPU metrics, distributed tracing
+- **🌐 Modern WebUI**: ChatGPT-like interface with model management, GPU monitoring
+- **📊 Observability**: Prometheus metrics, container logs, health checks
 
 ---
 
 ## ✨ Key Features
 
-### 🤖 AI Model Support (v3.0+)
+### 🤖 Inference Providers (v3.1+)
 
-- ✅ **yzma Local Inference** - Pure Go inference with llama.cpp (NO CGo!) *(v3.0.0)*
-- ✅ **GGUF Models** - Direct support for Hugging Face GGUF models *(v3.0.0)*
-- 🖼️ **Vision Language Models** - Image + text multimodal inference (Qwen2.5-VL, LLaVA) *(v3.0.4)*
-- 📥 **Hugging Face Integration** - Download models directly from HF Hub *(v3.0.0)*
-- ✅ **OpenAI-Compatible API** - `/v1/chat/completions`, `/v1/models`, `/v1/yzma/*`
-- 🔥 **Real-time Streaming** - Server-Sent Events (SSE) для живых ответов
-- 🛠️ **Function Calling** - Инструменты в стиле OpenAI
-- 🔄 **Ollama Fallback** - Optional Ollama support as backup backend
+| Provider | GPU | Quantization | Use Case |
+|----------|-----|--------------|----------|
+| **vLLM** | ✅ | BF16, FP16, AWQ, GPTQ | High-throughput production |
+| **SGLang** | ✅ | BF16, FP16 | Research, embeddings |
+| **TGI** | ✅ | BF16, FP16, GPTQ | HuggingFace native |
+| **llama.cpp** | ✅ | GGUF (Q4-Q8) | CPU/Low VRAM inference |
+
+### 🔍 HuggingFace Browser
+
+- **Search Models**: Filter by provider (vLLM, SGLang, TGI, llama.cpp, Embeddings)
+- **Size Filters**: < 3B, 3-7B, 7-14B, 14-30B, 30-70B, 70B+
+- **Memory Recommendations**: Automatic GPU utilization calculation
+- **One-Click Load**: Pre-fill form, configure, and start
+
+### 🎮 GPU Management
+
+- **Multi-GPU Selection**: Checkboxes with GPU name and memory info
+- **Auto Tensor Parallel**: Automatically set based on selected GPUs
+- **Memory Recommendations**: Calculate optimal `gpu_memory_utilization` and `max_model_len`
+- **Container Logs**: Real-time streaming to `logs/containers/{alias}.log`
 
 ### 🧠 RAG System (v2.0.0)
 
 - 📄 **Multi-Format Documents** - PDF, DOCX, CSV, TXT, Images с OCR
 - 🔌 **External Data Sources** - REST APIs, PostgreSQL databases, Web scraping
-- 🧬 **Semantic Chunking** - Intelligent text splitting с overlap
 - 🔍 **Vector Search** - PgVector с HNSW indexing
-- ⚡ **Async Processing** - Worker pool для document processing
-- 🔐 **Credentials Encryption** - AES-256 для sensitive data
-- 💬 **Chat Integration** - RAG toggle, source selector, Top-K controls в UI
+- 💬 **Chat Integration** - RAG toggle, source selector, Top-K controls
 
 ### 🔐 Enterprise Security
 
 - 🔒 **JWT Authentication** - Access & Refresh tokens с rotation
 - 👥 **Multi-Tenancy** - Organizations с membership и RBAC
 - 🔑 **API Key Management** - Personal & Tenant keys с model-level permissions
-- ⏱️ **Advanced Rate Limiting** - Per-key, per-tenant, per-endpoint limits
-- 🔍 **Audit Logging** - Comprehensive event tracking для compliance
-- 🛡️ **OIDC/LDAP** - Enterprise SSO integration (Keycloak, Active Directory)
+- 🛡️ **OIDC/LDAP** - Enterprise SSO (Keycloak, Active Directory)
 
 ### 📊 Monitoring & Observability
 
-- 📈 **Real-time Dashboard** - CPU, Memory, Goroutines, GPU metrics
-- 🎮 **Multi-GPU Monitoring** - NVIDIA GPU metrics через `nvidia-smi` (БЕЗ CGO!)
-- 📉 **Prometheus Integration** - Full metrics export для Grafana
-- 🔍 **OpenTelemetry Tracing** - Distributed tracing (Jaeger/Zipkin)
-- 📋 **Structured Logging** - Enhanced logs с SSE streaming
-- ⚠️ **Separate Error Log** - Dedicated error/warning log file с rotation
-
-### ⚡ Performance & UX
-
-- 🎨 **Dynamic Model Parameters** - Temperature, top_p, context window в UI
-- 📊 **Context Tracking** - Real-time usage monitoring
-- 🔄 **Auto-Summarization** - Context compression при overflow
-- 💾 **Conversation Export/Import** - JSON, Markdown, Text formats
-- 🌐 **Modern WebUI** - Consistent dark theme, responsive design
-- 🖥️ **Terminal UI (TUI)** - Alternative management interface
+- 📈 **Real-time Dashboard** - Backend status, Docker images, GPU metrics
+- 🐳 **Container Management** - Start, stop, logs, health checks
+- 📉 **Prometheus Integration** - Full metrics export
+- 📋 **Provider Logs** - Detailed launch commands in `logs/providers/{alias}.log`
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────────┐
-│ AIGateway Platform (Port 8080)                   │
-│                                                  │
-│ ┌──────────────────────────────────────────────┐ │
-│ │ OpenAI-Compatible API Layer                  │ │
-│ │ /v1/chat/completions, /v1/models, etc        │ │
-│ └──────────────────────────────────────────────┘ │
-│                                                  │
-│ ┌──────────────────────────────────────────────┐ │
-│ │ Model Router & Registry                      │ │
-│ │  ├─ Ollama models → Ollama (11434)          │ │
-│ │  ├─ HF models (GPU) → vLLM (8000)           │ │
-│ │  └─ Cloud APIs → OpenAI/Anthropic (future)  │ │
-│ └──────────────────────────────────────────────┘ │
-│                                                  │
-│ ┌──────────────────────────────────────────────┐ │
-│ │ RAG System                                   │ │
-│ │  ├─ Document Processing Pipeline            │ │
-│ │  ├─ Vector Store (PgVector)                 │ │
-│ │  ├─ Embeddings (Ollama)                     │ │
-│ │  └─ Orchestrator & Reranking                │ │
-│ └──────────────────────────────────────────────┘ │
-│                                                  │
-│ ┌──────────────────────────────────────────────┐ │
-│ │ Enterprise Features                          │ │
-│ │  ├─ Multi-Tenancy & RBAC                    │ │
-│ │  ├─ Rate Limiting & Quotas                  │ │
-│ │  ├─ Audit Logging                           │ │
-│ │  └─ OIDC/LDAP Integration                   │ │
-│ └──────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ AIGateway Platform (Port 8080)                                  │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ OpenAI-Compatible API Layer                                 │ │
+│ │ /v1/chat/completions, /v1/models, /v1/embeddings            │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                         │                                       │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Inference Router & Orchestrator                             │ │
+│ │  ├─ Model Registry (specs, status, health)                 │ │
+│ │  ├─ Container Manager (start, stop, logs)                  │ │
+│ │  └─ HuggingFace Downloader (cache management)              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                         │                                       │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Docker Runtime                                              │ │
+│ │  ├─ vLLM Container (GPU, Tensor Parallel)                  │ │
+│ │  ├─ SGLang Container (GPU, Embeddings)                     │ │
+│ │  ├─ TGI Container (GPU, Sharding)                          │ │
+│ │  └─ llama.cpp Container (GGUF, CPU/GPU)                    │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ RAG System                                                  │ │
+│ │  ├─ Document Processing Pipeline                           │ │
+│ │  ├─ Vector Store (PgVector)                                │ │
+│ │  └─ Embeddings (Ollama/SGLang)                             │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Enterprise Features                                         │ │
+│ │  ├─ Multi-Tenancy & RBAC                                   │ │
+│ │  ├─ OIDC/LDAP Integration                                  │ │
+│ │  └─ Audit Logging & Rate Limiting                          │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -120,10 +122,26 @@
 
 ### Prerequisites
 
-- **Go 1.25+** (для сборки из исходников)
-- **Ollama** server ([Download Ollama](https://ollama.ai/))
+- **Go 1.25+** (для сборки)
+- **Docker** with NVIDIA Container Toolkit (для GPU inference)
 - **PostgreSQL 13+** с pgvector extension (для RAG)
-- At least one model: `ollama pull llama3.2`
+- **NVIDIA GPU** (для vLLM/SGLang/TGI)
+
+### Pre-pull Docker Images
+
+```bash
+# vLLM (recommended for production)
+docker pull vllm/vllm-openai:latest
+
+# SGLang (research, embeddings)
+docker pull lmsysorg/sglang:latest
+
+# TGI (HuggingFace native)
+docker pull ghcr.io/huggingface/text-generation-inference:latest
+
+# llama.cpp (GGUF models)
+docker pull ghcr.io/ggml-org/llama.cpp:server-cuda
+```
 
 ### Installation
 
@@ -133,11 +151,12 @@
 git clone https://github.com/yourusername/aigateway.git
 cd aigateway
 
-# Build & Start all services
-docker compose --profile build up --build
+# Start infrastructure (PostgreSQL, Redis, etc.)
+docker compose -f infra/docker-compose.yml up -d
 
-# Server: http://localhost:8080
-# WebUI: http://localhost:8080/login
+# Build & run server
+go build -o bin/server cmd/server/main.go
+./bin/server -config configs/dev.yaml
 ```
 
 #### Option 2: Build from Source
@@ -149,87 +168,32 @@ cd aigateway
 # Install dependencies
 go mod tidy
 
-# Build all binaries
-./build.sh all
+# Build
+./build.ps1 all  # Windows
+./build.sh all   # Linux/macOS
 
-# Binaries в папке dist/
+# Run
+./dist/server -config configs/production.yaml
 ```
 
 ### First Run
 
-1. **Start Ollama**:
+1. **Access WebUI**: [http://localhost:8080/login](http://localhost:8080/login)
 
-```bash
-ollama serve
-ollama pull llama3.2  # Or any other model
-```
+2. **Default credentials**:
+   - Email: `admin@localhost`
+   - Password: `admin`
 
-2. **Configure AIGateway**:
+3. **Load a model**:
+   - Go to **Admin → Models → HuggingFace**
+   - Search for a model (e.g., "Qwen2.5-7B")
+   - Select provider filter (vLLM, SGLang, etc.)
+   - Click **Use**, configure GPU settings, click **Load & Start**
 
-```bash
-cp configs/production.yaml.example configs/production.yaml
-# Edit configs/production.yaml with your settings
-```
-
-3. **Run AIGateway**:
-
-```bash
-# From source
-./dist/server -config configs/production.yaml
-
-# Or with Docker
-docker compose up
-```
-
-4. **Access WebUI**:
-
-Open [http://localhost:8080/login](http://localhost:8080/login)
-
-**Default credentials** (первый запуск):
-- Email: `admin@localhost`
-- Password: `admin`
-
-⚠️ **Change default password immediately!**
-
----
-
-## 📚 Documentation
-
-### Getting Started
-- [Quick Start Guide](docs/QUICKSTART.md)
-- [Configuration Guide](docs/CONFIGURATION.md)
-- [Docker Deployment](docs/DOCKER.md)
-
-### Features
-- [RAG System Guide](docs/RAG_DEPLOYMENT_GUIDE.md)
-- [vLLM Installation](docs/VLLM_INSTALLATION.md)
-- [Multi-Tenancy Setup](docs/MULTITENANCY.md)
-- [OIDC Integration](docs/OIDC_SETUP.md)
-
-### Development
-- [Architecture Overview](Architecture.MD)
-- [Development Guide](docs/DEVELOPMENT.md)
-- [API Reference](docs/API.md)
-- [Contributing Guide](CONTRIBUTING.md)
-
----
-
-## 🎯 Use Cases
-
-### 1. **Private ChatGPT Alternative**
-Run your own ChatGPT-like service с local models и full data control.
-
-### 2. **RAG-Powered Knowledge Base**
-Upload documents, connect databases, enable semantic search через RAG system.
-
-### 3. **Multi-Team AI Platform**
-Multi-tenancy с isolated workspaces, RBAC, usage quotas.
-
-### 4. **GPU-Accelerated Inference**
-Use vLLM для fast inference HuggingFace models на multi-GPU setups.
-
-### 5. **Enterprise AI Gateway**
-Unified API для multiple LLM providers с governance, audit, compliance.
+4. **Chat with model**:
+   - Go to **Chat**
+   - Select loaded model from dropdown
+   - Start chatting!
 
 ---
 
@@ -243,38 +207,107 @@ server:
   host: "0.0.0.0"
   port: 8080
 
-ollama:
-  url: "http://localhost:11434"
-  timeout: 120s
+# Docker-based inference
+inference:
+  enabled: true
+  hf_cache_dir: "data/models/hf"
+  gguf_cache_dir: "data/models/gguf"
+  health_check_timeout: 60m
+  startup_timeout: 60m
+  docker:
+    api: true
+    socket: "unix:///var/run/docker.sock"
 
-# Enable RAG System
+# HuggingFace token (for gated models)
+huggingface:
+  token: "hf_xxx..."
+
+# RAG System
 rag:
   enabled: true
   vector_store:
     type: "pgvector"
     connection_string: "postgresql://user:pass@localhost:5432/aigateway"
-  embeddings:
-    provider: "ollama"
-    model: "nomic-embed-text"
 
-# Enable vLLM Provider (v2.2.0+)
-providers:
-  ollama:
-    enabled: true
-    base_url: "http://localhost:11434"
-  vllm:
-    enabled: true
-    base_url: "http://localhost:8000"
-    tensor_parallel_size: 2  # For 2x GPU
+# OIDC (Keycloak example)
+oidc:
+  enabled: true
+  issuer_url: "http://keycloak:8180/realms/master"
+  client_id: "aigateway"
+  client_secret: "xxx"
 ```
 
-See [Configuration Guide](docs/CONFIGURATION.md) для detailed options.
+### GPU Settings for Large Models
+
+| Model Size | GPUs | Tensor Parallel | GPU Utilization | Max Model Len |
+|------------|------|-----------------|-----------------|---------------|
+| 7B BF16    | 1    | 1               | 0.9             | 32768         |
+| 14B BF16   | 1    | 1               | 0.95            | 16384         |
+| 30B INT8   | 2    | 2               | 0.9             | 32768         |
+| 70B INT4   | 2    | 2               | 0.95            | 8192          |
+
+---
+
+## 📚 API Reference
+
+### OpenAI-Compatible Endpoints
+
+```bash
+# List models
+curl http://localhost:8080/v1/models \
+  -H "Authorization: Bearer sk-xxx"
+
+# Chat completion
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer sk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-5-7b-instruct",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "stream": true
+  }'
+
+# Embeddings
+curl http://localhost:8080/v1/embeddings \
+  -H "Authorization: Bearer sk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "mxbai-embed-large",
+    "input": "Hello world"
+  }'
+```
+
+### Model Management Endpoints
+
+```bash
+# Load model
+curl -X POST http://localhost:8080/api/system/inference/load \
+  -H "Authorization: Bearer sk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "alias": "qwen-7b",
+    "provider": "vllm",
+    "format": "hf",
+    "hf_repo": "Qwen/Qwen2.5-7B-Instruct",
+    "capabilities": ["chat"],
+    "vllm_tensor_parallel": 1,
+    "vllm_gpu_utilization": 0.9,
+    "vllm_max_model_len": 32768
+  }'
+
+# List running models
+curl http://localhost:8080/api/system/inference/models
+
+# Stop model
+curl -X POST http://localhost:8080/api/system/inference/stop/qwen-7b
+
+# Get container logs
+curl http://localhost:8080/api/system/inference/logs/qwen-7b
+```
 
 ---
 
 ## 🧪 Testing
-
-### Run Tests
 
 ```bash
 # Unit tests
@@ -288,97 +321,83 @@ go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-### E2E Tests (Playwright)
-
-```bash
-cd tests/playwright
-npm install
-npm test
-```
-
 ---
 
-## 📊 Roadmap
+## 📊 Troubleshooting
 
-See [Roadmap.MD](Roadmap.MD) для detailed development plan.
+### Common Issues
 
-### ✅ Completed
-- **v1.x** - Ollama proxy, Multi-tenancy, RBAC, OIDC, Performance monitoring
-- **v2.0.0** - RAG System, Chat Export/Import UI
+**1. OOM Error (Out of Memory)**
+```
+ValueError: No available memory for the cache blocks
+```
+Solution: Reduce `gpu_memory_utilization` or `max_model_len`
 
-### 🚧 In Progress
-- **v2.1.0** - Rebranding to AIGateway
-- **v2.2.0** - Model Registry, vLLM Integration, Multi-Provider support
+**2. NCCL Error (Multi-GPU)**
+```
+NCCL error: unhandled system error
+```
+Solution: Ensure Docker uses `--ipc=host`, `--shm-size=16g`
 
-### 🔮 Planned
-- **v2.3.0** - HuggingFace Hub integration, Model hot-swap
-- **v2.4.0** - OpenAI/Anthropic proxy support
-- **v2.5.0** - Advanced RAG features, Query analytics
+**3. Model not found in chat**
+```
+model does not exist
+```
+Solution: Check that model alias matches, or use full HFRepo name
+
+**4. Context canceled during load**
+```
+context canceled
+```
+Solution: Don't refresh page during model loading (takes 2-10 min for large models)
+
+### Useful Commands
+
+```bash
+# Check GPU memory
+nvidia-smi
+
+# Kill all inference containers
+docker ps -a | grep aigw- | awk '{print $1}' | xargs -r docker rm -f
+
+# View container logs
+docker logs -f <container_id>
+
+# Check server logs
+tail -f logs/proxy-dev.log
+```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) для guidelines.
-
-### Development Setup
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
-# Clone repository
+# Development setup
 git clone https://github.com/yourusername/aigateway.git
 cd aigateway
-
-# Install dependencies
 go mod tidy
-
-# Run in dev mode
 go run cmd/server/main.go -config configs/dev.yaml
-
-# Run tests
-go test ./...
 ```
 
 ---
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file для details.
-
----
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/aigateway&type=Date)](https://star-history.com/#yourusername/aigateway&Date)
-
----
-
-## 📧 Contact & Support
-
-- 📖 **Documentation**: [docs/](docs/)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/aigateway/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/aigateway/discussions)
-- 📧 **Email**: your-email@example.com
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [Ollama](https://ollama.ai/) - Awesome local LLM runtime
 - [vLLM](https://vllm.ai/) - Fast inference engine
+- [SGLang](https://github.com/sgl-project/sglang) - Research inference
+- [TGI](https://github.com/huggingface/text-generation-inference) - HuggingFace inference
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) - GGUF inference
 - [Gin](https://gin-gonic.com/) - HTTP framework
 - [pgvector](https://github.com/pgvector/pgvector) - Vector similarity search
 
 ---
 
 **Built with ❤️ for the open-source AI community**
-
----
-
-## 📈 Project Stats
-
-![GitHub](https://img.shields.io/github/license/yourusername/aigateway)
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/yourusername/aigateway)
-![GitHub last commit](https://img.shields.io/github/last-commit/yourusername/aigateway)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/aigateway)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/aigateway)
-

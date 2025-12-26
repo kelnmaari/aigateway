@@ -150,6 +150,16 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("GitLab API error (status %d): %s", e.StatusCode, e.Message)
 }
 
+// DoRequest performs an HTTP request (exported for indexer usage)
+func (c *Client) DoRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	return c.doRequest(ctx, method, path, body)
+}
+
+// ParseResponse parses the JSON response into the target struct (exported)
+func (c *Client) ParseResponse(resp *http.Response, target interface{}) error {
+	return c.parseResponse(resp, target)
+}
+
 // ============================================================================
 // Connection & Authentication
 // ============================================================================

@@ -5,6 +5,7 @@
 	import { authApi } from '$lib/api';
 	import { cn } from '$lib/utils';
 	import { Eye, EyeOff, Loader2, Shield, CheckCircle, XCircle } from 'lucide-svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let bootstrapToken = $state('');
 	let username = $state('');
@@ -90,7 +91,7 @@
 </script>
 
 <svelte:head>
-	<title>Setup Administrator - AIGateway</title>
+	<title>{m.bootstrap_title()} - AIGateway</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
@@ -102,8 +103,8 @@
 			>
 				<Shield class="h-8 w-8" />
 			</div>
-			<h1 class="text-2xl font-bold text-foreground">Initial Setup</h1>
-			<p class="mt-2 text-muted-foreground">Create the first administrator account</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.bootstrap_title()}</h1>
+			<p class="mt-2 text-muted-foreground">{m.bootstrap_subtitle()}</p>
 		</div>
 
 		<!-- Bootstrap Form -->
@@ -111,14 +112,14 @@
 			{#if checkingStatus}
 				<div class="flex items-center justify-center gap-2 py-8 text-muted-foreground">
 					<Loader2 class="h-5 w-5 animate-spin" />
-					Checking system status...
+					{m.bootstrap_checking()}
 				</div>
 			{:else if alreadyInitialized}
 				<div class="py-8 text-center">
 					<CheckCircle class="mx-auto mb-4 h-12 w-12 text-green-500" />
-					<h2 class="mb-2 text-lg font-semibold text-foreground">Already Initialized</h2>
+					<h2 class="mb-2 text-lg font-semibold text-foreground">{m.bootstrap_already_init()}</h2>
 					<p class="mb-6 text-muted-foreground">
-						This system has already been set up. Please sign in with your credentials.
+						{m.bootstrap_already_init_desc()}
 					</p>
 					<a
 						href="/login"
@@ -127,15 +128,14 @@
 							'hover:bg-primary/90'
 						)}
 					>
-						Go to Login
+						{m.bootstrap_go_login()}
 					</a>
 				</div>
 			{:else}
 				<div class="mb-6 rounded-lg bg-amber-500/10 p-4 text-sm text-amber-600 dark:text-amber-400">
-					<p class="font-medium">⚠️ Important</p>
+					<p class="font-medium">⚠️ {m.bootstrap_important()}</p>
 					<p class="mt-1">
-						This will create the first administrator account. The bootstrap token can be found in
-						the server configuration file or environment variables.
+						{m.bootstrap_important_desc()}
 					</p>
 				</div>
 
@@ -147,12 +147,12 @@
 					{/if}
 
 					<div class="space-y-2">
-						<label for="token" class="text-sm font-medium text-foreground"> Bootstrap Token </label>
+						<label for="token" class="text-sm font-medium text-foreground">{m.bootstrap_token()}</label>
 						<input
 							id="token"
 							type="password"
 							bind:value={bootstrapToken}
-							placeholder="Enter the bootstrap token"
+							placeholder={m.placeholder_bootstrap_token()}
 							required
 							class={cn(
 								'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
@@ -161,13 +161,13 @@
 							)}
 						/>
 						<p class="text-xs text-muted-foreground">
-							Found in configs/bootstrap or BOOTSTRAP_TOKEN env var
+							{m.bootstrap_token_hint()}
 						</p>
 					</div>
 
 					<div class="space-y-2">
 						<label for="username" class="text-sm font-medium text-foreground">
-							Admin Username
+							{m.bootstrap_admin_username()}
 						</label>
 						<input
 							id="username"
@@ -187,7 +187,7 @@
 					</div>
 
 					<div class="space-y-2">
-						<label for="email" class="text-sm font-medium text-foreground"> Admin Email </label>
+						<label for="email" class="text-sm font-medium text-foreground">{m.bootstrap_admin_email()}</label>
 						<input
 							id="email"
 							type="email"
@@ -204,14 +204,14 @@
 
 					<div class="space-y-2">
 						<label for="password" class="text-sm font-medium text-foreground">
-							Admin Password
+							{m.bootstrap_admin_password()}
 						</label>
 						<div class="relative">
 							<input
 								id="password"
 								type={showPassword ? 'text' : 'password'}
 								bind:value={password}
-								placeholder="Create a strong password"
+								placeholder={m.placeholder_strong_password()}
 								required
 								minlength="8"
 								class={cn(
@@ -242,7 +242,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.minLength ? 'text-green-500' : 'text-muted-foreground'}>
-									At least 8 characters
+									{m.auth_pass_min_length()}
 								</span>
 							</div>
 							<div class="flex items-center gap-1.5">
@@ -252,7 +252,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasUppercase ? 'text-green-500' : 'text-muted-foreground'}>
-									One uppercase letter
+									{m.auth_pass_uppercase()}
 								</span>
 							</div>
 							<div class="flex items-center gap-1.5">
@@ -262,7 +262,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasLowercase ? 'text-green-500' : 'text-muted-foreground'}>
-									One lowercase letter
+									{m.auth_pass_lowercase()}
 								</span>
 							</div>
 							<div class="flex items-center gap-1.5">
@@ -272,7 +272,7 @@
 									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasNumber ? 'text-green-500' : 'text-muted-foreground'}>
-									One number
+									{m.auth_pass_number()}
 								</span>
 							</div>
 						</div>
@@ -280,13 +280,13 @@
 
 					<div class="space-y-2">
 						<label for="confirm-password" class="text-sm font-medium text-foreground">
-							Confirm Password
+							{m.bootstrap_confirm_password()}
 						</label>
 						<input
 							id="confirm-password"
 							type="password"
 							bind:value={confirmPassword}
-							placeholder="Confirm your password"
+							placeholder={m.placeholder_confirm_password()}
 							required
 							class={cn(
 								'w-full rounded-lg border bg-background px-3 py-2 text-sm',
@@ -298,7 +298,7 @@
 							)}
 						/>
 						{#if confirmPassword.length > 0 && !passwordsMatch}
-							<p class="text-xs text-destructive">Passwords do not match</p>
+							<p class="text-xs text-destructive">{m.auth_passwords_no_match()}</p>
 						{/if}
 					</div>
 
@@ -313,20 +313,19 @@
 					>
 						{#if loading}
 							<Loader2 class="h-4 w-4 animate-spin" />
-							Setting up...
+							{m.bootstrap_creating()}
 						{:else}
 							<Shield class="h-4 w-4" />
-							Create Administrator
+							{m.bootstrap_create()}
 						{/if}
 					</button>
 				</form>
 			{/if}
-		</div>
 
-		<!-- Footer -->
-		<p class="mt-8 text-center text-xs text-muted-foreground">
-			This page is only available during initial setup
-		</p>
+			<div class="mt-6 text-center text-sm text-muted-foreground">
+				<a href="/login" class="text-primary hover:underline">{m.bootstrap_back_login()}</a>
+			</div>
+		</div>
 	</div>
 </div>
 

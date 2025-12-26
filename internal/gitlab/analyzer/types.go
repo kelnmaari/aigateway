@@ -195,3 +195,33 @@ type CodeChunk struct {
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
+// Issue represents a code issue found during analysis
+type Issue struct {
+	FilePath   string `json:"file_path"`
+	Line       int    `json:"line"`
+	EndLine    int    `json:"end_line,omitempty"`
+	Severity   string `json:"severity"`
+	Category   string `json:"category"`
+	Message    string `json:"message"`
+	Suggestion string `json:"suggestion,omitempty"`
+}
+
+// SuggestionItem represents an improvement suggestion
+type SuggestionItem struct {
+	FilePath    string `json:"file_path,omitempty"`
+	Line        int    `json:"line,omitempty"`
+	Type        string `json:"type"`
+	Category    string `json:"category,omitempty"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Priority    string `json:"priority"`
+}
+
+// AnalysisResultParsed simplified result for processor
+type AnalysisResultParsed struct {
+	Summary     string           `json:"summary"`
+	Score       int              `json:"overall_score"`
+	Issues      []Issue          `json:"issues"`
+	Suggestions []SuggestionItem `json:"suggestions"`
+}
+

@@ -10,6 +10,7 @@
 		Key,
 		Loader2,
 		Shield,
+		ShieldOff,
 		X,
 		Eye,
 		EyeOff
@@ -107,13 +108,25 @@
 			users = users.map((u) => (u.id === user.id ? { ...u, status: newStatus } : u));
 		} catch (error) {
 			console.error('Failed to toggle user status:', error);
-			alert('Failed to update user status');
+			alert(m.alert_failed_update_status());
+		}
+		showMenuFor = null;
+	}
+
+	async function toggleAdminRole(user: AdminUser) {
+		const newIsAdmin = !user.is_admin;
+		try {
+			await adminApi.updateUser(user.id, { is_admin: newIsAdmin });
+			users = users.map((u) => (u.id === user.id ? { ...u, is_admin: newIsAdmin } : u));
+		} catch (error) {
+			console.error('Failed to toggle admin role:', error);
+			alert(m.admin_users_toggle_admin_failed?.() || 'Failed to update admin role');
 		}
 		showMenuFor = null;
 	}
 
 	async function handleDeleteUser(user: AdminUser) {
-		if (!confirm(`Are you sure you want to delete "${user.username}"? This cannot be undone.`)) return;
+		if (!confirm(m.confirm_delete_user({ name: user.username }))) return;
 
 		try {
 			await adminApi.deleteUser(user.id);
@@ -121,7 +134,7 @@
 			total -= 1;
 		} catch (error) {
 			console.error('Failed to delete user:', error);
-			alert('Failed to delete user');
+			alert(m.alert_failed_delete_user());
 		}
 		showMenuFor = null;
 	}
@@ -149,13 +162,13 @@
 				<input
 					type="text"
 					bind:value={search}
-					placeholder="Search users..."
+					placeholder={m.common_search() + '...'}
 					class="w-64 rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 				/>
 			</form>
 			<Button onclick={openCreateModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Add User
+				{m.admin_add_user()}
 			</Button>
 		</div>
 	</div>
@@ -167,7 +180,7 @@
 		</div>
 	{:else if users.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<p class="text-muted-foreground">No users found</p>
+			<p class="text-muted-foreground">{m.admin_no_users()}</p>
 		</div>
 	{:else}
 		<div class="overflow-hidden rounded-lg border border-border">
@@ -175,16 +188,19 @@
 				<thead class="border-b border-border bg-muted/50">
 					<tr>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							User
+							{m.profile_username()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Role
+							{m.admin_user_role()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							{m.common_status()}
+							{m.profile_authProvider()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Last Login
+							{m.admin_user_status()}
+						</th>
+						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
+							{m.profile_lastLogin()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
 							{m.common_created()}
@@ -209,10 +225,28 @@
 								{#if user.is_admin}
 									<span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
 										<Shield class="h-3 w-3" />
-										Admin
+										{m.admin_users_admin()}
 									</span>
 								{:else}
-									<span class="text-sm text-muted-foreground">User</span>
+									<span class="text-sm text-muted-foreground">{m.admin_users_user()}</span>
+								{/if}
+							</td>
+							<td class="px-4 py-3">
+								{#if user.oidc_subject}
+									<!-- User has OIDC linked (may also have local password) -->
+									<span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400" title="OIDC linked{user.auth_provider === 'local' ? ' + Local password' : ''}">
+										<Key class="h-3 w-3" />
+										OIDC
+									</span>
+								{:else if user.auth_provider === 'ldap'}
+									<span class="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
+										<Key class="h-3 w-3" />
+										LDAP
+									</span>
+								{:else}
+									<span class="inline-flex items-center gap-1 rounded-full bg-gray-500/10 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+										{m.admin_users_local()}
+									</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3">
@@ -226,7 +260,7 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
-								{user.last_login_at ? formatRelativeTime(user.last_login_at) : 'Never'}
+								{user.last_login_at ? formatRelativeTime(user.last_login_at) : m.admin_users_never()}
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
 								{formatRelativeTime(user.created_at)}
@@ -242,15 +276,27 @@
 								{#if showMenuFor === user.id}
 									<div class="absolute right-4 top-full z-10 mt-1 w-48 rounded-lg border border-border bg-popover py-1 shadow-lg">
 										<button
+											onclick={() => toggleAdminRole(user)}
+											class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+										>
+											{#if user.is_admin}
+												<ShieldOff class="h-4 w-4" />
+												{m.admin_users_remove_admin()}
+											{:else}
+												<Shield class="h-4 w-4" />
+												{m.admin_users_make_admin()}
+											{/if}
+										</button>
+										<button
 											onclick={() => toggleUserStatus(user)}
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 										>
 											{#if user.status === 'active'}
 												<UserX class="h-4 w-4" />
-												Disable User
+												{m.admin_users_disable()}
 											{:else}
 												<UserCheck class="h-4 w-4" />
-												Enable User
+												{m.admin_users_enable()}
 											{/if}
 										</button>
 										<button
@@ -258,7 +304,7 @@
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
 										>
 											<Trash2 class="h-4 w-4" />
-											Delete User
+											{m.admin_users_delete()}
 										</button>
 									</div>
 								{/if}
@@ -273,7 +319,7 @@
 		{#if total > perPage}
 			<div class="flex items-center justify-between">
 				<p class="text-sm text-muted-foreground">
-					Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, total)} of {total} users
+					{m.admin_users_showing({ from: (page - 1) * perPage + 1, to: Math.min(page * perPage, total), total: total })}
 				</p>
 				<div class="flex gap-2">
 					<Button
@@ -303,15 +349,18 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showCreateModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showCreateModal = false)}
 		role="dialog"
+		aria-modal="true"
 		tabindex="-1"
 	>
 		<div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
 			<div class="mb-4 flex items-center justify-between">
-				<h2 class="text-lg font-semibold">Create User</h2>
+				<h2 class="text-lg font-semibold">{m.admin_users_create()}</h2>
 				<button
 					onclick={() => (showCreateModal = false)}
 					class="rounded p-1 text-muted-foreground hover:bg-accent"
+					title={m.common_close()}
 				>
 					<X class="h-5 w-5" />
 				</button>
@@ -325,7 +374,7 @@
 				{/if}
 
 				<div class="space-y-2">
-					<label for="username" class="text-sm font-medium">Username *</label>
+					<label for="username" class="text-sm font-medium">{m.auth_username()} *</label>
 					<input
 						id="username"
 						type="text"
@@ -337,7 +386,7 @@
 				</div>
 
 				<div class="space-y-2">
-					<label for="email" class="text-sm font-medium">Email *</label>
+					<label for="email" class="text-sm font-medium">{m.auth_email()} *</label>
 					<input
 						id="email"
 						type="email"
@@ -349,7 +398,7 @@
 				</div>
 
 				<div class="space-y-2">
-					<label for="password" class="text-sm font-medium">Password *</label>
+					<label for="password" class="text-sm font-medium">{m.auth_password()} *</label>
 					<div class="relative">
 						<input
 							id="password"
@@ -374,19 +423,19 @@
 				</div>
 
 				<div class="space-y-2">
-					<label for="fullname" class="text-sm font-medium">Full Name</label>
+					<label for="fullname" class="text-sm font-medium">{m.auth_fullName()}</label>
 					<input
 						id="fullname"
 						type="text"
 						bind:value={newFullName}
-						placeholder="John Doe"
+						placeholder={m.placeholder_full_name()}
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					/>
 				</div>
 
 				<label class="flex items-center gap-2">
 					<input type="checkbox" bind:checked={newIsAdmin} class="h-4 w-4 rounded border-input" />
-					<span class="text-sm font-medium">Administrator</span>
+					<span class="text-sm font-medium">{m.admin_users_administrator()}</span>
 				</label>
 
 				<div class="flex justify-end gap-3 pt-2">

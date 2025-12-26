@@ -23,6 +23,7 @@
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import GitLabNav from '$lib/components/gitlab-nav.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let integrations = $state<GitLabIntegration[]>([]);
 	let queueStats = $state<GitLabQueueStats | null>(null);
@@ -163,7 +164,7 @@
 	}
 
 	async function handleDelete(integration: GitLabIntegration) {
-		if (!confirm(`Delete integration "${integration.name}"? This will also delete all projects and reviews.`)) {
+		if (!confirm(m.confirm_delete_integration({ name: integration.name }))) {
 			return;
 		}
 
@@ -172,7 +173,7 @@
 			integrations = integrations.filter((i) => i.id !== integration.id);
 			totalIntegrations--;
 		} catch (error) {
-			alert('Failed to delete integration');
+			alert(m.alert_failed_delete_integration());
 		}
 	}
 
@@ -208,12 +209,12 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h2 class="text-2xl font-bold text-foreground">GitLab Integrations</h2>
-			<p class="text-muted-foreground">Manage GitLab connections for AI-powered MR reviews</p>
+			<h2 class="text-2xl font-bold text-foreground">{m.admin_gitlab_title()}</h2>
+			<p class="text-muted-foreground">{m.admin_gitlab_subtitle()}</p>
 		</div>
 		<Button onclick={openCreateModal}>
 			<Plus class="mr-2 h-4 w-4" />
-			Add Integration
+			{m.admin_gitlab_add()}
 		</Button>
 	</div>
 
@@ -223,42 +224,42 @@
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Activity class="h-4 w-4 text-yellow-500" />
-					<span class="text-sm text-muted-foreground">Pending</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_pending()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.pending}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
-					<span class="text-sm text-muted-foreground">Processing</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_processing()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.processing}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<CheckCircle class="h-4 w-4 text-green-500" />
-					<span class="text-sm text-muted-foreground">Completed Today</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_completed_today()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.completed_today}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<XCircle class="h-4 w-4 text-red-500" />
-					<span class="text-sm text-muted-foreground">Failed</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_failed()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.failed}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Server class="h-4 w-4 text-purple-500" />
-					<span class="text-sm text-muted-foreground">Workers</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_workers()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.active_workers}/{queueStats.total_workers}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Activity class="h-4 w-4 text-cyan-500" />
-					<span class="text-sm text-muted-foreground">Last 24h</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_last_24h()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.jobs_last_24_hours}</p>
 			</div>
@@ -271,7 +272,7 @@
 			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 			<input
 				type="text"
-				placeholder="Search integrations..."
+				placeholder={m.admin_gitlab_search()}
 				bind:value={searchQuery}
 				oninput={debouncedSearch}
 				class="h-10 w-full rounded-md border bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -282,14 +283,14 @@
 			onchange={() => { currentPage = 0; loadIntegrations(); }}
 			class="h-10 rounded-md border bg-background px-3 text-sm"
 		>
-			<option value="">All Statuses</option>
-			<option value="active">Active</option>
-			<option value="disabled">Disabled</option>
-			<option value="error">Error</option>
+			<option value="">{m.admin_gitlab_all_statuses()}</option>
+			<option value="active">{m.common_active()}</option>
+			<option value="disabled">{m.common_disabled()}</option>
+			<option value="error">{m.common_error()}</option>
 		</select>
 		<Button variant="outline" onclick={clearFilters}>
 			<RefreshCw class="mr-2 h-4 w-4" />
-			Reset
+			{m.common_reset()}
 		</Button>
 	</div>
 
@@ -302,23 +303,23 @@
 		{:else if integrations.length === 0}
 			<div class="flex flex-col items-center justify-center py-12 text-center">
 				<GitBranch class="h-12 w-12 text-muted-foreground/50" />
-				<p class="mt-4 text-lg font-medium text-muted-foreground">No integrations found</p>
-				<p class="text-sm text-muted-foreground">Add a GitLab integration to start reviewing MRs</p>
+				<p class="mt-4 text-lg font-medium text-muted-foreground">{m.admin_gitlab_no_integrations()}</p>
+				<p class="text-sm text-muted-foreground">{m.admin_gitlab_no_integrations_desc()}</p>
 				<Button class="mt-4" onclick={openCreateModal}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Integration
+					{m.admin_gitlab_add()}
 				</Button>
 			</div>
 		{:else}
 			<table class="w-full">
 				<thead>
 					<tr class="border-b text-left text-sm text-muted-foreground">
-						<th class="px-4 py-3 font-medium">Name</th>
-						<th class="px-4 py-3 font-medium">URL</th>
-						<th class="px-4 py-3 font-medium">Status</th>
-						<th class="px-4 py-3 font-medium">Projects</th>
-						<th class="px-4 py-3 font-medium">Last Sync</th>
-						<th class="px-4 py-3 font-medium">Actions</th>
+						<th class="px-4 py-3 font-medium">{m.admin_gitlab_name()}</th>
+						<th class="px-4 py-3 font-medium">{m.admin_gitlab_url()}</th>
+						<th class="px-4 py-3 font-medium">{m.admin_gitlab_status()}</th>
+						<th class="px-4 py-3 font-medium">{m.admin_gitlab_projects()}</th>
+						<th class="px-4 py-3 font-medium">{m.admin_gitlab_last_sync()}</th>
+						<th class="px-4 py-3 font-medium">{m.common_actions()}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -339,13 +340,13 @@
 								</a>
 							</td>
 							<td class="px-4 py-3">
-								<div class="flex items-center gap-2">
-									<svelte:component
-										this={getStatusIcon(integration.status)}
-										class={cn('h-4 w-4', getStatusColor(integration.status))}
-									/>
-									<span class="text-sm capitalize">{integration.status}</span>
-								</div>
+								{#if true}
+									{@const StatusIcon = getStatusIcon(integration.status)}
+									<div class="flex items-center gap-2">
+										<StatusIcon class={cn('h-4 w-4', getStatusColor(integration.status))} />
+										<span class="text-sm capitalize">{integration.status}</span>
+									</div>
+								{/if}
 								{#if integration.last_error}
 									<p class="mt-1 text-xs text-red-500 truncate max-w-[200px]" title={integration.last_error}>
 										{integration.last_error}
@@ -425,8 +426,10 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showCreateModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showCreateModal = false)}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="w-full max-w-lg rounded-lg bg-card p-6 shadow-xl">
 			<div class="flex items-center justify-between mb-4">
@@ -444,18 +447,20 @@
 
 			<div class="space-y-4">
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">Name *</label>
+					<label for="create-name" class="mb-1.5 block text-sm font-medium">Name *</label>
 					<input
+						id="create-name"
 						type="text"
 						bind:value={formName}
-						placeholder="My GitLab"
+						placeholder={m.placeholder_gitlab_name()}
 						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 					/>
 				</div>
 
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">GitLab URL *</label>
+					<label for="create-url" class="mb-1.5 block text-sm font-medium">GitLab URL *</label>
 					<input
+						id="create-url"
 						type="url"
 						bind:value={formBaseUrl}
 						placeholder="https://gitlab.com"
@@ -465,8 +470,9 @@
 				</div>
 
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">Personal Access Token *</label>
+					<label for="create-token" class="mb-1.5 block text-sm font-medium">Personal Access Token *</label>
 					<input
+						id="create-token"
 						type="password"
 						bind:value={formAccessToken}
 						placeholder="glpat-xxxxxxxxxxxx"
@@ -478,11 +484,12 @@
 				</div>
 
 				<div>
-					<label class="mb-1.5 block text-sm font-medium">Webhook Secret (optional)</label>
+					<label for="create-webhook" class="mb-1.5 block text-sm font-medium">Webhook Secret (optional)</label>
 					<input
+						id="create-webhook"
 						type="text"
 						bind:value={formWebhookSecret}
-						placeholder="Leave empty to auto-generate"
+						placeholder={m.placeholder_webhook_secret()}
 						class="h-10 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 					/>
 				</div>
@@ -508,8 +515,10 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showDetailModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDetailModal = false)}
 		role="dialog"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<div class="w-full max-w-lg rounded-lg bg-card p-6 shadow-xl">
 			<div class="flex items-center justify-between mb-4">

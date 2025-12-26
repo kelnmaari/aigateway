@@ -191,7 +191,7 @@
 			servers = servers.map((s) => (s.id === server.id ? { ...s, status: 'running' } : s));
 		} catch (error) {
 			console.error('Failed to start server:', error);
-			alert('Failed to start server');
+			alert(m.alert_failed_start_server());
 		}
 	}
 
@@ -201,12 +201,12 @@
 			servers = servers.map((s) => (s.id === server.id ? { ...s, status: 'stopped' } : s));
 		} catch (error) {
 			console.error('Failed to stop server:', error);
-			alert('Failed to stop server');
+			alert(m.alert_failed_stop_server());
 		}
 	}
 
 	async function handleDeleteServer(server: MCPServer) {
-		if (!confirm(`Delete MCP server "${server.name}"?`)) return;
+		if (!confirm(m.confirm_delete_mcp({ name: server.name }))) return;
 
 		try {
 			await mcpApi.deleteServer(server.id);
@@ -214,7 +214,7 @@
 			totalServers--;
 		} catch (error) {
 			console.error('Failed to delete server:', error);
-			alert('Failed to delete server');
+			alert(m.alert_failed_delete_server());
 		}
 	}
 
@@ -290,7 +290,7 @@
 	<title>{m.admin_mcp()} Servers | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-6 flex items-center justify-between">
 		<div>
@@ -319,7 +319,7 @@
 				<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 				<input
 					type="text"
-					placeholder="Search servers by name, description or tags..."
+					placeholder={m.placeholder_search_servers()}
 					class="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					bind:value={searchQuery}
 					oninput={debouncedSearch}
@@ -509,7 +509,7 @@
 							id="server-name"
 							type="text"
 							bind:value={serverName}
-							placeholder="My MCP Server"
+							placeholder={m.placeholder_server_name()}
 							required
 							class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						/>
@@ -521,7 +521,7 @@
 							id="server-desc"
 							bind:value={serverDescription}
 							rows="2"
-							placeholder="What this server does..."
+							placeholder={m.placeholder_server_desc()}
 							class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						></textarea>
 					</div>

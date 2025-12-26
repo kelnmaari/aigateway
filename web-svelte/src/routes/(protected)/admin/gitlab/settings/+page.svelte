@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { api } from '$lib/api/client';
 	import GitLabNav from '$lib/components/gitlab-nav.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	// Telegram Settings
 	let telegramEnabled = false;
@@ -207,10 +208,10 @@
 				<CardContent class="space-y-4">
 					<div class="flex items-center justify-between">
 						<div>
-							<label class="font-medium">Enable Telegram Notifications</label>
+							<label for="telegram-enabled" class="font-medium">Enable Telegram Notifications</label>
 							<p class="text-sm text-muted-foreground">Send review updates to Telegram</p>
 						</div>
-						<input type="checkbox" bind:checked={telegramEnabled} class="h-4 w-4" />
+						<input id="telegram-enabled" type="checkbox" bind:checked={telegramEnabled} class="h-4 w-4" />
 					</div>
 
 					{#if telegramEnabled}
@@ -265,12 +266,12 @@
 							<div class="flex-1 space-y-2">
 								<div class="flex gap-2">
 									<input
-										placeholder="Pattern (e.g., release/*)"
+										placeholder={m.placeholder_pattern()}
 										bind:value={rule.pattern}
 										class="flex-1 h-10 rounded-md border bg-background px-3 text-sm"
 									/>
 									<input
-										placeholder="Branches (comma-separated)"
+										placeholder={m.placeholder_branches()}
 										value={rule.branches.join(', ')}
 										onchange={(e) => rule.branches = e.target.value.split(',').map(b => b.trim()).filter(Boolean)}
 										class="flex-1 h-10 rounded-md border bg-background px-3 text-sm"
@@ -326,10 +327,11 @@
 
 					<div class="space-y-2">
 						<div class="flex items-center justify-between">
-							<label class="text-sm font-medium">Custom Instructions for {selectedLanguage}</label>
+							<label for="custom-instructions" class="text-sm font-medium">Custom Instructions for {selectedLanguage}</label>
 							<div class="flex items-center gap-2">
-								<label class="text-sm">Enabled</label>
+								<label for="lang-enabled" class="text-sm">Enabled</label>
 								<input
+									id="lang-enabled"
 									type="checkbox"
 									checked={languagePrompts.find(p => p.language === selectedLanguage)?.enabled}
 									onchange={(e) => {
@@ -343,7 +345,7 @@
 						</div>
 						<textarea
 							bind:value={customPrompt}
-							placeholder="Enter custom review instructions for this language..."
+							placeholder={m.placeholder_review_instructions()}
 							rows="10"
 							class="w-full rounded-md border bg-background px-3 py-2 text-sm"
 						></textarea>

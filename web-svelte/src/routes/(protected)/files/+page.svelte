@@ -21,6 +21,7 @@
 	import { filesApi, type FileItem } from '$lib/api/files';
 	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { IconButton } from '$lib/components/ui/icon-button';
 	import * as m from '$lib/paraglide/messages';
 
 	let files = $state<FileItem[]>([]);
@@ -137,7 +138,7 @@
 			uploadingFiles = [];
 		} catch (error) {
 			console.error('Failed to upload:', error);
-			alert('Failed to upload files');
+			alert(m.alert_failed_upload());
 		} finally {
 			isUploading = false;
 		}
@@ -145,7 +146,7 @@
 
 	async function handleDelete(item: FileItem) {
 		const name = item.original_name || item.filename || String(item.id);
-		if (!confirm(`Delete "${name}"?`)) return;
+		if (!confirm(m.confirm_delete_file({ name }))) return;
 
 		try {
 			await filesApi.delete(String(item.id));
@@ -153,7 +154,7 @@
 			totalFiles--;
 		} catch (error) {
 			console.error('Failed to delete:', error);
-			alert('Failed to delete');
+			alert(m.alert_failed_delete());
 		}
 		showMenuFor = null;
 	}
@@ -270,22 +271,22 @@
 	>
 		<div class="rounded-xl border-2 border-dashed border-primary bg-background p-12 text-center">
 			<Upload class="mx-auto mb-4 h-16 w-16 text-primary" />
-			<p class="text-xl font-semibold">Drop files here to upload</p>
+			<p class="text-xl font-semibold">{m.files_drop_here()}</p>
 		</div>
 	</div>
 {/if}
 
 <div
-	class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8"
+	class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8"
 	ondragover={handleDragOver}
 	role="main"
 >
 	<!-- Header -->
 	<div class="mb-6 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">{m.nav_files()}</h1>
+			<h1 class="text-2xl font-bold text-foreground">{m.files_title()}</h1>
 			<p class="mt-1 text-sm text-muted-foreground">
-				{totalFiles} files uploaded
+				{m.files_count({ count: totalFiles.toString() })}
 			</p>
 		</div>
 		<div class="flex gap-2">
@@ -295,7 +296,7 @@
 			</Button>
 			<Button onclick={() => (showUploadModal = true)}>
 				<Upload class="mr-2 h-4 w-4" />
-				Upload
+				{m.files_upload()}
 			</Button>
 		</div>
 	</div>
@@ -307,7 +308,7 @@
 			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 			<input
 				type="text"
-				placeholder="Search files..."
+				placeholder={m.files_search()}
 				value={searchQuery}
 				oninput={handleSearchInput}
 				class="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -319,7 +320,7 @@
 			onchange={() => { currentPage = 0; loadFiles(); }}
 			class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
 		>
-			<option value="">All Types</option>
+			<option value="">{m.files_all_types()}</option>
 			<option value="application/pdf">PDF</option>
 			<option value="text/plain">Text</option>
 			<option value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">DOCX</option>
@@ -331,10 +332,10 @@
 			onchange={() => { currentPage = 0; loadFiles(); }}
 			class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
 		>
-			<option value="">All Statuses</option>
-			<option value="completed">Extracted</option>
-			<option value="pending">Pending</option>
-			<option value="failed">Failed</option>
+			<option value="">{m.files_all_statuses()}</option>
+			<option value="completed">{m.files_status_extracted()}</option>
+			<option value="pending">{m.files_status_pending()}</option>
+			<option value="failed">{m.files_status_failed()}</option>
 		</select>
 	</div>
 
@@ -355,11 +356,11 @@
 			role="region"
 		>
 			<FileIcon class="mx-auto h-12 w-12 text-muted-foreground/40" />
-			<p class="mt-4 text-muted-foreground">No files uploaded yet</p>
-			<p class="mt-2 text-sm text-muted-foreground">Drag & drop files here or click to upload</p>
+			<p class="mt-4 text-muted-foreground">{m.files_no_files()}</p>
+			<p class="mt-2 text-sm text-muted-foreground">{m.files_drag_drop()}</p>
 			<Button variant="outline" class="mt-4" onclick={() => (showUploadModal = true)}>
 				<Upload class="mr-2 h-4 w-4" />
-				Upload files
+				{m.files_upload_files()}
 			</Button>
 		</div>
 	{:else}
@@ -371,16 +372,16 @@
 							{m.common_name()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Type
+							{m.files_type()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Size
+							{m.files_size()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							{m.common_status()}
+							{m.files_status()}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-							Uploaded
+							{m.files_uploaded_at()}
 						</th>
 						<th class="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">
 							{m.common_actions()}
@@ -405,10 +406,13 @@
 								{formatSize(item.size)}
 							</td>
 							<td class="px-4 py-3">
-								<div class="flex items-center gap-1.5">
-									<svelte:component this={status.icon} class={cn('h-4 w-4', status.class)} />
-									<span class="text-sm">{status.label}</span>
-								</div>
+								{#if true}
+									{@const StatusIcon = status.icon}
+									<div class="flex items-center gap-1.5">
+										<StatusIcon class={cn('h-4 w-4', status.class)} />
+										<span class="text-sm">{status.label}</span>
+									</div>
+								{/if}
 							</td>
 							<td class="px-4 py-3 text-sm text-muted-foreground">
 								{formatRelativeTime(item.created_at)}
@@ -430,7 +434,7 @@
 													class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 												>
 													<Eye class="h-4 w-4" />
-													View Text
+													{m.files_view_text()}
 												</button>
 											{/if}
 											<button
@@ -438,7 +442,7 @@
 												class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 											>
 												<Download class="h-4 w-4" />
-												Download
+												{m.tooltip_download()}
 											</button>
 											<button
 												onclick={() => handleDelete(item)}

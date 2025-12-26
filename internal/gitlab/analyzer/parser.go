@@ -359,3 +359,172 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 	return result, errors
 }
 
+// ============================================================================
+// Convenience functions for processor
+// ============================================================================
+
+// GetSystemPrompt returns the system prompt, optionally with custom additions
+func GetSystemPrompt(customPrompt string) string {
+	if customPrompt != "" {
+		return SystemPrompt + "\n\nAdditional instructions:\n" + customPrompt
+	}
+	return SystemPrompt
+}
+
+// ParseAnalysisResponse parses LLM response into AnalysisResultParsed
+// Supports multiple JSON formats that LLMs might return
+func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
+	parser := NewJSONParser()
+	
+	// Clean the response first
+	cleaned := parser.cleanResponse(response)
+	
+	// Try parsing as full AnalysisResult format
+	fullResult, err := parser.ParseAnalysisResult(response)
+	if err == nil && (fullResult.Summary != "" || len(fullResult.FileReviews) > 0 || len(fullResult.Categories) > 0) {
+		// Successfully parsed full format
+		return convertFullResult(fullResult), nil
+	}
+	
+	// Try parsing as alternative "issues" format: {"issues": [...], "overall_score": ...}
+	var altFormat struct {
+		Issues []struct {
+			Line       int    `json:"line"`
+			Column     int    `json:"column"`
+			Message    string `json:"message"`
+			Category   string `json:"category"`
+			Severity   string `json:"severity"`
+			Suggestion string `json:"suggestion"`
+			File       string `json:"file"`
+			FilePath   string `json:"file_path"`
+		} `json:"issues"`
+		OverallScore int    `json:"overall_score"`
+		Score        int    `json:"score"`
+		Summary      string `json:"summary"`
+	}
+	
+	if err := json.Unmarshal([]byte(cleaned), &altFormat); err == nil && len(altFormat.Issues) > 0 {
+		result := &AnalysisResultParsed{
+			Summary:     altFormat.Summary,
+			Score:       altFormat.OverallScore,
+			Issues:      make([]Issue, 0, len(altFormat.Issues)),
+			Suggestions: make([]SuggestionItem, 0),
+		}
+		if result.Score == 0 {
+			result.Score = altFormat.Score
+		}
+		if result.Score == 0 {
+			result.Score = 70 // Default moderate score
+		}
+		
+		for _, issue := range altFormat.Issues {
+			filePath := issue.FilePath
+			if filePath == "" {
+				filePath = issue.File
+			}
+			result.Issues = append(result.Issues, Issue{
+				FilePath:   filePath,
+				Line:       issue.Line,
+				Severity:   normalizeSeverity(issue.Severity),
+				Category:   normalizeCategory(issue.Category),
+				Message:    issue.Message,
+				Suggestion: issue.Suggestion,
+			})
+		}
+		
+		// Generate summary if empty
+		if result.Summary == "" && len(result.Issues) > 0 {
+			result.Summary = fmt.Sprintf("Found %d potential issues in the code.", len(result.Issues))
+		}
+		
+		return result, nil
+	}
+	
+	// Try partial parse as last resort
+	partialResult, parseErrors := parser.TryParsePartialJSON(response)
+	if partialResult != nil && (partialResult.Summary != "" || len(partialResult.FileReviews) > 0) {
+		result := convertFullResult(partialResult)
+		if len(parseErrors) > 0 {
+			// Log but don't fail
+			result.Summary = fmt.Sprintf("[Partial parse] %s", result.Summary)
+		}
+		return result, nil
+	}
+	
+	// If all parsing fails, return the original error
+	return nil, err
+}
+
+// convertFullResult converts AnalysisResult to AnalysisResultParsed
+func convertFullResult(fullResult *AnalysisResult) *AnalysisResultParsed {
+	result := &AnalysisResultParsed{
+		Summary:     fullResult.Summary,
+		Score:       fullResult.OverallScore,
+		Issues:      make([]Issue, 0),
+		Suggestions: make([]SuggestionItem, 0),
+	}
+	
+	// Extract issues from file reviews
+	for _, fileReview := range fullResult.FileReviews {
+		for _, lineIssue := range fileReview.LineIssues {
+			result.Issues = append(result.Issues, Issue{
+				FilePath:   fileReview.FilePath,
+				Line:       lineIssue.Line,
+				EndLine:    lineIssue.EndLine,
+				Severity:   lineIssue.Severity,
+				Category:   lineIssue.Category,
+				Message:    lineIssue.Message,
+				Suggestion: lineIssue.Suggestion,
+			})
+		}
+	}
+	
+	// Convert suggestions
+	for _, suggestion := range fullResult.Suggestions {
+		result.Suggestions = append(result.Suggestions, SuggestionItem{
+			Type:        suggestion.Category,
+			Title:       suggestion.Title,
+			Description: suggestion.Description,
+			Priority:    suggestion.Priority,
+		})
+	}
+	
+	return result
+}
+
+// normalizeSeverity normalizes severity strings to expected values
+func normalizeSeverity(severity string) string {
+	severity = strings.ToLower(strings.TrimSpace(severity))
+	switch severity {
+	case "critical", "high", "error":
+		return SeverityCritical
+	case "warning", "warn", "medium":
+		return SeverityWarning
+	case "info", "information", "low":
+		return SeverityInfo
+	case "suggestion", "hint":
+		return SeveritySuggestion
+	default:
+		return SeverityInfo
+	}
+}
+
+// normalizeCategory normalizes category strings to expected values
+func normalizeCategory(category string) string {
+	category = strings.ToLower(strings.TrimSpace(category))
+	switch category {
+	case "security", "vulnerability", "sec":
+		return CategorySecurity
+	case "bug", "bugs", "error":
+		return CategoryBugs
+	case "style", "formatting", "code_style":
+		return CategoryStyle
+	case "performance", "perf":
+		return CategoryPerformance
+	case "best_practice", "best-practice", "bestpractice", "practice":
+		return CategoryBestPractice
+	default:
+		return CategoryBestPractice
+	}
+}
+

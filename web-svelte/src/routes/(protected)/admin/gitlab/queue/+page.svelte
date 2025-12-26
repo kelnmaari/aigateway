@@ -20,6 +20,7 @@
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import GitLabNav from '$lib/components/gitlab-nav.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let stats = $state<GitLabQueueStats | null>(null);
 	let jobs = $state<GitLabJob[]>([]);
@@ -184,13 +185,13 @@
 	}
 
 	async function handleCancelJob(job: GitLabJob) {
-		if (!confirm(`Cancel job for MR !${job.mr_iid}?`)) return;
+		if (!confirm(m.confirm_cancel_job({ iid: job.mr_iid }))) return;
 		
 		try {
 			await gitlabApi.cancelJob(job.id);
 			await loadJobs();
 		} catch (error) {
-			alert('Failed to cancel job');
+			alert(m.alert_failed_cancel_job());
 		}
 	}
 
@@ -199,7 +200,7 @@
 			await gitlabApi.retryJob(job.id);
 			await loadJobs();
 		} catch (error) {
-			alert('Failed to retry job');
+			alert(m.alert_failed_retry_job());
 		}
 	}
 
@@ -249,8 +250,8 @@
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-4">
 			<div>
-				<h2 class="text-2xl font-bold text-foreground">Analysis Queue</h2>
-				<p class="text-muted-foreground">Monitor and manage MR analysis jobs</p>
+				<h2 class="text-2xl font-bold text-foreground">{m.admin_queue_title()}</h2>
+				<p class="text-muted-foreground">{m.admin_queue_subtitle()}</p>
 			</div>
 		</div>
 		<div class="flex items-center gap-2">
@@ -263,10 +264,10 @@
 			>
 				{#if wsConnected}
 					<Wifi class="mr-2 h-4 w-4 text-green-500" />
-					Live
+					{m.admin_queue_live()}
 				{:else}
 					<WifiOff class="mr-2 h-4 w-4" />
-					{wsEnabled ? 'Connecting...' : 'Offline'}
+					{wsEnabled ? m.admin_queue_connecting() : m.admin_queue_offline()}
 				{/if}
 			</Button>
 			<Button
@@ -276,15 +277,15 @@
 			>
 				{#if autoRefresh}
 					<Pause class="mr-2 h-4 w-4" />
-					Auto-refresh ON
+					{m.admin_queue_autorefresh_on()}
 				{:else}
 					<Play class="mr-2 h-4 w-4" />
-					Auto-refresh OFF
+					{m.admin_queue_autorefresh_off()}
 				{/if}
 			</Button>
 			<Button variant="outline" size="sm" onclick={loadAll}>
 				<RefreshCw class="mr-2 h-4 w-4" />
-				Refresh
+				{m.common_refresh()}
 			</Button>
 		</div>
 	</div>
@@ -295,35 +296,35 @@
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Clock class="h-4 w-4 text-yellow-500" />
-					<span class="text-sm text-muted-foreground">Pending</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_pending()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.pending}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
-					<span class="text-sm text-muted-foreground">Processing</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_processing()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.processing}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<CheckCircle class="h-4 w-4 text-green-500" />
-					<span class="text-sm text-muted-foreground">Completed</span>
+					<span class="text-sm text-muted-foreground">{m.admin_queue_completed()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.completed}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<XCircle class="h-4 w-4 text-red-500" />
-					<span class="text-sm text-muted-foreground">Failed</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_failed()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.failed}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Server class="h-4 w-4 text-purple-500" />
-					<span class="text-sm text-muted-foreground">Workers</span>
+					<span class="text-sm text-muted-foreground">{m.admin_gitlab_workers()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">
 					<span class="text-green-500">{stats.active_workers}</span>
@@ -333,7 +334,7 @@
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
 					<Activity class="h-4 w-4 text-cyan-500" />
-					<span class="text-sm text-muted-foreground">Avg Time</span>
+					<span class="text-sm text-muted-foreground">{m.admin_queue_avg_time()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">
 					{stats.avg_processing_time_ms ? `${(stats.avg_processing_time_ms / 1000).toFixed(1)}s` : '-'}
@@ -401,17 +402,19 @@
 								</div>
 							</td>
 							<td class="px-4 py-3">
-								<div class="flex items-center gap-2">
-									<svelte:component
-										this={getStatusIcon(job.status)}
-										class={cn(
-											'h-4 w-4',
-											getStatusColor(job.status),
-											job.status === 'processing' && 'animate-spin'
-										)}
-									/>
-									<span class="text-sm capitalize">{job.status}</span>
-								</div>
+								{#if true}
+									{@const StatusIcon = getStatusIcon(job.status)}
+									<div class="flex items-center gap-2">
+										<StatusIcon
+											class={cn(
+												'h-4 w-4',
+												getStatusColor(job.status),
+												job.status === 'processing' && 'animate-spin'
+											)}
+										/>
+										<span class="text-sm capitalize">{job.status}</span>
+									</div>
+								{/if}
 								{#if job.last_error}
 									<p class="mt-1 text-xs text-red-500 truncate max-w-[200px]" title={job.last_error}>
 										{job.last_error}

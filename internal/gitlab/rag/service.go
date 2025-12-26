@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -18,6 +19,18 @@ type EmbeddingProvider interface {
 	
 	// GenerateEmbeddings creates vector embeddings for multiple texts
 	GenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
+}
+
+// EmbeddingProviderWithModelOverride extends EmbeddingProvider with ability to use specific model
+type EmbeddingProviderWithModelOverride interface {
+	EmbeddingProvider
+
+	// GenerateEmbeddingWithModel creates embedding using specific model alias
+	// If modelAlias is empty, uses default behavior (configured model or auto-detect)
+	GenerateEmbeddingWithModel(ctx context.Context, text string, modelAlias string) ([]float32, error)
+
+	// GenerateEmbeddingsWithModel creates embeddings using specific model alias
+	GenerateEmbeddingsWithModel(ctx context.Context, texts []string, modelAlias string) ([][]float32, error)
 }
 
 // RAGService provides RAG capabilities for code review
@@ -79,7 +92,7 @@ func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error 
 
 	point := Point{
 		ID:     pointID,
-		Vector: embedding,
+		Vector: Float32ToFloat64(embedding),
 		Payload: map[string]interface{}{
 			"project_id":    chunk.ProjectID,
 			"file_path":     chunk.FilePath,
@@ -103,66 +116,45 @@ func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error 
 	return nil
 }
 
-// IndexCodeChunks indexes multiple code chunks in batch
-func (s *RAGService) IndexCodeChunks(ctx context.Context, chunks []CodeChunk) error {
-	if !s.enabled || len(chunks) == 0 {
-		return nil
-	}
-
-	// Generate embeddings in batch
-	contents := make([]string, len(chunks))
-	for i, chunk := range chunks {
-		contents[i] = chunk.Content
-	}
-
-	embeddings, err := s.embedder.GenerateEmbeddings(ctx, contents)
-	if err != nil {
-		return fmt.Errorf("generate embeddings: %w", err)
-	}
-
-	// Create points
-	points := make([]Point, len(chunks))
-	for i, chunk := range chunks {
-		pointID := generatePointID(chunk.ProjectID, chunk.FilePath, chunk.ChunkIndex)
-		points[i] = Point{
-			ID:     pointID,
-			Vector: embeddings[i],
-			Payload: map[string]interface{}{
-				"project_id":    chunk.ProjectID,
-				"file_path":     chunk.FilePath,
-				"chunk_index":   chunk.ChunkIndex,
-				"language":      chunk.Language,
-				"content":       chunk.Content,
-				"start_line":    chunk.StartLine,
-				"end_line":      chunk.EndLine,
-				"function_name": chunk.FunctionName,
-				"class_name":    chunk.ClassName,
-				"commit_sha":    chunk.CommitSHA,
-				"branch_name":   chunk.BranchName,
-				"last_updated":  chunk.LastUpdated,
-			},
-		}
-	}
-
-	if err := s.qdrant.UpsertPoints(ctx, points); err != nil {
-		return fmt.Errorf("upsert points: %w", err)
-	}
-
-	s.logger.WithField("count", len(chunks)).Info("Indexed code chunks")
-	return nil
-}
 
 // FindSimilarCode finds code chunks similar to the given query
-func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectID string, limit int) ([]CodeChunk, error) {
+// FindSimilarCode finds code similar to the query
+// If embeddingModelAlias is non-empty and embedder supports model override, uses that model
+func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectID string, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
 	if !s.enabled {
 		return nil, nil
 	}
 
-	// Generate embedding for query
-	embedding, err := s.embedder.GenerateEmbedding(ctx, query)
+	// Generate embedding for query - use model override if provided and supported
+	var embedding []float32
+	var err error
+
+	if embeddingModelAlias != "" {
+		if overrideProvider, ok := s.embedder.(EmbeddingProviderWithModelOverride); ok {
+			embedding, err = overrideProvider.GenerateEmbeddingWithModel(ctx, query, embeddingModelAlias)
+		} else {
+			// Fallback to default if provider doesn't support override
+			s.logger.WithField("model", embeddingModelAlias).Debug("Embedder doesn't support model override, using default")
+			embedding, err = s.embedder.GenerateEmbedding(ctx, query)
+		}
+	} else {
+		embedding, err = s.embedder.GenerateEmbedding(ctx, query)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("generate query embedding: %w", err)
 	}
+
+	// Validate embedding before search
+	if embedding == nil || len(embedding) == 0 {
+		s.logger.WithField("query_len", len(query)).Debug("Empty embedding generated, skipping search")
+		return nil, nil
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"embedding_dim": len(embedding),
+		"project_id":    projectID,
+		"limit":         limit,
+	}).Debug("Searching for similar code with embedding")
 
 	// Search in Qdrant
 	results, err := s.qdrant.SearchByProject(ctx, embedding, projectID, limit)
@@ -194,13 +186,13 @@ func (s *RAGService) FindSimilarCode(ctx context.Context, query string, projectI
 }
 
 // FindRelatedCode finds code related to the given file path
-func (s *RAGService) FindRelatedCode(ctx context.Context, projectID, filePath string, content string, limit int) ([]CodeChunk, error) {
+func (s *RAGService) FindRelatedCode(ctx context.Context, projectID, filePath string, content string, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
 	if !s.enabled {
 		return nil, nil
 	}
 
 	// Use the file content as query
-	return s.FindSimilarCode(ctx, content, projectID, limit)
+	return s.FindSimilarCode(ctx, content, projectID, limit, embeddingModelAlias)
 }
 
 // DeleteProjectIndex removes all indexed code for a project
@@ -221,10 +213,137 @@ func (s *RAGService) DeleteFileIndex(ctx context.Context, projectID, filePath st
 	return s.qdrant.DeleteByFile(ctx, projectID, filePath)
 }
 
+// DeleteProjectBranchIndex removes all indexed code for a project+branch combination
+func (s *RAGService) DeleteProjectBranchIndex(ctx context.Context, projectID, branch string) error {
+	if !s.enabled {
+		return nil
+	}
+
+	return s.qdrant.DeleteByProjectBranch(ctx, projectID, branch)
+}
+
+// IndexCodeChunks indexes multiple code chunks in batch with optional embedding model override (default collection)
+func (s *RAGService) IndexCodeChunks(ctx context.Context, chunks []CodeChunk, embeddingModelAlias string) error {
+	return s.IndexCodeChunksToCollection(ctx, "", chunks, embeddingModelAlias)
+}
+
+// IndexCodeChunksToCollection indexes multiple code chunks to specified collection
+// If collectionName is empty, uses default collection from config
+func (s *RAGService) IndexCodeChunksToCollection(ctx context.Context, collectionName string, chunks []CodeChunk, embeddingModelAlias string) error {
+	if !s.enabled || len(chunks) == 0 {
+		return nil
+	}
+
+	// Extract content for batch embedding
+	contents := make([]string, 0, len(chunks))
+	validIndices := make([]int, 0, len(chunks))
+
+	for i, chunk := range chunks {
+		if strings.TrimSpace(chunk.Content) != "" {
+			contents = append(contents, chunk.Content)
+			validIndices = append(validIndices, i)
+		}
+	}
+
+	if len(contents) == 0 {
+		return nil
+	}
+
+	// Generate embeddings in batch
+	var embeddings [][]float32
+	var err error
+
+	if embeddingModelAlias != "" {
+		if overrideProvider, ok := s.embedder.(EmbeddingProviderWithModelOverride); ok {
+			embeddings, err = overrideProvider.GenerateEmbeddingsWithModel(ctx, contents, embeddingModelAlias)
+		} else {
+			embeddings, err = s.embedder.GenerateEmbeddings(ctx, contents)
+		}
+	} else {
+		embeddings, err = s.embedder.GenerateEmbeddings(ctx, contents)
+	}
+	if err != nil {
+		return fmt.Errorf("generate embeddings: %w", err)
+	}
+
+	// Create points for Qdrant
+	points := make([]Point, 0, len(embeddings))
+	for i, embedding := range embeddings {
+		if embedding == nil || len(embedding) == 0 {
+			continue
+		}
+
+		chunkIdx := validIndices[i]
+		chunk := chunks[chunkIdx]
+
+		pointID := generatePointID(chunk.ProjectID, chunk.FilePath, chunk.ChunkIndex)
+
+		// Convert LastUpdated to unix timestamp for storage
+		lastUpdated := chunk.LastUpdated.Unix()
+		if chunk.LastUpdated.IsZero() {
+			lastUpdated = time.Now().Unix()
+		}
+
+		point := Point{
+			ID:     pointID,
+			Vector: Float32ToFloat64(embedding),
+			Payload: map[string]interface{}{
+				"project_id":    chunk.ProjectID,
+				"file_path":     chunk.FilePath,
+				"chunk_index":   chunk.ChunkIndex,
+				"language":      chunk.Language,
+				"content":       chunk.Content,
+				"start_line":    chunk.StartLine,
+				"end_line":      chunk.EndLine,
+				"function_name": chunk.FunctionName,
+				"class_name":    chunk.ClassName,
+				"commit_sha":    chunk.CommitSHA,
+				"branch_name":   chunk.BranchName,
+				"last_updated":  lastUpdated,
+			},
+		}
+		points = append(points, point)
+	}
+
+	if len(points) == 0 {
+		return nil
+	}
+
+	// Upsert to Qdrant (use specified collection or default)
+	if collectionName != "" {
+		if err := s.qdrant.UpsertPointsToCollection(ctx, collectionName, points); err != nil {
+			return fmt.Errorf("upsert points to %s: %w", collectionName, err)
+		}
+	} else {
+		if err := s.qdrant.UpsertPoints(ctx, points); err != nil {
+			return fmt.Errorf("upsert points: %w", err)
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"points":     len(points),
+		"collection": collectionName,
+	}).Debug("Indexed code chunks")
+	return nil
+}
+
+// EnsureCollectionNamed creates the specified collection if it doesn't exist
+func (s *RAGService) EnsureCollectionNamed(ctx context.Context, collectionName string) error {
+	if !s.enabled || s.qdrant == nil {
+		return nil
+	}
+	return s.qdrant.EnsureCollectionNamed(ctx, collectionName)
+}
+
 // GetContextForReview retrieves relevant code context for MR review
-func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, changedFiles []ChangedFile, limit int) ([]CodeChunk, error) {
+// embeddingModelAlias is optional - if provided, uses that specific model for embeddings
+func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, changedFiles []ChangedFile, limit int, embeddingModelAlias string) ([]CodeChunk, error) {
 	if !s.enabled || len(changedFiles) == 0 {
 		return nil, nil
+	}
+
+	if embeddingModelAlias != "" {
+		s.logger.WithField("embedding_model", embeddingModelAlias).Debug("Using project-specific embedding model")
 	}
 
 	allChunks := make([]CodeChunk, 0)
@@ -232,7 +351,7 @@ func (s *RAGService) GetContextForReview(ctx context.Context, projectID string, 
 
 	for _, file := range changedFiles {
 		// Find similar code for the changed content
-		chunks, err := s.FindSimilarCode(ctx, file.Diff, projectID, limit/len(changedFiles)+1)
+		chunks, err := s.FindSimilarCode(ctx, file.Diff, projectID, limit/len(changedFiles)+1, embeddingModelAlias)
 		if err != nil {
 			s.logger.WithError(err).WithField("file", file.Path).Warn("Failed to find similar code")
 			continue
@@ -278,19 +397,19 @@ func (s *RAGService) HealthCheck(ctx context.Context) error {
 
 // CodeChunk represents a chunk of code for indexing
 type CodeChunk struct {
-	ProjectID    string  `json:"project_id"`
-	FilePath     string  `json:"file_path"`
-	ChunkIndex   int     `json:"chunk_index"`
-	Language     string  `json:"language"`
-	Content      string  `json:"content"`
-	StartLine    int     `json:"start_line"`
-	EndLine      int     `json:"end_line"`
-	FunctionName string  `json:"function_name,omitempty"`
-	ClassName    string  `json:"class_name,omitempty"`
-	CommitSHA    string  `json:"commit_sha,omitempty"`
-	BranchName   string  `json:"branch_name,omitempty"`
-	LastUpdated  int64   `json:"last_updated,omitempty"`
-	Score        float32 `json:"score,omitempty"` // Similarity score (for search results)
+	ProjectID    string    `json:"project_id"`
+	FilePath     string    `json:"file_path"`
+	ChunkIndex   int       `json:"chunk_index"`
+	Language     string    `json:"language"`
+	Content      string    `json:"content"`
+	StartLine    int       `json:"start_line"`
+	EndLine      int       `json:"end_line"`
+	FunctionName string    `json:"function_name,omitempty"`
+	ClassName    string    `json:"class_name,omitempty"`
+	CommitSHA    string    `json:"commit_sha,omitempty"`
+	BranchName   string    `json:"branch_name,omitempty"`
+	LastUpdated  time.Time `json:"last_updated,omitempty"`
+	Score        float32   `json:"score,omitempty"` // Similarity score (for search results)
 }
 
 // ChangedFile represents a file changed in an MR
@@ -352,5 +471,13 @@ func FormatContextForPrompt(chunks []CodeChunk) string {
 	}
 
 	return sb.String()
+}
+
+// GetCollectionStats returns statistics for a specific collection
+func (s *RAGService) GetCollectionStats(ctx context.Context, collectionName string) (*CollectionStats, error) {
+	if !s.enabled || s.qdrant == nil {
+		return nil, fmt.Errorf("rag service not enabled")
+	}
+	return s.qdrant.GetCollectionStats(ctx, collectionName)
 }
 

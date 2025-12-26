@@ -43,8 +43,12 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	
 	// Parse filters
 	search := c.Query("search")
+	if search == "" {
+		search = c.Query("q") // SvelteKit uses 'q' parameter
+	}
 	author := c.Query("author")
 	tagsStr := c.Query("tags")
+	providerFilter := c.DefaultQuery("provider", "all")
 	sortBy := c.DefaultQuery("sort", "downloads")
 	limitStr := c.DefaultQuery("limit", "30")
 	
@@ -59,14 +63,31 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		tags = strings.Split(tagsStr, ",")
 	}
 	
-	// Always include GGUF tag
-	tags = append(tags, "gguf")
+	// Apply provider-specific filters
+	var library string
+	switch providerFilter {
+	case "llama.cpp":
+		// GGUF models for llama.cpp - use library filter instead of tag
+		// Many GGUF repos don't have the "gguf" tag but are indexed as gguf library
+		library = "gguf"
+	case "vllm", "sglang", "tgi":
+		// Transformer models for vLLM/SGLang/TGI
+		tags = append(tags, "text-generation")
+		library = "transformers"
+	case "embedding":
+		// Embedding models
+		tags = append(tags, "feature-extraction")
+	default:
+		// "all" - show text-generation models (most common for inference)
+		tags = append(tags, "text-generation")
+	}
 	
 	// Build filters
 	filters := huggingface.ModelFilters{
 		Search:       search,
 		Author:       author,
 		Tags:         tags,
+		Library:      library,
 		Sort:         sortBy,
 		Direction:    -1, // Descending
 		Limit:        limit,
@@ -93,6 +114,15 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		}
 		h.renderError(c, "Failed to search models: "+err.Error())
 		return
+	}
+	
+	// For llama.cpp filter, library=gguf was already passed to API
+	// All returned models should be GGUF models, mark them as such
+	if providerFilter == "llama.cpp" {
+		for i := range models {
+			models[i].HasGGUF = true // API with library=gguf only returns GGUF models
+		}
+		h.logger.WithField("count", len(models)).Debug("Marked all models as GGUF (library=gguf filter applied)")
 	}
 	
 	// Check if JSON response is requested (SvelteKit frontend)
@@ -261,6 +291,19 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	defer cancel()
 	
 	category := c.DefaultQuery("category", "all")
+	providerFilter := c.DefaultQuery("provider", "all")
+	
+	// Pagination parameters
+	limitStr := c.DefaultQuery("limit", "30")
+	pageStr := c.DefaultQuery("page", "1")
+	limit, _ := strconv.Atoi(limitStr)
+	page, _ := strconv.Atoi(pageStr)
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+	if page <= 0 {
+		page = 1
+	}
 	
 	var search string
 	var additionalTags []string
@@ -286,12 +329,31 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		search = ""
 	}
 	
+	// Apply provider-specific filters
+	var baseTags []string
+	var library string
+	switch providerFilter {
+	case "llama.cpp":
+		// Use library=gguf instead of tag for better coverage
+		library = "gguf"
+	case "vllm", "sglang", "tgi":
+		baseTags = []string{"text-generation"}
+		library = "transformers"
+	case "embedding":
+		baseTags = []string{"feature-extraction"}
+	default:
+		// "all" - show text-generation models
+		baseTags = []string{"text-generation"}
+	}
+	
 	filters := huggingface.ModelFilters{
 		Search:       search,
-		Tags:         append([]string{"gguf"}, additionalTags...),
+		Tags:         append(baseTags, additionalTags...),
+		Library:      library,
 		Sort:         "downloads",
 		Direction:    -1,
-		Limit:        20,
+		Limit:        limit,
+		Page:         page,
 		FullResponse: true,
 		CardData:     true,
 	}
@@ -299,11 +361,35 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	models, err := h.hfClient.SearchModels(ctx, filters)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get popular models")
+		// Check if JSON response is requested
+		if strings.Contains(c.GetHeader("Accept"), "application/json") {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		h.renderError(c, "Failed to load popular models: "+err.Error())
 		return
 	}
 	
-	// Render popular models
+	// For llama.cpp filter, library=gguf was already passed to API
+	// All returned models are GGUF models, mark them as such
+	if providerFilter == "llama.cpp" {
+		for i := range models {
+			models[i].HasGGUF = true
+		}
+	}
+	
+	// Check if JSON response is requested (SvelteKit frontend)
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"models":   models,
+			"count":    len(models),
+			"category": category,
+			"provider": providerFilter,
+		})
+		return
+	}
+	
+	// Render popular models (HTMX)
 	data := map[string]interface{}{
 		"Models":   models,
 		"Category": category,
@@ -492,6 +578,25 @@ func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
 		h.renderError(c, "Failed to render downloads list")
 		return
 	}
+}
+
+// PostClearCompleted removes all completed, failed, and cancelled downloads
+func (h *HuggingFaceUIHandler) PostClearCompleted(c *gin.Context) {
+	cleared := h.downloader.ClearCompleted()
+	
+	// Return JSON for SvelteKit frontend
+	if strings.Contains(c.GetHeader("Accept"), "application/json") {
+		c.JSON(http.StatusOK, gin.H{
+			"cleared": cleared,
+			"message": fmt.Sprintf("Cleared %d downloads", cleared),
+		})
+		return
+	}
+	
+	// Return HTML for HTMX
+	html := fmt.Sprintf(`<div class="alert alert-success">Cleared %d completed downloads.</div>`, cleared)
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, html)
 }
 
 // renderError renders error message

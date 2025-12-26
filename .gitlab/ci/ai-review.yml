@@ -1,0 +1,57 @@
+# AI Code Review via AIGateway
+# Include this in main .gitlab-ci.yml if you want AI reviews on MRs
+#
+# Usage in .gitlab-ci.yml:
+#   include:
+#     - local: '.gitlab/ci/ai-review.yml'
+
+variables:
+  # Proxy settings (configure in CI/CD Variables)
+  PROXY_URL: "http://your-aigateway:8080/v1/chat/completions"
+  # PROXY_API_KEY: set in Settings → CI/CD → Variables
+  
+  # Models for code review
+  COMMIT_REVIEW_MODEL: "swe-dev-32b-i1-gguf"
+  FULL_MR_REVIEW_MODEL: "swe-dev-32b-i1-gguf"
+
+.review_base:
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq bash git
+
+# Quick review of latest commit (automatic on push)
+ai:review:commit:
+  extends: .review_base
+  stage: test
+  script:
+    - chmod +x .gitlab/scripts/review-commit.sh
+    - .gitlab/scripts/review-commit.sh
+  artifacts:
+    paths:
+      - ai-review-commit-*.md
+    expire_in: 30 days
+    when: always
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+  allow_failure: true
+  timeout: 10m
+
+# Full MR review (manual trigger)
+ai:review:full:
+  extends: .review_base
+  stage: test
+  script:
+    - chmod +x .gitlab/scripts/review-full-mr.sh
+    - .gitlab/scripts/review-full-mr.sh
+  artifacts:
+    paths:
+      - ai-review-mr-*-full.md
+      - ai-review-mr-*-file-*.md
+    expire_in: 30 days
+    when: always
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+      when: manual
+  allow_failure: true
+  timeout: 40m
+

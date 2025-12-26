@@ -25,6 +25,7 @@
 		Server,
 		GitBranch
 	} from 'lucide-svelte';
+	import { Tooltip } from '$lib/components/ui/tooltip';
 
 	const STORAGE_KEY = 'PARAGLIDE_LOCALE';
 
@@ -91,7 +92,7 @@
 />
 
 <nav class="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+	<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
 		<div class="flex h-16 items-center justify-between">
 			<!-- Logo -->
 			<div class="flex items-center gap-8">
@@ -103,12 +104,12 @@
 				</a>
 
 				<!-- Desktop Navigation -->
-				<div class="hidden md:flex md:items-center md:gap-1">
+				<div class="hidden md:flex md:items-center md:gap-0.5">
 					{#each navItems as item}
 						<a
 							href={item.href}
 							class={cn(
-								'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+								'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
 								isActive(item.href)
 									? 'bg-accent text-accent-foreground'
 									: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -124,7 +125,7 @@
 							<a
 								href={item.href}
 								class={cn(
-									'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+									'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
 									isActive(item.href)
 										? 'bg-accent text-accent-foreground'
 										: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -141,27 +142,29 @@
 			<!-- Right side -->
 			<div class="flex items-center gap-2">
 				<!-- Theme Toggle -->
-				<button
-					onclick={() => themeStore.toggle()}
-					class="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:flex"
-					title={themeStore.isDark ? m.theme_light() : m.theme_dark()}
-				>
-					{#if themeStore.isDark}
-						<Sun class="h-4 w-4" />
-					{:else}
-						<Moon class="h-4 w-4" />
-					{/if}
-				</button>
+				<Tooltip text={themeStore.isDark ? m.theme_light() : m.theme_dark()} position="bottom">
+					<button
+						onclick={() => themeStore.toggle()}
+						class="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:flex"
+					>
+						{#if themeStore.isDark}
+							<Sun class="h-4 w-4" />
+						{:else}
+							<Moon class="h-4 w-4" />
+						{/if}
+					</button>
+				</Tooltip>
 
 				<!-- Locale Toggle -->
-				<button
-					onclick={toggleLocale}
-					class="hidden h-9 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:flex"
-					title="Change language"
-				>
-					<Globe class="h-4 w-4" />
-					<span class="uppercase">{getLocale()}</span>
-				</button>
+				<Tooltip text={m.settings_language()} position="bottom">
+					<button
+						onclick={toggleLocale}
+						class="hidden h-9 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:flex"
+					>
+						<Globe class="h-4 w-4" />
+						<span class="uppercase">{getLocale()}</span>
+					</button>
+				</Tooltip>
 
 				<!-- User Menu -->
 				<div class="relative" data-user-menu>

@@ -33,6 +33,7 @@ export interface GitLabProject {
   gitlab_project_id: number;
   name: string;
   path_with_namespace: string;
+  default_branch?: string;
   webhook_id?: number;
   status: 'active' | 'disabled' | 'error';
   auto_review: boolean;
@@ -40,10 +41,27 @@ export interface GitLabProject {
   embedding_model_id: string;
   review_prompt?: string;
   settings: GitLabProjectSettings;
+  index_status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+  last_indexed_at?: string;
   created_at: string;
   updated_at: string;
   integration_name?: string;
   review_count?: number;
+  // Index statistics (computed from Qdrant)
+  index_chunks?: number;
+  index_vectors?: number;
+}
+
+export interface GitLabIndexStatus {
+  project_id: string;
+  branch: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  files_indexed: number;
+  chunks_total: number;
+  last_indexed?: string;
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export interface GitLabProjectSettings {
@@ -53,10 +71,14 @@ export interface GitLabProjectSettings {
   max_lines_per_file?: number;
   skip_draft_mrs?: boolean;
   skip_bots?: boolean;
+  max_review_tokens?: number; // Max tokens for LLM review response
+  per_file_review?: boolean;  // Review each file separately with tool calling
+  review_language?: string;   // Language for review output: "en", "ru"
   chunk_size?: number;
   chunk_overlap?: number;
   target_branches?: string[];
   ignore_branches?: string[];
+  collection_name?: string; // Qdrant collection name
 }
 
 export interface GitLabReview {
@@ -226,7 +248,7 @@ export const gitlabApi = {
   }): Promise<GitLabIntegration> {
     return apiRequest('/integrations', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -239,7 +261,7 @@ export const gitlabApi = {
   }): Promise<GitLabIntegration> {
     return apiRequest(`/integrations/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -281,7 +303,7 @@ export const gitlabApi = {
   }): Promise<GitLabProject> {
     return apiRequest(`/integrations/${integrationId}/projects`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -295,7 +317,7 @@ export const gitlabApi = {
   }): Promise<GitLabProject> {
     return apiRequest(`/projects/${projectId}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
 
@@ -306,8 +328,31 @@ export const gitlabApi = {
   async setupWebhook(projectId: string, webhookUrl: string): Promise<{ webhook_id: number }> {
     return apiRequest(`/projects/${projectId}/webhook`, {
       method: 'POST',
-      body: JSON.stringify({ webhook_url: webhookUrl }),
+      body: { webhook_url: webhookUrl },
     });
+  },
+
+  // Indexing
+  async startIndexing(projectId: string, options?: { branch?: string; force?: boolean }): Promise<{ 
+    message: string; 
+    project_id: string; 
+    branch: string; 
+    status: string 
+  }> {
+    return apiRequest(`/projects/${projectId}/index`, {
+      method: 'POST',
+      body: options || {},
+    });
+  },
+
+  async getIndexStatus(projectId: string, branch?: string): Promise<GitLabIndexStatus> {
+    const params = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+    return apiRequest(`/projects/${projectId}/index/status${params}`);
+  },
+
+  async deleteIndex(projectId: string, branch?: string): Promise<{ message: string }> {
+    const params = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+    return apiRequest(`/projects/${projectId}/index${params}`, { method: 'DELETE' });
   },
 
   // Reviews
@@ -381,6 +426,47 @@ export const gitlabApi = {
   async checkModelUsage(modelId: string): Promise<ModelUsage> {
     return apiRequest(`/models/${modelId}/gitlab-usage`);
   },
+
+  // Settings
+  async getSettings(): Promise<GitLabSettings> {
+    return apiRequest('/settings');
+  },
+
+  async updateSettings(settings: Partial<GitLabSettings>): Promise<{ message: string }> {
+    return apiRequest('/settings', { method: 'PUT', body: settings });
+  },
+
+  // Analytics
+  async getAnalytics(range?: string): Promise<GitLabAnalytics> {
+    const params = new URLSearchParams();
+    if (range) params.set('range', range);
+    return apiRequest(`/analytics?${params}`);
+  },
+
+  // Feedback
+  async listFeedback(params?: { limit?: number; offset?: number }): Promise<PaginatedResponse<GitLabFeedback>> {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+    return apiRequest(`/feedback?${searchParams}`);
+  },
+
+  async submitFeedback(data: { review_id: string; rating: number; comment?: string }): Promise<{ message: string }> {
+    return apiRequest('/feedback', { method: 'POST', body: data });
+  },
+
+  // Available Projects (from GitLab API)
+  async listAvailableProjects(integrationId: string, params?: {
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<AvailableProjectsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.per_page) searchParams.set('per_page', params.per_page.toString());
+    return apiRequest(`/integrations/${integrationId}/available-projects?${searchParams}`);
+  },
 };
 
 // Model types
@@ -407,6 +493,59 @@ export interface GitLabProjectRef {
   project_id: string;
   project_name: string;
   usage_type: 'analysis' | 'embedding';
+}
+
+// Settings types
+export interface GitLabSettings {
+  auto_review_enabled: boolean;
+  default_analysis_model: string;
+  default_embedding_model: string;
+  max_files_per_mr: number;
+  max_lines_per_file: number;
+  webhook_secret_rotation: boolean;
+  notification_email: string;
+}
+
+// Analytics types
+export interface GitLabAnalytics {
+  range: string;
+  days: number;
+  total_reviews: number;
+  completed_reviews: number;
+  failed_reviews: number;
+  avg_processing_ms: number;
+  total_issues_found: number;
+  reviews_by_day: Array<{ date: string; count: number }>;
+  reviews_by_project: Array<{ project: string; count: number }>;
+  issue_categories: Array<{ category: string; count: number }>;
+}
+
+// Feedback types
+export interface GitLabFeedback {
+  id: string;
+  review_id: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+// Available projects from GitLab
+export interface AvailableProject {
+  id: number;
+  name: string;
+  path_with_namespace: string;
+  description?: string;
+  web_url: string;
+  default_branch: string;
+  visibility: string;
+  already_added: boolean;
+}
+
+export interface AvailableProjectsResponse {
+  projects: AvailableProject[];
+  total: number;
+  page: number;
+  per_page: number;
 }
 
 export default gitlabApi;

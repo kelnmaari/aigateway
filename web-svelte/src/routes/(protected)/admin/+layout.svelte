@@ -56,7 +56,7 @@
 <div class="min-h-[calc(100vh-4rem)]">
 	<!-- Admin Header -->
 	<div class="border-b border-border bg-card/50">
-		<div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+		<div class="mx-auto max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8">
 			<div class="flex items-center gap-3">
 				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
 					<Shield class="h-5 w-5" />
@@ -71,7 +71,7 @@
 
 	<!-- Tabs Navigation -->
 	<div class="border-b border-border bg-background">
-		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+		<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
 			<nav class="-mb-px flex gap-1 overflow-x-auto" aria-label="Admin tabs">
 				{#each tabs as tab}
 					<a
@@ -92,7 +92,7 @@
 	</div>
 
 	<!-- Content -->
-	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+	<div class="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
 		{@render children()}
 	</div>
 </div>

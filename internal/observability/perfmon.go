@@ -20,12 +20,20 @@ import (
 
 // PerformanceMonitor continuously monitors application performance metrics.
 type PerformanceMonitor struct {
-	logger   *logrus.Logger
-	config   PerfMonConfig
-	metrics  *PerformanceMetrics
-	baseline *PerformanceMetrics
-	mu       sync.RWMutex
-	stopCh   chan struct{}
+	logger        *logrus.Logger
+	metricsLogger *logrus.Logger // Отдельный логгер для метрик (в metrics.log)
+	config        PerfMonConfig
+	metrics       *PerformanceMetrics
+	baseline      *PerformanceMetrics
+	mu            sync.RWMutex
+	stopCh        chan struct{}
+}
+
+// SetMetricsLogger устанавливает отдельный логгер для метрик
+func (pm *PerformanceMonitor) SetMetricsLogger(logger *logrus.Logger) {
+	if pm != nil {
+		pm.metricsLogger = logger
+	}
 }
 
 // PerfMonConfig holds configuration for performance monitoring.
@@ -212,8 +220,12 @@ func (pm *PerformanceMonitor) analyzeMetrics() {
 		}).Warn("High memory allocation rate - possible memory leak")
 	}
 
-	// Log periodic metrics at debug level
-	pm.logger.WithFields(logrus.Fields{
+	// Log periodic metrics at debug level (в отдельный файл если настроен)
+	logTarget := pm.metricsLogger
+	if logTarget == nil {
+		logTarget = pm.logger
+	}
+	logTarget.WithFields(logrus.Fields{
 		"heap_alloc_mb":   fmt.Sprintf("%.2f", m.HeapAllocMB),
 		"heap_sys_mb":     fmt.Sprintf("%.2f", m.HeapSysMB),
 		"num_gc":          m.NumGC,

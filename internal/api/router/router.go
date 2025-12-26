@@ -3,6 +3,9 @@ package router
 
 import (
 	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -35,8 +38,15 @@ import (
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
+	gitlabIndexer "aigateway/internal/gitlab/indexer"
+	gitlabProcessor "aigateway/internal/gitlab/processor"
+	gitlabRAG "aigateway/internal/gitlab/rag"
+	gitlabStorage "aigateway/internal/gitlab/storage"
+	gitlabWebhook "aigateway/internal/gitlab/webhook"
+	gitlabWorker "aigateway/internal/gitlab/worker"
 	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
+	"aigateway/internal/inference"
 	internalLogger "aigateway/internal/logger"
 	"aigateway/internal/metrics"
 	"aigateway/internal/models"
@@ -77,11 +87,13 @@ func (a *apiKeyDatabaseAdapter) GetAPIKey(ctx context.Context, keyID string) (in
 
 // Router представляет HTTP роутер приложения с опциональным API Key Management
 type Router struct {
-	config  *config.Config
-	logger  *logrus.Logger
-	engine  *gin.Engine
-	version string       // Версия сервера
-	tracer  trace.Tracer // OpenTelemetry tracer (v1.6.0+)
+	config        *config.Config
+	logger        *logrus.Logger
+	httpLogger    *logrus.Logger // Отдельный логгер для детальных HTTP логов (в http.log)
+	metricsLogger *logrus.Logger // Отдельный логгер для GPU/performance метрик (в metrics.log)
+	engine        *gin.Engine
+	version       string       // Версия сервера
+	tracer        trace.Tracer // OpenTelemetry tracer (v1.6.0+)
 
 	// API Key Management компоненты (опциональные)
 	storage       storage.APIKeyStorage
@@ -203,6 +215,14 @@ type Router struct {
 	hfDownloader *huggingface.Downloader          // Model downloader
 	hfUIHandler  *handlersUI.HuggingFaceUIHandler // Hugging Face Model Browser
 
+	// Inference v4 (multi-provider)
+	inferenceSvc          *inference.Service
+	inferenceMgr          *inference.Manager
+	inferenceRouter       *inference.Router
+	inferenceHandler      *handlers.InferenceHandler
+	inferenceProxyHandler *handlers.InferenceProxyHandler
+	inferenceModelStore   *inference.ModelStore
+
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
 	yzmaClient    *yzma.Client
 	yzmaHandler   *handlers.YzmaHandler     // yzma inference handler
@@ -213,12 +233,22 @@ type Router struct {
 
 	// UI Framework (v3.1.0: Optimized JS+CSS bundling)
 	frameworkHandler *framework.Handler // Framework asset handler
+
+	// GitLab Integration (v3.1.0+)
+	gitlabHandler            *handlers.GitLabAdminHandler       // GitLab admin handler
+	gitlabWebhookHandler     *handlers.GitLabWebhookHandler     // GitLab webhook handler
+	gitlabWorkerPool         *gitlabWorker.Pool                 // GitLab worker pool for MR analysis
+	gitlabIndexerHandler     *handlers.GitLabIndexerHandler     // GitLab indexer handler (admin)
+	gitlabUserIndexerHandler *handlers.GitLabUserIndexerHandler // GitLab indexer handler (user-level)
+	gitlabIndexer            *gitlabIndexer.Indexer             // GitLab repository indexer
 }
 
 // NewOptions содержит опции для создания роутера
 type NewOptions struct {
 	Config               *config.Config
 	Logger               *logrus.Logger
+	HTTPLogger           *logrus.Logger                    // Опциональный логгер для HTTP запросов (отдельный файл)
+	MetricsLogger        *logrus.Logger                    // Опциональный логгер для GPU/performance метрик (отдельный файл)
 	Version              string
 	Database             storage.Database                  // Опциональная база данных для user auth
 	JWTManager           *jwt.Manager                      // Опциональный JWT manager
@@ -230,6 +260,7 @@ type NewOptions struct {
 	RAGDataSourceService *ragservice.DataSourceService     // Опциональный RAG Data Source Service (v1.13.1+)
 	RAGOrchestrator      *ragorchestrator.RAGOrchestrator  // Опциональный RAG Orchestrator (v1.13.1+)
 	VectorStore          vector.VectorStore                // Опциональный Vector Store для RAG (v3.2.0+)
+	InferenceRouter      *inference.Router                 // Опциональный Inference Router для Docker-based providers (v3.3.0+)
 }
 
 // New создает новый экземпляр роутера с опциональным API Key Management
@@ -246,6 +277,8 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 	r := &Router{
 		config:               opts.Config,
 		logger:               opts.Logger,
+		httpLogger:           opts.HTTPLogger,
+		metricsLogger:        opts.MetricsLogger,
 		version:              opts.Version,
 		db:                   opts.Database,
 		jwtManager:           opts.JWTManager,
@@ -295,7 +328,7 @@ func NewWithOptions(opts NewOptions) (*Router, error) {
 	r.setupHandlers(opts.Config, opts.Logger)
 
 	r.setupEngine()
-	r.setupRoutes()
+	r.setupRoutes() // includes setupInferenceRoutes()
 
 	return r, nil
 }
@@ -312,8 +345,34 @@ func (r *Router) Initialize() error {
 		}
 	}
 
+	// Auto-start saved models with auto_start=true
+	if r.inferenceModelStore != nil && r.inferenceRouter != nil {
+		go r.autoStartSavedModels()
+	}
+
 	r.logger.Info("Router initialized successfully")
 	return nil
+}
+
+// autoStartSavedModels loads models marked with auto_start=true
+func (r *Router) autoStartSavedModels() {
+	autoStart := r.inferenceModelStore.ListAutoStart()
+	if len(autoStart) == 0 {
+		return
+	}
+
+	r.logger.WithField("count", len(autoStart)).Info("Auto-starting saved models")
+	ctx := context.Background()
+
+	for _, saved := range autoStart {
+		spec := saved.ToSpec()
+		r.logger.WithField("alias", spec.Alias).Info("Auto-starting model")
+
+		_, err := r.inferenceRouter.EnsureBySpec(ctx, spec)
+		if err != nil {
+			r.logger.WithError(err).WithField("alias", spec.Alias).Error("Failed to auto-start model")
+		}
+	}
 }
 
 // Close закрывает роутер и освобождает ресурсы
@@ -436,7 +495,11 @@ func (r *Router) setupMiddleware() {
 
 	// Metrics Collector middleware для historical metrics (Phase 12.1)
 	if r.metricsStorage != nil {
-		r.engine.Use(middleware.MetricsCollector(r.metricsStorage, r.logger))
+		r.engine.Use(middleware.MetricsCollectorWithConfig(middleware.MetricsCollectorConfig{
+			Storage:        r.metricsStorage,
+			Logger:         r.logger,
+			DetailedLogger: r.httpLogger, // HTTP метрики в отдельный файл
+		}))
 	}
 
 	// Request Tracker middleware для monitoring (TUI-04)
@@ -446,8 +509,9 @@ func (r *Router) setupMiddleware() {
 
 	// Structured logging middleware
 	loggingConfig := middleware.LoggingConfig{
-		Logger:    r.logger,
-		SkipPaths: []string{"/health", "/healthz", "/ready", "/api/stats", "/api/config", r.config.Metrics.PrometheusPath}, // Пропускаем health checks, stats, config и metrics
+		Logger:         r.logger,
+		DetailedLogger: r.httpLogger, // Детальные HTTP логи в отдельный файл
+		SkipPaths:      []string{"/health", "/healthz", "/ready", "/api/stats", "/api/config", r.config.Metrics.PrometheusPath}, // Пропускаем health checks, stats, config и metrics
 	}
 	r.engine.Use(middleware.RequestLogging(loggingConfig))
 
@@ -494,7 +558,189 @@ func (r *Router) setupRoutes() {
 	r.setupGPURoutes()         // GPU Monitoring (v1.9.3)
 	r.setupFileRoutes()        // File Storage & Processing (v1.10.0)
 	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
-	r.setupGitLabStubRoutes()  // GitLab Integration stub routes (v3.2.0)
+	r.setupGitLabRoutes()      // GitLab Integration routes (v3.1.0)
+	r.setupInferenceRoutes()   // Inference v4 system routes
+}
+
+// setupInferenceRoutes registers minimal inference v4 endpoints (system).
+func (r *Router) setupInferenceRoutes() {
+	if r.inferenceHandler == nil || r.engine == nil {
+		return
+	}
+	group := r.engine.Group("/api/system/inference")
+
+	// Use JWT authentication for admin UI access (like other admin routes)
+	if r.jwtManager != nil && r.db != nil {
+		r.logger.Info("Inference routes: Using JWT authentication with admin role check")
+		group.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		group.Use(middleware.RequireAdmin(r.db, r.logger))
+	}
+	{
+		group.POST("/load", r.inferenceHandler.PostLoad)
+		group.POST("/prepare", r.inferenceHandler.PostPrepare)
+		group.POST("/stop", r.inferenceHandler.PostStop)
+		group.POST("/evict", r.inferenceHandler.PostEvict)
+		group.POST("/pin", r.inferenceHandler.PostPin)
+		group.POST("/unpin", r.inferenceHandler.PostUnpin)
+		group.POST("/delete-artifacts", r.inferenceHandler.PostDeleteArtifacts)
+		group.POST("/evict-cache", r.inferenceHandler.PostEvictCache)
+		group.GET("/cache", r.inferenceHandler.GetCache)
+		group.POST("/cache/clear", r.inferenceHandler.PostClearCache)
+		group.GET("/health", r.inferenceHandler.GetHealth)
+		group.GET("/models", r.inferenceHandler.GetModels)
+		group.GET("/logs", r.inferenceHandler.GetLogs)
+		group.GET("/metrics", r.inferenceHandler.GetMetrics)
+		group.GET("/trt-engines", r.inferenceHandler.ListTRTEngines)
+		group.POST("/convert-trt", r.inferenceHandler.ConvertTRT)
+		group.POST("/delete-trt-engine", r.inferenceHandler.DeleteTRTEngine)
+		// Saved models (persist config between restarts)
+		group.GET("/saved", r.inferenceHandler.GetSavedModels)
+		group.POST("/save", r.inferenceHandler.PostSaveModel)
+		group.POST("/delete-saved", r.inferenceHandler.PostDeleteSaved)
+		group.POST("/auto-start", r.inferenceHandler.PostSetAutoStart)
+		group.POST("/update-saved", r.inferenceHandler.PostUpdateSaved)
+		group.POST("/create-saved", r.inferenceHandler.PostCreateSaved)
+		// Docker image management
+		group.GET("/docker-images", r.inferenceHandler.GetDockerImages)
+		group.POST("/docker-images/pull", r.inferenceHandler.PostPullDockerImage)
+		// Repository download (v3.3.x+) - download all model files locally
+		group.POST("/download-repo", r.inferenceHandler.PostDownloadRepository)
+		group.GET("/repo-downloads", r.inferenceHandler.GetRepoDownloads)
+		group.POST("/repo-downloads/status", r.inferenceHandler.GetRepoDownloadStatus)  // POST because model_id contains /
+		group.POST("/repo-downloads/cancel", r.inferenceHandler.CancelRepoDownload)
+		group.POST("/repo-downloads/remove", r.inferenceHandler.RemoveRepoDownload)
+	}
+	r.logger.Info("Inference v4 routes configured")
+
+	// OpenAI-compatible proxy routes for inference v4 providers
+	r.setupInferenceProxyRoutes()
+
+	// HuggingFace JSON API for model browser (v3.3.0+)
+	r.setupHuggingFaceAPIRoutes()
+}
+
+// setupHuggingFaceAPIRoutes registers JSON API endpoints for HuggingFace model browser.
+func (r *Router) setupHuggingFaceAPIRoutes() {
+	if r.hfClient == nil || r.engine == nil {
+		return
+	}
+
+	hfGroup := r.engine.Group("/api/huggingface")
+	if r.jwtManager != nil && r.db != nil {
+		hfGroup.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	}
+	{
+		// Search models
+		hfGroup.GET("/search", func(c *gin.Context) {
+			query := c.Query("q")
+			author := c.Query("author")
+			tag := c.Query("tag")
+			limitStr := c.DefaultQuery("limit", "20")
+			limit := 20
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+				limit = l
+			}
+
+			filters := huggingface.ModelFilters{
+				Search: query,
+				Author: author,
+				Limit:  limit,
+				Sort:   "downloads",
+			}
+			if tag != "" {
+				filters.Tags = []string{tag}
+			}
+
+			models, err := r.hfClient.SearchModels(c.Request.Context(), filters)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"models": models})
+		})
+
+		// Get model info with files
+		hfGroup.GET("/models/:repo/*subpath", func(c *gin.Context) {
+			repo := c.Param("repo")
+			subpath := c.Param("subpath")
+			if subpath != "" && subpath != "/" {
+				repo = repo + subpath
+			}
+
+			info, err := r.hfClient.GetModelInfo(c.Request.Context(), repo)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, info)
+		})
+
+		// Get popular GGUF models
+		hfGroup.GET("/popular", func(c *gin.Context) {
+			filters := huggingface.ModelFilters{
+				Tags:  []string{"gguf"},
+				Sort:  "downloads",
+				Limit: 50,
+			}
+
+			models, err := r.hfClient.SearchModels(c.Request.Context(), filters)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"models": models})
+		})
+
+		// Start download
+		hfGroup.POST("/download", func(c *gin.Context) {
+			if r.hfDownloader == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Downloader not configured"})
+				return
+			}
+
+			var req struct {
+				ModelID   string `json:"model_id"`
+				Filename  string `json:"filename"`
+				TotalSize int64  `json:"total_size"`
+				SHA256    string `json:"sha256"`
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			download, err := r.hfDownloader.StartDownload(req.ModelID, req.Filename, req.TotalSize, req.SHA256)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"download_id": download.ID, "message": "Download started"})
+		})
+	}
+	r.logger.Info("HuggingFace JSON API routes configured: /api/huggingface/*")
+}
+
+// setupInferenceProxyRoutes registers OpenAI-compatible proxy routes for inference v4.
+func (r *Router) setupInferenceProxyRoutes() {
+	if r.inferenceProxyHandler == nil || r.engine == nil {
+		return
+	}
+
+	// /v1/inference/* routes - proxy to running provider containers
+	v1inf := r.engine.Group("/v1/inference")
+	if r.db != nil {
+		v1inf.Use(middleware.APIKeyDBAuth(r.config, r.db, r.logger))
+	}
+	{
+		v1inf.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
+		v1inf.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
+		v1inf.GET("/models", r.inferenceProxyHandler.HandleModels)
+	}
+	r.logger.Info("Inference v4 OpenAI proxy routes configured: /v1/inference/*")
 }
 
 // setupHealthRoutes настраивает health check endpoint для desktop client
@@ -598,6 +844,7 @@ func (r *Router) setupGPURoutes() {
 	api := r.engine.Group("/api/gpu")
 	{
 		api.GET("/metrics", r.gpuHandler.GetGPUMetrics)
+		api.GET("/list", r.gpuHandler.GetGPUList) // v3.3.x: GPU list for model deployment
 	}
 
 	r.logger.Info("✅ GPU monitoring routes registered")
@@ -747,6 +994,7 @@ func (r *Router) setupUIRoutes() {
 			hf.GET("/downloads/:download_id/progress", r.hfUIHandler.GetDownloadProgress)
 			hf.POST("/downloads/:download_id/pause", r.hfUIHandler.PostPauseDownload)
 			hf.POST("/downloads/:download_id/cancel", r.hfUIHandler.PostCancelDownload)
+			hf.POST("/downloads/clear-completed", r.hfUIHandler.PostClearCompleted)
 		}
 		r.logger.Info("✅ Hugging Face UI routes registered")
 	}
@@ -765,7 +1013,7 @@ func (r *Router) setupUIRoutes() {
 
 			// Statistics
 			yzma.GET("/stats", r.yzmaUIHandler.GetStats)
-			
+
 			// Model metadata (v3.2.0+)
 			yzma.GET("/metadata/*model_path", r.yzmaUIHandler.GetModelMetadata)
 
@@ -913,7 +1161,74 @@ func (r *Router) setupSystemRoutes() {
 			// These work even before models are loaded, allowing WebUI to show status
 			system.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)
 			system.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck)
+		} else {
+			// Stub endpoints when yzma is disabled (v3.3.0+)
+			system.GET("/models", func(c *gin.Context) {
+				// Return models from inference v4 if available
+				if r.inferenceRouter != nil {
+					models := r.inferenceRouter.ListModels()
+					data := make([]gin.H, 0, len(models))
+					for _, m := range models {
+						data = append(data, gin.H{
+							"id":       m.Spec.Alias,
+							"object":   "model",
+							"owned_by": string(m.Spec.Provider),
+							"created":  0,
+						})
+					}
+					c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+			})
+			system.GET("/yzma/gpu", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"available":    false,
+					"device_name":  "N/A (yzma disabled)",
+					"cuda_version": "",
+					"message":      "yzma inference backend is disabled, using Docker-based inference",
+				})
+			})
+			system.GET("/yzma/health", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{
+					"status":  "unavailable",
+					"message": "yzma inference backend is disabled",
+				})
+			})
 		}
+
+		// Backend status endpoint (v3.3.x) - shows which inference backend is active
+		system.GET("/backend", func(c *gin.Context) {
+			backendType := r.config.Inference.Backend
+			if backendType == "" {
+				backendType = "docker" // default
+			}
+
+			resp := gin.H{
+				"backend": backendType,
+				"ready":   false,
+			}
+
+			if backendType == "docker" && r.inferenceRouter != nil {
+				models := r.inferenceRouter.ListModels()
+				runningCount := 0
+				for _, m := range models {
+					if m.Status == "running" {
+						runningCount++
+					}
+				}
+				resp["ready"] = true
+				resp["loaded_models"] = len(models)
+				resp["running_models"] = runningCount
+				resp["max_running_models"] = r.config.Inference.Docker.MaxRunningModels
+				resp["docker_enabled"] = r.config.Inference.Docker.Enabled
+			} else if backendType == "yzma" && r.yzmaHandler != nil {
+				resp["ready"] = true
+				resp["yzma_enabled"] = true
+			}
+
+			c.JSON(http.StatusOK, resp)
+		})
 	}
 
 	r.logger.Info("System API endpoints configured")
@@ -964,6 +1279,14 @@ func (r *Router) setupAuthRoutes() {
 		authPublic.POST("/register", r.authHandler.Register)
 		authPublic.POST("/login", r.authHandler.Login)
 		authPublic.POST("/refresh", r.authHandler.RefreshToken)
+
+		// Auth providers status (for UI to show SSO buttons)
+		authPublic.GET("/providers", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"oidc_enabled": r.oidcHandler != nil,
+				"ldap_enabled": r.ldapHandler != nil,
+			})
+		})
 	}
 
 	// OIDC authentication endpoints (Version 1.11.1+: Keycloak SSO Integration)
@@ -1427,7 +1750,7 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
 			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		} else if r.config.Auth.Enabled && r.authenticator != nil {
 			// API Key auth
@@ -1437,7 +1760,7 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/gpu", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
 			v1.GET("/yzma/health", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleHealthCheck) // v3.2.2+
 		} else {
 			// No auth
@@ -1447,8 +1770,38 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
 			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
 			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)       // v3.2.2+
+			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
 			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
+		}
+	} else {
+		// Fallback /v1/models endpoint when yzma is disabled (v3.3.0+)
+		// Returns models from inference v4 or empty list
+		r.logger.Info("yzma disabled - registering fallback /v1/models endpoint")
+		v1.GET("/models", func(c *gin.Context) {
+			// Try to get models from inference v4 manager
+			if r.inferenceRouter != nil {
+				models := r.inferenceRouter.ListModels()
+				data := make([]gin.H, 0, len(models))
+				for _, m := range models {
+					data = append(data, gin.H{
+						"id":       m.Spec.Alias,
+						"object":   "model",
+						"owned_by": string(m.Spec.Provider),
+						"created":  0,
+					})
+				}
+				c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+				return
+			}
+			// No inference manager - return empty list
+			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+		})
+
+		// Fallback /v1/chat/completions for inference v4 models (v3.3.x)
+		if r.inferenceProxyHandler != nil {
+			r.logger.Info("yzma disabled - registering fallback /v1/chat/completions endpoint for inference v4")
+			v1.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
+			v1.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
 		}
 	}
 }
@@ -2261,6 +2614,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	r.hfClient = huggingface.NewClient(hfAPIToken, hfLogger)
 
 	// Initialize downloader (HF-02)
+	// Create separate logger for downloads with dedicated log file
+	downloadLogger := internalLogger.NewFileLogger("logs/downloads.log", cfg.Logging.Level)
+	downloadLogger.Info("📥 Downloads logger initialized with separate log file")
+
 	downloadsDir := cfg.HuggingFace.ModelsDir
 	if downloadsDir == "" {
 		downloadsDir = "./data/models"
@@ -2272,11 +2629,11 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	autoResume := cfg.HuggingFace.AutoResume
 
 	var err error
-	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, hfLogger)
+	r.hfDownloader, err = huggingface.NewDownloader(r.hfClient, downloadsDir, maxConcurrent, autoResume, downloadLogger)
 	if err != nil {
-		hfLogger.WithError(err).Error("Failed to initialize Hugging Face downloader")
+		downloadLogger.WithError(err).Error("Failed to initialize Hugging Face downloader")
 	} else {
-		hfLogger.WithFields(logrus.Fields{
+		downloadLogger.WithFields(logrus.Fields{
 			"downloads_dir":  downloadsDir,
 			"max_concurrent": maxConcurrent,
 			"auto_resume":    autoResume,
@@ -2287,6 +2644,148 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	if r.templateRenderer != nil && r.hfDownloader != nil {
 		r.hfUIHandler = handlersUI.NewHuggingFaceUIHandler(r.hfClient, r.hfDownloader, r.templateRenderer, hfLogger)
 		hfLogger.Info("✅ Hugging Face browser initialized")
+	}
+
+	// Inference v4 (multi-provider) bootstrap
+	// Use cfg.Inference.Docker if backend is "docker", otherwise fallback to legacy config
+	dockerCfg := cfg.Inference.Docker
+	useDockerInference := cfg.Inference.Backend == "docker" && dockerCfg.Enabled
+
+	var infHFCache, infGGUFCache, infTRTDir string
+	var infMaxConcurrent int
+	var infAutoResume bool
+	var infHTTPTimeout, infHealthTimeout, infStartupTimeout time.Duration
+	var infMaxRunning int
+	var infCacheMax int64
+	var infDockerBin string
+
+	if useDockerInference {
+		// Use new Docker inference config (v3.3.0+)
+		infHFCache = dockerCfg.HFCacheDir
+		if infHFCache == "" {
+			infHFCache = "./data/models/hf"
+		}
+		infGGUFCache = dockerCfg.GGUFDir
+		if infGGUFCache == "" {
+			infGGUFCache = "./data/models/gguf"
+		}
+		infTRTDir = dockerCfg.TRTEnginesDir
+		if infTRTDir == "" {
+			infTRTDir = "./data/engines/trt"
+		}
+		infMaxConcurrent = dockerCfg.MaxConcurrentDownloads
+		if infMaxConcurrent <= 0 {
+			infMaxConcurrent = 2
+		}
+		infAutoResume = dockerCfg.AutoResume
+		infHTTPTimeout = cfg.HuggingFace.DefaultDownloadTimeout
+		if infHTTPTimeout == 0 {
+			infHTTPTimeout = 5 * time.Minute
+		}
+		infHealthTimeout = dockerCfg.HealthCheckTimeout
+		if infHealthTimeout == 0 {
+			infHealthTimeout = 60 * time.Second
+		}
+		infStartupTimeout = dockerCfg.StartupTimeout
+		if infStartupTimeout == 0 {
+			infStartupTimeout = 5 * time.Minute
+		}
+		infMaxRunning = dockerCfg.MaxRunningModels
+		if infMaxRunning <= 0 {
+			infMaxRunning = 2
+		}
+		infCacheMax = dockerCfg.CacheMaxBytes
+		infDockerBin = dockerCfg.DockerBin
+		logger.WithFields(logrus.Fields{
+			"hf_cache":         infHFCache,
+			"gguf_cache":       infGGUFCache,
+			"trt_engines":      infTRTDir,
+			"max_running":      infMaxRunning,
+			"default_provider": dockerCfg.DefaultProvider,
+		}).Info("Using Docker-based inference (v3.3.0+)")
+	} else {
+		// Legacy fallback for non-docker mode
+		infHFCache = downloadsDir
+		infGGUFCache = cfg.Yzma.ModelsDir
+		if infGGUFCache == "" {
+			infGGUFCache = infHFCache
+		}
+		infHTTPTimeout = cfg.HuggingFace.DefaultDownloadTimeout
+		if infHTTPTimeout == 0 {
+			infHTTPTimeout = 5 * time.Minute
+		}
+		infMaxConcurrent = maxConcurrent
+		infAutoResume = cfg.HuggingFace.AutoResume
+		infMaxRunning = cfg.Models.Preload.MaxLoadedModels
+		infCacheMax = cfg.HuggingFace.CacheMaxBytes
+		infHealthTimeout = 60 * time.Second
+		infStartupTimeout = 5 * time.Minute
+	}
+
+	infSvc, err := inference.NewService(inference.ServiceConfig{
+		HFToken:               hfAPIToken,
+		HFCacheDir:            infHFCache,
+		GGUFCacheDir:          infGGUFCache,
+		TRTEnginesDir:         infTRTDir,
+		ContainerLogsDir:      "logs/containers", // Container logs directory
+		MaxConcurrentDownload: infMaxConcurrent,
+		AutoResume:            infAutoResume,
+		HTTPTimeout:           infHTTPTimeout,
+		DockerBin:             infDockerBin,
+		Logger:                logger,
+		MaxRunningModels:      infMaxRunning,
+		CacheMaxBytes:         infCacheMax,
+		HealthCheckTimeout:    infHealthTimeout,
+		StartupTimeout:        infStartupTimeout,
+	})
+	if err != nil {
+		logger.WithError(err).Warn("Inference v4 service init failed")
+	} else {
+		r.inferenceSvc = infSvc
+		r.inferenceMgr = inference.NewManager(infSvc)
+		r.inferenceRouter = inference.NewRouter(r.inferenceMgr)
+		r.inferenceHandler = handlers.NewInferenceHandler(r.inferenceRouter, logger)
+		r.inferenceProxyHandler = handlers.NewInferenceProxyHandler(r.inferenceRouter, logger)
+		// Initialize model store for persistence (store in data/ directory)
+		modelStore, storeErr := inference.NewModelStore("./data", logger)
+		if storeErr != nil {
+			logger.WithError(storeErr).Warn("Failed to create model store")
+		} else {
+			r.inferenceModelStore = modelStore
+			r.inferenceHandler.SetModelStore(modelStore)
+			logger.Info("Inference model store initialized")
+
+			// Register saved specs to update recovered instances with full specs (capabilities, etc.)
+			savedModels := modelStore.List()
+			if len(savedModels) > 0 {
+				specs := make([]inference.ModelSpec, 0, len(savedModels))
+				for _, sm := range savedModels {
+					specs = append(specs, sm.ToSpec())
+				}
+				infSvc.RegisterSavedSpecs(specs)
+			}
+		}
+		// Idle stop using legacy preload.unload_after if set
+		idleAfter := cfg.Models.Preload.UnloadAfter
+		if idleAfter > 0 {
+			checkEvery := idleAfter / 2
+			if checkEvery <= 0 {
+				checkEvery = idleAfter
+			}
+			r.inferenceMgr.StartIdleReaper(context.Background(), idleAfter, checkEvery)
+			logger.WithFields(logrus.Fields{
+				"idle_after": idleAfter,
+				"interval":   checkEvery,
+			}).Info("Inference idle reaper started")
+		}
+		// Periodic cache metrics refresh
+		r.inferenceMgr.StartCacheGaugeUpdater(context.Background(), time.Minute)
+		logger.WithFields(logrus.Fields{
+			"hf_cache":     infHFCache,
+			"gguf_cache":   infGGUFCache,
+			"max_download": maxConcurrent,
+			"use_docker":   true,
+		}).Info("Inference v4 service initialized")
 	}
 
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
@@ -2373,7 +2872,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			"from_inference":   cfg.Inference.Yzma.TensorSplit,
 			"from_yzma":        cfg.Yzma.TensorSplit,
 		}).Debug("🔍 Parsing tensor_split from config")
-		
+
 		if tensorSplitStr != "" {
 			parts := strings.Split(tensorSplitStr, ",")
 			for _, part := range parts {
@@ -2501,6 +3000,201 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	} else {
 		logger.Info("yzma local inference disabled in config")
 	}
+
+	// GitLab Integration (v3.1.0+)
+	// Note: r.engine is nil here (setupHandlers called before setupEngine)
+	// Webhook route is registered in setupGitLabRoutes
+	if cfg.GitLab.Enabled && r.db != nil {
+		// Create separate logger for GitLab with dedicated log file
+		gitlabLogger := internalLogger.NewFileLogger("logs/gitlab.log", cfg.Logging.Level)
+		if gitlabLogger == nil {
+			logger.Error("Failed to create GitLab logger")
+			return
+		}
+		gitlabLogger.Info("🦊 GitLab Integration logger initialized with separate log file")
+
+		// Create GitLab storage using main database
+		// Try to get underlying *sql.DB via type assertion
+		type sqlDBGetter interface {
+			GetDB() interface{}
+		}
+		if getter, ok := r.db.(sqlDBGetter); ok {
+			dbInterface := getter.GetDB()
+			if dbInterface == nil {
+				logger.Warn("GitLab Integration disabled: GetDB() returned nil")
+				return
+			}
+			if sqlDB, ok := dbInterface.(*sql.DB); ok && sqlDB != nil {
+				glStore := gitlabStorage.NewPostgresStore(sqlDB)
+				if glStore == nil {
+					logger.Error("Failed to create GitLab PostgresStore")
+					return
+				}
+
+				glHandler := handlers.NewGitLabAdminHandler(glStore, gitlabLogger)
+				if glHandler == nil {
+					logger.Error("Failed to create GitLabAdminHandler")
+					return
+				}
+				glHandler.SetMainDB(r.db)
+				r.gitlabHandler = glHandler
+
+				// Create webhook handler
+				webhookService := gitlabWebhook.NewHandler(glStore, gitlabLogger, nil)
+				if webhookService == nil {
+					logger.Error("Failed to create GitLab webhook service")
+					return
+				}
+				r.gitlabWebhookHandler = handlers.NewGitLabWebhookHandler(webhookService, "", "", gitlabLogger)
+				if r.gitlabWebhookHandler == nil {
+					logger.Error("Failed to create GitLabWebhookHandler")
+					return
+				}
+
+				// Get or create internal API key for GitLab workers
+				gitlabAPIKey := r.getOrCreateGitLabAPIKey(context.Background(), gitlabLogger)
+				if gitlabAPIKey == "" {
+					gitlabLogger.Error("⚠️ GitLab API key not created - workers will fail with 401. Check migration 093 (system user).")
+				} else {
+					gitlabLogger.WithField("key_prefix", gitlabAPIKey[:20]+"...").Info("✅ GitLab API key ready for workers")
+				}
+
+				// Initialize RAG service if enabled
+				// Uses main RAG config (config.RAG) for Qdrant settings
+				// Uses GitLab-specific embedding_model_alias for dynamic embedding resolution (optional - auto-detect if empty)
+				var ragService *gitlabRAG.RAGService
+				if cfg.GitLab.EnableRAG {
+					// Check if Qdrant is configured in main RAG config
+					qdrantURL := cfg.RAG.VectorStore.Qdrant.URL
+					if qdrantURL == "" && cfg.RAG.VectorStore.Type == "qdrant" {
+						qdrantURL = cfg.RAG.VectorStore.ConnectionString
+					}
+
+					if qdrantURL == "" {
+						gitlabLogger.Warn("RAG enabled but Qdrant not configured in main rag.vector_store section")
+					} else {
+						gitlabLogger.Info("🔍 Initializing RAG for GitLab code review...")
+
+						// Create dynamic embedding provider (resolves URL from inference registry at runtime)
+						// If EmbeddingModelAlias is empty, it will auto-detect any running embedding model
+						embeddingCfg := gitlabRAG.DynamicEmbeddingConfig{
+							ModelAlias: cfg.GitLab.RAG.EmbeddingModelAlias, // Empty = auto-detect
+							Timeout:    60 * time.Second,
+						}
+						// Use inference router as model instance provider
+						var embedder gitlabRAG.EmbeddingProvider
+						if r.inferenceRouter != nil {
+							embedder = gitlabRAG.NewDynamicEmbeddingProvider(embeddingCfg, r.inferenceRouter, gitlabLogger)
+							if cfg.GitLab.RAG.EmbeddingModelAlias != "" {
+								gitlabLogger.WithField("model_alias", cfg.GitLab.RAG.EmbeddingModelAlias).Info("Using dynamic embedding provider (explicit model)")
+							} else {
+								gitlabLogger.Info("Using dynamic embedding provider (auto-detect any running embedding model)")
+							}
+						} else {
+							gitlabLogger.Warn("Inference router not available, RAG embedding will not work")
+						}
+
+						// Get vector dimensions from main RAG config
+						vectorSize := cfg.RAG.VectorStore.Dimensions
+						if vectorSize == 0 {
+							vectorSize = cfg.RAG.Embeddings.Dimensions
+						}
+						if vectorSize == 0 {
+							vectorSize = 768 // Default for most embedding models (BERT-based)
+						}
+
+						// Collection name: GitLab-specific or default
+						collection := cfg.GitLab.RAG.CollectionName
+						if collection == "" {
+							collection = "gitlab_code_embeddings"
+						}
+
+						ragCfg := gitlabRAG.RAGConfig{
+							Enabled: true,
+							Qdrant: gitlabRAG.QdrantConfig{
+								URL:        qdrantURL,
+								APIKey:     "", // Use main RAG config if needed
+								Collection: collection,
+								VectorSize: vectorSize,
+								Timeout:    30 * time.Second,
+								Enabled:    true,
+							},
+						}
+
+						if embedder != nil {
+							ragService = gitlabRAG.NewRAGService(ragCfg, embedder, gitlabLogger)
+							if err := ragService.Initialize(context.Background()); err != nil {
+								gitlabLogger.WithError(err).Warn("Failed to initialize RAG, continuing without it")
+								ragService = nil
+							} else {
+								gitlabLogger.WithFields(logrus.Fields{
+									"qdrant_url":  qdrantURL,
+									"collection":  collection,
+									"vector_size": vectorSize,
+								}).Info("✅ RAG service initialized for GitLab")
+							}
+						}
+					}
+				}
+
+				// Create processor and worker pool
+				processorCfg := gitlabProcessor.ProcessorConfig{
+					LLMBaseURL: fmt.Sprintf("http://localhost:%d", cfg.Server.Port), // Use self as LLM endpoint
+					LLMAPIKey:  gitlabAPIKey,                                        // Auto-generated API key
+					Timeout:    10 * time.Minute,
+				}
+				processor := gitlabProcessor.NewProcessor(glStore, ragService, processorCfg, gitlabLogger)
+
+				poolCfg := gitlabWorker.DefaultPoolConfig()
+				if cfg.GitLab.Workers > 0 {
+					poolCfg.WorkerCount = cfg.GitLab.Workers
+				}
+				r.gitlabWorkerPool = gitlabWorker.NewPool(glStore, processor, gitlabLogger, poolCfg)
+
+				// Connect worker pool to handler for stats
+				r.gitlabHandler.SetWorkerPool(r.gitlabWorkerPool)
+
+				// Start worker pool
+				r.gitlabWorkerPool.Start()
+				gitlabLogger.WithField("workers", poolCfg.WorkerCount).Info("✅ GitLab worker pool started")
+
+				// Initialize repository indexer for RAG with dedicated log file
+				if ragService != nil {
+					// Connect RAG service to handler for index statistics
+					r.gitlabHandler.SetQdrantStats(ragService)
+					
+					// Create dedicated logger for indexer with log rotation
+					indexerLogger := internalLogger.NewFileLogger("logs/gitlab-indexer.log", cfg.Logging.Level)
+					if indexerLogger == nil {
+						indexerLogger = gitlabLogger // Fallback to gitlab logger
+						gitlabLogger.Warn("Failed to create indexer logger, using gitlab logger")
+					}
+
+					r.gitlabIndexer = gitlabIndexer.NewIndexer(ragService, indexerLogger)
+					r.gitlabIndexer.SetStore(glStore) // Enable DB persistence for index status
+					r.gitlabIndexerHandler = handlers.NewGitLabIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
+					r.gitlabUserIndexerHandler = handlers.NewGitLabUserIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
+
+					// Set onMerge callback for webhook handler to trigger reindexing
+					if r.gitlabWebhookHandler != nil {
+						r.gitlabWebhookHandler.SetOnMergeCallback(r.gitlabIndexerHandler.HandleMergeEvent)
+					}
+
+					gitlabLogger.Info("✅ GitLab repository indexer initialized for RAG (logs: logs/gitlab-indexer.log)")
+				}
+
+				// Note: Webhook route registered in setupGitLabRoutes (after engine is created)
+				gitlabLogger.Info("✅ GitLab Integration handler initialized")
+				logger.Info("✅ GitLab Integration handler initialized (logs: logs/gitlab.log)")
+			} else {
+				logger.Warn("GitLab Integration disabled: cannot access SQL DB")
+			}
+		} else {
+			logger.Warn("GitLab Integration disabled: database does not support GetDB()")
+		}
+	} else if cfg.GitLab.Enabled {
+		logger.Warn("GitLab Integration enabled but database not available")
+	}
 }
 
 // setupFileStorage инициализирует file storage и extractors (v1.10.0)
@@ -2567,8 +3261,110 @@ func (r *Router) Shutdown(ctx context.Context) error {
 		r.requestStorage.Stop()
 	}
 
+	if r.inferenceSvc != nil {
+		r.inferenceSvc.Shutdown()
+		r.logger.Info("Inference service stopped")
+	}
+
+	// Stop GitLab worker pool
+	if r.gitlabWorkerPool != nil {
+		r.gitlabWorkerPool.Stop(30 * time.Second)
+		r.logger.Info("GitLab worker pool stopped")
+	}
+
 	r.logger.Info("All router components stopped")
 	return nil
+}
+
+// getOrCreateGitLabAPIKey returns existing or creates new API key for GitLab workers
+func (r *Router) getOrCreateGitLabAPIKey(parentCtx context.Context, logger *logrus.Logger) string {
+	const gitlabKeyName = "GitlabJobsApiKey"
+
+	logger.Info("🔑 Starting GitLab API key creation/retrieval...")
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	if r.db == nil {
+		logger.Warn("Database not available, cannot create GitLab API key")
+		return ""
+	}
+
+	// List all API keys and find by name
+	keys, err := r.db.ListAPIKeys(ctx)
+	if err != nil {
+		logger.WithError(err).Error("Failed to list API keys")
+		return ""
+	}
+
+	logger.WithField("total_keys", len(keys)).Debug("Listed existing API keys")
+
+	// Find existing key - we need to regenerate since we can't recover plain key from hash
+	for _, key := range keys {
+		if key.Name == gitlabKeyName {
+			// Delete and recreate to get a new plain key
+			logger.WithField("key_id", key.ID).Info("Found existing GitLab API key, regenerating")
+			if err := r.db.DeleteAPIKey(ctx, key.ID); err != nil {
+				logger.WithError(err).Warn("Failed to delete old GitLab API key")
+			}
+			break
+		}
+	}
+
+	// Generate new key
+	plainKey := generateSecureAPIKey()
+	keyHash, err := models.HashAPIKey(plainKey)
+	if err != nil {
+		logger.WithError(err).Error("Failed to hash API key")
+		return ""
+	}
+
+	// Create new key owned by system user
+	systemUserID := "system" // Created by migration 093
+	apiKey := &models.APIKey{
+		ID:          "gitlab", // Must match extracted keyID from sk-proj-gitlab-<random>
+		Name:        gitlabKeyName,
+		Description: "Internal API key for GitLab MR analysis workers (auto-generated)",
+		KeyHash:     keyHash,
+		KeyPrefix:   plainKey[:12] + "...",
+		UserID:      &systemUserID,                            // Owned by system user
+		TenantID:    nil,                                      // No tenant binding
+		Scope:       models.APIKeyScopePersonal,               // Personal key of system user
+		Status:      models.APIKeyStatusActive,                // Must be active!
+		Models:      []string{"*"},                            // Access to all models
+		Permissions: []string{"chat", "models", "embeddings"}, // Required permissions
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := r.db.CreateAPIKey(ctx, apiKey); err != nil {
+		logger.WithError(err).Error("❌ Failed to create GitLab API key - check if system user exists (migration 093)")
+		// Also log to main logger
+		r.logger.WithError(err).Error("❌ Failed to create GitLab API key - check if system user exists (migration 093)")
+		return ""
+	}
+
+	logger.WithFields(logrus.Fields{
+		"key_id":     apiKey.ID,
+		"key_name":   apiKey.Name,
+		"key_prefix": apiKey.KeyPrefix,
+	}).Info("✅ Created GitLab API key for workers")
+	r.logger.WithField("key_id", apiKey.ID).Info("✅ Created GitLab API key for workers")
+
+	return plainKey
+}
+
+// generateSecureAPIKey generates a secure random API key
+// Format: sk-proj-<keyid>-<random> where keyid=gitlab and random is hex
+// bcrypt has a 72 byte limit, so we use 16 random bytes = 32 hex chars
+// Total: "sk-proj-gitlab-" (15) + 32 = 47 bytes (well under 72)
+func generateSecureAPIKey() string {
+	b := make([]byte, 16) // 16 bytes = 32 hex characters
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to less secure but working method
+		return fmt.Sprintf("sk-proj-gitlab-%d", time.Now().UnixNano())
+	}
+	return "sk-proj-gitlab-" + hex.EncodeToString(b)
 }
 
 // setupMCPRoutes настраивает MCP servers catalog endpoints (v1.4.5)
@@ -2765,143 +3561,196 @@ func (r *Router) setupK8sProbes() {
 	r.logger.Info("✅ Kubernetes health probes configured: /healthz/live, /healthz/ready, /healthz/status")
 }
 
-// setupGitLabStubRoutes настраивает stub routes для GitLab Integration
-// Полная имплементация требует инициализации GitLab storage
-func (r *Router) setupGitLabStubRoutes() {
-	// Admin GitLab routes (stub - returns empty data)
+// setupGitLabRoutes настраивает routes для GitLab Integration
+// Использует реальный handler если gitlab.enabled=true, иначе stub routes
+func (r *Router) setupGitLabRoutes() {
+	// Admin GitLab routes
 	adminGitlab := r.engine.Group("/api/admin/gitlab")
 	if r.jwtManager != nil && r.db != nil {
 		adminGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
 		adminGitlab.Use(middleware.RequireAdmin(r.db, r.logger))
 	}
 
-	// Integrations
-	adminGitlab.GET("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.POST("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized. Configure gitlab section in config."})
-	})
-	adminGitlab.GET("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
-	})
-	adminGitlab.PUT("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.POST("/integrations/:id/test", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
+	// If gitlabHandler is initialized, use real handlers
+	if r.gitlabHandler != nil {
+		// Integrations
+		adminGitlab.GET("/integrations", r.gitlabHandler.ListIntegrations)
+		adminGitlab.POST("/integrations", r.gitlabHandler.CreateIntegration)
+		adminGitlab.GET("/integrations/:id", r.gitlabHandler.GetIntegration)
+		adminGitlab.PUT("/integrations/:id", r.gitlabHandler.UpdateIntegration)
+		adminGitlab.DELETE("/integrations/:id", r.gitlabHandler.DeleteIntegration)
+		adminGitlab.POST("/integrations/:id/test", r.gitlabHandler.TestIntegration)
 
-	// Projects
-	adminGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.GET("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
-	})
-	adminGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.POST("/projects/:project_id/webhook", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
+		// Projects
+		adminGitlab.GET("/integrations/:id/projects", r.gitlabHandler.ListProjects)
+		adminGitlab.POST("/integrations/:id/projects", r.gitlabHandler.AddProject)
+		adminGitlab.GET("/projects/:project_id", r.gitlabHandler.GetProject)
+		adminGitlab.PUT("/projects/:project_id", r.gitlabHandler.UpdateProject)
+		adminGitlab.DELETE("/projects/:project_id", r.gitlabHandler.DeleteProject)
+		adminGitlab.POST("/projects/:project_id/webhook", r.gitlabHandler.SetupWebhook)
 
-	// Reviews
-	adminGitlab.GET("/reviews", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.GET("/reviews/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
-	})
-	adminGitlab.POST("/reviews/:id/retry", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
+		// Project Indexing (RAG)
+		if r.gitlabIndexerHandler != nil {
+			adminGitlab.POST("/projects/:project_id/index", r.gitlabIndexerHandler.IndexProject)
+			adminGitlab.GET("/projects/:project_id/index/status", r.gitlabIndexerHandler.GetIndexStatus)
+			adminGitlab.DELETE("/projects/:project_id/index", r.gitlabIndexerHandler.DeleteIndex)
+		}
 
-	// Queue
-	adminGitlab.GET("/queue/status", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"pending":    0,
-			"processing": 0,
-			"completed":  0,
-			"failed":     0,
-			"workers":    gin.H{"total": 0, "active": 0, "idle": 0},
+		// Reviews
+		adminGitlab.GET("/reviews", r.gitlabHandler.ListReviews)
+		adminGitlab.GET("/reviews/:id", r.gitlabHandler.GetReview)
+		adminGitlab.POST("/reviews/:id/retry", r.gitlabHandler.RetryReview)
+
+		// Queue
+		adminGitlab.GET("/queue/status", r.gitlabHandler.GetQueueStatus)
+		adminGitlab.GET("/queue/jobs", r.gitlabHandler.ListJobs)
+		adminGitlab.POST("/queue/jobs/:id/cancel", r.gitlabHandler.CancelJob)
+		adminGitlab.POST("/queue/jobs/:id/retry", r.gitlabHandler.RetryJob)
+
+		// Models
+		adminGitlab.GET("/models", r.gitlabHandler.ListActiveModels)
+		adminGitlab.GET("/models/analysis", r.gitlabHandler.ListAnalysisModels)
+		adminGitlab.GET("/models/embedding", r.gitlabHandler.ListEmbeddingModels)
+
+		// Settings, Analytics, Feedback (GITLAB-UI)
+		adminGitlab.GET("/settings", r.gitlabHandler.GetSettings)
+		adminGitlab.PUT("/settings", r.gitlabHandler.UpdateSettings)
+		adminGitlab.GET("/analytics", r.gitlabHandler.GetAnalytics)
+		adminGitlab.GET("/feedback", r.gitlabHandler.ListFeedback)
+		adminGitlab.POST("/feedback", r.gitlabHandler.SubmitFeedback)
+
+		// Available GitLab projects for selection (GITLAB-AUTO)
+		adminGitlab.GET("/integrations/:id/available-projects", r.gitlabHandler.ListAvailableProjects)
+
+		// Webhook route - NO authentication, uses webhook secret verification
+		if r.gitlabWebhookHandler != nil {
+			r.engine.POST("/api/gitlab/webhook/:integration_id", r.gitlabWebhookHandler.HandleWebhook)
+			r.logger.Info("✅ GitLab webhook route registered: POST /api/gitlab/webhook/:integration_id")
+		}
+
+		r.logger.Info("✅ GitLab Integration routes configured with real handlers")
+	} else {
+		// Stub routes when GitLab not configured
+		adminGitlab.GET("/integrations", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 		})
-	})
-	adminGitlab.GET("/queue/jobs", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.POST("/queue/jobs/:id/cancel", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-	adminGitlab.POST("/queue/jobs/:id/retry", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
-	})
-
-	// Models
-	adminGitlab.GET("/models", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.GET("/models/analysis", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	adminGitlab.GET("/models/embedding", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-
-	// Analytics
-	adminGitlab.GET("/analytics", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"total_reviews":       0,
-			"completed_reviews":   0,
-			"failed_reviews":      0,
-			"avg_analysis_time":   0,
-			"reviews_by_day":      []interface{}{},
-			"reviews_by_project":  []interface{}{},
-			"model_usage":         []interface{}{},
+		adminGitlab.POST("/integrations", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized. Configure gitlab section in config."})
 		})
-	})
-
-	// Feedback
-	adminGitlab.GET("/feedback", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"stats":             gin.H{"total_feedback": 0, "approval_rate": 0, "accuracy_rate": 0},
-			"category_accuracy": []interface{}{},
-			"model_accuracy":    []interface{}{},
-			"recent":            []interface{}{},
+		adminGitlab.GET("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
 		})
-	})
-	adminGitlab.POST("/feedback/export", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
-	})
-
-	// Settings
-	adminGitlab.GET("/settings", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"telegram_enabled":     false,
-			"github_enabled":       false,
-			"bitbucket_enabled":    false,
-			"default_prompt":       "",
-			"language_prompts":     []interface{}{},
-			"priority_rules":       []interface{}{},
+		adminGitlab.PUT("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
 		})
-	})
-	adminGitlab.PUT("/settings", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"success": true})
-	})
-	adminGitlab.POST("/settings/telegram/test", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Test successful (stub)"})
-	})
+		adminGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.POST("/integrations/:id/test", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
 
-	// User-level GitLab routes
+		// Projects stub
+		adminGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.GET("/projects/:project_id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		})
+		adminGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.POST("/projects/:project_id/webhook", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+
+		// Reviews stub
+		adminGitlab.GET("/reviews", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.GET("/reviews/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		})
+		adminGitlab.POST("/reviews/:id/retry", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+
+		// Queue stub
+		adminGitlab.GET("/queue/status", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"pending":    0,
+				"processing": 0,
+				"completed":  0,
+				"failed":     0,
+				"workers":    gin.H{"total": 0, "active": 0, "idle": 0},
+			})
+		})
+		adminGitlab.GET("/queue/jobs", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.POST("/queue/jobs/:id/cancel", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+		adminGitlab.POST("/queue/jobs/:id/retry", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		})
+
+		// Models stub
+		adminGitlab.GET("/models", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.GET("/models/analysis", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.GET("/models/embedding", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+
+		// Settings, Analytics, Feedback stubs
+		adminGitlab.GET("/settings", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"auto_review_enabled":     true,
+				"default_analysis_model":  "",
+				"default_embedding_model": "",
+				"max_files_per_mr":        50,
+				"max_lines_per_file":      1000,
+				"webhook_secret_rotation": false,
+				"notification_email":      "",
+			})
+		})
+		adminGitlab.PUT("/settings", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "Settings updated"})
+		})
+		adminGitlab.GET("/analytics", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"total_reviews":        0,
+				"avg_processing_time":  0,
+				"issues_found":         0,
+				"reviews_by_day":       []interface{}{},
+				"reviews_by_project":   []interface{}{},
+				"top_issue_categories": []interface{}{},
+			})
+		})
+		adminGitlab.GET("/feedback", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		adminGitlab.POST("/feedback", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "Feedback submitted"})
+		})
+		adminGitlab.GET("/integrations/:id/available-projects", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"projects": []interface{}{}, "total": 0})
+		})
+
+		r.logger.Info("✅ GitLab Integration stub routes configured (gitlab.enabled=false)")
+	}
+
+	// User-level GitLab routes (always stub for now - user-level not implemented)
 	userGitlab := r.engine.Group("/api/gitlab")
 	if r.jwtManager != nil && r.db != nil {
 		userGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
@@ -2911,43 +3760,54 @@ func (r *Router) setupGitLabStubRoutes() {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 	})
 	userGitlab.POST("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/integrations/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
 	})
 	userGitlab.PUT("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 	})
 	userGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.GET("/projects/:project_id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 	})
 	userGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 	userGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
+
+	// User-level Project Indexing (with ownership check)
+	if r.gitlabUserIndexerHandler != nil {
+		userGitlab.POST("/projects/:project_id/index", r.gitlabUserIndexerHandler.IndexProject)
+		userGitlab.GET("/projects/:project_id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
+		userGitlab.DELETE("/projects/:project_id/index", r.gitlabUserIndexerHandler.DeleteIndex)
+	} else {
+		userGitlab.POST("/projects/:project_id/index", func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		})
+		userGitlab.GET("/projects/:project_id/index/status", func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		})
+		userGitlab.DELETE("/projects/:project_id/index", func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		})
+	}
+
 	userGitlab.GET("/reviews", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 	})
 	userGitlab.GET("/reviews/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
 	})
-
-	// WebSocket stub (returns 501 Not Implemented instead of 404)
-	adminGitlab.GET("/ws", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "WebSocket not available - GitLab storage not initialized"})
-	})
-
-	r.logger.Info("✅ GitLab Integration stub routes configured: /api/admin/gitlab/*, /api/gitlab/*")
 }

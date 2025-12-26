@@ -88,8 +88,9 @@ func main() {
 		fmt.Printf("📋 Configuration auto-detected\n")
 	}
 
-	// Настройка логирования
-	appLogger := logger.Setup(cfg)
+	// Настройка логирования (с отдельными файлами для HTTP и metrics)
+	loggers := logger.SetupAll(cfg)
+	appLogger := loggers.Main
 	appLogger.WithField("version", version.Version).
 		WithField("git_commit", version.GitCommit).
 		WithField("build_date", version.BuildDate).
@@ -305,13 +306,17 @@ func main() {
 			GCPercentage:         cfg.Observability.Performance.GCPercentage,
 		})
 
+		// Устанавливаем отдельный логгер для метрик (если настроен)
+		if loggers.Metrics != nil {
+			perfMonitor.SetMetricsLogger(loggers.Metrics)
+		}
+
 		// Start performance monitor in background
 		monitorCtx, monitorCancel := context.WithCancel(context.Background())
 		defer monitorCancel()
 		go perfMonitor.Start(monitorCtx)
 
-		// Graceful shutdown
-		defer perfMonitor.Stop()
+		// Note: perfMonitor.Stop() called explicitly in shutdown section
 
 		appLogger.WithFields(map[string]interface{}{
 			"collection_interval":    collectionInterval,
@@ -343,8 +348,12 @@ func main() {
 		appLogger.WithError(err).Error("Failed to initialize GPU monitor")
 		// Не критичная ошибка, продолжаем
 	} else if gpuMonitor != nil {
+		// Устанавливаем отдельный логгер для метрик (если настроен)
+		if loggers.Metrics != nil {
+			gpuMonitor.SetMetricsLogger(loggers.Metrics)
+		}
 		gpuMonitor.Start()
-		defer gpuMonitor.Stop()
+		// Note: gpuMonitor.Stop() called explicitly in shutdown section
 		appLogger.Info("✅ GPU Monitor initialized successfully")
 		fmt.Println("🎮 NVIDIA GPU мониторинг включен")
 	}
@@ -401,8 +410,7 @@ func main() {
 		customMetrics = metrics.NewCustomMonigoMetrics(monigoInstance, db, cfg, appLogger)
 		customMetrics.Start()
 
-		// Graceful shutdown для custom metrics
-		defer customMetrics.Stop()
+		// Note: customMetrics.Stop() called explicitly in shutdown section
 
 		appLogger.WithFields(map[string]interface{}{
 			"service_name": "Ollama-OpenAI-Proxy",
@@ -421,6 +429,7 @@ func main() {
 	// Инициализация RAG Data Source Service (Version 1.13.1+)
 	var ragDataSourceService *ragservice.DataSourceService
 	var ragOrchestrator *ragorchestrator.RAGOrchestrator
+	var ragWorker *ragworker.RAGWorker      // Объявляем на верхнем уровне для graceful shutdown
 	var vectorStore vector.VectorStore // Объявляем на верхнем уровне для передачи в роутер
 	if cfg.RAG.Enabled && db != nil {
 		appLogger.Info("Initializing RAG Data Source Service...")
@@ -551,7 +560,7 @@ func main() {
 			appLogger.Info("Starting RAG Worker...")
 			
 			// Создаем и запускаем worker с embedder и vectorStore
-			ragWorker := ragworker.NewRAGWorker(db, embedder, vectorStore, ragLogger)
+			ragWorker = ragworker.NewRAGWorker(db, embedder, vectorStore, ragLogger)
 			
 			// Запускаем в отдельной goroutine
 			go func() {
@@ -559,8 +568,7 @@ func main() {
 				ragWorker.Start(workerCtx)
 			}()
 			
-			// Graceful shutdown для worker
-			defer ragWorker.Stop()
+			// Note: ragWorker.Stop() вызывается явно в shutdown секции перед закрытием БД
 			
 			if embedder != nil {
 				appLogger.Info("✅ RAG Worker started with embeddings support")
@@ -586,6 +594,8 @@ func main() {
 	appRouter, err = router.NewWithOptions(router.NewOptions{
 		Config:               cfg,
 		Logger:               appLogger,
+		HTTPLogger:           loggers.HTTP,         // Отдельный файл для HTTP логов (может быть nil)
+		MetricsLogger:        loggers.Metrics,      // Отдельный файл для GPU/performance метрик (может быть nil)
 		Version:              version.Version,
 		Database:             db,                   // Может быть nil для legacy mode
 		JWTManager:           jwtManager,           // Может быть nil для legacy mode
@@ -782,19 +792,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Закрываем роутер и освобождаем ресурсы
-	if err := appRouter.Close(); err != nil {
-		appLogger.WithError(err).Error("Error closing router")
-	}
-
-	// Закрываем базу данных
-	if db != nil {
-		if err := dbfactory.CloseDatabase(db, appLogger); err != nil {
-			appLogger.WithError(err).Error("Error closing database")
-		}
-	}
-
-	// Shutdown HTTP server
+	// 1. Shutdown HTTP/HTTPS servers FIRST (stop accepting new requests)
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		appLogger.WithError(err).Error("Failed to gracefully shutdown HTTP server")
 		log.Printf("❌ Ошибка при остановке HTTP сервера: %v", err)
@@ -802,13 +800,47 @@ func main() {
 		appLogger.Info("HTTP server stopped gracefully")
 	}
 	
-	// Shutdown HTTPS server (if running)
 	if tlsServer != nil {
 		if err := tlsServer.Shutdown(shutdownCtx); err != nil {
 			appLogger.WithError(err).Error("Failed to gracefully shutdown HTTPS server")
 			log.Printf("❌ Ошибка при остановке HTTPS сервера: %v", err)
 		} else {
 			appLogger.Info("HTTPS server stopped gracefully")
+		}
+	}
+
+	// 2. Stop all background workers and monitors
+	if customMetrics != nil {
+		appLogger.Info("Stopping custom metrics collector...")
+		customMetrics.Stop()
+	}
+	
+	if gpuMonitor != nil {
+		appLogger.Info("Stopping GPU monitor...")
+		gpuMonitor.Stop()
+	}
+	
+	if perfMonitor != nil {
+		appLogger.Info("Stopping performance monitor...")
+		perfMonitor.Stop()
+	}
+
+	// 3. Close router and release resources
+	if err := appRouter.Close(); err != nil {
+		appLogger.WithError(err).Error("Error closing router")
+	}
+
+	// 4. Stop RAG Worker before closing DB
+	if ragWorker != nil {
+		appLogger.Info("Stopping RAG Worker...")
+		ragWorker.Stop()
+		appLogger.Info("RAG Worker stopped successfully")
+	}
+
+	// 5. Close database LAST (after all workers stopped)
+	if db != nil {
+		if err := dbfactory.CloseDatabase(db, appLogger); err != nil {
+			appLogger.WithError(err).Error("Error closing database")
 		}
 	}
 

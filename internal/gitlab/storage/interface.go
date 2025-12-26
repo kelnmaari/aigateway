@@ -15,6 +15,8 @@ type Store interface {
 	JobStore
 	WebhookEventStore
 	ModelUsageStore
+	FeedbackStore
+	AnalyticsStore
 }
 
 // IntegrationStore manages GitLab integrations
@@ -72,6 +74,9 @@ type ProjectStore interface {
 	
 	// DeleteProjectsByIntegration deletes all projects for an integration
 	DeleteProjectsByIntegration(ctx context.Context, integrationID string) error
+	
+	// UpdateProjectIndexStatus updates the index status and chunks count for a project
+	UpdateProjectIndexStatus(ctx context.Context, projectID, status string, chunksCount int64) error
 }
 
 // ReviewStore manages MR reviews
@@ -168,5 +173,20 @@ type ModelUsageStore interface {
 	
 	// IsModelUsed checks if a model is used by any project
 	IsModelUsed(ctx context.Context, modelID string) (bool, error)
+}
+
+// FeedbackStore manages review feedback
+type FeedbackStore interface {
+	// CreateFeedback creates a new feedback entry
+	CreateFeedback(ctx context.Context, feedback *models.GitLabReviewFeedback) error
+	
+	// ListFeedback lists feedback with filtering
+	ListFeedback(ctx context.Context, req *models.GitLabFeedbackListRequest) ([]models.GitLabReviewFeedback, int, error)
+}
+
+// AnalyticsStore provides analytics queries
+type AnalyticsStore interface {
+	// GetAnalytics retrieves aggregated analytics for the specified number of days
+	GetAnalytics(ctx context.Context, days int) (*models.GitLabAnalytics, error)
 }
 

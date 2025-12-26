@@ -54,13 +54,28 @@ export const downloadsApi = {
 
 	getDownloadProgress: (id: string) => api.get<Download>(`/api/ui/hf/downloads/${id}/progress`),
 
-	// Hugging Face search
-	searchHuggingFace: (query: string) => {
-		const params = new URLSearchParams({ q: query });
-		return api.get<HuggingFaceSearchResponse>(`/api/ui/hf/search?${params}`);
+	// Hugging Face search (uses /api/ui/huggingface/ with provider filter support)
+	// provider filter: 'all' | 'vllm' | 'sglang' | 'tgi' | 'llama.cpp' | 'embedding'
+	searchHuggingFace: (query: string, provider: string = 'all') => {
+		const params = new URLSearchParams();
+		if (query) {
+			params.set('q', query);
+		}
+		if (provider && provider !== 'all') {
+			params.set('provider', provider);
+		}
+		return api.get<HuggingFaceSearchResponse>(`/api/ui/huggingface/search?${params}`);
 	},
 
-	getPopularModels: () => api.get<HuggingFaceSearchResponse>('/api/ui/hf/popular'),
+	getPopularModels: (provider: string = 'all', limit: number = 30, page: number = 1) => {
+		const params = new URLSearchParams();
+		if (provider && provider !== 'all') {
+			params.set('provider', provider);
+		}
+		params.set('limit', limit.toString());
+		params.set('page', page.toString());
+		return api.get<HuggingFaceSearchResponse>(`/api/ui/huggingface/popular?${params}`);
+	},
 
 	// Ollama pull (via yzma)
 	pullOllamaModel: (model: string) => api.post('/v1/yzma/models/load', { name: model })

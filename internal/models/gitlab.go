@@ -3,6 +3,8 @@ package models
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -79,6 +81,7 @@ type GitLabProject struct {
 	GitLabProjectID   int64                `json:"gitlab_project_id" db:"gitlab_project_id"`
 	Name              string               `json:"name" db:"name"`
 	PathWithNamespace string               `json:"path_with_namespace" db:"path_with_namespace"`
+	DefaultBranch     string               `json:"default_branch" db:"default_branch"` // Target branch for indexing
 	WebhookID         *int64               `json:"webhook_id,omitempty" db:"webhook_id"`
 	Status            GitLabProjectStatus  `json:"status" db:"status"`
 	AutoReview        bool                 `json:"auto_review" db:"auto_review"`
@@ -91,12 +94,59 @@ type GitLabProject struct {
 	ReviewPrompt      string               `json:"review_prompt,omitempty" db:"review_prompt"`
 	Settings          GitLabProjectSettings `json:"settings" db:"settings"`
 	
+	// Indexing status
+	IndexStatus       string               `json:"index_status,omitempty" db:"index_status"` // pending, in_progress, completed, failed
+	LastIndexedAt     *time.Time           `json:"last_indexed_at,omitempty" db:"last_indexed_at"`
+	
 	CreatedAt         time.Time            `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time            `json:"updated_at" db:"updated_at"`
 	
 	// Computed fields (not stored)
-	IntegrationName   string               `json:"integration_name,omitempty" db:"-"`
-	ReviewCount       int                  `json:"review_count,omitempty" db:"-"`
+	IntegrationName string `json:"integration_name,omitempty" db:"-"`
+	ReviewCount     int    `json:"review_count,omitempty" db:"-"`
+	
+	// Index statistics (computed from Qdrant)
+	IndexChunks     int64  `json:"index_chunks,omitempty" db:"-"`
+	IndexVectors    int64  `json:"index_vectors,omitempty" db:"-"`
+}
+
+// GetCollectionName returns the Qdrant collection name for this project.
+// If Settings.CollectionName is set, it is returned.
+// Otherwise, generates collection name from PathWithNamespace or Name.
+func (p *GitLabProject) GetCollectionName() string {
+	if p.Settings.CollectionName != "" {
+		return p.Settings.CollectionName
+	}
+	// Generate from path_with_namespace (e.g., "group/project" -> "group-project")
+	name := p.PathWithNamespace
+	if name == "" {
+		name = p.Name
+	}
+	return SanitizeCollectionName(name)
+}
+
+// SanitizeCollectionName converts a project name to a valid Qdrant collection name.
+// Converts to lowercase, replaces spaces and special characters with "-".
+func SanitizeCollectionName(name string) string {
+	// Lowercase
+	name = strings.ToLower(name)
+	// Replace / with -
+	name = strings.ReplaceAll(name, "/", "-")
+	// Replace spaces with -
+	name = strings.ReplaceAll(name, " ", "-")
+	// Replace special characters with -
+	re := regexp.MustCompile(`[^a-z0-9_-]`)
+	name = re.ReplaceAllString(name, "-")
+	// Remove consecutive dashes
+	re = regexp.MustCompile(`-+`)
+	name = re.ReplaceAllString(name, "-")
+	// Trim leading/trailing dashes
+	name = strings.Trim(name, "-")
+	// Prefix with "gitlab-" for clarity
+	if name == "" {
+		name = "default"
+	}
+	return "gitlab-" + name
 }
 
 // GitLabProjectStatus represents the status of a GitLab project
@@ -113,20 +163,28 @@ type GitLabProjectSettings struct {
 	// File Filters
 	IncludePatterns []string `json:"include_patterns,omitempty"` // ["*.go", "*.ts", "*.py"]
 	ExcludePatterns []string `json:"exclude_patterns,omitempty"` // ["vendor/*", "node_modules/*", "*.min.js"]
-	
+
 	// Analysis settings
-	MaxFilesPerMR    int  `json:"max_files_per_mr,omitempty"`    // Default: 50
-	MaxLinesPerFile  int  `json:"max_lines_per_file,omitempty"`  // Default: 2000
-	SkipDraftMRs     bool `json:"skip_draft_mrs,omitempty"`      // Skip WIP/Draft MRs
-	SkipBots         bool `json:"skip_bots,omitempty"`           // Skip bot-created MRs
-	
+	MaxFilesPerMR   int  `json:"max_files_per_mr,omitempty"`   // Default: 50
+	MaxLinesPerFile int  `json:"max_lines_per_file,omitempty"` // Default: 2000
+	SkipDraftMRs    bool `json:"skip_draft_mrs,omitempty"`     // Skip WIP/Draft MRs
+	SkipBots        bool `json:"skip_bots,omitempty"`          // Skip bot-created MRs
+
+	// LLM settings
+	MaxReviewTokens int    `json:"max_review_tokens,omitempty"` // Max tokens for LLM response, default: 8192
+	PerFileReview   bool   `json:"per_file_review,omitempty"`   // Review each file separately with tool calling
+	ReviewLanguage  string `json:"review_language,omitempty"`   // Language for review output: "en", "ru", etc.
+
 	// Chunking settings
-	ChunkSize        int  `json:"chunk_size,omitempty"`          // Default: 1000 tokens
-	ChunkOverlap     int  `json:"chunk_overlap,omitempty"`       // Default: 100 tokens
-	
+	ChunkSize    int `json:"chunk_size,omitempty"`    // Default: 1000 tokens
+	ChunkOverlap int `json:"chunk_overlap,omitempty"` // Default: 100 tokens
+
 	// Branch filters
-	TargetBranches   []string `json:"target_branches,omitempty"` // Only review MRs to these branches
-	IgnoreBranches   []string `json:"ignore_branches,omitempty"` // Never review MRs from these branches
+	TargetBranches []string `json:"target_branches,omitempty"` // Only review MRs to these branches
+	IgnoreBranches []string `json:"ignore_branches,omitempty"` // Never review MRs from these branches
+
+	// Qdrant Collection (auto-generated from project name if empty)
+	CollectionName string `json:"collection_name,omitempty"` // Qdrant collection for code embeddings
 }
 
 // Scan implements sql.Scanner for GitLabProjectSettings
@@ -292,10 +350,12 @@ const (
 
 // GitLabSuggestion represents a general suggestion for the MR
 type GitLabSuggestion struct {
-	Type        string `json:"type"`        // "improvement", "best_practice", "documentation"
+	FilePath    string `json:"file_path,omitempty"` // File this suggestion relates to
+	Line        int    `json:"line,omitempty"`      // Line number if applicable
+	Type        string `json:"type"`                // "improvement", "best_practice", "documentation"
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	Priority    string `json:"priority"`    // "high", "medium", "low"
+	Priority    string `json:"priority"` // "high", "medium", "low"
 }
 
 // ============================================================================
@@ -545,5 +605,79 @@ type GitLabQueueStats struct {
 	JobsLastHour        int   `json:"jobs_last_hour"`
 	JobsLast24Hours     int   `json:"jobs_last_24_hours"`
 	CompletedToday      int   `json:"completed_today"`
+}
+
+// ============================================================================
+// Feedback Models
+// ============================================================================
+
+// GitLabReviewFeedback represents user feedback on a code review
+type GitLabReviewFeedback struct {
+	ID           string    `json:"id" db:"id"`
+	ReviewID     string    `json:"review_id" db:"review_id"`
+	UserID       *string   `json:"user_id,omitempty" db:"user_id"`
+	Rating       int       `json:"rating" db:"rating"`
+	FeedbackType string    `json:"feedback_type" db:"feedback_type"`
+	Comment      string    `json:"comment,omitempty" db:"comment"`
+	IssueIndex   *int      `json:"issue_index,omitempty" db:"issue_index"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
+// FeedbackType constants
+const (
+	FeedbackTypeGeneral       = "general"
+	FeedbackTypeAccuracy      = "accuracy"
+	FeedbackTypeHelpfulness   = "helpfulness"
+	FeedbackTypeFalsePositive = "false_positive"
+	FeedbackTypeMissedIssue   = "missed_issue"
+)
+
+// GitLabFeedbackListRequest request parameters for listing feedback
+type GitLabFeedbackListRequest struct {
+	ReviewID     *string `json:"review_id,omitempty"`
+	FeedbackType *string `json:"feedback_type,omitempty"`
+	MinRating    *int    `json:"min_rating,omitempty"`
+	Limit        int     `json:"limit"`
+	Offset       int     `json:"offset"`
+}
+
+// ============================================================================
+// Analytics Models
+// ============================================================================
+
+// GitLabAnalytics represents aggregated analytics data
+type GitLabAnalytics struct {
+	Range             string                   `json:"range"`
+	Days              int                      `json:"days"`
+	TotalReviews      int                      `json:"total_reviews"`
+	CompletedReviews  int                      `json:"completed_reviews"`
+	FailedReviews     int                      `json:"failed_reviews"`
+	PendingReviews    int                      `json:"pending_reviews"`
+	AvgProcessingMs   int64                    `json:"avg_processing_ms"`
+	TotalIssuesFound  int                      `json:"total_issues_found"`
+	TotalTokensUsed   int64                    `json:"total_tokens_used"`
+	ReviewsByDay      []DayStats               `json:"reviews_by_day"`
+	ReviewsByProject  []ProjectStats           `json:"reviews_by_project"`
+	ReviewsByStatus   map[string]int           `json:"reviews_by_status"`
+	AvgRating         float64                  `json:"avg_rating"`
+	FeedbackCount     int                      `json:"feedback_count"`
+}
+
+// DayStats represents daily statistics
+type DayStats struct {
+	Date             string `json:"date"`
+	TotalReviews     int    `json:"total_reviews"`
+	CompletedReviews int    `json:"completed_reviews"`
+	FailedReviews    int    `json:"failed_reviews"`
+	IssuesFound      int    `json:"issues_found"`
+}
+
+// ProjectStats represents per-project statistics
+type ProjectStats struct {
+	ProjectID        string `json:"project_id"`
+	ProjectName      string `json:"project_name"`
+	TotalReviews     int    `json:"total_reviews"`
+	CompletedReviews int    `json:"completed_reviews"`
+	IssuesFound      int    `json:"issues_found"`
 }
 

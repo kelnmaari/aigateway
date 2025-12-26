@@ -84,8 +84,20 @@
 	}
 
 	async function clearCompleted() {
-		// Filter out completed and failed downloads locally since API might not have clear endpoint
-		downloads = downloads.filter((d) => d.status === 'downloading' || d.status === 'pending');
+		try {
+			const response = await fetch('/api/ui/huggingface/downloads/clear-completed', {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+					Accept: 'application/json'
+				}
+			});
+			if (response.ok) {
+				await loadDownloads();
+			}
+		} catch (error) {
+			console.error('Failed to clear completed downloads:', error);
+		}
 	}
 
 	function formatBytes(bytes: number | undefined): string {
@@ -151,14 +163,14 @@
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<div>
-			<h2 class="text-lg font-semibold">Model Downloads</h2>
-			<p class="text-sm text-muted-foreground">HuggingFace model download queue</p>
+			<h2 class="text-lg font-semibold">{m.admin_downloads_title()}</h2>
+			<p class="text-sm text-muted-foreground">{m.admin_downloads_queue()}</p>
 		</div>
 		<div class="flex gap-2">
 			{#if completedDownloads.length > 0 || failedDownloads.length > 0}
 				<Button variant="outline" size="sm" onclick={clearCompleted}>
 					<Trash2 class="mr-2 h-4 w-4" />
-					Clear Completed
+					{m.admin_downloads_clear()}
 				</Button>
 			{/if}
 			<Button variant="outline" size="sm" onclick={loadDownloads} disabled={isLoading}>
@@ -177,7 +189,7 @@
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{activeDownloads.length}</p>
-					<p class="text-xs text-muted-foreground">Active</p>
+					<p class="text-xs text-muted-foreground">{m.admin_downloads_active()}</p>
 				</div>
 			</div>
 		</div>
@@ -189,7 +201,7 @@
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{downloads.filter((d) => d.status === 'pending').length}</p>
-					<p class="text-xs text-muted-foreground">Pending</p>
+					<p class="text-xs text-muted-foreground">{m.admin_downloads_pending()}</p>
 				</div>
 			</div>
 		</div>
@@ -201,7 +213,7 @@
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{completedDownloads.length}</p>
-					<p class="text-xs text-muted-foreground">Completed</p>
+					<p class="text-xs text-muted-foreground">{m.admin_downloads_completed()}</p>
 				</div>
 			</div>
 		</div>
@@ -213,7 +225,7 @@
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{failedDownloads.length}</p>
-					<p class="text-xs text-muted-foreground">Failed</p>
+					<p class="text-xs text-muted-foreground">{m.admin_downloads_failed()}</p>
 				</div>
 			</div>
 		</div>
@@ -227,9 +239,9 @@
 	{:else if downloads.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
 			<Download class="mx-auto h-12 w-12 text-muted-foreground/40" />
-			<p class="mt-4 text-lg font-medium">No active downloads</p>
+			<p class="mt-4 text-lg font-medium">{m.admin_downloads_empty()}</p>
 			<p class="mt-1 text-muted-foreground">
-				Start downloading models from the Models tab → HuggingFace Browser
+				{m.admin_downloads_empty_desc()}
 			</p>
 		</div>
 	{:else}

@@ -2,6 +2,7 @@
 	import { MessageSquare, Plus, Trash2, MoreVertical } from 'lucide-svelte';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import type { Conversation } from '$lib/stores/chat.svelte';
+	import { IconButton } from '$lib/components/ui/icon-button';
 	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
@@ -51,7 +52,7 @@
 		{#if conversations.length === 0}
 			<div class="flex flex-col items-center justify-center py-12 text-center">
 				<MessageSquare class="h-10 w-10 text-muted-foreground/40" />
-				<p class="mt-3 text-sm text-muted-foreground">No conversations yet</p>
+				<p class="mt-3 text-sm text-muted-foreground">{m.chat_no_conversations()}</p>
 			</div>
 		{:else}
 			<div class="space-y-1 pb-4">
@@ -70,7 +71,7 @@
 					>
 						<MessageSquare class="h-4 w-4 shrink-0" />
 						<div class="min-w-0 flex-1">
-							<p class="truncate font-medium">{conversation.title || 'Untitled'}</p>
+							<p class="truncate font-medium">{conversation.title || m.chat_untitled()}</p>
 							<p class="text-xs opacity-60">{formatRelativeTime(conversation.updated_at)}</p>
 						</div>
 

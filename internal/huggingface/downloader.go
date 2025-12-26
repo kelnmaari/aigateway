@@ -143,6 +143,38 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 	}
 	d.logger.WithField("dir", filepath.Dir(absDestPath)).Info("📂 Directory created/verified")
 
+	// Check if file already exists and is complete
+	if info, err := os.Stat(destPath); err == nil {
+		existingSize := info.Size()
+		if existingSize >= totalSize {
+			d.logger.WithFields(logrus.Fields{
+				"download_id":   downloadID,
+				"file_size":     existingSize,
+				"expected_size": totalSize,
+			}).Info("✅ File already exists and is complete, skipping download")
+			
+			now := time.Now()
+			return &Download{
+				ID:             downloadID,
+				ModelID:        modelID,
+				Filename:       filename,
+				DestPath:       destPath,
+				TotalSize:      totalSize,
+				DownloadedSize: totalSize,
+				Status:         DownloadStatusCompleted,
+				Progress:       100.0,
+				StartedAt:      &now,
+				CompletedAt:    &now,
+				Mu:             sync.RWMutex{},
+			}, nil
+		}
+		d.logger.WithFields(logrus.Fields{
+			"download_id":   downloadID,
+			"file_size":     existingSize,
+			"expected_size": totalSize,
+		}).Info("⚠️ File exists but incomplete, will re-download")
+	}
+
 	// Check for partial download
 	var downloadedSize int64
 	partPath := destPath + ".part"
@@ -573,6 +605,27 @@ func (d *Downloader) CancelDownload(downloadID string) error {
 	return nil
 }
 
+// ClearCompleted removes all completed, failed, and cancelled downloads from the list
+func (d *Downloader) ClearCompleted() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	cleared := 0
+	for id, download := range d.downloads {
+		download.Mu.RLock()
+		status := download.Status
+		download.Mu.RUnlock()
+
+		if status == DownloadStatusCompleted || status == DownloadStatusFailed || status == DownloadStatusCancelled {
+			delete(d.downloads, id)
+			cleared++
+		}
+	}
+
+	d.logger.WithField("cleared", cleared).Info("Cleared completed downloads")
+	return cleared
+}
+
 // Shutdown gracefully stops the downloader
 func (d *Downloader) Shutdown() {
 	d.logger.Info("Shutting down download manager")
@@ -586,4 +639,468 @@ func (d *Downloader) Shutdown() {
 func generateDownloadID(modelID, filename string) string {
 	hash := sha256.Sum256([]byte(modelID + "/" + filename))
 	return hex.EncodeToString(hash[:8])
+}
+
+// RepoDownload represents a full repository download (multiple files)
+type RepoDownload struct {
+	ID            string         `json:"id"`
+	ModelID       string         `json:"model_id"`
+	Status        DownloadStatus `json:"status"`
+	TotalFiles    int            `json:"total_files"`
+	CompletedFiles int           `json:"completed_files"`
+	FailedFiles   int            `json:"failed_files"`
+	TotalSize     int64          `json:"total_size"`
+	DownloadedSize int64         `json:"downloaded_size"`
+	Progress      float64        `json:"progress"` // 0.0 to 100.0
+	Error         string         `json:"error,omitempty"`
+	Files         []*Download    `json:"files"`
+	StartedAt     *time.Time     `json:"started_at,omitempty"`
+	CompletedAt   *time.Time     `json:"completed_at,omitempty"`
+	LocalPath     string         `json:"local_path"` // Path where model is saved
+	
+	mu sync.RWMutex
+}
+
+// repoDownloads tracks repository-level downloads
+var repoDownloads = struct {
+	sync.RWMutex
+	m map[string]*RepoDownload
+}{m: make(map[string]*RepoDownload)}
+
+// DownloadRepository downloads all files for a HuggingFace model
+// Downloads safetensors/bin, config.json, tokenizer files, etc.
+func (d *Downloader) DownloadRepository(ctx context.Context, modelID string) (*RepoDownload, error) {
+	// Check if already downloading
+	repoDownloads.RLock()
+	if existing, ok := repoDownloads.m[modelID]; ok {
+		if existing.Status == DownloadStatusDownloading || existing.Status == DownloadStatusPending {
+			repoDownloads.RUnlock()
+			return existing, nil
+		}
+	}
+	repoDownloads.RUnlock()
+
+	// Use background context for the actual download work
+	// The HTTP request context is only used for initial model info fetch
+	modelInfo, err := d.client.GetModelInfo(ctx, modelID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model info: %w", err)
+	}
+
+	if len(modelInfo.Siblings) == 0 {
+		return nil, fmt.Errorf("no files found in repository %s", modelID)
+	}
+
+	// Filter important files for model loading
+	var filesToDownload []File
+	for _, f := range modelInfo.Siblings {
+		// Skip large unnecessary files
+		if shouldDownloadFile(f.Filename) {
+			filesToDownload = append(filesToDownload, f)
+		}
+	}
+
+	if len(filesToDownload) == 0 {
+		return nil, fmt.Errorf("no downloadable model files found in %s", modelID)
+	}
+
+	// Calculate total size
+	var totalSize int64
+	for _, f := range filesToDownload {
+		if f.LFS != nil {
+			totalSize += f.LFS.Size
+		} else {
+			totalSize += f.Size
+		}
+	}
+
+	// Create repo download tracker
+	now := time.Now()
+	repoDownload := &RepoDownload{
+		ID:         generateDownloadID(modelID, "repo"),
+		ModelID:    modelID,
+		Status:     DownloadStatusDownloading,
+		TotalFiles: len(filesToDownload),
+		TotalSize:  totalSize,
+		StartedAt:  &now,
+		LocalPath:  filepath.Join(d.downloadsDir, modelID),
+		Files:      make([]*Download, 0, len(filesToDownload)),
+	}
+
+	repoDownloads.Lock()
+	repoDownloads.m[modelID] = repoDownload
+	repoDownloads.Unlock()
+
+	d.logger.WithFields(logrus.Fields{
+		"model_id":    modelID,
+		"total_files": len(filesToDownload),
+		"total_size":  totalSize,
+		"local_path":  repoDownload.LocalPath,
+	}).Info("Starting repository download")
+
+	// Start downloading files in background
+	// Use d.ctx (downloader's context) instead of HTTP request context
+	// This prevents cancellation when HTTP response is sent
+	go func() {
+		for _, file := range filesToDownload {
+			var fileSize int64
+			var sha string
+			if file.LFS != nil {
+				fileSize = file.LFS.Size
+				sha = file.LFS.OID
+			} else {
+				fileSize = file.Size
+			}
+
+			d.logger.WithFields(logrus.Fields{
+				"model_id": modelID,
+				"filename": file.Filename,
+				"size":     fileSize,
+				"sha":      sha,
+			}).Debug("Starting file download")
+
+			download, err := d.StartDownload(modelID, file.Filename, fileSize, sha)
+			if err != nil {
+				d.logger.WithError(err).WithField("file", file.Filename).Error("Failed to start file download")
+				repoDownload.mu.Lock()
+				repoDownload.FailedFiles++
+				repoDownload.mu.Unlock()
+				continue
+			}
+
+			repoDownload.mu.Lock()
+			repoDownload.Files = append(repoDownload.Files, download)
+			repoDownload.mu.Unlock()
+		}
+
+		// Wait for all downloads to complete (polling)
+		// Use downloader's context, not HTTP request context
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-d.ctx.Done():
+				repoDownload.mu.Lock()
+				repoDownload.Status = DownloadStatusCancelled
+				repoDownload.Error = "downloader shutdown"
+				repoDownload.mu.Unlock()
+				return
+			case <-ticker.C:
+				completed, failed, downloaded := d.checkRepoProgress(repoDownload)
+				
+				repoDownload.mu.Lock()
+				repoDownload.CompletedFiles = completed
+				repoDownload.FailedFiles = failed
+				repoDownload.DownloadedSize = downloaded
+				if repoDownload.TotalSize > 0 {
+					repoDownload.Progress = float64(downloaded) / float64(repoDownload.TotalSize) * 100
+				}
+
+				allDone := (completed + failed) >= repoDownload.TotalFiles
+				if allDone {
+					if failed > 0 {
+						repoDownload.Status = DownloadStatusFailed
+						repoDownload.Error = fmt.Sprintf("%d files failed to download", failed)
+					} else {
+						repoDownload.Status = DownloadStatusCompleted
+						now := time.Now()
+						repoDownload.CompletedAt = &now
+						repoDownload.Progress = 100
+					}
+					repoDownload.mu.Unlock()
+					
+					d.logger.WithFields(logrus.Fields{
+						"model_id":   modelID,
+						"completed":  completed,
+						"failed":     failed,
+						"status":     repoDownload.Status,
+						"local_path": repoDownload.LocalPath,
+					}).Info("Repository download finished")
+					return
+				}
+				repoDownload.mu.Unlock()
+			}
+		}
+	}()
+
+	return repoDownload, nil
+}
+
+// checkRepoProgress checks progress of all files in repo download
+func (d *Downloader) checkRepoProgress(repo *RepoDownload) (completed, failed int, downloaded int64) {
+	repo.mu.RLock()
+	files := repo.Files
+	repo.mu.RUnlock()
+
+	for _, f := range files {
+		f.Mu.RLock()
+		switch f.Status {
+		case DownloadStatusCompleted:
+			completed++
+			downloaded += f.TotalSize
+		case DownloadStatusFailed, DownloadStatusCancelled:
+			failed++
+		case DownloadStatusDownloading, DownloadStatusPending:
+			downloaded += f.DownloadedSize
+		}
+		f.Mu.RUnlock()
+	}
+	return
+}
+
+// GetRepoDownload returns the status of a repository download
+func (d *Downloader) GetRepoDownload(modelID string) (*RepoDownload, bool) {
+	repoDownloads.RLock()
+	defer repoDownloads.RUnlock()
+	repo, ok := repoDownloads.m[modelID]
+	return repo, ok
+}
+
+// ListRepoDownloads returns all repository downloads
+func (d *Downloader) ListRepoDownloads() []*RepoDownload {
+	repoDownloads.RLock()
+	defer repoDownloads.RUnlock()
+	
+	result := make([]*RepoDownload, 0, len(repoDownloads.m))
+	for _, repo := range repoDownloads.m {
+		result = append(result, repo)
+	}
+	return result
+}
+
+// DownloadSingleFile downloads a specific file from a HuggingFace repository
+func (d *Downloader) DownloadSingleFile(ctx context.Context, modelID, filename string) (*RepoDownload, error) {
+	// Check if already downloading this repo
+	repoDownloads.RLock()
+	if existing, ok := repoDownloads.m[modelID]; ok {
+		if existing.Status == DownloadStatusDownloading || existing.Status == DownloadStatusPending {
+			repoDownloads.RUnlock()
+			return existing, nil
+		}
+	}
+	repoDownloads.RUnlock()
+
+	// Get file info from HuggingFace
+	modelInfo, err := d.client.GetModelInfo(ctx, modelID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model info: %w", err)
+	}
+
+	// Find the requested file
+	var targetFile *File
+	for _, f := range modelInfo.Siblings {
+		if f.Filename == filename {
+			targetFile = &f
+			break
+		}
+	}
+
+	if targetFile == nil {
+		return nil, fmt.Errorf("file %s not found in repository %s", filename, modelID)
+	}
+
+	// Get file size
+	var fileSize int64
+	var sha string
+	if targetFile.LFS != nil {
+		fileSize = targetFile.LFS.Size
+		sha = targetFile.LFS.OID
+	} else {
+		fileSize = targetFile.Size
+	}
+
+	// Create repo download tracker for single file
+	now := time.Now()
+	repoDownload := &RepoDownload{
+		ID:         generateDownloadID(modelID, filename),
+		ModelID:    modelID,
+		Status:     DownloadStatusDownloading,
+		TotalFiles: 1,
+		TotalSize:  fileSize,
+		StartedAt:  &now,
+		LocalPath:  filepath.Join(d.downloadsDir, modelID),
+		Files:      make([]*Download, 0, 1),
+	}
+
+	repoDownloads.Lock()
+	repoDownloads.m[modelID] = repoDownload
+	repoDownloads.Unlock()
+
+	d.logger.WithFields(logrus.Fields{
+		"model_id":   modelID,
+		"filename":   filename,
+		"file_size":  fileSize,
+		"local_path": repoDownload.LocalPath,
+	}).Info("Starting single file download")
+
+	// Start download in background
+	go func() {
+		download, err := d.StartDownload(modelID, filename, fileSize, sha)
+		if err != nil {
+			d.logger.WithError(err).WithField("file", filename).Error("Failed to start file download")
+			repoDownload.mu.Lock()
+			repoDownload.Status = DownloadStatusFailed
+			repoDownload.FailedFiles = 1
+			repoDownload.Error = err.Error()
+			repoDownload.mu.Unlock()
+			return
+		}
+
+		repoDownload.mu.Lock()
+		repoDownload.Files = append(repoDownload.Files, download)
+		repoDownload.mu.Unlock()
+
+		// Wait for download to complete
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-d.ctx.Done():
+				repoDownload.mu.Lock()
+				repoDownload.Status = DownloadStatusCancelled
+				repoDownload.Error = "downloader shutdown"
+				repoDownload.mu.Unlock()
+				return
+			case <-ticker.C:
+				download.Mu.RLock()
+				status := download.Status
+				downloaded := download.DownloadedSize
+				download.Mu.RUnlock()
+
+				repoDownload.mu.Lock()
+				repoDownload.DownloadedSize = downloaded
+				if repoDownload.TotalSize > 0 {
+					repoDownload.Progress = float64(downloaded) / float64(repoDownload.TotalSize) * 100
+				}
+
+				if status == DownloadStatusCompleted {
+					repoDownload.Status = DownloadStatusCompleted
+					repoDownload.CompletedFiles = 1
+					repoDownload.Progress = 100
+					now := time.Now()
+					repoDownload.CompletedAt = &now
+					repoDownload.mu.Unlock()
+
+					d.logger.WithFields(logrus.Fields{
+						"model_id":   modelID,
+						"filename":   filename,
+						"local_path": repoDownload.LocalPath,
+					}).Info("Single file download completed")
+					return
+				} else if status == DownloadStatusFailed || status == DownloadStatusCancelled {
+					repoDownload.Status = status
+					repoDownload.FailedFiles = 1
+					if status == DownloadStatusFailed {
+						repoDownload.Error = "download failed"
+					} else {
+						repoDownload.Error = "download cancelled"
+					}
+					repoDownload.mu.Unlock()
+					return
+				}
+				repoDownload.mu.Unlock()
+			}
+		}
+	}()
+
+	return repoDownload, nil
+}
+
+// CancelRepoDownload cancels a repository download and all its file downloads
+func (d *Downloader) CancelRepoDownload(modelID string) error {
+	repoDownloads.Lock()
+	repo, ok := repoDownloads.m[modelID]
+	if !ok {
+		repoDownloads.Unlock()
+		return fmt.Errorf("repository download not found: %s", modelID)
+	}
+	
+	// Mark as cancelled
+	repo.mu.Lock()
+	repo.Status = DownloadStatusCancelled
+	repo.Error = "cancelled by user"
+	files := repo.Files
+	repo.mu.Unlock()
+	repoDownloads.Unlock()
+	
+	// Cancel all individual file downloads
+	for _, file := range files {
+		if file != nil && (file.Status == DownloadStatusDownloading || file.Status == DownloadStatusPending) {
+			_ = d.CancelDownload(file.ID)
+		}
+	}
+	
+	d.logger.WithField("model_id", modelID).Info("Repository download cancelled")
+	return nil
+}
+
+// RemoveRepoDownload removes a repository download from the list
+func (d *Downloader) RemoveRepoDownload(modelID string) {
+	repoDownloads.Lock()
+	delete(repoDownloads.m, modelID)
+	repoDownloads.Unlock()
+}
+
+// shouldDownloadFile determines if a file should be downloaded for model loading
+func shouldDownloadFile(filename string) bool {
+	// Always download these
+	essentialFiles := []string{
+		"config.json",
+		"tokenizer.json",
+		"tokenizer_config.json",
+		"special_tokens_map.json",
+		"vocab.json",
+		"merges.txt",
+		"vocab.txt",
+		"generation_config.json",
+		"preprocessor_config.json",
+	}
+	
+	for _, ef := range essentialFiles {
+		if filename == ef {
+			return true
+		}
+	}
+	
+	// Download model weight files
+	if hasAnySuffix(filename, ".safetensors", ".bin", ".pt", ".pth", ".gguf") {
+		return true
+	}
+	
+	// Download sentence-transformers specific files
+	if hasAnyPrefix(filename, "1_Pooling/", "2_Normalize/") {
+		return true
+	}
+	
+	// Skip README, license, git files, etc
+	if hasAnySuffix(filename, ".md", ".txt", ".gitattributes") {
+		return false
+	}
+	
+	// Skip model card data
+	if filename == "README.md" || filename == "LICENSE" {
+		return false
+	}
+	
+	return false
+}
+
+func hasAnySuffix(s string, suffixes ...string) bool {
+	for _, suffix := range suffixes {
+		if len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAnyPrefix(s string, prefixes ...string) bool {
+	for _, prefix := range prefixes {
+		if len(s) >= len(prefix) && s[:len(prefix)] == prefix {
+			return true
+		}
+	}
+	return false
 }

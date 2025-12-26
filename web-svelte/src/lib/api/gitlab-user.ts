@@ -32,6 +32,7 @@ export interface GitLabProject {
   gitlab_project_id: number;
   name: string;
   path_with_namespace: string;
+  default_branch?: string;
   webhook_id?: number;
   status: 'active' | 'disabled' | 'error';
   auto_review: boolean;
@@ -39,6 +40,8 @@ export interface GitLabProject {
   embedding_model_id: string;
   review_prompt?: string;
   settings: GitLabProjectSettings;
+  index_status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+  last_indexed_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -157,5 +160,44 @@ export async function listMyReviews(): Promise<{ data: GitLabReview[]; total: nu
 
 export async function getMyReview(reviewId: string): Promise<GitLabReview> {
   return api.get(`/api/gitlab/reviews/${reviewId}`);
+}
+
+// ============================================================================
+// Project Indexing (RAG)
+// ============================================================================
+
+export interface GitLabIndexStatus {
+  project_id: string;
+  branch: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  files_indexed: number;
+  chunks_total: number;
+  last_indexed?: string;
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export async function startMyProjectIndexing(
+  projectId: string,
+  options?: { branch?: string; force?: boolean }
+): Promise<{ message: string; project_id: string; branch: string; status: string }> {
+  return api.post(`/api/gitlab/projects/${projectId}/index`, options || {});
+}
+
+export async function getMyProjectIndexStatus(
+  projectId: string,
+  branch?: string
+): Promise<GitLabIndexStatus> {
+  const params = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+  return api.get(`/api/gitlab/projects/${projectId}/index/status${params}`);
+}
+
+export async function deleteMyProjectIndex(
+  projectId: string,
+  branch?: string
+): Promise<{ message: string }> {
+  const params = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+  return api.delete(`/api/gitlab/projects/${projectId}/index${params}`);
 }
 

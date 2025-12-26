@@ -23,14 +23,41 @@ server:
     enabled: true
     version: "svelte"
 
-# Inference Configuration
+# Inference Configuration (v3.3.0+: Docker-based multi-provider)
 inference:
-  backend: "yzma"
+  backend: "docker"  # "docker" (multi-provider containers) or "yzma" (legacy in-process)
   max_loaded_models: 3
-  gpu_layers: -1
+  gpu_layers: -1  # Only used by yzma backend
   
-  yzma:
+  # Docker-based inference (v3.3.0+ multi-provider)
+  # Providers: vLLM, SGLang, TGI, TensorRT-LLM, llama.cpp server
+  docker:
     enabled: true
+    
+    # Model cache directories (host paths, mounted to containers)
+    hf_cache_dir: "./data/models/hf"        # HuggingFace models cache
+    gguf_dir: "./data/models/gguf"          # GGUF files for llama.cpp
+    trt_engines_dir: "./data/engines/trt"   # TensorRT-LLM compiled engines
+    
+    # Container limits
+    max_running_models: 2                   # Max concurrent inference containers
+    cache_max_bytes: 107374182400           # 100GB cache limit (0 = unlimited)
+    
+    # Timeouts
+    health_check_timeout: "60m"             # Wait for large model download inside container
+    startup_timeout: "60m"                  # Overall model loading timeout
+    
+    # Docker settings
+    docker_bin: "docker"                    # Path to docker binary
+    max_concurrent_downloads: 2             # Parallel model downloads
+    auto_resume: true                       # Resume interrupted downloads
+    
+    # Default provider when not specified in load request
+    default_provider: "vllm"                # vllm | sglang | tgi | tensorrt-llm | llama.cpp
+  
+  # Legacy yzma backend (in-process llama.cpp, deprecated)
+  yzma:
+    enabled: false
     lib_path: "C:/llama"
     models_dir: "./data/models"
     context_size: 4096
@@ -41,7 +68,7 @@ inference:
     top_p: 0.9
     min_p: 0.1
     verbose: true
-    request_timeout: "30m"  # Max time for a single generation (0 = no timeout for thinking models)
+    request_timeout: "30m"
 
 auth:
   enabled: true
@@ -81,7 +108,42 @@ auth:
       validation_per_ip_minute: 10
 
   oidc:
-    enabled: false
+    enabled: true
+    provider: "keycloak"
+    issuer: "http://localhost:8180/realms/master"  # или /realms/aigateway если создал отдельный realm
+    client_id: "ollama-proxy"
+    client_secret: "kknbVa2RRI3CYhCYvKZNJMJTIddJuona"  # Из Keycloak → Clients → ollama-proxy → Credentials
+    redirect_uri: "http://localhost:8085/api/auth/oidc/callback"
+    scopes:
+      - openid
+      - profile
+      - email
+    
+    claims:
+      user_id: "sub"
+      username: "preferred_username"
+      email: "email"
+      name: "name"
+      groups: "groups"
+      roles: "realm_roles"
+    
+    auto_create_user: true
+    auto_update_user: true
+    default_role: "user"
+    
+    session_store: "memory"
+    session_ttl: "10m"
+    
+    tenant_provisioning:
+      enabled: false  # Включи если нужно автосоздание tenants из групп
+    role_mapping:
+      # Группы которые дают admin права
+      admin_groups:
+        - "/AIG_ADMIN"
+      
+      # Группы обычных пользователей (опционально)
+      user_groups:
+        - "/AIG_USER"
   
   ldap:
     enabled: false
@@ -122,6 +184,8 @@ logging:
   error_log_max_backups: 10
   error_log_max_age: 90
   error_log_compress: true
+  auth_log_enabled: true
+  auth_log_file_path: "logs/auth.log"
 
 models:
   default_embedding_model: "mxbai-embed-large:latest"
@@ -378,4 +442,24 @@ huggingface:
   download_timeout: 5m # Default timeout for model downloads
   max_concurrent_downloads: 2 # Maximum number of parallel downloads
   auto_resume: true # Automatically resume interrupted downloads
+
+# GitLab MR Review Integration (v3.1.0+)
+gitlab:
+  enabled: true # Enable GitLab integration
+  workers: 2 # Number of concurrent review workers
+  max_files_per_mr: 50 # Maximum files per MR
+  max_lines_per_file: 2000 # Maximum lines per file
+  review_timeout: 5m # Timeout for single review
+  enable_rag: true # Enable RAG for context-aware reviews
+  
+  # RAG configuration for GitLab code review
+  # Note: Qdrant settings are taken from main "rag.vector_store" section above
+  rag:
+    # Embedding model alias (optional - if empty, auto-detects any running TEI model)
+    # The model must be started via Admin -> Models before RAG can be used
+    # Example models: "bge-m3", "e5-large", "nomic-embed", "gte-large"
+    # embedding_model_alias: "bge-m3"  # Uncomment to specify explicit model
+    
+    # Optional: override collection name (default: "gitlab_code_embeddings")
+    # collection_name: "gitlab_code_embeddings"
 

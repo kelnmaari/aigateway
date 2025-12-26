@@ -44,12 +44,12 @@ type qdrantUpsertRequest struct {
 }
 
 type qdrantSearchRequest struct {
-	Vector      []float64              `json:"vector"`
-	Limit       int                    `json:"limit"`
-	WithPayload bool                   `json:"with_payload"`
-	WithVector  bool                   `json:"with_vector"`
-	Filter      *qdrantFilter          `json:"filter,omitempty"`
-	ScoreThreshold float64             `json:"score_threshold,omitempty"`
+	Vector         []float64     `json:"vector"`
+	Limit          int           `json:"limit"`
+	WithPayload    bool          `json:"with_payload"`
+	WithVector     bool          `json:"with_vector"`
+	Filter         *qdrantFilter `json:"filter,omitempty"`
+	ScoreThreshold float64       `json:"score_threshold,omitempty"`
 }
 
 type qdrantFilter struct {
@@ -77,16 +77,15 @@ type qdrantSearchResponse struct {
 
 type qdrantCollectionInfo struct {
 	Result struct {
-		Status         string `json:"status"`
-		VectorsCount   int64  `json:"vectors_count"`
-		PointsCount    int64  `json:"points_count"`
-		SegmentsCount  int    `json:"segments_count"`
-		Config         struct {
+		Status        string `json:"status"`
+		PointsCount   int64  `json:"points_count"` // Primary counter for indexed points
+		SegmentsCount int    `json:"segments_count"`
+		// VectorsCount can be int64 (legacy) or object (for named vectors in Qdrant 1.x+)
+		VectorsCount json.RawMessage `json:"vectors_count"`
+		Config       struct {
 			Params struct {
-				Vectors struct {
-					Size     int    `json:"size"`
-					Distance string `json:"distance"`
-				} `json:"vectors"`
+				// Vectors can be a single vector config or named vectors map
+				Vectors json.RawMessage `json:"vectors"`
 			} `json:"params"`
 		} `json:"config"`
 	} `json:"result"`
@@ -160,9 +159,9 @@ func (s *QdrantStore) Name() string {
 func (s *QdrantStore) ensureCollection() error {
 	// Check if collection exists
 	url := fmt.Sprintf("%s/collections/%s", s.baseURL, s.collection)
-	
+
 	s.logger.WithField("url", url).Debug("Checking if Qdrant collection exists")
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -192,7 +191,7 @@ func (s *QdrantStore) ensureCollection() error {
 	createReq.Vectors.Distance = "Cosine"
 
 	body, _ := json.Marshal(createReq)
-	
+
 	req, err = http.NewRequest("PUT", url, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -244,7 +243,7 @@ func (s *QdrantStore) InsertBatch(ctx context.Context, docs []VectorDocument) er
 	}
 
 	startTime := time.Now()
-	
+
 	s.logger.WithField("count", len(docs)).Debug("Inserting batch of vectors into Qdrant")
 
 	points := make([]qdrantPoint, len(docs))
@@ -313,7 +312,7 @@ func (s *QdrantStore) Search(ctx context.Context, req SearchRequest) (*SearchRes
 	}
 
 	startTime := time.Now()
-	
+
 	s.logger.WithFields(logrus.Fields{
 		"top_k":       req.TopK,
 		"min_score":   req.MinScore,
@@ -396,12 +395,12 @@ func (s *QdrantStore) Search(ctx context.Context, req SearchRequest) (*SearchRes
 	}
 
 	searchTime := time.Since(startTime)
-	
+
 	s.logger.WithFields(logrus.Fields{
-		"results":      len(documents),
-		"search_time":  searchTime.String(),
-		"qdrant_time":  fmt.Sprintf("%.3fms", searchResp.Time*1000),
-		"top_k":        req.TopK,
+		"results":     len(documents),
+		"search_time": searchTime.String(),
+		"qdrant_time": fmt.Sprintf("%.3fms", searchResp.Time*1000),
+		"top_k":       req.TopK,
 	}).Debug("Qdrant vector search completed")
 
 	return &SearchResponse{
@@ -582,14 +581,65 @@ func (s *QdrantStore) GetIndexStats(ctx context.Context) (*IndexStats, error) {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	// Parse vectors_count - can be int64 (legacy) or object (named vectors)
+	var vectorsCount int64
+	if len(info.Result.VectorsCount) > 0 {
+		// Try as int64 first
+		if err := json.Unmarshal(info.Result.VectorsCount, &vectorsCount); err != nil {
+			// Try as object (named vectors: {"": count, "name1": count})
+			var vectorsMap map[string]int64
+			if err := json.Unmarshal(info.Result.VectorsCount, &vectorsMap); err == nil {
+				// Sum all vector counts
+				for _, count := range vectorsMap {
+					vectorsCount += count
+				}
+			}
+		}
+	}
+	// Fallback to points_count if vectors_count is 0 or missing
+	if vectorsCount == 0 {
+		vectorsCount = info.Result.PointsCount
+	}
+
+	// Parse vectors config - can be single config or named vectors map
+	var dimensions int
+	if len(info.Result.Config.Params.Vectors) > 0 {
+		// Try as single vector config first
+		var singleConfig struct {
+			Size     int    `json:"size"`
+			Distance string `json:"distance"`
+		}
+		if err := json.Unmarshal(info.Result.Config.Params.Vectors, &singleConfig); err == nil && singleConfig.Size > 0 {
+			dimensions = singleConfig.Size
+		} else {
+			// Try as named vectors map
+			var vectorsMap map[string]struct {
+				Size     int    `json:"size"`
+				Distance string `json:"distance"`
+			}
+			if err := json.Unmarshal(info.Result.Config.Params.Vectors, &vectorsMap); err == nil {
+				// Get first vector config
+				for _, v := range vectorsMap {
+					dimensions = v.Size
+					break
+				}
+			}
+		}
+	}
+	// Fallback to configured dimensions
+	if dimensions == 0 {
+		dimensions = s.dimensions
+	}
+
 	stats := &IndexStats{
-		TotalVectors: info.Result.VectorsCount,
-		Dimensions:   info.Result.Config.Params.Vectors.Size,
+		TotalVectors: vectorsCount,
+		Dimensions:   dimensions,
 		IndexType:    "hnsw", // Qdrant uses HNSW by default
 	}
 
 	s.logger.WithFields(logrus.Fields{
 		"vectors_count": stats.TotalVectors,
+		"points_count":  info.Result.PointsCount,
 		"dimensions":    stats.Dimensions,
 	}).Debug("Qdrant collection stats retrieved")
 
@@ -630,4 +680,3 @@ func (s *QdrantStore) Close() error {
 
 // Ensure QdrantStore implements VectorStore interface
 var _ VectorStore = (*QdrantStore)(nil)
-

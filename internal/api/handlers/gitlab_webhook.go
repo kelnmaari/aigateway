@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"aigateway/internal/gitlab/webhook"
+	"aigateway/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -121,5 +122,12 @@ func (h *GitLabWebhookHandler) verifyHMACSignature(body []byte, signature string
 	expectedMAC := mac.Sum(nil)
 	expectedSignature := "sha256=" + hex.EncodeToString(expectedMAC)
 	return hmac.Equal([]byte(expectedSignature), []byte(signature))
+}
+
+// SetOnMergeCallback sets the callback for merge events (to trigger reindexing)
+func (h *GitLabWebhookHandler) SetOnMergeCallback(fn func(integration *models.GitLabIntegration, project *models.GitLabProject, targetBranch string)) {
+	if h.handler != nil {
+		h.handler.SetOnMergeCallback(fn)
+	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"aigateway/internal/gitlab/client"
+	"aigateway/internal/gitlab/rag"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/models"
 	mainStorage "aigateway/internal/storage"
@@ -19,10 +20,22 @@ import (
 )
 
 // GitLabAdminHandler handles GitLab admin API requests
+// WorkerPoolStats interface for getting worker pool statistics
+type WorkerPoolStats interface {
+	GetWorkerCounts() (total, active, idle int)
+}
+
+// QdrantStatsProvider provides index statistics from Qdrant
+type QdrantStatsProvider interface {
+	GetCollectionStats(ctx context.Context, collectionName string) (*rag.CollectionStats, error)
+}
+
 type GitLabAdminHandler struct {
-	store    storage.Store
-	mainDB   mainStorage.Database // For accessing model registry
-	logger   *logrus.Logger
+	store         storage.Store
+	mainDB        mainStorage.Database   // For accessing model registry
+	workerPool    WorkerPoolStats        // Worker pool for queue stats
+	qdrantStats   QdrantStatsProvider    // For index stats
+	logger        *logrus.Logger
 }
 
 // NewGitLabAdminHandler creates a new GitLab admin handler
@@ -33,9 +46,19 @@ func NewGitLabAdminHandler(store storage.Store, logger *logrus.Logger) *GitLabAd
 	}
 }
 
+// SetWorkerPool sets the worker pool for queue statistics
+func (h *GitLabAdminHandler) SetWorkerPool(pool WorkerPoolStats) {
+	h.workerPool = pool
+}
+
 // SetMainDB sets the main database for model access
 func (h *GitLabAdminHandler) SetMainDB(db mainStorage.Database) {
 	h.mainDB = db
+}
+
+// SetQdrantStats sets the Qdrant stats provider for index statistics
+func (h *GitLabAdminHandler) SetQdrantStats(qs QdrantStatsProvider) {
+	h.qdrantStats = qs
 }
 
 // ============================================================================
@@ -336,6 +359,18 @@ func (h *GitLabAdminHandler) ListProjects(c *gin.Context) {
 		h.logger.WithError(err).Error("Failed to list projects")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list projects"})
 		return
+	}
+
+	// Enrich projects with index statistics from Qdrant
+	if h.qdrantStats != nil {
+		for i := range projects {
+			collectionName := projects[i].GetCollectionName()
+			stats, err := h.qdrantStats.GetCollectionStats(ctx, collectionName)
+			if err == nil && stats != nil {
+				projects[i].IndexChunks = stats.PointsCount
+				projects[i].IndexVectors = stats.VectorsCount
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -664,9 +699,10 @@ func (h *GitLabAdminHandler) RetryReview(c *gin.Context) {
 	// Create new job
 	job := &models.GitLabAnalysisJob{
 		ReviewID:      id,
-		IntegrationID: "", // Will be filled from project
+		IntegrationID: review.IntegrationID,
 		ProjectID:     review.ProjectID,
 		MRIID:         review.MRIID,
+		MRTitle:       review.MRTitle,
 		Status:        models.GitLabJobStatusPending,
 		Priority:      models.GitLabReviewPriorityNormal,
 		MaxRetries:    3,
@@ -703,6 +739,14 @@ func (h *GitLabAdminHandler) GetQueueStatus(c *gin.Context) {
 		h.logger.WithError(err).Error("Failed to get queue stats")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get queue stats"})
 		return
+	}
+
+	// Enrich with worker pool stats if available
+	if h.workerPool != nil {
+		total, active, idle := h.workerPool.GetWorkerCounts()
+		stats.TotalWorkers = total
+		stats.ActiveWorkers = active
+		stats.IdleWorkers = idle
 	}
 
 	c.JSON(http.StatusOK, stats)
@@ -1010,3 +1054,276 @@ func (h *GitLabAdminHandler) ListEmbeddingModels(c *gin.Context) {
 	})
 }
 
+// ============================================================================
+// Settings Handlers
+// ============================================================================
+
+// GetSettings GET /api/admin/gitlab/settings
+func (h *GitLabAdminHandler) GetSettings(c *gin.Context) {
+	// Return default settings for now - can be extended to store in DB
+	c.JSON(http.StatusOK, gin.H{
+		"auto_review_enabled":     true,
+		"default_analysis_model":  "",
+		"default_embedding_model": "",
+		"max_files_per_mr":        50,
+		"max_lines_per_file":      1000,
+		"webhook_secret_rotation": false,
+		"notification_email":      "",
+	})
+}
+
+// UpdateSettings PUT /api/admin/gitlab/settings
+func (h *GitLabAdminHandler) UpdateSettings(c *gin.Context) {
+	var req map[string]interface{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.WithField("settings", req).Info("GitLab settings update requested")
+
+	// TODO: Persist settings to database
+	c.JSON(http.StatusOK, gin.H{"message": "Settings updated", "settings": req})
+}
+
+// ============================================================================
+// Analytics Handlers
+// ============================================================================
+
+// GetAnalytics GET /api/admin/gitlab/analytics
+func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
+	rangeParam := c.DefaultQuery("range", "7d")
+
+	// Calculate date range
+	var days int
+	switch rangeParam {
+	case "24h":
+		days = 1
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	case "90d":
+		days = 90
+	default:
+		days = 7
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	analytics, err := h.store.GetAnalytics(ctx, days)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get analytics")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get analytics"})
+		return
+	}
+
+	analytics.Range = rangeParam
+	c.JSON(http.StatusOK, analytics)
+}
+
+// ============================================================================
+// Feedback Handlers
+// ============================================================================
+
+// ListFeedback GET /api/admin/gitlab/feedback
+func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
+	req := models.GitLabFeedbackListRequest{
+		Limit:  20,
+		Offset: 0,
+	}
+
+	if limit, err := strconv.Atoi(c.DefaultQuery("limit", "20")); err == nil && limit > 0 {
+		req.Limit = limit
+	}
+	if offset, err := strconv.Atoi(c.DefaultQuery("offset", "0")); err == nil && offset >= 0 {
+		req.Offset = offset
+	}
+	if reviewID := c.Query("review_id"); reviewID != "" {
+		req.ReviewID = &reviewID
+	}
+	if feedbackType := c.Query("type"); feedbackType != "" {
+		req.FeedbackType = &feedbackType
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	feedback, total, err := h.store.ListFeedback(ctx, &req)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list feedback")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list feedback"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  feedback,
+		"total": total,
+		"pagination": gin.H{
+			"limit":  req.Limit,
+			"offset": req.Offset,
+			"total":  total,
+		},
+	})
+}
+
+// SubmitFeedback POST /api/admin/gitlab/feedback
+func (h *GitLabAdminHandler) SubmitFeedback(c *gin.Context) {
+	var req struct {
+		ReviewID     string  `json:"review_id" binding:"required"`
+		Rating       int     `json:"rating" binding:"required,min=1,max=5"`
+		FeedbackType string  `json:"feedback_type"`
+		Comment      string  `json:"comment"`
+		IssueIndex   *int    `json:"issue_index"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Default feedback type
+	if req.FeedbackType == "" {
+		req.FeedbackType = models.FeedbackTypeGeneral
+	}
+
+	// Get user ID from context if available
+	var userID *string
+	if uid, exists := c.Get("user_id"); exists {
+		if id, ok := uid.(string); ok {
+			userID = &id
+		}
+	}
+
+	feedback := &models.GitLabReviewFeedback{
+		ReviewID:     req.ReviewID,
+		UserID:       userID,
+		Rating:       req.Rating,
+		FeedbackType: req.FeedbackType,
+		Comment:      req.Comment,
+		IssueIndex:   req.IssueIndex,
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	if err := h.store.CreateFeedback(ctx, feedback); err != nil {
+		h.logger.WithError(err).Error("Failed to submit feedback")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit feedback"})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"feedback_id": feedback.ID,
+		"review_id":   req.ReviewID,
+		"rating":      req.Rating,
+	}).Info("Feedback submitted for review")
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Feedback submitted successfully",
+		"id":      feedback.ID,
+	})
+}
+
+// ============================================================================
+// Available Projects (GitLab API Integration)
+// ============================================================================
+
+// ListAvailableProjects GET /api/admin/gitlab/integrations/:id/available-projects
+// Fetches projects from GitLab that the integration has access to
+func (h *GitLabAdminHandler) ListAvailableProjects(c *gin.Context) {
+	integrationID := c.Param("id")
+	search := c.Query("search")
+	perPage := 20
+	page := 1
+
+	if p, err := strconv.Atoi(c.DefaultQuery("page", "1")); err == nil && p > 0 {
+		page = p
+	}
+	if pp, err := strconv.Atoi(c.DefaultQuery("per_page", "20")); err == nil && pp > 0 && pp <= 100 {
+		perPage = pp
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	// Get integration to access GitLab API
+	integration, err := h.store.GetIntegration(ctx, integrationID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get integration")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get integration"})
+		return
+	}
+	if integration == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		return
+	}
+
+	// Create GitLab client
+	glClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+	})
+
+	// Fetch projects from GitLab
+	projects, err := glClient.ListProjects(ctx, &client.ListProjectsOptions{
+		Search:     search,
+		Page:       page,
+		PerPage:    perPage,
+		Membership: true, // Only show projects user has access to
+	})
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list GitLab projects")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to fetch projects from GitLab: %v", err)})
+		return
+	}
+
+	// Get already added project IDs to mark them
+	existingProjects, _, err := h.store.ListProjects(ctx, &models.GitLabProjectListRequest{
+		IntegrationID: &integrationID,
+		Limit:         1000,
+	})
+	if err != nil {
+		h.logger.WithError(err).Warn("Failed to list existing projects")
+		existingProjects = nil
+	}
+
+	existingIDs := make(map[int64]bool)
+	for _, p := range existingProjects {
+		existingIDs[int64(p.GitLabProjectID)] = true
+	}
+
+	// Format response
+	type ProjectInfo struct {
+		ID                int64  `json:"id"`
+		Name              string `json:"name"`
+		PathWithNamespace string `json:"path_with_namespace"`
+		Description       string `json:"description,omitempty"`
+		WebURL            string `json:"web_url"`
+		DefaultBranch     string `json:"default_branch"`
+		Visibility        string `json:"visibility"`
+		AlreadyAdded      bool   `json:"already_added"`
+	}
+
+	result := make([]ProjectInfo, 0, len(projects))
+	for _, p := range projects {
+		result = append(result, ProjectInfo{
+			ID:                p.ID,
+			Name:              p.Name,
+			PathWithNamespace: p.PathWithNamespace,
+			Description:       p.Description,
+			WebURL:            p.WebURL,
+			DefaultBranch:     p.DefaultBranch,
+			Visibility:        p.Visibility,
+			AlreadyAdded:      existingIDs[p.ID],
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"projects": result,
+		"total":    len(result),
+		"page":     page,
+		"per_page": perPage,
+	})
+}

@@ -31,7 +31,7 @@
 	// Real-time SSE
 	let eventSource: EventSource | null = null;
 	let isRealtime = $state(false);
-	let logsContainer: HTMLDivElement | null = null;
+	let logsContainer = $state<HTMLDivElement | null>(null);
 
 	// Filter levels
 	const levels = ['', 'debug', 'info', 'warn', 'error'] as const;
@@ -131,7 +131,7 @@
 
 	function startRealtime() {
 		if (!selectedFile) {
-			alert('Please select a log file first');
+			alert(m.alert_select_log_file());
 			return;
 		}
 
@@ -141,7 +141,7 @@
 
 		const token = localStorage.getItem('access_token');
 		if (!token) {
-			alert('Authentication required. Please login again.');
+			alert(m.alert_auth_required());
 			return;
 		}
 
@@ -291,7 +291,7 @@
 						: 'border-transparent text-muted-foreground hover:text-foreground'
 				)}
 			>
-				Application Logs
+				{m.admin_logs_app()}
 			</button>
 			<button
 				onclick={() => switchTab('audit')}
@@ -317,7 +317,7 @@
 					{#each logFiles as file}
 						<option value={file.name}>
 							{file.name}
-							{file.is_current ? ' (current)' : ''}
+							{file.is_current ? ` (${m.admin_logs_current()})` : ''}
 						</option>
 					{/each}
 				</select>
@@ -328,24 +328,25 @@
 					size="sm"
 					onclick={toggleRealtime}
 					class="gap-1.5"
+					title={m.tooltip_live()}
 				>
 					{#if isRealtime}
 						<Radio class="h-3.5 w-3.5 animate-pulse" />
 						<Square class="h-3.5 w-3.5" />
-						Stop
+						{m.admin_logs_stop()}
 					{:else}
 						<Play class="h-3.5 w-3.5" />
-						Live
+						{m.admin_logs_realtime()}
 					{/if}
 				</Button>
 
 				<!-- Download -->
-				<Button variant="outline" size="sm" onclick={downloadLog} disabled={!selectedFile}>
+				<Button variant="outline" size="sm" onclick={downloadLog} disabled={!selectedFile} title={m.admin_logs_download()}>
 					<Download class="h-4 w-4" />
 				</Button>
 
 				<!-- Refresh -->
-				<Button variant="outline" size="sm" onclick={loadLogs} disabled={isLoading || isRealtime}>
+				<Button variant="outline" size="sm" onclick={loadLogs} disabled={isLoading || isRealtime} title={m.common_refresh()}>
 					<RefreshCw class={cn('h-4 w-4', isLoading && 'animate-spin')} />
 				</Button>
 			</div>

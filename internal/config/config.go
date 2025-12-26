@@ -34,21 +34,106 @@ type Config struct {
 	Agent         AgentConfig         `mapstructure:"agent"`          // Version 2.5.0+: Agentic AI configuration
 	HuggingFace   HuggingFaceConfig   `mapstructure:"huggingface"`    // Version 3.0.0+: Hugging Face integration
 	Yzma          YzmaConfig          `mapstructure:"yzma"`           // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
+	GitLab        GitLabConfig        `mapstructure:"gitlab"`         // Version 3.1.0+: GitLab MR Review integration
+}
+
+// GitLabConfig configures GitLab MR Review integration (v3.1.0+)
+type GitLabConfig struct {
+	// Enabled enables GitLab MR review feature
+	Enabled bool `mapstructure:"enabled"`
+
+	// Workers number of concurrent MR review workers
+	Workers int `mapstructure:"workers"`
+
+	// MaxFilesPerMR limits files analyzed per MR
+	MaxFilesPerMR int `mapstructure:"max_files_per_mr"`
+
+	// MaxLinesPerFile limits lines per file
+	MaxLinesPerFile int `mapstructure:"max_lines_per_file"`
+
+	// ReviewTimeout for single MR review
+	ReviewTimeout time.Duration `mapstructure:"review_timeout"`
+
+	// EnableRAG enables RAG for context-aware reviews
+	EnableRAG bool `mapstructure:"enable_rag"`
+
+	// RAG configuration for GitLab code review
+	RAG GitLabRAGConfig `mapstructure:"rag"`
+}
+
+// GitLabRAGConfig configures RAG specifically for GitLab code review
+// Note: Uses main config.RAG.VectorStore for Qdrant settings
+type GitLabRAGConfig struct {
+	// EmbeddingModelAlias specifies the embedding model to use (resolved dynamically from inference registry)
+	// Example: "bge-m3", "e5-large", "nomic-embed"
+	// The model must be running via Admin -> Models before GitLab RAG can be used
+	EmbeddingModelAlias string `mapstructure:"embedding_model_alias"`
+	
+	// CollectionName overrides default collection name for GitLab code embeddings
+	// If empty, uses "gitlab_code_embeddings"
+	CollectionName string `mapstructure:"collection_name"`
 }
 
 // InferenceConfig represents unified inference backend configuration (v3.0.6+)
 type InferenceConfig struct {
-	// Backend is always "yzma" (v3.0.6+: Ollama removed)
-	Backend string `mapstructure:"backend"` // "yzma" only
+	// Backend: "yzma" (legacy in-process) or "docker" (v3.3.0+ multi-provider containers)
+	Backend string `mapstructure:"backend"`
 
 	// MaxLoadedModels limits how many models can be loaded simultaneously
 	MaxLoadedModels int `mapstructure:"max_loaded_models"`
 
 	// GPULayers controls GPU offloading (-1 = auto, 0 = CPU only, >0 = specific layer count)
+	// Used by yzma backend only
 	GPULayers int `mapstructure:"gpu_layers"`
 
-	// Yzma configuration (only backend)
+	// Yzma configuration (legacy backend)
 	Yzma YzmaConfig `mapstructure:"yzma"`
+
+	// Docker configuration (v3.3.0+ multi-provider backend)
+	Docker DockerInferenceConfig `mapstructure:"docker"`
+}
+
+// DockerInferenceConfig configures Docker-based multi-provider inference (v3.3.0+)
+// Supports: vLLM, SGLang, TGI, TensorRT-LLM, llama.cpp server
+type DockerInferenceConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+
+	// HFCacheDir is the host directory for HuggingFace model cache
+	// Mounted to containers as /root/.cache/huggingface
+	HFCacheDir string `mapstructure:"hf_cache_dir"`
+
+	// GGUFDir is the host directory for GGUF model files
+	// Mounted to llama.cpp containers
+	GGUFDir string `mapstructure:"gguf_dir"`
+
+	// TRTEnginesDir is the host directory for TensorRT-LLM compiled engines
+	TRTEnginesDir string `mapstructure:"trt_engines_dir"`
+
+	// MaxRunningModels limits concurrent running inference containers
+	MaxRunningModels int `mapstructure:"max_running_models"`
+
+	// CacheMaxBytes limits total cache size (0 = unlimited)
+	// LRU eviction when exceeded
+	CacheMaxBytes int64 `mapstructure:"cache_max_bytes"`
+
+	// HealthCheckTimeout is timeout for container health check after start
+	HealthCheckTimeout time.Duration `mapstructure:"health_check_timeout"`
+
+	// StartupTimeout is overall timeout for model loading + container start
+	StartupTimeout time.Duration `mapstructure:"startup_timeout"`
+
+	// DockerBin is path to docker binary (default: "docker")
+	DockerBin string `mapstructure:"docker_bin"`
+
+	// MaxConcurrentDownloads limits parallel model downloads
+	MaxConcurrentDownloads int `mapstructure:"max_concurrent_downloads"`
+
+	// AutoResume enables resume of interrupted downloads
+	AutoResume bool `mapstructure:"auto_resume"`
+
+	// DefaultProvider is default inference provider when not specified
+	// Options: "vllm", "sglang", "tgi", "tensorrt-llm", "llama.cpp"
+	DefaultProvider string `mapstructure:"default_provider"`
 }
 
 // ServerConfig конфигурация HTTP сервера
@@ -182,6 +267,24 @@ type OIDCConfig struct {
 
 	// TenantProvisioning конфигурация автоматического provisioning tenants из groups (Version 1.11.2+)
 	TenantProvisioning TenantProvisioningConfig `mapstructure:"tenant_provisioning"`
+
+	// RoleMapping конфигурация маппинга ролей из OIDC claims
+	RoleMapping OIDCRoleMapping `mapstructure:"role_mapping"`
+}
+
+// OIDCRoleMapping конфигурация маппинга ролей из OIDC
+type OIDCRoleMapping struct {
+	// AdminRoles список ролей (realm_access.roles) которые дают admin права
+	AdminRoles []string `mapstructure:"admin_roles"`
+
+	// AdminGroups список групп которые дают admin права
+	AdminGroups []string `mapstructure:"admin_groups"`
+
+	// UserRoles список ролей для обычных пользователей (опционально, для явной проверки)
+	UserRoles []string `mapstructure:"user_roles"`
+
+	// UserGroups список групп для обычных пользователей (опционально)
+	UserGroups []string `mapstructure:"user_groups"`
 }
 
 // ClaimsMapping маппинг OIDC claims на поля пользователя
@@ -296,6 +399,18 @@ type LoggingConfig struct {
 	ErrorLogMaxBackups int    `mapstructure:"error_log_max_backups"` // (default: same as MaxBackups)
 	ErrorLogMaxAge     int    `mapstructure:"error_log_max_age"`     // days (default: same as MaxAge)
 	ErrorLogCompress   bool   `mapstructure:"error_log_compress"`    // (default: same as Compress)
+
+	// Auth log file (separate file for authentication events)
+	AuthLogEnabled  bool   `mapstructure:"auth_log_enabled"`   // Enable separate auth log file
+	AuthLogFilePath string `mapstructure:"auth_log_file_path"` // Path to auth log file
+
+	// HTTP log file (separate file for HTTP request logs)
+	HTTPLogEnabled  bool   `mapstructure:"http_log_enabled"`   // Enable separate HTTP log file
+	HTTPLogFilePath string `mapstructure:"http_log_file_path"` // Path to HTTP log file (default: logs/http.log)
+
+	// Metrics log file (separate file for GPU/performance metrics)
+	MetricsLogEnabled  bool   `mapstructure:"metrics_log_enabled"`   // Enable separate metrics log file
+	MetricsLogFilePath string `mapstructure:"metrics_log_file_path"` // Path to metrics log file (default: logs/metrics.log)
 
 	// Structured fields для JSON логирования
 	StructuredFields map[string]string `mapstructure:"structured_fields"`
@@ -716,11 +831,25 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.webui.version", "legacy") // "legacy" or "svelte"
 
 	// Inference defaults (v3.0.5+)
-	v.SetDefault("inference.backend", "yzma")      // Primary: yzma (local inference)
+	v.SetDefault("inference.backend", "yzma")      // Primary: yzma (local) or "docker" (multi-provider containers)
 	v.SetDefault("inference.max_loaded_models", 3) // Keep 3 models in memory
-	v.SetDefault("inference.gpu_layers", -1)       // Auto GPU offloading
+	v.SetDefault("inference.gpu_layers", -1)       // Auto GPU offloading (yzma only)
 
-	// Inference > Yzma defaults
+	// Inference > Docker defaults (v3.3.0+ multi-provider)
+	v.SetDefault("inference.docker.enabled", false)
+	v.SetDefault("inference.docker.hf_cache_dir", "./data/models/hf")
+	v.SetDefault("inference.docker.gguf_dir", "./data/models/gguf")
+	v.SetDefault("inference.docker.trt_engines_dir", "./data/engines/trt")
+	v.SetDefault("inference.docker.max_running_models", 2)
+	v.SetDefault("inference.docker.cache_max_bytes", 0)          // 0 = unlimited
+	v.SetDefault("inference.docker.health_check_timeout", "60m") // 60min for large model download inside container
+	v.SetDefault("inference.docker.startup_timeout", "5m")
+	v.SetDefault("inference.docker.docker_bin", "docker")
+	v.SetDefault("inference.docker.max_concurrent_downloads", 2)
+	v.SetDefault("inference.docker.auto_resume", true)
+	v.SetDefault("inference.docker.default_provider", "vllm")
+
+	// Inference > Yzma defaults (legacy)
 	v.SetDefault("inference.yzma.enabled", true)
 	v.SetDefault("inference.yzma.models_dir", "./data/models")
 	v.SetDefault("inference.yzma.context_size", 4096)
@@ -733,15 +862,19 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("inference.yzma.verbose", false)
 	// GPU configuration (v3.2.1+)
 	v.SetDefault("inference.yzma.main_gpu", 0)
-	v.SetDefault("inference.yzma.tensor_split", "")       // Empty = single GPU
-	v.SetDefault("inference.yzma.flash_attention", true)  // Enable by default for modern GPUs
-	v.SetDefault("inference.yzma.threads", 0)             // 0 = auto (use all CPU cores)
-	v.SetDefault("inference.yzma.threads_batch", 0)       // 0 = same as threads
+	v.SetDefault("inference.yzma.tensor_split", "")      // Empty = single GPU
+	v.SetDefault("inference.yzma.flash_attention", true) // Enable by default for modern GPUs
+	v.SetDefault("inference.yzma.threads", 0)            // 0 = auto (use all CPU cores)
+	v.SetDefault("inference.yzma.threads_batch", 0)      // 0 = same as threads
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "text")
 	v.SetDefault("logging.output", "stdout")
+	v.SetDefault("logging.http_log_enabled", true)
+	v.SetDefault("logging.http_log_file_path", "logs/http.log")
+	v.SetDefault("logging.metrics_log_enabled", true)
+	v.SetDefault("logging.metrics_log_file_path", "logs/metrics.log")
 
 	// Auth defaults
 	v.SetDefault("auth.enabled", false)
@@ -963,6 +1096,9 @@ type HuggingFaceConfig struct {
 
 	// CacheDir - directory for caching model metadata
 	CacheDir string `mapstructure:"cache_dir"`
+
+	// CacheMaxBytes - max cache size; 0 = unlimited (eviction by oldest)
+	CacheMaxBytes int64 `mapstructure:"cache_max_bytes"`
 
 	// DefaultDownloadTimeout - timeout for model downloads
 	DefaultDownloadTimeout time.Duration `mapstructure:"download_timeout"`

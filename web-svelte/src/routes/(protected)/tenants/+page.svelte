@@ -15,6 +15,8 @@
 	import { tenantsApi, type Tenant, type TenantMember } from '$lib/api/tenants';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { IconButton } from '$lib/components/ui/icon-button';
+	import { FormLabel } from '$lib/components/ui/form-label';
 	import * as m from '$lib/paraglide/messages';
 
 	// State
@@ -115,7 +117,7 @@
 	}
 
 	async function handleDeleteTenant(tenant: Tenant) {
-		if (!confirm(`Are you sure you want to delete "${tenant.name}"? This cannot be undone.`)) {
+		if (!confirm(m.confirm_delete_tenant({ name: tenant.name }))) {
 			return;
 		}
 
@@ -128,20 +130,20 @@
 			}
 		} catch (error) {
 			console.error('Failed to delete tenant:', error);
-			alert('Failed to delete organization');
+			alert(m.alert_failed_delete_org());
 		}
 	}
 
 	async function handleRemoveMember(member: TenantMember) {
 		if (!selectedTenant) return;
-		if (!confirm(`Remove ${member.username} from this organization?`)) return;
+		if (!confirm(m.confirm_remove_member({ name: member.username }))) return;
 
 		try {
 			await tenantsApi.removeMember(selectedTenant.id, member.id);
 			members = members.filter((m) => m.id !== member.id);
 		} catch (error) {
 			console.error('Failed to remove member:', error);
-			alert('Failed to remove member');
+			alert(m.alert_failed_remove_member());
 		}
 	}
 
@@ -172,16 +174,16 @@
 	<title>{m.nav_tenants()} | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Header -->
 	<div class="mb-8 flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-foreground">{m.nav_tenants()}</h1>
-			<p class="mt-1 text-muted-foreground">Manage your organizations and teams</p>
+			<h1 class="text-2xl font-bold text-foreground">{m.tenants_title()}</h1>
+			<p class="mt-1 text-muted-foreground">{m.tenants_subtitle()}</p>
 		</div>
 		<Button onclick={openCreateModal}>
 			<Plus class="mr-2 h-4 w-4" />
-			{m.common_create()} Organization
+			{m.tenants_create()}
 		</Button>
 	</div>
 
@@ -193,11 +195,11 @@
 	{:else if tenants.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
 			<Building2 class="mx-auto h-12 w-12 text-muted-foreground/40" />
-			<p class="mt-4 text-lg font-medium text-foreground">No organizations yet</p>
-			<p class="mt-1 text-muted-foreground">Create your first organization to collaborate with your team</p>
+			<p class="mt-4 text-lg font-medium text-foreground">{m.tenants_noTenants()}</p>
+			<p class="mt-1 text-muted-foreground">{m.tenants_createFirst()}</p>
 			<Button variant="outline" class="mt-6" onclick={openCreateModal}>
 				<Plus class="mr-2 h-4 w-4" />
-				Create Organization
+				{m.tenants_create()}
 			</Button>
 		</div>
 	{:else}
@@ -251,7 +253,9 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showCreateModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showCreateModal = false)}
 		role="dialog"
+		aria-modal="true"
 		tabindex="-1"
 	>
 		<div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
@@ -272,21 +276,21 @@
 					</div>
 				{/if}
 
-				<div class="space-y-2">
-					<label for="tenant-name" class="text-sm font-medium">Name *</label>
+				<div>
+					<FormLabel label={m.form_tenant_name()} description={m.form_tenant_name_desc()} required for="tenant-name" />
 					<input
 						id="tenant-name"
 						type="text"
 						bind:value={tenantName}
 						oninput={handleNameChange}
-						placeholder="My Organization"
+						placeholder={m.placeholder_org_name()}
 						required
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					/>
 				</div>
 
-				<div class="space-y-2">
-					<label for="tenant-slug" class="text-sm font-medium">Slug *</label>
+				<div>
+					<FormLabel label={m.form_tenant_slug()} description={m.form_tenant_slug_desc()} required for="tenant-slug" />
 					<div class="flex items-center gap-1">
 						<span class="text-sm text-muted-foreground">@</span>
 						<input
@@ -299,15 +303,14 @@
 							class="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 						/>
 					</div>
-					<p class="text-xs text-muted-foreground">Lowercase letters, numbers, and hyphens only</p>
 				</div>
 
-				<div class="space-y-2">
-					<label for="tenant-desc" class="text-sm font-medium">{m.common_description()}</label>
+				<div>
+					<FormLabel label={m.form_tenant_description()} description={m.form_tenant_description_desc()} for="tenant-desc" />
 					<textarea
 						id="tenant-desc"
 						bind:value={tenantDescription}
-						placeholder="Optional description"
+						placeholder={m.placeholder_org_desc()}
 						rows="3"
 						class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 					></textarea>
@@ -334,7 +337,9 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
 		onclick={(e) => e.target === e.currentTarget && (showDetailModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDetailModal = false)}
 		role="dialog"
+		aria-modal="true"
 		tabindex="-1"
 	>
 		<div class="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl">

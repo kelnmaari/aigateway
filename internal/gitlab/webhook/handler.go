@@ -32,6 +32,9 @@ type Handler struct {
 
 	// Job enqueue function (injected)
 	enqueueJob func(ctx context.Context, job *models.GitLabAnalysisJob) error
+
+	// Merge callback for triggering reindex (injected by indexer)
+	onMerge func(integration *models.GitLabIntegration, project *models.GitLabProject, targetBranch string)
 }
 
 // WebhookRateLimiter interface for rate limiting webhooks
@@ -67,6 +70,11 @@ func (h *Handler) SetEnqueueFunc(fn func(ctx context.Context, job *models.GitLab
 // SetRateLimiter sets the rate limiter
 func (h *Handler) SetRateLimiter(rl WebhookRateLimiter) {
 	h.rateLimiter = rl
+}
+
+// SetOnMergeCallback sets the callback for merge events (to trigger reindexing)
+func (h *Handler) SetOnMergeCallback(fn func(integration *models.GitLabIntegration, project *models.GitLabProject, targetBranch string)) {
+	h.onMerge = fn
 }
 
 // HandleWebhook handles incoming GitLab webhook requests
@@ -148,8 +156,17 @@ func (h *Handler) handleMergeRequestEvent(ctx context.Context, w http.ResponseWr
 		return
 	}
 
-	// Only process open, update, reopen actions
 	action := event.ObjectAttributes.Action
+
+	// Handle merge event - trigger reindex of target branch
+	if action == "merge" {
+		h.handleMergeComplete(ctx, integration, &event)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK - merge processed"))
+		return
+	}
+
+	// Only process open, update, reopen actions for reviews
 	if !isReviewableAction(action) {
 		h.logger.WithField("action", action).Debug("Ignoring non-reviewable action")
 		w.WriteHeader(http.StatusOK)
@@ -353,6 +370,38 @@ func isReviewableAction(action string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// handleMergeComplete handles MR merge events to trigger reindexing
+func (h *Handler) handleMergeComplete(ctx context.Context, integration *models.GitLabIntegration, event *client.MergeRequestEvent) {
+	h.logger.WithFields(logrus.Fields{
+		"project_id":    event.Project.ID,
+		"mr_iid":        event.ObjectAttributes.IID,
+		"target_branch": event.ObjectAttributes.TargetBranch,
+	}).Info("MR merged, triggering reindex")
+
+	// Find project configuration
+	project, err := h.store.GetProjectByGitLabID(ctx, integration.ID, event.Project.ID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get project for merge event")
+		return
+	}
+	if project == nil {
+		h.logger.WithField("gitlab_project_id", event.Project.ID).Debug("Project not configured, skipping reindex")
+		return
+	}
+
+	// Call merge callback if set (for reindexing)
+	if h.onMerge != nil {
+		targetBranch := event.ObjectAttributes.TargetBranch
+		if targetBranch == "" {
+			targetBranch = project.DefaultBranch
+			if targetBranch == "" {
+				targetBranch = "main"
+			}
+		}
+		h.onMerge(integration, project, targetBranch)
 	}
 }
 

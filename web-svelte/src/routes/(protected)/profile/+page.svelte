@@ -19,6 +19,8 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { IconButton } from '$lib/components/ui/icon-button';
+	import { FormLabel } from '$lib/components/ui/form-label';
 	import * as m from '$lib/paraglide/messages';
 
 	// Profile state
@@ -127,26 +129,26 @@
 	}
 
 	async function handleRevokeDevice(deviceId: string) {
-		if (!confirm('Revoke access for this device?')) return;
+		if (!confirm(m.confirm_revoke_device())) return;
 
 		try {
 			await profileApi.revokeDevice(deviceId);
 			devices = devices.filter((d) => d.id !== deviceId);
 		} catch (error) {
 			console.error('Failed to revoke device:', error);
-			alert('Failed to revoke device');
+			alert(m.alert_failed_revoke_device());
 		}
 	}
 
 	async function handleRevokeAll() {
-		if (!confirm('Revoke access for all other devices? You will need to log in again on those devices.')) return;
+		if (!confirm(m.confirm_revoke_all_devices())) return;
 
 		try {
 			await profileApi.revokeAllDevices();
 			devices = devices.filter((d) => d.is_current);
 		} catch (error) {
 			console.error('Failed to revoke devices:', error);
-			alert('Failed to revoke devices');
+			alert(m.alert_failed_revoke_devices());
 		}
 	}
 
@@ -166,7 +168,7 @@
 	<title>{m.nav_profile()} | AI Gateway</title>
 </svelte:head>
 
-<div class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	<h1 class="mb-8 text-2xl font-bold text-foreground">{m.nav_profile()}</h1>
 
 	{#if isLoading}
@@ -174,54 +176,56 @@
 			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if profile}
-		<div class="space-y-8">
-			<!-- Profile Info -->
-			<section class="rounded-xl border border-border bg-card p-6">
-				<div class="mb-6 flex items-center gap-4">
-					<div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-						<User class="h-8 w-8" />
-					</div>
-					<div>
-						<h2 class="text-lg font-semibold">{profile.full_name || profile.username}</h2>
-						<p class="text-sm text-muted-foreground">@{profile.username}</p>
-						{#if profile.is_admin}
-							<span class="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-								<Shield class="h-3 w-3" />
-								Admin
-							</span>
-						{/if}
-					</div>
-				</div>
-
-				<form onsubmit={(e) => { e.preventDefault(); handleSaveProfile(); }} class="space-y-4">
-					{#if profileError}
-						<div class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-							{profileError}
+		<div class="grid gap-6 lg:grid-cols-2">
+			<!-- Left Column -->
+			<div class="space-y-6">
+				<!-- Profile Info -->
+				<section class="rounded-xl border border-border bg-card p-6">
+					<div class="mb-6 flex items-center gap-4">
+						<div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+							<User class="h-8 w-8" />
 						</div>
-					{/if}
+						<div>
+							<h2 class="text-lg font-semibold">{profile.full_name || profile.username}</h2>
+							<p class="text-sm text-muted-foreground">@{profile.username}</p>
+							{#if profile.is_admin}
+								<span class="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+									<Shield class="h-3 w-3" />
+									Admin
+								</span>
+							{/if}
+						</div>
+					</div>
+
+					<form onsubmit={(e) => { e.preventDefault(); handleSaveProfile(); }} class="space-y-4">
+						{#if profileError}
+							<div class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+								{profileError}
+							</div>
+						{/if}
 					{#if profileSuccess}
 						<div class="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-500">
 							<CheckCircle class="h-4 w-4" />
-							Profile updated successfully
+							{m.profile_updated()}
 						</div>
 					{/if}
 
-					<div class="space-y-2">
-						<label for="full-name" class="text-sm font-medium">Full Name</label>
+					<div>
+						<FormLabel label={m.form_profile_fullname()} description={m.form_profile_fullname_desc()} for="full-name" />
 						<div class="relative">
 							<User class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 							<input
 								id="full-name"
 								type="text"
 								bind:value={fullName}
-								placeholder="Your full name"
+								placeholder={m.placeholder_full_name()}
 								class="w-full rounded-lg border border-input bg-background py-2 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 							/>
 						</div>
 					</div>
 
-					<div class="space-y-2">
-						<label for="email" class="text-sm font-medium">Email</label>
+					<div>
+						<FormLabel label={m.form_profile_email()} description={m.form_profile_email_desc()} for="email" />
 						<div class="relative">
 							<Mail class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 							<input
@@ -234,41 +238,41 @@
 						</div>
 					</div>
 
-					<div class="flex justify-end">
-						<Button type="submit" disabled={isSavingProfile}>
-							{#if isSavingProfile}
-								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							{:else}
-								<Save class="mr-2 h-4 w-4" />
-							{/if}
-							{m.common_save()}
-						</Button>
-					</div>
-				</form>
-			</section>
+						<div class="flex justify-end">
+							<Button type="submit" disabled={isSavingProfile}>
+								{#if isSavingProfile}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								{:else}
+									<Save class="mr-2 h-4 w-4" />
+								{/if}
+								{m.common_save()}
+							</Button>
+						</div>
+					</form>
+				</section>
 
-			<!-- Change Password -->
-			<section class="rounded-xl border border-border bg-card p-6">
+				<!-- Change Password -->
+				<section class="rounded-xl border border-border bg-card p-6">
 				<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
 					<Lock class="h-5 w-5" />
-					Change Password
+					{m.profile_changePassword()}
 				</h2>
 
-				<form onsubmit={(e) => { e.preventDefault(); handleChangePassword(); }} class="space-y-4">
-					{#if passwordError}
-						<div class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-							{passwordError}
-						</div>
-					{/if}
+					<form onsubmit={(e) => { e.preventDefault(); handleChangePassword(); }} class="space-y-4">
+						{#if passwordError}
+							<div class="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+								{passwordError}
+							</div>
+						{/if}
 					{#if passwordSuccess}
 						<div class="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-500">
 							<CheckCircle class="h-4 w-4" />
-							Password changed successfully
+							{m.profile_passwordChanged()}
 						</div>
 					{/if}
 
-					<div class="space-y-2">
-						<label for="current-password" class="text-sm font-medium">Current Password</label>
+					<div>
+						<FormLabel label={m.form_profile_password_current()} description={m.form_profile_password_current_desc()} required for="current-password" />
 						<div class="relative">
 							<Lock class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 							<input
@@ -292,8 +296,8 @@
 						</div>
 					</div>
 
-					<div class="space-y-2">
-						<label for="new-password" class="text-sm font-medium">New Password</label>
+					<div>
+						<FormLabel label={m.form_profile_password_new()} description={m.form_profile_password_new_desc()} required for="new-password" />
 						<input
 							id="new-password"
 							type={showPasswords ? 'text' : 'password'}
@@ -304,8 +308,8 @@
 						/>
 					</div>
 
-					<div class="space-y-2">
-						<label for="confirm-password" class="text-sm font-medium">Confirm New Password</label>
+					<div>
+						<FormLabel label={m.form_profile_password_confirm()} description={m.form_profile_password_confirm_desc()} required for="confirm-password" />
 						<input
 							id="confirm-password"
 							type={showPasswords ? 'text' : 'password'}
@@ -323,108 +327,112 @@
 							{#if isChangingPassword}
 								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 							{/if}
-							Change Password
+							{m.profile_changePassword()}
 						</Button>
 					</div>
-				</form>
-			</section>
+					</form>
+				</section>
+			</div>
 
-			<!-- Active Devices -->
-			<section class="rounded-xl border border-border bg-card p-6">
+			<!-- Right Column -->
+			<div class="space-y-6">
+				<!-- Active Devices -->
+				<section class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="flex items-center gap-2 text-lg font-semibold">
 						<Monitor class="h-5 w-5" />
-						Active Sessions
+						{m.profile_activeSessions()}
 					</h2>
 					{#if devices.length > 1}
 						<Button variant="outline" size="sm" onclick={handleRevokeAll}>
 							<LogOut class="mr-2 h-4 w-4" />
-							Revoke All Others
+							{m.profile_revokeAll()}
 						</Button>
 					{/if}
 				</div>
 
-				{#if loadingDevices}
-					<div class="flex items-center justify-center py-8">
-						<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-					</div>
+					{#if loadingDevices}
+						<div class="flex items-center justify-center py-8">
+							<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+						</div>
 				{:else if devices.length === 0}
-					<p class="py-4 text-center text-muted-foreground">No active sessions</p>
-				{:else}
-					<div class="space-y-3">
-						{#each devices as device (device.id)}
-							{@const DeviceIcon = getDeviceIcon(device.device_type)}
-							<div class="flex items-center justify-between rounded-lg border border-border p-4">
-								<div class="flex items-center gap-4">
-									<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-										<DeviceIcon class="h-5 w-5 text-muted-foreground" />
-									</div>
-									<div>
-										<p class="font-medium text-foreground">
-											{device.device_name}
-											{#if device.is_current}
+					<p class="py-4 text-center text-muted-foreground">{m.profile_noSessions()}</p>
+					{:else}
+						<div class="space-y-3">
+							{#each devices as device (device.id)}
+								{@const DeviceIcon = getDeviceIcon(device.device_type)}
+								<div class="flex items-center justify-between rounded-lg border border-border p-4">
+									<div class="flex items-center gap-4">
+										<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+											<DeviceIcon class="h-5 w-5 text-muted-foreground" />
+										</div>
+										<div>
+											<p class="font-medium text-foreground">
+												{device.device_name}
+										{#if device.is_current}
 												<span class="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-													Current
+													{m.profile_current()}
 												</span>
 											{/if}
-										</p>
-										<p class="text-xs text-muted-foreground">
-											{device.ip_address} • Last active {formatRelativeTime(device.last_active_at)}
-										</p>
+											</p>
+											<p class="text-xs text-muted-foreground">
+												{device.ip_address} • Last active {formatRelativeTime(device.last_active_at)}
+											</p>
+										</div>
 									</div>
+									{#if !device.is_current}
+										<button
+											onclick={() => handleRevokeDevice(device.id)}
+											class="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+											title="Revoke access"
+										>
+											<LogOut class="h-4 w-4" />
+										</button>
+									{/if}
 								</div>
-								{#if !device.is_current}
-									<button
-										onclick={() => handleRevokeDevice(device.id)}
-										class="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-										title="Revoke access"
-									>
-										<LogOut class="h-4 w-4" />
-									</button>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</section>
+							{/each}
+						</div>
+					{/if}
+				</section>
 
-			<!-- Account Info -->
-			<section class="rounded-xl border border-border bg-card p-6">
-				<h2 class="mb-4 text-lg font-semibold">Account Information</h2>
+				<!-- Account Info -->
+				<section class="rounded-xl border border-border bg-card p-6">
+					<h2 class="mb-4 text-lg font-semibold">{m.profile_accountInfo()}</h2>
 				<dl class="space-y-3 text-sm">
 					<div class="flex justify-between">
-						<dt class="text-muted-foreground">Username</dt>
+						<dt class="text-muted-foreground">{m.profile_username()}</dt>
 						<dd class="font-medium">@{profile.username}</dd>
 					</div>
 					<div class="flex justify-between">
-						<dt class="text-muted-foreground">Account Status</dt>
-						<dd>
-							<span class={cn(
-								'rounded-full px-2 py-0.5 text-xs font-medium',
-								profile.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-							)}>
-								{profile.status}
-							</span>
-						</dd>
-					</div>
+						<dt class="text-muted-foreground">{m.profile_accountStatus()}</dt>
+							<dd>
+								<span class={cn(
+									'rounded-full px-2 py-0.5 text-xs font-medium',
+									profile.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+								)}>
+									{profile.status}
+								</span>
+							</dd>
+						</div>
 					<div class="flex justify-between">
-						<dt class="text-muted-foreground">Member Since</dt>
+						<dt class="text-muted-foreground">{m.profile_memberSince()}</dt>
 						<dd class="font-medium">{new Date(profile.created_at).toLocaleDateString()}</dd>
 					</div>
 					{#if profile.last_login_at}
 						<div class="flex justify-between">
-							<dt class="text-muted-foreground">Last Login</dt>
+							<dt class="text-muted-foreground">{m.profile_lastLogin()}</dt>
 							<dd class="font-medium">{formatRelativeTime(profile.last_login_at)}</dd>
 						</div>
 					{/if}
 					{#if profile.auth_provider}
 						<div class="flex justify-between">
-							<dt class="text-muted-foreground">Auth Provider</dt>
+							<dt class="text-muted-foreground">{m.profile_authProvider()}</dt>
 							<dd class="font-medium capitalize">{profile.auth_provider}</dd>
 						</div>
 					{/if}
 				</dl>
-			</section>
+				</section>
+			</div>
 		</div>
 	{/if}
 </div>

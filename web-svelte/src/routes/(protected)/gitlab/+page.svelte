@@ -6,6 +6,7 @@
     deleteMyIntegration,
     type GitLabIntegration 
   } from '$lib/api/gitlab-user';
+  import * as m from '$lib/paraglide/messages';
 
   let integrations: GitLabIntegration[] = [];
   let loading = true;
@@ -59,7 +60,7 @@
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete integration "${name}"? This will also delete all associated projects.`)) {
+    if (!confirm(m.confirm_delete_integration({ name }))) {
       return;
     }
 
@@ -82,14 +83,14 @@
 </script>
 
 <svelte:head>
-  <title>GitLab Integrations - AIGateway</title>
+  <title>{m.gitlab_title()} - AIGateway</title>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-6xl">
+<div class="container mx-auto px-4 py-8 max-w-[1600px]">
   <div class="flex justify-between items-center mb-8">
     <div>
-      <h1 class="text-3xl font-bold text-gray-100">GitLab Integrations</h1>
-      <p class="text-gray-400 mt-1">Connect your GitLab repositories for AI-powered code reviews</p>
+      <h1 class="text-3xl font-bold text-gray-100">{m.gitlab_title()}</h1>
+      <p class="text-gray-400 mt-1">{m.gitlab_subtitle()}</p>
     </div>
     <button
       on:click={() => showCreateModal = true}
@@ -98,7 +99,7 @@
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
       </svg>
-      Add Integration
+      {m.gitlab_add_integration()}
     </button>
   </div>
 
@@ -117,13 +118,13 @@
       <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
       </svg>
-      <h3 class="text-xl font-semibold text-gray-300 mb-2">No integrations yet</h3>
-      <p class="text-gray-500 mb-6">Connect your GitLab instance to enable AI code reviews</p>
+      <h3 class="text-xl font-semibold text-gray-300 mb-2">{m.gitlab_no_integrations()}</h3>
+      <p class="text-gray-500 mb-6">{m.gitlab_no_integrations_desc()}</p>
       <button
         on:click={() => showCreateModal = true}
         class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
       >
-        Create Your First Integration
+        {m.gitlab_add_integration()}
       </button>
     </div>
   {:else}
@@ -191,6 +192,8 @@
         <button
           on:click={() => showCreateModal = false}
           class="text-gray-400 hover:text-gray-200"
+          title={m.common_close()}
+          aria-label={m.common_close()}
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -253,7 +256,7 @@
             id="webhook_secret"
             type="password"
             bind:value={newIntegration.webhook_secret}
-            placeholder="Optional secret for webhook verification"
+            placeholder={m.placeholder_optional_secret()}
             class="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>

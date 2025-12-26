@@ -107,10 +107,9 @@ func (b *Builder) writeHeader(sb *strings.Builder, result *models.GitLabReviewRe
 }
 
 func (b *Builder) writeSummary(sb *strings.Builder, result *models.GitLabReviewResult) {
-	// Score badge
-	scoreColor := b.scoreColor(result.OverallScore)
-	sb.WriteString(fmt.Sprintf("**Overall Score:** ![%d/100](https://img.shields.io/badge/score-%d%%25--%s)\n\n", 
-		result.OverallScore, result.OverallScore, scoreColor))
+	// Score with emoji indicator
+	scoreEmoji := b.scoreEmoji(result.OverallScore)
+	sb.WriteString(fmt.Sprintf("**Overall Score:** %s **%d/100**\n\n", scoreEmoji, result.OverallScore))
 
 	// Summary text
 	if result.Summary != "" {
@@ -144,7 +143,18 @@ func (b *Builder) writeSuggestions(sb *strings.Builder, suggestions []models.Git
 
 	for _, s := range suggestions {
 		priority := b.priorityBadge(s.Priority)
-		sb.WriteString(fmt.Sprintf("#### %s %s\n\n%s\n\n", priority, s.Title, s.Description))
+		
+		// Include file path if available
+		location := ""
+		if s.FilePath != "" {
+			if s.Line > 0 {
+				location = fmt.Sprintf("`%s:%d` — ", s.FilePath, s.Line)
+			} else {
+				location = fmt.Sprintf("`%s` — ", s.FilePath)
+			}
+		}
+		
+		sb.WriteString(fmt.Sprintf("#### %s %s%s\n\n%s\n\n", priority, location, s.Title, s.Description))
 	}
 
 	if b.collapseSections {
@@ -194,12 +204,10 @@ func (b *Builder) writeFileReviews(sb *strings.Builder, fileReviews []models.Git
 
 func (b *Builder) writeStats(sb *strings.Builder, stats ReviewStats) {
 	sb.WriteString("---\n\n")
-	sb.WriteString("<sub>\n")
-	sb.WriteString(fmt.Sprintf("📊 **Stats:** %d files • %d lines changed • %d issues found\n", 
+	sb.WriteString(fmt.Sprintf("📊 *Stats:* %d files • %d lines changed • %d issues found ", 
 		stats.FilesAnalyzed, stats.LinesChanged, stats.IssuesFound))
-	sb.WriteString(fmt.Sprintf("⏱️ **Processing:** %.2fs • %d tokens • Model: %s\n", 
+	sb.WriteString(fmt.Sprintf("⏱️ *Processing:* %.2fs • %d tokens • Model: %s\n", 
 		float64(stats.ProcessingTimeMs)/1000, stats.TokensUsed, stats.Model))
-	sb.WriteString("</sub>\n")
 }
 
 func (b *Builder) writeFooter(sb *strings.Builder) {
@@ -221,22 +229,7 @@ func (b *Builder) scoreEmoji(score int) string {
 	case score >= 50:
 		return "⚠️"
 	default:
-		return "🔴"
-	}
-}
-
-func (b *Builder) scoreColor(score int) string {
-	switch {
-	case score >= 90:
-		return "brightgreen"
-	case score >= 70:
-		return "green"
-	case score >= 50:
-		return "yellow"
-	case score >= 30:
-		return "orange"
-	default:
-		return "red"
+		return "❌"
 	}
 }
 
@@ -264,13 +257,13 @@ func (b *Builder) categoryEmoji(category string) string {
 func (b *Builder) severityIcon(severity models.GitLabIssueSeverity) string {
 	switch severity {
 	case models.GitLabIssueSeverityCritical:
-		return "🔴"
+		return "🚨"
 	case models.GitLabIssueSeverityHigh:
-		return "🟠"
+		return "⚠️"
 	case models.GitLabIssueSeverityMedium:
-		return "🟡"
+		return "⚡"
 	case models.GitLabIssueSeverityLow:
-		return "🟢"
+		return "💬"
 	default:
 		return "ℹ️"
 	}

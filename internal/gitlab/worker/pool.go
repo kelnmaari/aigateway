@@ -175,6 +175,12 @@ func (p *Pool) Stats() PoolStats {
 	}
 }
 
+// GetWorkerCounts returns worker counts for UI (implements handlers.WorkerPoolStats)
+func (p *Pool) GetWorkerCounts() (total, active, idle int) {
+	stats := p.Stats()
+	return stats.TotalWorkers, stats.ActiveWorkers, stats.IdleWorkers
+}
+
 // PoolStats contains pool statistics
 type PoolStats struct {
 	TotalWorkers  int

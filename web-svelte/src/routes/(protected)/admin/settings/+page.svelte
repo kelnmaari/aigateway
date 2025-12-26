@@ -71,7 +71,7 @@
 			}, 2000);
 		} catch (error) {
 			console.error('Failed to save setting:', error);
-			alert('Failed to save setting');
+			alert(m.alert_failed_save_setting());
 		} finally {
 			savingKeys.delete(key);
 			savingKeys = new Set(savingKeys);

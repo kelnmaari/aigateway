@@ -29,13 +29,29 @@ server:
     enabled: true
     version: "legacy"  # "legacy" (HTML/JS) or "svelte" (Svelte 5)
 
-# Inference Configuration (v3.0.5+: Unified Backend)
+# Inference Configuration (v3.3.0+: Multi-provider support)
 inference:
-  backend: "yzma"  # Only yzma is supported (v3.0.6+)
-  max_loaded_models: 3    # Keep 3 models in memory (yzma only)
-  gpu_layers: -1          # GPU offloading (v3.0.6+): -1=auto (all layers to GPU), 0=CPU only, >0=specific layers count
+  backend: "yzma"  # "yzma" (legacy in-process) or "docker" (v3.3.0+ multi-provider containers)
+  max_loaded_models: 3    # Keep 3 models in memory
+  gpu_layers: -1          # GPU offloading (yzma only): -1=auto, 0=CPU only, >0=specific layers
   
-  # yzma Configuration (Primary Backend)
+  # Docker-based inference (v3.3.0+ multi-provider)
+  # Uncomment and set backend: "docker" to use
+  docker:
+    enabled: false
+    hf_cache_dir: "./data/models/hf"
+    gguf_dir: "./data/models/gguf"
+    trt_engines_dir: "./data/engines/trt"
+    max_running_models: 2
+    cache_max_bytes: 0  # 0 = unlimited
+    health_check_timeout: "60s"
+    startup_timeout: "5m"
+    docker_bin: "docker"
+    max_concurrent_downloads: 2
+    auto_resume: true
+    default_provider: "vllm"  # vllm | sglang | tgi | tensorrt-llm | llama.cpp
+  
+  # yzma Configuration (Legacy in-process llama.cpp)
   yzma:
     enabled: true
     lib_path: "C:/llama" # Path to directory containing llama.cpp DLLs
@@ -231,6 +247,16 @@ logging:
   error_log_max_backups: 10   # Keep more error log backups
   error_log_max_age: 90       # days (keep errors longer)
   error_log_compress: true
+
+  # Separate HTTP log file (detailed HTTP request logs)
+  # Allows keeping main log clean while preserving detailed HTTP debugging info
+  http_log_enabled: true
+  http_log_file_path: "logs/http.log"
+
+  # Separate metrics log file (GPU metrics, performance metrics)
+  # Prevents flooding main log with periodic debug metrics
+  metrics_log_enabled: true
+  metrics_log_file_path: "logs/metrics.log"
 
 models:
   # Модель по умолчанию для embeddings

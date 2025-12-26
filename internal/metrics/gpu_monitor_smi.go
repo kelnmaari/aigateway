@@ -15,11 +15,19 @@ import (
 
 // GPUMonitor отслеживает метрики NVIDIA GPU через nvidia-smi
 type GPUMonitor struct {
-	logger   *logrus.Logger
-	mu       sync.RWMutex
-	enabled  bool
-	interval time.Duration
-	stopChan chan struct{}
+	logger        *logrus.Logger
+	metricsLogger *logrus.Logger // Отдельный логгер для метрик (в metrics.log)
+	mu            sync.RWMutex
+	enabled       bool
+	interval      time.Duration
+	stopChan      chan struct{}
+}
+
+// SetMetricsLogger устанавливает отдельный логгер для метрик
+func (m *GPUMonitor) SetMetricsLogger(logger *logrus.Logger) {
+	if m != nil {
+		m.metricsLogger = logger
+	}
 }
 
 // GPUMetrics содержит метрики GPU
@@ -143,7 +151,13 @@ func (m *GPUMonitor) queryNvidiaSMI() (*GPUMetrics, error) {
 
 	lines := splitLines(string(output))
 
-	m.logger.WithFields(logrus.Fields{
+	// Используем metricsLogger для debug логов если настроен
+	debugLogger := m.metricsLogger
+	if debugLogger == nil {
+		debugLogger = m.logger
+	}
+
+	debugLogger.WithFields(logrus.Fields{
 		"output_length": len(output),
 		"lines_count":   len(lines),
 	}).Debug("nvidia-smi output received")
@@ -155,7 +169,7 @@ func (m *GPUMonitor) queryNvidiaSMI() (*GPUMetrics, error) {
 
 		fields := splitCSV(line)
 
-		m.logger.WithFields(logrus.Fields{
+		debugLogger.WithFields(logrus.Fields{
 			"fields_count": len(fields),
 			"raw_line":     line,
 		}).Debug("Parsing nvidia-smi line")
@@ -201,7 +215,7 @@ func (m *GPUMonitor) queryNvidiaSMI() (*GPUMetrics, error) {
 			device.MemoryUsage = (memUse / memTot) * 100
 		}
 
-		m.logger.WithFields(logrus.Fields{
+		debugLogger.WithFields(logrus.Fields{
 			"index":        device.Index,
 			"name":         device.Name,
 			"temp":         device.TemperatureC,
@@ -239,8 +253,12 @@ func (m *GPUMonitor) collectLoop() {
 				continue
 			}
 
-			// Логируем метрики
-			m.logger.WithFields(logrus.Fields{
+			// Логируем метрики в отдельный файл (если настроен) или в основной
+			logTarget := m.metricsLogger
+			if logTarget == nil {
+				logTarget = m.logger
+			}
+			logTarget.WithFields(logrus.Fields{
 				"device_count":    metrics.DeviceCount,
 				"total_memory_mb": fmt.Sprintf("%.2f", metrics.TotalMemoryMB),
 				"used_memory_mb":  fmt.Sprintf("%.2f", metrics.UsedMemoryMB),

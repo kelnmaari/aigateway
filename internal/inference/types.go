@@ -57,6 +57,8 @@ type ModelSpec struct {
 	LlamaTensorSplit string // --tensor-split, e.g. "0.5,0.5"
 	LlamaNGPULayers  int    // --n-gpu-layers
 	LlamaCtxSize     int    // --ctx-size (context window size)
+	LlamaNParallel   int    // --parallel (concurrent request slots)
+	LlamaFlashAttn   bool   // --flash-attn (enable flash attention)
 
 	// SGLang-specific
 	SGLangTensorParallel int    // --tp (tensor parallel)

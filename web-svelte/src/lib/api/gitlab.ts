@@ -72,6 +72,7 @@ export interface GitLabProjectSettings {
   skip_draft_mrs?: boolean;
   skip_bots?: boolean;
   max_review_tokens?: number; // Max tokens for LLM review response
+  per_file_review?: boolean;  // Review each file separately with tool calling
   chunk_size?: number;
   chunk_overlap?: number;
   target_branches?: string[];

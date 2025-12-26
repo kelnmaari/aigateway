@@ -282,6 +282,11 @@ func (p *Processor) analyzeWithLLM(
 	chunks []chunker.Chunk,
 	ragContext []rag.CodeChunk,
 ) (*analyzer.AnalysisResultParsed, int, error) {
+	// Check if per-file review mode is enabled
+	if project.Settings.PerFileReview {
+		return p.analyzePerFile(ctx, project, diffs)
+	}
+	
 	// Build the prompt
 	prompt := p.buildAnalysisPrompt(project, diffs, chunks, ragContext)
 	
@@ -481,6 +486,46 @@ IMPORTANT:
 `)
 	
 	return sb.String()
+}
+
+// analyzePerFile uses per-file review mode with tool calling
+func (p *Processor) analyzePerFile(
+	ctx context.Context,
+	project *models.GitLabProject,
+	diffs []client.Diff,
+) (*analyzer.AnalysisResultParsed, int, error) {
+	p.logger.WithFields(logrus.Fields{
+		"project":     project.Name,
+		"files_count": len(diffs),
+	}).Info("Using per-file review mode with tool calling")
+	
+	// Get LLM configuration
+	llmURL := p.llmBaseURL
+	if llmURL == "" {
+		llmURL = "http://localhost:8080"
+	}
+	
+	modelID := project.AnalysisModelID
+	if modelID == "" {
+		modelID = "default"
+	}
+	
+	maxTokens := project.Settings.MaxReviewTokens
+	if maxTokens <= 0 {
+		maxTokens = 4096 // Lower default for per-file mode
+	}
+	
+	// Create per-file reviewer
+	reviewer := NewPerFileReviewer(
+		p.ragService,
+		project.ID,
+		llmURL,
+		p.llmAPIKey,
+		maxTokens,
+		p.logger,
+	)
+	
+	return reviewer.ReviewFiles(ctx, project, diffs, modelID)
 }
 
 // buildReviewResult converts analysis result to review result

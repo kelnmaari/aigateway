@@ -112,6 +112,8 @@
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
 		llama_ctx_size: 0,
+		llama_n_parallel: 0,
+		llama_flash_attn: false,
 		llama_tensor_split: '',
 		sglang_tensor_parallel: 1,
 		sglang_mem_fraction: 0.9,
@@ -136,6 +138,8 @@
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
 		llama_ctx_size: 0,
+		llama_n_parallel: 0,
+		llama_flash_attn: false,
 		sglang_tensor_parallel: 0,
 		sglang_mem_fraction: 0.8,
 		tgi_num_shard: 1
@@ -628,6 +632,8 @@
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
 				llama_ctx_size: form.llama_ctx_size,
+				llama_n_parallel: form.llama_n_parallel,
+				llama_flash_attn: form.llama_flash_attn,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
 				tgi_num_shard: form.tgi_num_shard
@@ -688,6 +694,8 @@
 				llama_tensor_split: m.llama_tensor_split,
 				llama_n_gpu_layers: m.llama_n_gpu_layers,
 				llama_ctx_size: m.llama_ctx_size,
+				llama_n_parallel: m.llama_n_parallel,
+				llama_flash_attn: m.llama_flash_attn,
 				sglang_tensor_parallel: m.sglang_tensor_parallel,
 				sglang_mem_fraction: m.sglang_mem_fraction,
 				tgi_num_shard: m.tgi_num_shard,
@@ -761,6 +769,8 @@
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
 			llama_ctx_size: saved.llama_ctx_size || 0,
+			llama_n_parallel: saved.llama_n_parallel || 0,
+			llama_flash_attn: saved.llama_flash_attn || false,
 			llama_tensor_split: saved.llama_tensor_split || '',
 			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
 			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,
@@ -798,6 +808,8 @@
 				llama_main_gpu: saved.llama_main_gpu,
 				llama_n_gpu_layers: saved.llama_n_gpu_layers,
 				llama_ctx_size: saved.llama_ctx_size,
+				llama_n_parallel: saved.llama_n_parallel,
+				llama_flash_attn: saved.llama_flash_attn,
 				sglang_tensor_parallel: saved.sglang_tensor_parallel,
 				sglang_mem_fraction: saved.sglang_mem_fraction,
 				tgi_num_shard: saved.tgi_num_shard,
@@ -1178,6 +1190,16 @@
 								<span title="Context size (0 = default 2048)">ctx_size</span>
 								<input type="number" min="0" class="border rounded px-3 py-2 bg-background" bind:value={form.llama_ctx_size} placeholder="32768" />
 							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<span title="Parallel request slots (0 = auto)">n_parallel</span>
+								<input type="number" min="0" class="border rounded px-3 py-2 bg-background" bind:value={form.llama_n_parallel} placeholder="4" />
+							</label>
+							<label class="flex items-center gap-2 text-sm pt-5">
+								<input type="checkbox" class="w-4 h-4" bind:checked={form.llama_flash_attn} />
+								<span title="Enable Flash Attention for faster inference">Flash Attn</span>
+							</label>
+						</div>
+						<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
 							<label class="flex flex-col gap-1 text-sm">
 								<span>main_gpu</span>
 								<input type="number" min="0" class="border rounded px-3 py-2 bg-background" bind:value={form.llama_main_gpu} />
@@ -1951,13 +1973,29 @@
 								bind:value={editSavedForm.llama_ctx_size} />
 							<p class="text-xs text-muted-foreground mt-1">0 = default (2048)</p>
 						</div>
+						<div>
+							<label for="edit-llama-parallel" class="block text-sm font-medium mb-1">N Parallel</label>
+							<input id="edit-llama-parallel" type="number" min="0" class="w-full px-3 py-2 rounded border bg-background" 
+								placeholder="4"
+								bind:value={editSavedForm.llama_n_parallel} />
+							<p class="text-xs text-muted-foreground mt-1">Concurrent request slots (0 = auto)</p>
+						</div>
 					</div>
-					<div>
-						<label for="edit-llama-split" class="block text-sm font-medium mb-1">Tensor Split</label>
-						<input id="edit-llama-split" type="text" class="w-full px-3 py-2 rounded border bg-background" 
-							placeholder="e.g., 0.5,0.5"
-							bind:value={editSavedForm.llama_tensor_split} />
-						<p class="text-xs text-muted-foreground mt-1">Comma-separated split ratios for multi-GPU</p>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="edit-llama-flash" class="block text-sm font-medium mb-1">Flash Attention</label>
+							<label class="flex items-center gap-2">
+								<input id="edit-llama-flash" type="checkbox" class="w-4 h-4" bind:checked={editSavedForm.llama_flash_attn} />
+								<span class="text-sm text-muted-foreground">Enable for faster inference</span>
+							</label>
+						</div>
+						<div>
+							<label for="edit-llama-split" class="block text-sm font-medium mb-1">Tensor Split</label>
+							<input id="edit-llama-split" type="text" class="w-full px-3 py-2 rounded border bg-background" 
+								placeholder="e.g., 0.5,0.5"
+								bind:value={editSavedForm.llama_tensor_split} />
+							<p class="text-xs text-muted-foreground mt-1">Comma-separated split ratios for multi-GPU</p>
+						</div>
 					</div>
 				{/if}
 			</div>

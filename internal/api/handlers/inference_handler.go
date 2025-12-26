@@ -55,7 +55,9 @@ type LoadRequest struct {
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
 	LlamaTensorSplit string `json:"llama_tensor_split"`
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers"`
-	LlamaCtxSize     int    `json:"llama_ctx_size"` // Context size (default: 2048)
+	LlamaCtxSize     int    `json:"llama_ctx_size"`     // Context size (default: 2048)
+	LlamaNParallel   int    `json:"llama_n_parallel"`   // Parallel slots (concurrent requests)
+	LlamaFlashAttn   bool   `json:"llama_flash_attn"`   // Enable Flash Attention
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel"`
@@ -98,6 +100,8 @@ type ModelsResponse struct {
 	LlamaTensorSplit     string  `json:"llama_tensor_split,omitempty"`
 	LlamaNGPULayers      int     `json:"llama_n_gpu_layers,omitempty"`
 	LlamaCtxSize         int     `json:"llama_ctx_size,omitempty"`
+	LlamaNParallel       int     `json:"llama_n_parallel,omitempty"`
+	LlamaFlashAttn       bool    `json:"llama_flash_attn,omitempty"`
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64 `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
@@ -142,6 +146,8 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		LlamaTensorSplit:   req.LlamaTensorSplit,
 		LlamaNGPULayers:    req.LlamaNGPULayers,
 		LlamaCtxSize:       req.LlamaCtxSize,
+		LlamaNParallel:     req.LlamaNParallel,
+		LlamaFlashAttn:     req.LlamaFlashAttn,
 		// SGLang
 		SGLangTensorParallel: req.SGLangTensorParallel,
 		SGLangDataParallel:   req.SGLangDataParallel,
@@ -362,6 +368,8 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 			LlamaTensorSplit:     m.Spec.LlamaTensorSplit,
 			LlamaNGPULayers:      m.Spec.LlamaNGPULayers,
 			LlamaCtxSize:         m.Spec.LlamaCtxSize,
+			LlamaNParallel:       m.Spec.LlamaNParallel,
+			LlamaFlashAttn:       m.Spec.LlamaFlashAttn,
 			SGLangTensorParallel: m.Spec.SGLangTensorParallel,
 			SGLangMemFraction:    m.Spec.SGLangMemFraction,
 			TGINumShard:          m.Spec.TGINumShard,
@@ -528,6 +536,8 @@ type SavedModelResponse struct {
 	LlamaMainGPU         int                    `json:"llama_main_gpu,omitempty"`
 	LlamaNGPULayers      int                    `json:"llama_n_gpu_layers,omitempty"`
 	LlamaCtxSize         int                    `json:"llama_ctx_size,omitempty"`
+	LlamaNParallel       int                    `json:"llama_n_parallel,omitempty"`
+	LlamaFlashAttn       bool                   `json:"llama_flash_attn,omitempty"`
 	LlamaTensorSplit     string                 `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel int                    `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64                `json:"sglang_mem_fraction,omitempty"`
@@ -562,6 +572,8 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 			LlamaMainGPU:         m.LlamaMainGPU,
 			LlamaNGPULayers:      m.LlamaNGPULayers,
 			LlamaCtxSize:         m.LlamaCtxSize,
+			LlamaNParallel:       m.LlamaNParallel,
+			LlamaFlashAttn:       m.LlamaFlashAttn,
 			LlamaTensorSplit:     m.LlamaTensorSplit,
 			SGLangTensorParallel: m.SGLangTensorParallel,
 			SGLangMemFraction:    m.SGLangMemFraction,
@@ -664,6 +676,8 @@ type UpdateSavedRequest struct {
 	LlamaMainGPU         *int     `json:"llama_main_gpu,omitempty"`
 	LlamaNGPULayers      *int     `json:"llama_n_gpu_layers,omitempty"`
 	LlamaCtxSize         *int     `json:"llama_ctx_size,omitempty"`
+	LlamaNParallel       *int     `json:"llama_n_parallel,omitempty"`
+	LlamaFlashAttn       *bool    `json:"llama_flash_attn,omitempty"`
 	LlamaTensorSplit     *string  `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel *int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
@@ -709,6 +723,12 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		}
 		if req.LlamaCtxSize != nil {
 			m.LlamaCtxSize = *req.LlamaCtxSize
+		}
+		if req.LlamaNParallel != nil {
+			m.LlamaNParallel = *req.LlamaNParallel
+		}
+		if req.LlamaFlashAttn != nil {
+			m.LlamaFlashAttn = *req.LlamaFlashAttn
 		}
 		if req.LlamaTensorSplit != nil {
 			m.LlamaTensorSplit = *req.LlamaTensorSplit

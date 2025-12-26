@@ -338,6 +338,12 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	if spec.LlamaCtxSize > 0 {
 		cmd = append(cmd, "--ctx-size", fmt.Sprintf("%d", spec.LlamaCtxSize))
 	}
+	if spec.LlamaNParallel > 0 {
+		cmd = append(cmd, "--parallel", fmt.Sprintf("%d", spec.LlamaNParallel))
+	}
+	if spec.LlamaFlashAttn {
+		cmd = append(cmd, "--flash-attn")
+	}
 	if spec.LlamaMainGPU > 0 {
 		cmd = append(cmd, "--main-gpu", fmt.Sprintf("%d", spec.LlamaMainGPU))
 	}

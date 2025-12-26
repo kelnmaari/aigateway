@@ -67,6 +67,7 @@
 	let editMaxReviewTokens = $state('8192');
 	let editSkipDraftMRs = $state(true);
 	let editSkipBots = $state(true);
+	let editPerFileReview = $state(false);
 	let editCollectionName = $state('');
 	let editStatus = $state<'active' | 'disabled'>('active');
 	let isSaving = $state(false);
@@ -373,6 +374,7 @@
 		editMaxReviewTokens = String(project.settings?.max_review_tokens || 8192);
 		editSkipDraftMRs = project.settings?.skip_draft_mrs ?? true;
 		editSkipBots = project.settings?.skip_bots ?? true;
+		editPerFileReview = project.settings?.per_file_review ?? false;
 		editCollectionName = project.settings?.collection_name || '';
 		saveError = '';
 		showEditProjectModal = true;
@@ -410,6 +412,7 @@
 					max_review_tokens: parseInt(editMaxReviewTokens) || 8192,
 					skip_draft_mrs: editSkipDraftMRs,
 					skip_bots: editSkipBots,
+					per_file_review: editPerFileReview,
 					collection_name: editCollectionName || undefined
 				}
 			});
@@ -1296,7 +1299,7 @@
 							<p class="mt-1 text-xs text-muted-foreground">{m.admin_project_max_review_tokens_hint()}</p>
 						</div>
 					</div>
-					<div class="mt-3 flex gap-4">
+					<div class="mt-3 flex flex-wrap gap-4">
 						<div class="flex items-center gap-2">
 							<input
 								type="checkbox"
@@ -1314,6 +1317,17 @@
 								class="rounded border-gray-300"
 							/>
 							<label for="editSkipBots" class="text-sm">{m.admin_project_skip_bots()}</label>
+						</div>
+						<div class="flex items-center gap-2">
+							<input
+								type="checkbox"
+								id="editPerFileReview"
+								bind:checked={editPerFileReview}
+								class="rounded border-gray-300"
+							/>
+							<label for="editPerFileReview" class="text-sm" title="Review each file separately with tool calling for better context">
+								Per-file review (with tools)
+							</label>
 						</div>
 					</div>
 				</div>

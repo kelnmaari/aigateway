@@ -33,6 +33,8 @@ type SavedModel struct {
 	LlamaTensorSplit string `json:"llama_tensor_split,omitempty"`
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers,omitempty"`
 	LlamaCtxSize     int    `json:"llama_ctx_size,omitempty"`
+	LlamaNParallel   int    `json:"llama_n_parallel,omitempty"`
+	LlamaFlashAttn   bool   `json:"llama_flash_attn,omitempty"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
@@ -105,6 +107,8 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		LlamaTensorSplit:   spec.LlamaTensorSplit,
 		LlamaNGPULayers:    spec.LlamaNGPULayers,
 		LlamaCtxSize:       spec.LlamaCtxSize,
+		LlamaNParallel:     spec.LlamaNParallel,
+		LlamaFlashAttn:     spec.LlamaFlashAttn,
 		SGLangTensorParallel: spec.SGLangTensorParallel,
 		SGLangMemFraction:  spec.SGLangMemFraction,
 		TGINumShard:        spec.TGINumShard,
@@ -206,6 +210,8 @@ func (m SavedModel) ToSpec() ModelSpec {
 		LlamaTensorSplit:   m.LlamaTensorSplit,
 		LlamaNGPULayers:    m.LlamaNGPULayers,
 		LlamaCtxSize:       m.LlamaCtxSize,
+		LlamaNParallel:     m.LlamaNParallel,
+		LlamaFlashAttn:     m.LlamaFlashAttn,
 		SGLangTensorParallel: m.SGLangTensorParallel,
 		SGLangMemFraction:  m.SGLangMemFraction,
 		TGINumShard:        m.TGINumShard,

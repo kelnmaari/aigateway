@@ -865,8 +865,8 @@
 	
 	"admin_models_logs": "Logs",
 	"admin_models_logs_title": "Container Logs",
-	"admin_models_logs_autoRefresh": "Auto-refresh: 2s",
-	"admin_models_logs_autoScroll": "Auto-scroll",
+	"admin_models_logs_auto_refresh": "Auto-refresh: 2s",
+	"admin_models_logs_auto_scroll": "Auto-scroll",
 	"admin_models_logs_loading": "Loading logs...",
-	"admin_models_logs_noLogs": "No logs available"
+	"admin_models_logs_no_logs": "No logs available"
 }

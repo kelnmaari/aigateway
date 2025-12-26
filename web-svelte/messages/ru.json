@@ -865,8 +865,8 @@
 	
 	"admin_models_logs": "Логи",
 	"admin_models_logs_title": "Логи контейнера",
-	"admin_models_logs_autoRefresh": "Авто-обновление: 2с",
-	"admin_models_logs_autoScroll": "Авто-прокрутка",
+	"admin_models_logs_auto_refresh": "Авто-обновление: 2с",
+	"admin_models_logs_auto_scroll": "Авто-прокрутка",
 	"admin_models_logs_loading": "Загрузка логов...",
-	"admin_models_logs_noLogs": "Логи недоступны"
+	"admin_models_logs_no_logs": "Логи недоступны"
 }

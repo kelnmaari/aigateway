@@ -2163,12 +2163,12 @@
 					{#if logsModalLoading}
 						<Loader2 class="w-4 h-4 animate-spin text-muted-foreground" />
 					{/if}
-					<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{m.admin_models_logs_autoRefresh()}</span>
+					<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{m.admin_models_logs_auto_refresh()}</span>
 				</div>
 				<div class="flex items-center gap-3">
 					<label class="flex items-center gap-2 text-sm text-muted-foreground">
 						<input type="checkbox" class="w-4 h-4" bind:checked={logsModalAutoScroll} />
-						{m.admin_models_logs_autoScroll()}
+						{m.admin_models_logs_auto_scroll()}
 					</label>
 					<button 
 						class="px-3 py-1 text-sm rounded border hover:bg-muted"
@@ -2197,7 +2197,7 @@
 				{:else if logsModalLoading}
 					<div class="text-muted-foreground">{m.admin_models_logs_loading()}</div>
 				{:else}
-					<div class="text-muted-foreground">{m.admin_models_logs_noLogs()}</div>
+					<div class="text-muted-foreground">{m.admin_models_logs_no_logs()}</div>
 				{/if}
 			</div>
 		</div>

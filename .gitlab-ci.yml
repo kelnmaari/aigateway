@@ -311,9 +311,9 @@ publish:rpm:
       echo "╚══════════════════════════════════════════════════════════════╝"
       echo ""
       
-      # Get latest version from GitLab Package Registry
+      # Get latest version from GitLab Package Registry (exclude "latest" pseudo-version)
       echo "→ Finding latest version..."
-      LATEST_VERSION=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&order_by=created_at&sort=desc" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+      LATEST_VERSION=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&order_by=created_at&sort=desc&per_page=10" | grep -o '"version":"[^"]*"' | cut -d'"' -f4 | grep -v "^latest$" | head -1)
       
       if [ -z "$LATEST_VERSION" ]; then
           echo "Error: Could not determine latest version"
@@ -323,22 +323,37 @@ publish:rpm:
       echo "   Latest version: ${LATEST_VERSION}"
       echo ""
       
-      # Find RPM filename
+      # Find RPM filename from package files
       echo "→ Finding RPM package..."
-      RPM_URL="${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${LATEST_VERSION}"
-      RPM_NAME=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&package_version=${LATEST_VERSION}" | grep -o '"file_name":"[^"]*\.rpm"' | head -1 | cut -d'"' -f4)
+      PACKAGE_ID=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&package_version=${LATEST_VERSION}" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
       
-      if [ -z "$RPM_NAME" ]; then
-          # Fallback: construct name
-          RPM_NAME="${PACKAGE_NAME}-${LATEST_VERSION}.el9.x86_64.rpm"
+      if [ -n "$PACKAGE_ID" ]; then
+          RPM_NAME=$(curl -fsSL "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages/${PACKAGE_ID}/package_files" | grep -o '"file_name":"[^"]*\.rpm"' | head -1 | cut -d'"' -f4)
       fi
       
+      if [ -z "$RPM_NAME" ]; then
+          # Fallback: try common patterns
+          for suffix in "el9.x86_64.rpm" "x86_64.rpm"; do
+              TEST_NAME="${PACKAGE_NAME}-${LATEST_VERSION}.${suffix}"
+              if curl -fsSL --head "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${LATEST_VERSION}/${TEST_NAME}" 2>/dev/null | grep -q "200"; then
+                  RPM_NAME="$TEST_NAME"
+                  break
+              fi
+          done
+      fi
+      
+      if [ -z "$RPM_NAME" ]; then
+          echo "Error: Could not find RPM package"
+          exit 1
+      fi
+      
+      RPM_URL="${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${LATEST_VERSION}/${RPM_NAME}"
       echo "   Package: ${RPM_NAME}"
       echo ""
       
       # Download RPM
       echo "→ Downloading..."
-      curl -fsSL "${RPM_URL}/${RPM_NAME}" -o "/tmp/${RPM_NAME}"
+      curl -fsSL "${RPM_URL}" -o "/tmp/${RPM_NAME}"
       
       # Install
       echo "→ Installing..."

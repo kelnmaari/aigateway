@@ -41,7 +41,7 @@ if (-not $SkipBuild) {
     $GitCommit = git rev-parse --short HEAD 2>$null
     if (-not $GitCommit) { $GitCommit = "unknown" }
     
-    $LDFlags = "-X main.Version=$Version -X main.BuildTime=$BuildTime -X main.GitCommit=$GitCommit -s -w"
+    $LDFlags = "-X aigateway/internal/version.Version=$Version -X aigateway/internal/version.BuildDate=$BuildTime -X aigateway/internal/version.GitCommit=$GitCommit -s -w"
     
     go build -ldflags $LDFlags -o "$ProjectRoot\bin\server-linux" cmd/server/main.go
     

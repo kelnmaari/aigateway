@@ -12,7 +12,10 @@
 		Plus,
 		ArrowRight,
 		Loader2,
-		Building2
+		Building2,
+		Download,
+		X,
+		Sparkles
 	} from 'lucide-svelte';
 	import * as Card from '$lib/components/ui/card';
 
@@ -27,10 +30,59 @@
 	let availableModels = $state<Array<{ id: string; name?: string }>>([]);
 	let tenants = $state<Array<{ id: string; name: string; role: string }>>([]);
 	let loading = $state(true);
+	
+	// Version check state
+	let currentVersion = $state('');
+	let latestVersion = $state('');
+	let hasUpdate = $state(false);
+	let updateDismissed = $state(false);
+	let versionCheckError = $state('');
 
 	onMount(async () => {
 		await loadDashboardData();
+		await checkForUpdates();
 	});
+	
+	// Compare semantic versions: returns 1 if a > b, -1 if a < b, 0 if equal
+	function compareVersions(a: string, b: string): number {
+		const normalize = (v: string) => v.replace(/^v/, '').split(/[-+]/)[0]; // Remove 'v' prefix and pre-release suffix
+		const partsA = normalize(a).split('.').map(Number);
+		const partsB = normalize(b).split('.').map(Number);
+		
+		for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+			const numA = partsA[i] || 0;
+			const numB = partsB[i] || 0;
+			if (numA > numB) return 1;
+			if (numA < numB) return -1;
+		}
+		return 0;
+	}
+	
+	async function checkForUpdates() {
+		try {
+			// Get current version from system info
+			const sysInfo = await api.get<{ version: string; git_commit: string }>('/api/system/info');
+			currentVersion = sysInfo.version || 'unknown';
+			
+			// Get changelogs to find latest version
+			const changelogsRes = await api.get<{ changelogs: Array<{ version: string }> }>('/api/system/changelogs');
+			const changelogs = changelogsRes.changelogs || [];
+			
+			if (changelogs.length > 0) {
+				// Find the latest version from changelogs
+				const versions = changelogs.map(c => c.version).sort((a, b) => compareVersions(b, a));
+				latestVersion = versions[0];
+				
+				// Check if update is available
+				if (currentVersion !== 'dev' && currentVersion !== 'unknown') {
+					hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+				}
+			}
+		} catch (err) {
+			console.error('Version check failed:', err);
+			versionCheckError = 'Failed to check for updates';
+		}
+	}
 
 	async function loadDashboardData() {
 		loading = true;
@@ -109,6 +161,47 @@
 </svelte:head>
 
 <div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
+	<!-- Update Available Banner -->
+	{#if hasUpdate && !updateDismissed}
+		<div class="mb-6 relative overflow-hidden rounded-lg border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 p-4">
+			<div class="absolute inset-0 bg-grid-pattern opacity-5"></div>
+			<div class="relative flex items-center justify-between">
+				<div class="flex items-center gap-4">
+					<div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
+						<Sparkles class="h-6 w-6" />
+					</div>
+					<div>
+						<h3 class="font-semibold text-foreground flex items-center gap-2">
+							{m.dashboard_update_available()}
+							<span class="inline-flex items-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+								v{latestVersion}
+							</span>
+						</h3>
+						<p class="text-sm text-muted-foreground">
+							{m.dashboard_update_current({ version: currentVersion })}
+						</p>
+					</div>
+				</div>
+				<div class="flex items-center gap-2">
+					<a 
+						href="/admin/about" 
+						class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
+					>
+						<Download class="h-4 w-4" />
+						{m.dashboard_update_view_changelog()}
+					</a>
+					<button 
+						onclick={() => updateDismissed = true}
+						class="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
+						title={m.common_close()}
+					>
+						<X class="h-5 w-5" />
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Header -->
 	<div class="mb-8">
 		<h1 class="text-2xl font-bold text-foreground">

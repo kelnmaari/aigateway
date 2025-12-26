@@ -133,9 +133,9 @@ build:binary:
     # Build Go binary with embedded WebUI
     - |
       go build -ldflags "\
-        -X main.Version=${BUILD_VERSION} \
-        -X main.BuildTime=${BUILD_TIME} \
-        -X main.GitCommit=${GIT_COMMIT} \
+        -X aigateway/internal/version.Version=${BUILD_VERSION} \
+        -X aigateway/internal/version.BuildDate=${BUILD_TIME} \
+        -X aigateway/internal/version.GitCommit=${GIT_COMMIT} \
         -s -w" \
         -o bin/aigateway-linux-amd64 \
         cmd/server/main.go

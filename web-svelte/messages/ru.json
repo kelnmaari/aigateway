@@ -858,5 +858,12 @@
 
 	"settings_title": "Настройки",
 	"common_disable": "Отключить",
-	"common_enable": "Включить"
+	"common_enable": "Включить",
+	
+	"admin_models_logs": "Логи",
+	"admin_models_logs_title": "Логи контейнера",
+	"admin_models_logs_autoRefresh": "Авто-обновление: 2с",
+	"admin_models_logs_autoScroll": "Авто-прокрутка",
+	"admin_models_logs_loading": "Загрузка логов...",
+	"admin_models_logs_noLogs": "Логи недоступны"
 }

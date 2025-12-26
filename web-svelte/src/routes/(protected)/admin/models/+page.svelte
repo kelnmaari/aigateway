@@ -102,6 +102,86 @@
 	let selectedMetrics = $state('');
 	let selectedHealth = $state<{status: string; response_time_ms?: number; error?: string} | null>(null);
 	let logsInterval: ReturnType<typeof setInterval> | null = null;
+	
+	// Logs modal state
+	let logsModalOpen = $state(false);
+	let logsModalAlias = $state('');
+	let logsModalContent = $state('');
+	let logsModalLoading = $state(false);
+	let logsModalInterval: ReturnType<typeof setInterval> | null = null;
+	let logsModalAutoScroll = $state(true);
+	let logsContainer: HTMLDivElement | null = $state(null);
+	
+	// Colorize log lines
+	function colorizeLogs(logs: string): string {
+		if (!logs) return '';
+		
+		return logs.split('\n').map(line => {
+			let html = escapeHtml(line);
+			
+			// Timestamps: time="..." or [2025-...] or 2025-01-01T...
+			html = html.replace(/(time="[^"]*"|^\[\d{4}-[^\]]+\]|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*)/g, 
+				'<span class="text-gray-500">$1</span>');
+			
+			// Log levels with colors
+			html = html.replace(/\b(level=error|ERROR|ERRO|FATAL|CRITICAL)\b/gi, 
+				'<span class="text-red-500 font-bold">$1</span>');
+			html = html.replace(/\b(level=warn|WARNING|WARN)\b/gi, 
+				'<span class="text-yellow-500 font-bold">$1</span>');
+			html = html.replace(/\b(level=info|INFO)\b/gi, 
+				'<span class="text-blue-400">$1</span>');
+			html = html.replace(/\b(level=debug|DEBUG)\b/gi, 
+				'<span class="text-gray-400">$1</span>');
+			
+			// Success messages
+			html = html.replace(/\b(SUCCESS|OK|READY|LOADED|STARTED|COMPLETED)\b/gi, 
+				'<span class="text-green-400 font-bold">$1</span>');
+			
+			// msg="..." content
+			html = html.replace(/msg="([^"]*)"/g, 
+				'msg="<span class="text-cyan-300">$1</span>"');
+			
+			// Key=value pairs (highlight keys)
+			html = html.replace(/\b([a-z_]+)=([^\s]+)/gi, (match, key, value) => {
+				// Skip already processed level= and msg=
+				if (key === 'level' || key === 'msg' || key === 'time') return match;
+				return `<span class="text-purple-400">${key}</span>=<span class="text-orange-300">${value}</span>`;
+			});
+			
+			// Numbers
+			html = html.replace(/\b(\d+\.?\d*)(ms|s|MB|GB|KB|B|%)\b/g, 
+				'<span class="text-yellow-300">$1$2</span>');
+			
+			// File paths
+			html = html.replace(/(\/[a-zA-Z0-9_./-]+)/g, 
+				'<span class="text-teal-400">$1</span>');
+			
+			// HTTP methods
+			html = html.replace(/\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g, 
+				'<span class="text-pink-400 font-bold">$1</span>');
+			
+			// HTTP status codes
+			html = html.replace(/\b(2\d{2})\b/g, '<span class="text-green-400">$1</span>');
+			html = html.replace(/\b(4\d{2})\b/g, '<span class="text-yellow-400">$1</span>');
+			html = html.replace(/\b(5\d{2})\b/g, '<span class="text-red-400">$1</span>');
+			
+			// Quoted strings
+			html = html.replace(/"([^"]+)"/g, (match, content) => {
+				// Skip already processed
+				if (match.includes('class=')) return match;
+				return `"<span class="text-lime-300">${content}</span>"`;
+			});
+			
+			return html;
+		}).join('\n');
+	}
+	
+	function escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+	}
 
 	// Edit saved model modal state
 	let editingSavedModel = $state<SavedModel | null>(null);
@@ -164,6 +244,7 @@
 	onDestroy(() => {
 		if (logsInterval) clearInterval(logsInterval);
 		if (repoDownloadsInterval) clearInterval(repoDownloadsInterval);
+		if (logsModalInterval) clearInterval(logsModalInterval);
 	});
 	
 	// Auto-refresh downloads when tab is active
@@ -672,6 +753,50 @@
 			await loadModels();
 		} catch (e: any) {
 			showMsg(e?.message || 'Ошибка остановки', 'error');
+		}
+	}
+	
+	// Logs modal functions
+	async function openLogsModal(alias: string) {
+		logsModalAlias = alias;
+		logsModalContent = '';
+		logsModalLoading = true;
+		logsModalOpen = true;
+		
+		// Initial load
+		await fetchLogsForModal();
+		
+		// Start auto-refresh every 2 seconds
+		logsModalInterval = setInterval(fetchLogsForModal, 2000);
+	}
+	
+	async function fetchLogsForModal() {
+		try {
+			const resp = await inferenceApi.logs(logsModalAlias, 500);
+			logsModalContent = resp.logs || '';
+			
+			// Auto-scroll to bottom
+			if (logsModalAutoScroll && logsContainer) {
+				setTimeout(() => {
+					if (logsContainer) {
+						logsContainer.scrollTop = logsContainer.scrollHeight;
+					}
+				}, 50);
+			}
+		} catch (e: any) {
+			logsModalContent = `Error loading logs: ${e?.message || 'Unknown error'}`;
+		} finally {
+			logsModalLoading = false;
+		}
+	}
+	
+	function closeLogsModal() {
+		logsModalOpen = false;
+		logsModalAlias = '';
+		logsModalContent = '';
+		if (logsModalInterval) {
+			clearInterval(logsModalInterval);
+			logsModalInterval = null;
 		}
 	}
 
@@ -1325,6 +1450,7 @@
 									<div class="flex gap-1 flex-shrink-0">
 										{#if m.status === 'running' || m.status === 'starting'}
 											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); stopModel(m.alias); }}>Stop</button>
+											<button class="px-2 py-1 text-xs rounded border hover:bg-muted" onclick={(e) => { e.stopPropagation(); openLogsModal(m.alias); }} title={m.admin_models_logs_title()}>{m.admin_models_logs()}</button>
 										{:else}
 											<button class="px-2 py-1 text-xs rounded border bg-green-500/10 text-green-600 hover:bg-green-500/20" onclick={(e) => { e.stopPropagation(); startModel(m); }}>Start</button>
 										{/if}
@@ -2007,6 +2133,72 @@
 				<button class="px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90" onclick={saveEditedModel}>
 					Save Changes
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Logs Modal (70-80% of screen) -->
+{#if logsModalOpen}
+	<div 
+		class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+		onclick={closeLogsModal}
+		onkeydown={(e) => e.key === 'Escape' && closeLogsModal()}
+		tabindex="-1"
+		role="dialog"
+		aria-modal="true"
+	>
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div 
+			class="bg-card border rounded-lg shadow-2xl flex flex-col"
+			style="width: 80vw; height: 80vh; max-width: 1600px;"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			role="document"
+		>
+			<!-- Header -->
+			<div class="px-4 py-3 border-b bg-muted/50 flex items-center justify-between flex-shrink-0">
+				<div class="flex items-center gap-3">
+					<h2 class="font-semibold text-lg">{m.admin_models_logs_title()}: {logsModalAlias}</h2>
+					{#if logsModalLoading}
+						<Loader2 class="w-4 h-4 animate-spin text-muted-foreground" />
+					{/if}
+					<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{m.admin_models_logs_autoRefresh()}</span>
+				</div>
+				<div class="flex items-center gap-3">
+					<label class="flex items-center gap-2 text-sm text-muted-foreground">
+						<input type="checkbox" class="w-4 h-4" bind:checked={logsModalAutoScroll} />
+						{m.admin_models_logs_autoScroll()}
+					</label>
+					<button 
+						class="px-3 py-1 text-sm rounded border hover:bg-muted"
+						onclick={fetchLogsForModal}
+						title={m.common_refresh()}
+					>
+						{m.common_refresh()}
+					</button>
+					<button 
+						class="text-muted-foreground hover:text-foreground text-xl font-bold w-8 h-8 flex items-center justify-center rounded hover:bg-muted"
+						onclick={closeLogsModal}
+						title="Close"
+					>
+						×
+					</button>
+				</div>
+			</div>
+			
+			<!-- Logs Content -->
+			<div 
+				class="flex-1 overflow-auto p-4 bg-black/95 font-mono text-sm text-gray-300"
+				bind:this={logsContainer}
+			>
+				{#if logsModalContent}
+					<pre class="whitespace-pre-wrap break-words leading-relaxed">{@html colorizeLogs(logsModalContent)}</pre>
+				{:else if logsModalLoading}
+					<div class="text-muted-foreground">{m.admin_models_logs_loading()}</div>
+				{:else}
+					<div class="text-muted-foreground">{m.admin_models_logs_noLogs()}</div>
+				{/if}
 			</div>
 		</div>
 	</div>

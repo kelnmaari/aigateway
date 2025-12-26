@@ -858,5 +858,12 @@
 
 	"settings_title": "Settings",
 	"common_disable": "Disable",
-	"common_enable": "Enable"
+	"common_enable": "Enable",
+	
+	"admin_models_logs": "Logs",
+	"admin_models_logs_title": "Container Logs",
+	"admin_models_logs_autoRefresh": "Auto-refresh: 2s",
+	"admin_models_logs_autoScroll": "Auto-scroll",
+	"admin_models_logs_loading": "Loading logs...",
+	"admin_models_logs_noLogs": "No logs available"
 }

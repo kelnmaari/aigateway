@@ -1,34 +1,64 @@
-# 🚀 AIGateway Platform v3.1
+# 🚀 AIGateway Platform v4.0
 
-> **Enterprise AI Infrastructure with Multi-Provider Inference**  
-> OpenAI-Compatible API • Docker-Based Inference • vLLM/SGLang/TGI • RAG System • Enterprise Security
+> **Enterprise AI Infrastructure with Multi-Provider Inference & Web Search**  
+> OpenAI-Compatible API • Docker-Based Inference • vLLM/SGLang/TGI/llama.cpp • RAG System • GitLab Code Review • Tavily Web Search
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.1.0-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-4.0.2-brightgreen.svg)](VERSION)
 
 ---
 
 ## 📖 What is AIGateway?
 
-**AIGateway v3.1** is a production-ready, enterprise-grade AI infrastructure platform with **multi-provider Docker-based inference**. Provides unified **OpenAI-compatible API** for models from Hugging Face with support for vLLM, SGLang, TGI, and llama.cpp backends.
+**AIGateway v4.0** is a production-ready, enterprise-grade AI infrastructure platform with **multi-provider Docker-based inference**. Provides unified **OpenAI-compatible API** for models from Hugging Face with support for vLLM, SGLang, TGI, and llama.cpp backends.
 
-### 🎯 Why AIGateway v3.1?
+### 🎯 Why AIGateway v4.0?
 
 - **🐳 Docker-Based Inference**: vLLM, SGLang, TGI, llama.cpp — managed via Docker containers
+- **🔍 Web Search (NEW!)**: Tavily API integration for real-time internet search in ChatUI
 - **🎮 Multi-GPU Support**: Tensor parallelism, automatic GPU selection, memory recommendations
 - **🔍 HuggingFace Browser**: Search and load models directly from HF Hub with size/provider filters
 - **📦 Format Support**: HF models (BF16/FP16/INT8/INT4), GGUF quantized models
 - **🧠 RAG Built-in**: Retrieval-Augmented Generation with vector search, multimodal documents
+- **🦊 GitLab Integration**: AI-powered MR code reviews with per-file analysis
 - **🏢 Enterprise-Ready**: Multi-tenancy, RBAC, OIDC/LDAP, audit logging, quotas
 - **🌐 Modern WebUI**: ChatGPT-like interface with model management, GPU monitoring
-- **📊 Observability**: Prometheus metrics, container logs, health checks
+- **📦 RPM Packages**: One-line installation for Rocky Linux / RHEL
 
 ---
 
-## ✨ Key Features
+## ✨ What's New in v4.0
 
-### 🤖 Inference Providers (v3.1+)
+### 🔍 Web Search in ChatUI
+- **Tavily API Integration**: Real-time web search during chat
+- **Visual Tool Events**: See "Searching..." → "Searched (1237ms)" like Cursor IDE
+- **Toggle Control**: Enable/disable web search per session
+
+### 🦊 GitLab MR Reviews
+- **Per-File Analysis**: Each file reviewed separately with tool calling
+- **Code Context**: Automatic retrieval of related functions from Qdrant
+- **Multi-Language**: Review comments in Russian or English
+- **Configurable Tokens**: Set `MaxReviewTokens` per project
+
+### 🎯 Extended Model Capabilities
+- **New Capabilities**: `autocomplete`, `edit`, `apply`, `rerank`
+- **Auto-Expansion**: Select `chat` → adds `autocomplete`, `edit`, `apply`
+- **Edit Saved Models**: Modify capabilities for existing saved models
+
+### 📊 Container Logs UI
+- **Real-time Logs**: View container output in large modal (80% screen)
+- **Log Coloring**: Colorized output based on log level
+- **Auto-refresh**: Continuous updates every 2 seconds
+
+### 📦 RPM Packaging
+- **One-line Install**: `curl -fsSL .../install.sh | sudo bash`
+- **SystemD Service**: Auto-start, restart on failure
+- **YUM Repository**: GitLab Package Registry integration
+
+---
+
+## 🤖 Inference Providers
 
 | Provider | GPU | Quantization | Use Case |
 |----------|-----|--------------|----------|
@@ -36,41 +66,12 @@
 | **SGLang** | ✅ | BF16, FP16 | Research, embeddings |
 | **TGI** | ✅ | BF16, FP16, GPTQ | HuggingFace native |
 | **llama.cpp** | ✅ | GGUF (Q4-Q8) | CPU/Low VRAM inference |
+| **TEI** | ✅ | — | Text embeddings |
 
-### 🔍 HuggingFace Browser
-
-- **Search Models**: Filter by provider (vLLM, SGLang, TGI, llama.cpp, Embeddings)
-- **Size Filters**: < 3B, 3-7B, 7-14B, 14-30B, 30-70B, 70B+
-- **Memory Recommendations**: Automatic GPU utilization calculation
-- **One-Click Load**: Pre-fill form, configure, and start
-
-### 🎮 GPU Management
-
-- **Multi-GPU Selection**: Checkboxes with GPU name and memory info
-- **Auto Tensor Parallel**: Automatically set based on selected GPUs
-- **Memory Recommendations**: Calculate optimal `gpu_memory_utilization` and `max_model_len`
-- **Container Logs**: Real-time streaming to `logs/containers/{alias}.log`
-
-### 🧠 RAG System (v2.0.0)
-
-- 📄 **Multi-Format Documents** - PDF, DOCX, CSV, TXT, Images с OCR
-- 🔌 **External Data Sources** - REST APIs, PostgreSQL databases, Web scraping
-- 🔍 **Vector Search** - PgVector с HNSW indexing
-- 💬 **Chat Integration** - RAG toggle, source selector, Top-K controls
-
-### 🔐 Enterprise Security
-
-- 🔒 **JWT Authentication** - Access & Refresh tokens с rotation
-- 👥 **Multi-Tenancy** - Organizations с membership и RBAC
-- 🔑 **API Key Management** - Personal & Tenant keys с model-level permissions
-- 🛡️ **OIDC/LDAP** - Enterprise SSO (Keycloak, Active Directory)
-
-### 📊 Monitoring & Observability
-
-- 📈 **Real-time Dashboard** - Backend status, Docker images, GPU metrics
-- 🐳 **Container Management** - Start, stop, logs, health checks
-- 📉 **Prometheus Integration** - Full metrics export
-- 📋 **Provider Logs** - Detailed launch commands in `logs/providers/{alias}.log`
+### llama.cpp Parameters (v4.0+)
+- `ctx_size`: Context window size (default: model's max)
+- `n_parallel`: Concurrent request slots
+- `flash_attn`: Enable Flash Attention for faster inference
 
 ---
 
@@ -83,13 +84,15 @@
 │ ┌─────────────────────────────────────────────────────────────┐ │
 │ │ OpenAI-Compatible API Layer                                 │ │
 │ │ /v1/chat/completions, /v1/models, /v1/embeddings            │ │
+│ │ /api/chat/completions (with web search tools)               │ │
 │ └─────────────────────────────────────────────────────────────┘ │
 │                         │                                       │
 │ ┌─────────────────────────────────────────────────────────────┐ │
 │ │ Inference Router & Orchestrator                             │ │
 │ │  ├─ Model Registry (specs, status, health)                 │ │
 │ │  ├─ Container Manager (start, stop, logs)                  │ │
-│ │  └─ HuggingFace Downloader (cache management)              │ │
+│ │  ├─ HuggingFace Downloader (cache management)              │ │
+│ │  └─ Tools Registry (Tavily web search)                     │ │
 │ └─────────────────────────────────────────────────────────────┘ │
 │                         │                                       │
 │ ┌─────────────────────────────────────────────────────────────┐ │
@@ -97,14 +100,15 @@
 │ │  ├─ vLLM Container (GPU, Tensor Parallel)                  │ │
 │ │  ├─ SGLang Container (GPU, Embeddings)                     │ │
 │ │  ├─ TGI Container (GPU, Sharding)                          │ │
-│ │  └─ llama.cpp Container (GGUF, CPU/GPU)                    │ │
+│ │  ├─ llama.cpp Container (GGUF, CPU/GPU)                    │ │
+│ │  └─ TEI Container (Embeddings)                             │ │
 │ └─────────────────────────────────────────────────────────────┘ │
 │                                                                 │
 │ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ RAG System                                                  │ │
-│ │  ├─ Document Processing Pipeline                           │ │
-│ │  ├─ Vector Store (PgVector)                                │ │
-│ │  └─ Embeddings (Ollama/SGLang)                             │ │
+│ │ Integrations                                                │ │
+│ │  ├─ GitLab MR Reviews (per-file analysis)                  │ │
+│ │  ├─ RAG System (PgVector, Qdrant)                          │ │
+│ │  └─ Web Search (Tavily API)                                │ │
 │ └─────────────────────────────────────────────────────────────┘ │
 │                                                                 │
 │ ┌─────────────────────────────────────────────────────────────┐ │
@@ -127,53 +131,31 @@
 - **PostgreSQL 13+** с pgvector extension (для RAG)
 - **NVIDIA GPU** (для vLLM/SGLang/TGI)
 
-### Pre-pull Docker Images
-
-```bash
-# vLLM (recommended for production)
-docker pull vllm/vllm-openai:latest
-
-# SGLang (research, embeddings)
-docker pull lmsysorg/sglang:latest
-
-# TGI (HuggingFace native)
-docker pull ghcr.io/huggingface/text-generation-inference:latest
-
-# llama.cpp (GGUF models)
-docker pull ghcr.io/ggml-org/llama.cpp:server-cuda
-```
-
 ### Installation
 
-#### Option 1: Docker Compose (Recommended)
+#### Option 1: RPM Package (Rocky Linux / RHEL)
 
 ```bash
-git clone https://github.com/yourusername/aigateway.git
-cd aigateway
+# One-line install
+curl -fsSL https://gitlab.example.com/api/v4/projects/XXX/packages/generic/aigateway/latest/install.sh | sudo bash
 
-# Start infrastructure (PostgreSQL, Redis, etc.)
-docker compose -f infra/docker-compose.yml up -d
-
-# Build & run server
-go build -o bin/server cmd/server/main.go
-./bin/server -config configs/dev.yaml
+# Start service
+sudo systemctl start oop
+sudo systemctl enable oop
 ```
 
 #### Option 2: Build from Source
 
 ```bash
-git clone https://github.com/yourusername/aigateway.git
-cd aigateway
+git clone https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy.git
+cd ollama-openai-proxy
 
-# Install dependencies
-go mod tidy
-
-# Build
-./build.ps1 all  # Windows
-./build.sh all   # Linux/macOS
+# Build with WebUI
+./build-new.ps1 all -WebUI svelte  # Windows
+./build.sh all                      # Linux
 
 # Run
-./dist/server -config configs/production.yaml
+./bin/server -config configs/dev.yaml
 ```
 
 ### First Run
@@ -193,6 +175,7 @@ go mod tidy
 4. **Chat with model**:
    - Go to **Chat**
    - Select loaded model from dropdown
+   - Enable **Web Search** toggle for internet access
    - Start chatting!
 
 ---
@@ -222,6 +205,12 @@ inference:
 huggingface:
   token: "hf_xxx..."
 
+# Tools Configuration (v4.0+)
+tools:
+  # Tavily Web Search API key
+  # Get your key at https://tavily.com
+  tavily_api_key: "tvly-xxx..."
+
 # RAG System
 rag:
   enabled: true
@@ -229,12 +218,11 @@ rag:
     type: "pgvector"
     connection_string: "postgresql://user:pass@localhost:5432/aigateway"
 
-# OIDC (Keycloak example)
-oidc:
+# GitLab Integration
+gitlab:
   enabled: true
-  issuer_url: "http://keycloak:8180/realms/master"
-  client_id: "aigateway"
-  client_secret: "xxx"
+  default_model: "qwen-7b"
+  embedding_model: "nomic-embed-text"
 ```
 
 ### GPU Settings for Large Models
@@ -267,13 +255,15 @@ curl http://localhost:8080/v1/chat/completions \
     "stream": true
   }'
 
-# Embeddings
-curl http://localhost:8080/v1/embeddings \
-  -H "Authorization: Bearer sk-xxx" \
+# Chat with web search (v4.0+)
+curl http://localhost:8080/api/chat/completions \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mxbai-embed-large",
-    "input": "Hello world"
+    "model": "qwen-7b",
+    "messages": [{"role": "user", "content": "What is the latest news about AI?"}],
+    "use_tools": true,
+    "stream": true
   }'
 ```
 
@@ -289,7 +279,7 @@ curl -X POST http://localhost:8080/api/system/inference/load \
     "provider": "vllm",
     "format": "hf",
     "hf_repo": "Qwen/Qwen2.5-7B-Instruct",
-    "capabilities": ["chat"],
+    "capabilities": ["chat", "autocomplete", "edit", "apply"],
     "vllm_tensor_parallel": 1,
     "vllm_gpu_utilization": 0.9,
     "vllm_max_model_len": 32768
@@ -298,28 +288,57 @@ curl -X POST http://localhost:8080/api/system/inference/load \
 # List running models
 curl http://localhost:8080/api/system/inference/models
 
-# Stop model
-curl -X POST http://localhost:8080/api/system/inference/stop/qwen-7b
-
 # Get container logs
-curl http://localhost:8080/api/system/inference/logs/qwen-7b
+curl "http://localhost:8080/api/system/inference/logs?alias=qwen-7b&tail=100"
+
+# Update saved model capabilities
+curl -X POST "http://localhost:8080/api/system/inference/update-saved?alias=qwen-7b" \
+  -H "Content-Type: application/json" \
+  -d '{"capabilities": ["chat", "autocomplete", "edit", "apply"]}'
 ```
 
 ---
 
-## 🧪 Testing
+## 🔍 Web Search Integration
 
-```bash
-# Unit tests
-go test ./...
+### How It Works
 
-# With race detector
-go test -race ./...
+1. User enables "Use web search" toggle in ChatUI
+2. Request goes to `/api/chat/completions` with `use_tools: true`
+3. Model can call `web_search` tool when it needs current information
+4. Tavily API returns search results
+5. Results are injected into context, model generates final response
 
-# With coverage
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
+### Tool Events in UI
+
+During streaming, you'll see Cursor-like tool events:
+- 🔄 **Searching** "query..." (while searching)
+- ✅ **Searched** "query" (1237ms) • Found 5 results
+
+### Configuration
+
+```yaml
+tools:
+  tavily_api_key: "tvly-xxx..."  # Get at https://tavily.com
 ```
+
+---
+
+## 🦊 GitLab Integration
+
+### Features
+
+- **MR Code Review**: AI-powered analysis of merge requests
+- **Per-File Review**: Each file analyzed separately
+- **Tool Calling**: Model can search codebase for context
+- **Multi-Language**: Comments in Russian or English
+
+### Setup
+
+1. Add GitLab integration in Admin → GitLab
+2. Configure project with analysis and embedding models
+3. Index repository (creates Qdrant collection)
+4. Reviews trigger automatically on MR creation
 
 ---
 
@@ -333,19 +352,13 @@ ValueError: No available memory for the cache blocks
 ```
 Solution: Reduce `gpu_memory_utilization` or `max_model_len`
 
-**2. NCCL Error (Multi-GPU)**
+**2. Web Search Not Working**
 ```
-NCCL error: unhandled system error
+web search not configured
 ```
-Solution: Ensure Docker uses `--ipc=host`, `--shm-size=16g`
+Solution: Add `tavily_api_key` to `tools` section in config
 
-**3. Model not found in chat**
-```
-model does not exist
-```
-Solution: Check that model alias matches, or use full HFRepo name
-
-**4. Context canceled during load**
+**3. Context Canceled During Load**
 ```
 context canceled
 ```
@@ -371,12 +384,12 @@ tail -f logs/proxy-dev.log
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! 
 
 ```bash
 # Development setup
-git clone https://github.com/yourusername/aigateway.git
-cd aigateway
+git clone https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy.git
+cd ollama-openai-proxy
 go mod tidy
 go run cmd/server/main.go -config configs/dev.yaml
 ```
@@ -395,6 +408,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [SGLang](https://github.com/sgl-project/sglang) - Research inference
 - [TGI](https://github.com/huggingface/text-generation-inference) - HuggingFace inference
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - GGUF inference
+- [Tavily](https://tavily.com/) - Web search API
 - [Gin](https://gin-gonic.com/) - HTTP framework
 - [pgvector](https://github.com/pgvector/pgvector) - Vector similarity search
 

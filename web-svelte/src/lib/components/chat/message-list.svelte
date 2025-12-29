@@ -1,17 +1,38 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { User, Bot, Copy, Check, Brain, ChevronDown, ChevronRight } from 'lucide-svelte';
+	import { User, Bot, Copy, Check, Brain, ChevronDown, ChevronRight, Search, Globe, Loader2 } from 'lucide-svelte';
 	import { cn, copyToClipboard as copyText } from '$lib/utils';
-	import type { Message } from '$lib/stores/chat.svelte';
+	import type { Message, ToolEvent } from '$lib/stores/chat.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
 		messages: Message[];
 		streamingContent?: string;
 		isStreaming?: boolean;
+		toolEvents?: ToolEvent[];
 	}
 
-	let { messages, streamingContent = '', isStreaming = false }: Props = $props();
+	let { messages, streamingContent = '', isStreaming = false, toolEvents = [] }: Props = $props();
+	
+	// Get icon for tool type
+	function getToolIcon(tool: string) {
+		switch (tool) {
+			case 'web_search':
+				return Search;
+			default:
+				return Globe;
+		}
+	}
+	
+	// Get label for tool type
+	function getToolLabel(tool: string) {
+		switch (tool) {
+			case 'web_search':
+				return m.chat_tool_searching();
+			default:
+				return tool;
+		}
+	}
 
 	let container: HTMLDivElement;
 	let copiedId: string | null = $state(null);
@@ -228,6 +249,39 @@
 				</div>
 			</div>
 		{/each}
+
+		<!-- Tool Events (like Cursor's "Searched for X") -->
+		{#if toolEvents.length > 0}
+			<div class="flex gap-4">
+				<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-500">
+					<Globe class="h-4 w-4" />
+				</div>
+				<div class="flex-1 space-y-2">
+					{#each toolEvents as event}
+						{@const ToolIcon = getToolIcon(event.tool)}
+						<div class="flex items-center gap-2 text-sm">
+							{#if event.type === 'tool_start'}
+								<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+								<span class="text-muted-foreground">{getToolLabel(event.tool)}</span>
+								<span class="font-medium text-foreground">"{event.query}"</span>
+							{:else if event.type === 'tool_end'}
+								<ToolIcon class="h-4 w-4 text-green-500" />
+								<span class="text-muted-foreground">{m.chat_tool_searched()}</span>
+								<span class="font-medium text-foreground">"{event.query}"</span>
+								{#if event.elapsed}
+									<span class="text-xs text-muted-foreground">({event.elapsed}ms)</span>
+								{/if}
+								{#if event.result}
+									<span class="text-xs text-green-600 dark:text-green-400">• {event.result}</span>
+								{/if}
+							{:else if event.type === 'error'}
+								<span class="text-red-500">{event.query}</span>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
 		<!-- Streaming Message -->
 		{#if isStreaming && streamingContent}

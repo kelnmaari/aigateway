@@ -490,6 +490,10 @@ type ToolsConfig struct {
 	// Пример: "llama3.1:latest" - модель с хорошей поддержкой function calling
 	FallbackModel string `mapstructure:"fallback_model"`
 
+	// TavilyAPIKey API key for Tavily web search integration
+	// Get your key at https://tavily.com
+	TavilyAPIKey string `mapstructure:"tavily_api_key"`
+
 	// Optimizer конфигурация оптимизации промптов для локальных моделей
 	Optimizer OptimizerConfig `mapstructure:"optimizer"`
 }

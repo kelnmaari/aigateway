@@ -135,6 +135,7 @@
 
 		// Start streaming response
 		chatStore.setStreaming(true);
+		chatStore.clearToolEvents(); // Clear previous tool events
 		abortController = new AbortController();
 
 		try {
@@ -145,19 +146,43 @@
 
 			let fullResponse = '';
 
-			for await (const chunk of chatApi.streamChatCompletion(
-				{
-					model: chatStore.selectedModel,
-					messages,
-					temperature: chatStore.params.temperature,
-					top_p: chatStore.params.top_p,
-					max_tokens: chatStore.params.max_tokens,
-					num_ctx: chatStore.params.num_ctx
-				},
-				abortController.signal
-			)) {
-				fullResponse += chunk;
-				chatStore.setStreamingContent(fullResponse);
+			// Use tools-enabled API if use_tools is enabled
+			if (chatStore.params.use_tools) {
+				for await (const event of chatApi.streamChatWithTools(
+					{
+						model: chatStore.selectedModel,
+						messages,
+						temperature: chatStore.params.temperature,
+						top_p: chatStore.params.top_p,
+						max_tokens: chatStore.params.max_tokens,
+						num_ctx: chatStore.params.num_ctx,
+						use_tools: true
+					},
+					abortController.signal
+				)) {
+					if (event.type === 'content') {
+						fullResponse += event.content;
+						chatStore.setStreamingContent(fullResponse);
+					} else if (event.type === 'tool') {
+						chatStore.addToolEvent(event.event);
+					}
+				}
+			} else {
+				// Standard streaming without tools
+				for await (const chunk of chatApi.streamChatCompletion(
+					{
+						model: chatStore.selectedModel,
+						messages,
+						temperature: chatStore.params.temperature,
+						top_p: chatStore.params.top_p,
+						max_tokens: chatStore.params.max_tokens,
+						num_ctx: chatStore.params.num_ctx
+					},
+					abortController.signal
+				)) {
+					fullResponse += chunk;
+					chatStore.setStreamingContent(fullResponse);
+				}
 			}
 
 			// Add assistant message
@@ -270,6 +295,7 @@
 				messages={chatStore.messages}
 				streamingContent={chatStore.streamingContent}
 				isStreaming={chatStore.isStreaming}
+				toolEvents={chatStore.toolEvents}
 			/>
 		{:else}
 			<!-- Welcome Screen -->

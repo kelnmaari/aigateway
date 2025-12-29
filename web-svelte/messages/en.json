@@ -571,6 +571,11 @@
 	"chat_thinking": "Thinking",
 	"chat_thinking_progress": "Thinking...",
 	"chat_thought_complete": "Thought complete",
+	"chat_tool_searching": "Searching",
+	"chat_tool_searched": "Searched",
+	"chat_tool_web_search": "Web Search",
+	"chat_use_tools": "Use web search",
+	"chat_use_tools_hint": "Enable AI to search the web for current information",
 
 	"admin_gitlab_title": "GitLab Integrations",
 	"admin_gitlab_subtitle": "Manage GitLab connections for AI-powered MR reviews",

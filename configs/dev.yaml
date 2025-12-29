@@ -341,6 +341,11 @@ tools:
   # Оставьте пустым "" чтобы отключить автопереключение
   fallback_model: ""  # ⬅️ Уже с 32k контекстом, reasoning помогает с tools
   
+  # 🔍 TAVILY WEB SEARCH API
+  # Enables web search capability for ChatUI
+  # Get your API key at https://tavily.com
+  tavily_api_key: "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"
+  
     # 🎯 SMART PROMPT OPTIMIZER - адаптация сложных промптов для локальных моделей
   optimizer:
     # Включить оптимизацию промптов (рекомендуется для IDE с большими system messages)

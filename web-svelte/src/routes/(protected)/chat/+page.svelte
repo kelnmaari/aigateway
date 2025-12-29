@@ -218,6 +218,7 @@
 			}
 		} finally {
 			chatStore.setStreaming(false);
+			chatStore.clearToolEvents(); // Clear tool events after response complete
 			abortController = null;
 		}
 	}

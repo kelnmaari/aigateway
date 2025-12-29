@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Settings, ChevronDown, Sparkles, Scale, Target, Code } from 'lucide-svelte';
+	import { Settings, ChevronDown, Sparkles, Scale, Target, Code, Search } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import type { ChatParams } from '$lib/stores/chat.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -159,6 +159,23 @@
 						class="w-full"
 					/>
 				</div>
+			</div>
+			
+			<!-- Web Search Toggle -->
+			<div class="mt-4 border-t border-border pt-4">
+				<label class="flex items-center gap-3 cursor-pointer">
+					<input
+						type="checkbox"
+						checked={params.use_tools ?? true}
+						onchange={(e) => onParamsChange({ use_tools: e.currentTarget.checked })}
+						class="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+					/>
+					<Search class="h-4 w-4 text-blue-500" />
+					<div class="flex-1">
+						<span class="text-sm font-medium">{m.chat_use_tools()}</span>
+						<p class="text-xs text-muted-foreground">{m.chat_use_tools_hint()}</p>
+					</div>
+				</label>
 			</div>
 
 			<!-- Mobile Presets -->

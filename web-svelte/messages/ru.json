@@ -571,6 +571,11 @@
 	"chat_thinking": "Размышляю",
 	"chat_thinking_progress": "Размышляю...",
 	"chat_thought_complete": "Обдумал",
+	"chat_tool_searching": "Ищу",
+	"chat_tool_searched": "Нашёл",
+	"chat_tool_web_search": "Поиск в интернете",
+	"chat_use_tools": "Использовать поиск",
+	"chat_use_tools_hint": "Разрешить AI искать актуальную информацию в интернете",
 
 	"admin_gitlab_title": "GitLab Интеграции",
 	"admin_gitlab_subtitle": "Управление подключениями GitLab для AI код-ревью",

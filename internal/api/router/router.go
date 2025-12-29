@@ -62,6 +62,7 @@ import (
 	"aigateway/internal/services/rbac"
 	"aigateway/internal/settings"
 	"aigateway/internal/storage"
+	"aigateway/internal/tools"
 	"aigateway/internal/web"
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
@@ -221,6 +222,7 @@ type Router struct {
 	inferenceRouter       *inference.Router
 	inferenceHandler      *handlers.InferenceHandler
 	inferenceProxyHandler *handlers.InferenceProxyHandler
+	chatToolsHandler      *handlers.ChatToolsHandler // Chat with tools support (v4.0.3+)
 	inferenceModelStore   *inference.ModelStore
 
 	// yzma Local Inference (Version 3.0.0+: YZMA-01)
@@ -741,6 +743,18 @@ func (r *Router) setupInferenceProxyRoutes() {
 		v1inf.GET("/models", r.inferenceProxyHandler.HandleModels)
 	}
 	r.logger.Info("Inference v4 OpenAI proxy routes configured: /v1/inference/*")
+	
+	// /api/chat/completions - Chat with tools support (web search etc.)
+	if r.chatToolsHandler != nil {
+		apiChat := r.engine.Group("/api/chat")
+		if r.jwtManager != nil && r.db != nil {
+			apiChat.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		}
+		{
+			apiChat.POST("/completions", r.chatToolsHandler.HandleChatWithTools)
+		}
+		r.logger.Info("Chat with tools route configured: /api/chat/completions")
+	}
 }
 
 // setupHealthRoutes настраивает health check endpoint для desktop client
@@ -2746,6 +2760,18 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		r.inferenceRouter = inference.NewRouter(r.inferenceMgr)
 		r.inferenceHandler = handlers.NewInferenceHandler(r.inferenceRouter, logger)
 		r.inferenceProxyHandler = handlers.NewInferenceProxyHandler(r.inferenceRouter, logger)
+		
+		// Initialize chat tools handler with Tavily web search (v4.0.3+)
+		if cfg.Tools.TavilyAPIKey != "" {
+			toolsReg := tools.NewRegistry(cfg.Tools.TavilyAPIKey)
+			r.chatToolsHandler = handlers.NewChatToolsHandler(r.inferenceRouter, toolsReg, logger)
+			logger.Info("Chat tools handler initialized with Tavily web search")
+		} else {
+			// No Tavily key - handler without tools
+			r.chatToolsHandler = handlers.NewChatToolsHandler(r.inferenceRouter, nil, logger)
+			logger.Info("Chat tools handler initialized (no Tavily key configured)")
+		}
+		
 		// Initialize model store for persistence (store in data/ directory)
 		modelStore, storeErr := inference.NewModelStore("./data", logger)
 		if storeErr != nil {

@@ -26,13 +26,25 @@ export interface ChatParams {
 	top_p: number;
 	max_tokens: number;
 	num_ctx: number;
+	use_tools: boolean; // Enable web search and other tools
+}
+
+// Tool event for displaying tool usage in UI (like Cursor's "Searched", "Read", etc.)
+export interface ToolEvent {
+	type: 'tool_start' | 'tool_end' | 'thinking' | 'error';
+	tool: string;
+	query: string;
+	result?: string;
+	elapsed?: number;
+	timestamp?: number;
 }
 
 const DEFAULT_PARAMS: ChatParams = {
 	temperature: 0.7,
 	top_p: 0.9,
 	max_tokens: 4096,
-	num_ctx: 8192
+	num_ctx: 8192,
+	use_tools: true // Enabled by default
 };
 
 class ChatStore {
@@ -46,6 +58,9 @@ class ChatStore {
 	isStreaming = $state(false);
 	streamingContent = $state('');
 	isLoading = $state(false);
+	
+	// Tool events (for displaying tool usage like Cursor)
+	toolEvents = $state<ToolEvent[]>([]);
 
 	// Derived
 	currentConversation = $derived(
@@ -56,10 +71,10 @@ class ChatStore {
 
 	// Presets
 	readonly presets = {
-		creative: { temperature: 0.9, top_p: 0.95, max_tokens: 4096, num_ctx: 8192 },
-		balanced: { temperature: 0.7, top_p: 0.9, max_tokens: 4096, num_ctx: 8192 },
-		precise: { temperature: 0.3, top_p: 0.8, max_tokens: 4096, num_ctx: 8192 },
-		coding: { temperature: 0.2, top_p: 0.85, max_tokens: 8192, num_ctx: 16384 }
+		creative: { temperature: 0.9, top_p: 0.95, max_tokens: 4096, num_ctx: 8192, use_tools: true },
+		balanced: { temperature: 0.7, top_p: 0.9, max_tokens: 4096, num_ctx: 8192, use_tools: true },
+		precise: { temperature: 0.3, top_p: 0.8, max_tokens: 4096, num_ctx: 8192, use_tools: true },
+		coding: { temperature: 0.2, top_p: 0.85, max_tokens: 8192, num_ctx: 16384, use_tools: true }
 	} as const;
 
 	// Actions
@@ -120,6 +135,19 @@ class ChatStore {
 
 	setStreamingContent(content: string) {
 		this.streamingContent = content;
+	}
+	
+	// Tool events management
+	addToolEvent(event: ToolEvent) {
+		this.toolEvents = [...this.toolEvents, { ...event, timestamp: Date.now() }];
+	}
+	
+	clearToolEvents() {
+		this.toolEvents = [];
+	}
+	
+	setUseTools(enabled: boolean) {
+		this.params = { ...this.params, use_tools: enabled };
 	}
 
 	appendStreamingContent(chunk: string) {

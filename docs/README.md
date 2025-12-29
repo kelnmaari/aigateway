@@ -1,4 +1,4 @@
-# 📚 Documentation Index - AIGateway Platform v1.9.3
+# 📚 Documentation Index — AIGateway Platform v4.0
 
 Полная документация проекта
 
@@ -6,307 +6,97 @@
 
 ## 🚀 Getting Started
 
-### For New Users
-
-1. **[Quick Start Guide](QUICK_START.md)** ⭐
-   - Установка за 5 минут
-   - Первый запуск
-   - Bootstrap admin user
-   - Первый chat
-   - Создание API key
-
-### For Administrators
-
-2. **[WebUI Guide](WEBUI_GUIDE.md)**
-   - Полный мануал по WebUI
-   - Chat interface
-   - Multi-tenancy & Teams
-   - Admin panel
-   - Performance monitoring
-
-3. **[Configuration Guide](CONFIGURATION.md)**
-   - Все параметры конфигурации
-   - SQLite vs PostgreSQL
-   - Production setup
-   - Docker deployment
-   - Environment variables
+| Документ | Описание |
+|----------|----------|
+| **[Quick Start](QUICK_START.md)** | Установка, первый запуск, базовая настройка |
+| **[Configuration](CONFIGURATION.md)** | Все параметры конфигурации |
+| **[WebUI Guide](WEBUI_GUIDE.md)** | Работа с веб-интерфейсом |
 
 ---
 
-## 📖 Reference Documentation
+## 🤖 Inference & Models
 
-### API & Integration
-
-4. **[API Documentation](API_DOCUMENTATION.md)**
-   - OpenAI-compatible endpoints
-   - REST API reference
-   - Authentication
-   - Request/Response examples
-   - Error codes
-
-5. **[Authentication API](AUTH_API.md)**
-   - JWT authentication
-   - User management
-   - Tenant management
-   - API keys
-   - RBAC
-
-### Architecture & Design
-
-6. **[Architecture](ARCHITECTURE.md)**
-   - System overview
-   - Component design
-   - Data flow
-   - Technology stack
-   - Design patterns
-
-7. **[Performance Guide](PERFORMANCE.md)**
-   - Performance tuning
-   - GPU optimization
-   - Connection pooling
-   - Monitoring & metrics
-   - Benchmarks
+| Документ | Описание |
+|----------|----------|
+| **[Inference HowTo](INFERENCE_HOWTO.md)** | Загрузка и запуск моделей (vLLM, SGLang, TGI, llama.cpp) |
+| **[Inference Troubleshooting](INFERENCE_TROUBLESHOOTING.md)** | Решение проблем с моделями |
+| **[vLLM Installation](VLLM_INSTALLATION.md)** | Установка и настройка vLLM |
+| **[Embeddings Configuration](EMBEDDINGS_CONFIGURATION.md)** | Настройка embedding-моделей |
 
 ---
 
-## 🔧 Troubleshooting & Maintenance
+## 🦊 GitLab Integration
 
-8. **[Troubleshooting Guide](TROUBLESHOOTING.md)** ⭐
-   - Common issues & solutions
-   - Server problems
-   - Database issues
-   - Authentication errors
-   - Build & deployment
-
----
-
-## 🤖 AI Code Review Integration
-
-9. **[AI Review Setup](AI_REVIEW_SETUP.md)**
-   - GitLab CI/CD интеграция
-   - AI code review через AIGateway Platform
-   - Настройка и конфигурация
-   - Режимы работы (inline, summary, context)
-   - Troubleshooting
-
-10. **[AI Review Quick Start](AI_REVIEW_QUICKSTART.md)** ⭐
-    - 3 шага до первого AI review
-    - Быстрая настройка
-    - Базовые команды
-
-11. **[AI Review Go Prompts](AI_REVIEW_GO_PROMPTS.md)**
-    - Кастомные промпты для Go кода
-    - Security & Performance фокус
-    - Concurrency & Error handling
-    - Обучающие промпты
-
-12. **[AI Review Dynamic Config](AI_REVIEW_DYNAMIC_CONFIG.md)** ⭐
-    - Автогенерация .ai-review.yaml в CI
-    - Динамические параметры для разных MR
-    - Примеры для разных сценариев
-    - Best practices и troubleshooting
-
-13. **[BUGFIX: Streaming omitempty](BUGFIX_STREAMING_OMITEMPTY.md)** 🔴 CRITICAL
-    - Исправление critical бага с partial responses
-    - Проблема: omitempty на Stream field
-    - Симптомы: One-word responses from LLM
-    - Решение: Removed omitempty tag
+| Документ | Описание |
+|----------|----------|
+| **[GitLab README](gitlab-readme.md)** | Обзор интеграции с GitLab |
+| **[GitLab API](gitlab-api.md)** | API endpoints для GitLab |
+| **[GitLab Webhook Setup](gitlab-webhook-setup.md)** | Настройка вебхуков |
+| **[AI Review Setup](AI_REVIEW_SETUP.md)** | Настройка AI code review |
+| **[AI Review QuickStart](AI_REVIEW_QUICKSTART.md)** | Быстрый старт AI review |
+| **[AI Review Prompts](AI_REVIEW_GO_PROMPTS.md)** | Кастомные промпты для Go |
+| **[AI Review Dynamic Config](AI_REVIEW_DYNAMIC_CONFIG.md)** | Динамическая конфигурация |
 
 ---
 
-## 📊 Feature Documentation
+## 🧠 RAG System
 
-### Version 1.9.3 (Current)
-
-**Key Features:**
-
-- ✅ ChatGPT-like WebUI
-- ✅ Multi-Tenancy with RBAC
-- ✅ Dynamic Model Parameters
-- ✅ Context Tracking & Auto-Summarization
-- ✅ MoniGo Performance Dashboard
-- ✅ NVIDIA GPU Monitoring (Linux/macOS)
-- ✅ OpenTelemetry Distributed Tracing
-
-**Documentation:**
-
-- [WebUI Guide](WEBUI_GUIDE.md) - Sections: Chat, Parameters, Context
-- [Configuration](CONFIGURATION.md) - Sections: Performance, GPU Monitoring
-- [Quick Start](QUICK_START.md) - Section: First Chat
-
-### Upcoming Features
-
-**v1.10.0 - Smart Chat & Content**
-
-- Vision OCR (Multimodal Chat)
-- Web Content Fetcher
-- File Upload (PDF, DOCX, TXT)
-- Conversation Export/Import
-- WebSocket Real-time Updates
-
-See [Roadmap.MD](../Roadmap.MD) for full plan.
+| Документ | Описание |
+|----------|----------|
+| **[RAG Config Guide](RAG_CONFIG_GUIDE.md)** | Конфигурация RAG системы |
+| **[RAG Deployment Guide](RAG_DEPLOYMENT_GUIDE.md)** | Развёртывание RAG |
+| **[RAG Worker Guide](RAG_WORKER_GUIDE.md)** | Worker для обработки документов |
+| **[PDF Extraction](PDF_EXTRACTION.md)** | Извлечение текста из PDF |
 
 ---
 
-## 🎯 Quick Reference
+## 🔐 Security & Auth
 
-### Common Tasks
-
-| Task | Documentation | Section |
-|------|---------------|---------|
-| Install & Run | [Quick Start](QUICK_START.md) | Installation |
-| Create User | [Quick Start](QUICK_START.md) | Bootstrap Admin |
-| Start Chatting | [WebUI Guide](WEBUI_GUIDE.md) | Chat Interface |
-| Create API Key | [WebUI Guide](WEBUI_GUIDE.md) | API Keys |
-| Add Team Member | [WebUI Guide](WEBUI_GUIDE.md) | Tenants & Teams |
-| Configure Server | [Configuration](CONFIGURATION.md) | Server Settings |
-| Setup Production | [Configuration](CONFIGURATION.md) | Production Config |
-| Monitor Performance | [WebUI Guide](WEBUI_GUIDE.md) | Admin Panel |
-| Fix Issues | [Troubleshooting](TROUBLESHOOTING.md) | All Sections |
-| Setup AI Review | [AI Review Quick Start](AI_REVIEW_QUICKSTART.md) | Quick Start |
-| Configure AI Review | [AI Review Setup](AI_REVIEW_SETUP.md) | Configuration |
-
-### API Quick Links
-
-| Endpoint | Documentation |
-|----------|---------------|
-| `POST /v1/chat/completions` | [API Docs](API_DOCUMENTATION.md#post-v1chatcompletions) |
-| `GET /v1/models` | [API Docs](API_DOCUMENTATION.md#get-v1models) |
-| `POST /api/auth/register` | [Auth API](AUTH_API.md#post-apiauthregister) |
-| `POST /api/auth/login` | [Auth API](AUTH_API.md#post-apiauthlogin) |
-| `GET /api/gpu/metrics` | [WebUI Guide](WEBUI_GUIDE.md#gpu-monitoring) |
+| Документ | Описание |
+|----------|----------|
+| **[Auth API](AUTH_API.md)** | Аутентификация, JWT, API ключи |
+| **[JWT Sessions](JWT_SESSIONS.md)** | Работа с JWT сессиями |
 
 ---
 
-## 📝 Documentation Standards
+## 📊 Monitoring & Operations
 
-### File Naming
-
-- `*.md` - Markdown format
-- UPPERCASE for main docs (e.g., `README.md`)
-- lowercase_snake_case для technical docs
-
-### Structure
-
-All documentation follows this structure:
-
-```markdown
-# 📄 Title - Version
-
-Brief description
+| Документ | Описание |
+|----------|----------|
+| **[Prometheus Setup](PROMETHEUS_SETUP.md)** | Настройка мониторинга |
+| **[Performance](PERFORMANCE.md)** | Оптимизация производительности |
+| **[Cache Optimization](CACHE_OPTIMIZATION.md)** | Оптимизация кэширования |
+| **[Troubleshooting](TROUBLESHOOTING.md)** | Общее решение проблем |
+| **[grafana-dashboard.json](grafana-dashboard.json)** | Готовый дашборд Grafana |
 
 ---
 
-## 📋 Table of Contents
+## 🚀 Deployment
+
+| Документ | Описание |
+|----------|----------|
+| **[K8S Helm Deployment](K8S_HELM_DEPLOYMENT.md)** | Развёртывание в Kubernetes |
+| **[YZMA GPU Setup (Rocky 9)](YZMA_GPU_SETUP_ROCKY9.md)** | Настройка GPU на Rocky Linux |
+| **[YZMA Integration](YZMA_INTEGRATION.md)** | Интеграция с YZMA |
 
 ---
 
-## Sections...
+## 📖 Reference
+
+| Документ | Описание |
+|----------|----------|
+| **[API Documentation](API_DOCUMENTATION.md)** | Полный справочник API |
+| **[Architecture](ARCHITECTURE.md)** | Архитектура системы |
 
 ---
 
-## Related Documentation
+## 🔗 Links
+
+- **Repository:** https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy
+- **Changelog:** [../CHANGELOG.md](../CHANGELOG.md)
+- **Main README:** [../README.md](../README.md)
 
 ---
 
-**Version:** X.Y.Z
-**Last Updated:** YYYY-MM-DD
-```
-
-### Update Policy
-
-- ✅ Update docs при каждом major/minor release
-- ✅ Version badge в header каждого файла
-- ✅ Last Updated date в footer
-- ✅ Cross-references между документами
-- ✅ Code examples актуальны и протестированы
-
----
-
-## 🔗 External Resources
-
-### Official Links
-
-- **GitHub Repository:** <https://github.com/yourusername/aigateway>
-- **Issue Tracker:** <https://github.com/yourusername/aigateway/issues>
-- **Discussions:** <https://github.com/yourusername/aigateway/discussions>
-
-### Related Projects
-
-- **Ollama:** <https://ollama.ai/> - Local LLM platform
-- **OpenAI API:** <https://platform.openai.com/docs> - API standard
-- **MoniGo:** <https://github.com/iyashjayesh/monigo> - Performance monitoring
-
-### Community
-
-- **Discord:** (coming soon)
-- **Reddit:** (coming soon)
-- **Stack Overflow:** Tag `aigateway`
-
----
-
-## 📞 Support
-
-### Getting Help
-
-1. **Check Documentation** - Start here! 📚
-2. **Search Issues** - Maybe already answered
-3. **Ask in Discussions** - Community support
-4. **Open Issue** - For bugs/features
-
-### Reporting Bugs
-
-When reporting issues, include:
-
-- Version: `cat VERSION`
-- OS: `uname -a` or `ver`
-- Config snippet (без секретов!)
-- Error logs
-- Steps to reproduce
-
-### Feature Requests
-
-Use GitHub Discussions:
-
-- Describe use case
-- Explain benefits
-- Suggest implementation (optional)
-
----
-
-## 🤝 Contributing
-
-Want to improve documentation?
-
-1. Fork repository
-2. Edit `docs/*.md`
-3. Follow [Documentation Standards](#documentation-standards)
-4. Submit Pull Request
-
-**Documentation PRs welcome!** 📝
-
----
-
-## 📜 License
-
-Documentation is part of AIGateway Platform project:
-
-- **License:** MIT
-- **See:** [LICENSE](../LICENSE)
-
----
-
-**Documentation Version:** 1.9.3  
-**Last Updated:** 2025-10-14  
-**Maintained by:** AIGateway Platform Team
-
----
-
-<div align="center">
-
-**[⬆ Back to Top](#-documentation-index---aigateway-v193)**
-
-Made with ❤️ for the Open Source Community
-
-</div>
-
+**Version:** 4.0.2  
+**Last Updated:** 2025-12-29

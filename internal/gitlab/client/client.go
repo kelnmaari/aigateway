@@ -519,3 +519,46 @@ func (c *Client) CreateProjectWebhook(ctx context.Context, projectID int64, webh
 	return c.CreateWebhook(ctx, projectID, req)
 }
 
+// Issue represents a GitLab issue
+type Issue struct {
+	ID          int64    `json:"id"`
+	IID         int      `json:"iid"`
+	ProjectID   int64    `json:"project_id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	State       string   `json:"state"`
+	Labels      []string `json:"labels"`
+	WebURL      string   `json:"web_url"`
+	CreatedAt   string   `json:"created_at"`
+}
+
+// CreateIssueRequest contains the data for creating an issue
+type CreateIssueRequest struct {
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
+	Assignees   []int64  `json:"assignee_ids,omitempty"`
+}
+
+// CreateIssue creates a new issue in a GitLab project
+func (c *Client) CreateIssue(ctx context.Context, projectID int64, req *CreateIssueRequest) (*Issue, error) {
+	path := fmt.Sprintf("/projects/%d/issues", projectID)
+
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, path, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, err
+	}
+
+	var issue Issue
+	if err := c.parseResponse(resp, &issue); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	return &issue, nil
+}
+

@@ -143,6 +143,45 @@ type Dashboard struct {
 	IssuesByCategory  []CategoryStats       `json:"issues_by_category"`
 	IssuesBySeverity  []SeverityStats       `json:"issues_by_severity"`
 	RecentActivity    []ActivityItem        `json:"recent_activity"`
+	DependencyHealth  *DependencyHealthStats `json:"dependency_health,omitempty"`
+	SecurityScore     *SecurityScoreStats   `json:"security_score,omitempty"`
+	TeamProductivity  *TeamProductivityStats `json:"team_productivity,omitempty"`
+}
+
+// DependencyHealthStats contains dependency health metrics
+type DependencyHealthStats struct {
+	TotalDependencies    int     `json:"total_dependencies"`
+	OutdatedCount        int     `json:"outdated_count"`
+	OutdatedPercentage   float64 `json:"outdated_percentage"`
+	VulnerableCount      int     `json:"vulnerable_count"`
+	CriticalVulns        int     `json:"critical_vulns"`
+	HighVulns            int     `json:"high_vulns"`
+	MediumVulns          int     `json:"medium_vulns"`
+	LastScanAt           *time.Time `json:"last_scan_at,omitempty"`
+}
+
+// SecurityScoreStats contains security score metrics
+type SecurityScoreStats struct {
+	OverallScore         int     `json:"overall_score"`        // 0-100
+	SecretsScanScore     int     `json:"secrets_scan_score"`
+	SASTScore            int     `json:"sast_score"`
+	DependencyScore      int     `json:"dependency_score"`
+	TotalFindings        int     `json:"total_findings"`
+	CriticalFindings     int     `json:"critical_findings"`
+	HighFindings         int     `json:"high_findings"`
+	MediumFindings       int     `json:"medium_findings"`
+	LowFindings          int     `json:"low_findings"`
+	ScoreTrend           []TrendPoint `json:"score_trend,omitempty"`
+}
+
+// TeamProductivityStats contains team productivity metrics
+type TeamProductivityStats struct {
+	TotalMRsReviewed     int     `json:"total_mrs_reviewed"`
+	AvgReviewTimeMinutes float64 `json:"avg_review_time_minutes"`
+	IssuesFoundPerMR     float64 `json:"issues_found_per_mr"`
+	AutoFixApplied       int     `json:"auto_fix_applied"`
+	TimesSavedHours      float64 `json:"times_saved_hours"` // Estimated time saved by AI review
+	TopReviewers         []UserReviewStats `json:"top_reviewers,omitempty"`
 }
 
 // ActivityItem represents recent activity

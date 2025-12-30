@@ -233,3 +233,71 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ============================================================================
+// SAST (Static Application Security Testing)
+// ============================================================================
+
+// SASTScanRequest request body for SAST scanning
+type SASTScanRequest struct {
+	Types       []scanner.VulnerabilityType `json:"types,omitempty"`
+	MinSeverity scanner.Severity            `json:"min_severity,omitempty"`
+	Language    string                      `json:"language,omitempty"`
+}
+
+// SASTScan POST /api/admin/gitlab/projects/:id/sast-scan
+// Performs SAST scanning for security vulnerabilities.
+func (h *GitLabSecretsHandler) SASTScan(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	var req SASTScanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req = SASTScanRequest{}
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
+	defer cancel()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Failed to get project")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check if project is indexed
+	collectionName := project.GetCollectionName()
+	if collectionName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project has no indexed collection. Please index the repository first."})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"project_id": projectID,
+		"collection": collectionName,
+		"language":   req.Language,
+		"types":      req.Types,
+	}).Info("Starting SAST scan")
+
+	// Create SAST scanner and run
+	sastScanner := scanner.NewSASTScanner(h.vectorStore, h.logger)
+	result, err := sastScanner.Scan(ctx, scanner.SASTScanRequest{
+		ProjectID:      projectID,
+		CollectionName: collectionName,
+		Types:          req.Types,
+		MinSeverity:    req.MinSeverity,
+		Language:       req.Language,
+	})
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("SAST scan failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "SAST scan failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+

@@ -496,6 +496,338 @@ export const gitlabApi = {
   async getSecretsPatterns(): Promise<SecretsPatternsResponse> {
     return apiRequest('/secrets/patterns');
   },
+
+  async sastScan(projectId: string, params?: {
+    types?: SASTVulnerabilityType[];
+    min_severity?: SecretSeverity;
+    language?: string;
+  }): Promise<SASTScanResult> {
+    return apiRequest(`/projects/${projectId}/sast-scan`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  // ============================================================================
+  // Dependency Scanning (v4.1+)
+  // ============================================================================
+
+  async checkDependencies(projectId: string): Promise<DependencyScanResult> {
+    return apiRequest(`/projects/${projectId}/check-dependencies`, {
+      method: 'POST',
+    });
+  },
+
+  async createDependencyIssue(projectId: string, params: {
+    title: string;
+    description?: string;
+    labels?: string[];
+    critical?: boolean;
+  }): Promise<{ message: string; url: string }> {
+    return apiRequest(`/projects/${projectId}/create-dependency-issue`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  // ============================================================================
+  // Changelog Analysis (v4.2+)
+  // ============================================================================
+
+  async analyzeChangelog(projectId: string, params: AnalyzeChangelogRequest): Promise<ChangelogAnalysis> {
+    return apiRequest(`/projects/${projectId}/analyze-changelog`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async analyzeChangelogs(projectId: string, params: AnalyzeChangelogsRequest): Promise<AnalyzeChangelogsResponse> {
+    return apiRequest(`/projects/${projectId}/analyze-changelogs`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  // ============================================================================
+  // Code Quality (v4.1+)
+  // ============================================================================
+
+  async analyzeQuality(projectId: string, params?: {
+    max_files?: number;
+    language?: string;
+  }): Promise<QualityScore> {
+    return apiRequest(`/projects/${projectId}/quality-score`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async detectDeadCode(projectId: string, params?: {
+    max_chunks?: number;
+    language?: string;
+  }): Promise<DeadCodeResult> {
+    return apiRequest(`/projects/${projectId}/dead-code`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  // ============================================================================
+  // Auto-Documentation (v4.1+)
+  // ============================================================================
+
+  async scanDocs(projectId: string, params?: {
+    max_files?: number;
+    language?: string;
+    exported_only?: boolean;
+  }): Promise<DocScanResult> {
+    return apiRequest(`/projects/${projectId}/scan-docs`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async generateDocs(projectId: string, params?: {
+    symbol_ids?: string[];
+    max_symbols?: number;
+    language?: string;
+  }): Promise<DocGenerationResult> {
+    return apiRequest(`/projects/${projectId}/generate-docs`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async bulkApplyDocs(projectId: string, params: BulkApplyDocsRequest): Promise<BulkApplyResult> {
+    return apiRequest(`/projects/${projectId}/bulk-apply-docs`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async createDocsMR(projectId: string, params: CreateDocsMRRequest): Promise<CreateDocsMRResult> {
+    return apiRequest(`/projects/${projectId}/create-docs-mr`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  // ============================================================================
+  // Test Generation (v4.1+)
+  // ============================================================================
+
+  async scanTests(projectId: string, params?: {
+    max_files?: number;
+    language?: string;
+  }): Promise<TestScanResult> {
+    return apiRequest(`/projects/${projectId}/scan-tests`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async generateTests(projectId: string, params?: {
+    max_functions?: number;
+    language?: string;
+    framework?: string;
+  }): Promise<TestGenerationResult> {
+    return apiRequest(`/projects/${projectId}/generate-tests`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async downloadTests(projectId: string, params: DownloadTestsRequest): Promise<Blob> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(`/api/admin/gitlab/projects/${projectId}/download-tests`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw new Error(error.error || 'Download failed');
+    }
+    
+    return response.blob();
+  },
+
+  // ============================================================================
+  // Architecture Diagrams (v4.2+)
+  // ============================================================================
+
+  async scanArchitecture(projectId: string, params?: {
+    max_files?: number;
+    language?: string;
+  }): Promise<ArchitectureScanResult> {
+    return apiRequest(`/projects/${projectId}/scan-architecture`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async generateDiagram(projectId: string, params?: {
+    type?: DiagramType;
+    format?: DiagramFormat;
+    scope?: string;
+    max_depth?: number;
+  }): Promise<DiagramGenerationResult> {
+    return apiRequest(`/projects/${projectId}/generate-diagram`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async getArchitecture(projectId: string, type?: DiagramType): Promise<DiagramGenerationResult> {
+    const query = type ? `?type=${type}` : '';
+    return apiRequest(`/projects/${projectId}/architecture${query}`);
+  },
+
+  // ============================================================================
+  // Scheduled Scans API (v4.1.0+)
+  // ============================================================================
+
+  async listSchedules(params?: {
+    project_id?: string;
+    integration_id?: string;
+    scan_type?: ScanType;
+    enabled?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ schedules: ScheduledScan[]; total: number }> {
+    const query = new URLSearchParams();
+    if (params?.project_id) query.set('project_id', params.project_id);
+    if (params?.integration_id) query.set('integration_id', params.integration_id);
+    if (params?.scan_type) query.set('scan_type', params.scan_type);
+    if (params?.enabled !== undefined) query.set('enabled', String(params.enabled));
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const queryStr = query.toString();
+    return apiRequest(`/schedules${queryStr ? '?' + queryStr : ''}`);
+  },
+
+  async getSchedule(scheduleId: string): Promise<ScheduledScan> {
+    return apiRequest(`/schedules/${scheduleId}`);
+  },
+
+  async createSchedule(request: CreateScheduledScanRequest): Promise<ScheduledScan> {
+    return apiRequest('/schedules', {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  async updateSchedule(scheduleId: string, request: UpdateScheduledScanRequest): Promise<ScheduledScan> {
+    return apiRequest(`/schedules/${scheduleId}`, {
+      method: 'PUT',
+      body: request,
+    });
+  },
+
+  async deleteSchedule(scheduleId: string): Promise<void> {
+    return apiRequest(`/schedules/${scheduleId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async triggerSchedule(scheduleId: string): Promise<{ message: string; history: ScanHistory }> {
+    return apiRequest(`/schedules/${scheduleId}/trigger`, {
+      method: 'POST',
+    });
+  },
+
+  async getScheduleHistory(scheduleId: string, params?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<{ history: ScanHistory[]; total: number }> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const queryStr = query.toString();
+    return apiRequest(`/schedules/${scheduleId}/history${queryStr ? '?' + queryStr : ''}`);
+  },
+
+  async getSchedulerStatus(): Promise<SchedulerStatus> {
+    return apiRequest('/schedules/status');
+  },
+
+  // ============================================================================
+  // Analytics Dashboard API (v4.2+)
+  // ============================================================================
+
+  async getAnalyticsDashboard(params?: {
+    start_date?: string;
+    end_date?: string;
+    integration_id?: string;
+    project_id?: string;
+  }): Promise<AnalyticsDashboard> {
+    return apiRequest('/analytics/dashboard', { query: params });
+  },
+
+  async getModelComparison(params?: {
+    start_date?: string;
+    end_date?: string;
+  }): Promise<ModelComparison> {
+    return apiRequest('/analytics/models', { query: params });
+  },
+
+  async getSecurityOverview(): Promise<SecurityScoreStats> {
+    return apiRequest('/analytics/security');
+  },
+
+  async getDependencyHealth(): Promise<DependencyHealthStats> {
+    return apiRequest('/analytics/dependencies');
+  },
+
+  async getProjectAnalytics(projectId: string, params?: {
+    start_date?: string;
+    end_date?: string;
+  }): Promise<ProjectAnalytics> {
+    return apiRequest(`/projects/${projectId}/analytics`, { query: params });
+  },
+
+  async exportAnalyticsReport(params?: {
+    format?: 'json' | 'csv';
+    start_date?: string;
+    end_date?: string;
+  }): Promise<Blob> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const queryStr = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+    const response = await fetch(`/api/admin/gitlab/analytics/export${queryStr}`, { headers });
+    
+    if (!response.ok) {
+      throw new Error('Export failed');
+    }
+    
+    return response.blob();
+  },
+
+  // ============================================================================
+  // Code Duplication Detection API (v4.1.0+)
+  // ============================================================================
+
+  async detectDuplication(projectId: string, params?: {
+    max_files?: number;
+    language?: string;
+  }): Promise<DuplicationResult> {
+    return apiRequest(`/projects/${projectId}/detect-duplication`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
 };
 
 // Model types
@@ -630,6 +962,514 @@ export interface SecretsPatternsResponse {
   total: number;
 }
 
+// ============================================================================
+// Dependency Scanning Types
+// ============================================================================
+
+export interface DependencyInfo {
+  name: string;
+  current_version: string;
+  latest_version: string;
+  indirect: boolean;
+  update_type: 'major' | 'minor' | 'patch' | 'none' | 'unknown';
+  has_update: boolean;
+}
+
+export interface DependencyVulnerability {
+  id: string;
+  summary: string;
+  details: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  fixed_in: string;
+  references: string[];
+  published_at: string;
+}
+
+export interface DependencyWithVulns {
+  dependency: DependencyInfo;
+  vulnerabilities: DependencyVulnerability[];
+  is_vulnerable: boolean;
+}
+
+export interface DependencyScanSummary {
+  total_dependencies: number;
+  direct_dependencies: number;
+  outdated_count: number;
+  vulnerable_count: number;
+  up_to_date_count: number;
+  by_update_type: Record<string, number>;
+  by_severity: Record<string, number>;
+  critical_vulns: number;
+}
+
+export interface DependencyScanResult {
+  project_id: string;
+  scan_id: string;
+  language: string;
+  file_path: string;
+  scanned_at: string;
+  duration: string;
+  dependencies: DependencyWithVulns[];
+  summary: DependencyScanSummary;
+  status: 'completed' | 'failed';
+  error?: string;
+}
+
+// ============================================================================
+// Changelog Analysis Types (v4.2+)
+// ============================================================================
+
+export interface BreakingChange {
+  description: string;
+  affected_area: string; // e.g., "API", "Config", "Behavior"
+  severity: 'high' | 'medium' | 'low';
+  workaround?: string;
+}
+
+export interface ChangelogAnalysis {
+  package_name: string;
+  current_version: string;
+  latest_version: string;
+  language: string;
+  summary: string;
+  breaking_changes: BreakingChange[];
+  new_features: string[];
+  bug_fixes: string[];
+  security_fixes: string[];
+  deprecated_features: string[];
+  migration_guide: string;
+  risk_level: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'high' | 'medium' | 'low';
+  tokens_used: number;
+  analyzed_at: string;
+}
+
+export interface AnalyzeChangelogRequest {
+  package_name: string;
+  current_version: string;
+  latest_version: string;
+  language: string; // "go", "nodejs", "python"
+  model_id?: string;
+}
+
+export interface AnalyzeChangelogsRequest {
+  dependencies: Array<{
+    name: string;
+    current_version: string;
+    latest_version: string;
+  }>;
+  language: string;
+  model_id?: string;
+}
+
+export interface AnalyzeChangelogsResponse {
+  analyses: ChangelogAnalysis[];
+  total: number;
+}
+
+// ============================================================================
+// Code Quality Types
+// ============================================================================
+
+export type QualityCategory = 'complexity' | 'documentation' | 'testing' | 'security' | 'maintainability' | 'naming' | 'error_handling';
+
+export interface QualityScore {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  overall_score: number;
+  breakdown: Record<QualityCategory, number>;
+  file_scores: FileScore[];
+  recommendations: QualityRecommendation[];
+  summary: QualitySummary;
+  status: 'completed' | 'failed';
+  error?: string;
+  model_id: string;
+  tokens_used: number;
+}
+
+export interface FileScore {
+  file_path: string;
+  language: string;
+  lines_of_code: number;
+  score: number;
+  breakdown: Record<QualityCategory, number>;
+  issues: QualityIssue[];
+  functions_count: number;
+}
+
+export interface QualityIssue {
+  category: QualityCategory;
+  severity: 'high' | 'medium' | 'low';
+  file_path: string;
+  line: number;
+  message: string;
+  suggestion?: string;
+  code_snippet?: string;
+}
+
+export interface QualityRecommendation {
+  category: QualityCategory;
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  file_paths?: string[];
+  impact: string;
+}
+
+export interface QualitySummary {
+  total_files: number;
+  total_lines_of_code: number;
+  total_functions: number;
+  issues_count: number;
+  high_severity_count: number;
+  medium_severity_count: number;
+  low_severity_count: number;
+  top_issue_categories: CategoryStat[];
+  best_scoring_files: string[];
+  worst_scoring_files: string[];
+}
+
+export interface CategoryStat {
+  category: QualityCategory;
+  count: number;
+  avg_score: number;
+}
+
+// ============================================================================
+// Dead Code Types
+// ============================================================================
+
+export type SymbolType = 'function' | 'type' | 'variable' | 'constant' | 'interface' | 'class' | 'method';
+export type Confidence = 'high' | 'medium' | 'low';
+
+export interface DeadSymbol {
+  name: string;
+  type: SymbolType;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  confidence: Confidence;
+  reason: string;
+  lines_of_code: number;
+  exportable: boolean;
+}
+
+export interface DeadCodeResult {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  dead_symbols: DeadSymbol[];
+  summary: DeadCodeSummary;
+  model_id: string;
+  tokens_used: number;
+  files_scanned: number;
+  chunks_scanned: number;
+}
+
+export interface DeadCodeSummary {
+  total_dead_symbols: number;
+  by_type: Record<SymbolType, number>;
+  by_confidence: Record<Confidence, number>;
+  estimated_dead_lines: number;
+  top_affected_files: FileStats[];
+}
+
+export interface FileStats {
+  file_path: string;
+  dead_symbols: number;
+  dead_lines: number;
+}
+
+// ============================================================================
+// Auto-Documentation Types
+// ============================================================================
+
+export interface UndocumentedSymbol {
+  name: string;
+  type: string;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  language: string;
+  signature: string;
+  is_exported: boolean;
+  importance: 'high' | 'medium' | 'low';
+}
+
+export interface DocScanResult {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  symbols: UndocumentedSymbol[];
+  summary: DocScanSummary;
+  files_scanned: number;
+}
+
+export interface DocScanSummary {
+  total_symbols: number;
+  exported_count: number;
+  by_type: Record<string, number>;
+  by_language: Record<string, number>;
+  by_importance: Record<string, number>;
+  top_affected_files: DocFileStats[];
+}
+
+export interface DocFileStats {
+  file_path: string;
+  count: number;
+  exported: number;
+}
+
+export interface GeneratedDoc {
+  symbol: UndocumentedSymbol;
+  documentation: string;
+  format: string;
+  language: string;
+  preview: string;
+}
+
+export interface DocGenerationResult {
+  project_id: string;
+  generated_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  docs: GeneratedDoc[];
+  tokens_used: number;
+  model_id: string;
+}
+
+// Bulk Apply + MR Creation Types
+export interface BulkApplyDocsRequest {
+  docs: GeneratedDoc[];
+  create_mr?: boolean;
+  mr_title?: string;
+  mr_description?: string;
+  target_branch?: string;
+  labels?: string[];
+}
+
+export interface BulkApplyResult {
+  project_id: string;
+  applied_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  applied_count: number;
+  failed_count: number;
+  applied_files: AppliedFile[];
+  mr?: MergeRequestInfo;
+}
+
+export interface AppliedFile {
+  file_path: string;
+  symbols_added: number;
+  lines_added: number;
+  status: 'success' | 'failed';
+  error?: string;
+}
+
+export interface MergeRequestInfo {
+  id?: number;
+  iid?: number;
+  url?: string;
+  title: string;
+  description: string;
+  source_branch: string;
+  target_branch: string;
+  labels: string[];
+  commit_message?: string;
+  file_changes?: FileChange[];
+  status?: string;
+  message?: string;
+}
+
+export interface FileChange {
+  file_path: string;
+  symbol_name: string;
+  symbol_type: string;
+  line_number: number;
+  documentation: string;
+  language: string;
+}
+
+export interface CreateDocsMRRequest {
+  docs: GeneratedDoc[];
+  title?: string;
+  description?: string;
+  target_branch?: string;
+  source_branch?: string;
+  labels?: string[];
+  commit_message?: string;
+}
+
+export interface CreateDocsMRResult {
+  status: string;
+  message: string;
+  mr: MergeRequestInfo;
+  docs_count: number;
+  files_affected: number;
+}
+
+// ============================================================================
+// Test Generation Types
+// ============================================================================
+
+export interface TestableFunction {
+  name: string;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  language: string;
+  signature: string;
+  code: string;
+  is_exported: boolean;
+  has_tests: boolean;
+  complexity: 'low' | 'medium' | 'high';
+}
+
+export interface TestScanResult {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  functions: TestableFunction[];
+  summary: TestScanSummary;
+  files_scanned: number;
+}
+
+export interface TestScanSummary {
+  total_functions: number;
+  without_tests: number;
+  with_tests: number;
+  by_language: Record<string, number>;
+  by_complexity: Record<string, number>;
+  top_files: TestFileStats[];
+}
+
+export interface TestFileStats {
+  file_path: string;
+  function_count: number;
+  untested: number;
+}
+
+export interface GeneratedTest {
+  function: TestableFunction;
+  test_code: string;
+  test_name: string;
+  framework: string;
+  language: string;
+  description: string;
+}
+
+export interface TestGenerationResult {
+  project_id: string;
+  generated_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  tests: GeneratedTest[];
+  tokens_used: number;
+  model_id: string;
+}
+
+export interface DownloadTestsRequest {
+  tests: GeneratedTest[];
+  format?: 'single' | 'zip';
+  filename?: string;
+}
+
+// ============================================================================
+// Architecture Diagram Types
+// ============================================================================
+
+export type DiagramType = 'module_dependency' | 'call_graph' | 'data_flow' | 'package_structure';
+export type DiagramFormat = 'mermaid' | 'svg' | 'png' | 'd3_json';
+
+export interface ArchitectureNode {
+  id: string;
+  name: string;
+  type: string; // "package", "module", "function", "class", "file"
+  file_path?: string;
+  language?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ArchitectureEdge {
+  source: string;
+  target: string;
+  label?: string;
+  type: string; // "dependency", "call", "inheritance", "composition"
+  weight?: number;
+  metadata?: Record<string, string>;
+}
+
+export interface ArchitectureGraph {
+  nodes: ArchitectureNode[];
+  edges: ArchitectureEdge[];
+}
+
+export interface ArchitectureScanSummary {
+  total_nodes: number;
+  total_edges: number;
+  by_node_type: Record<string, number>;
+  by_edge_type: Record<string, number>;
+  by_language: Record<string, number>;
+  module_count: number;
+  function_count: number;
+  package_count: number;
+  circular_deps?: string[][];
+}
+
+export interface ArchitectureScanResult {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  graph: ArchitectureGraph;
+  summary: ArchitectureScanSummary;
+  languages: string[];
+}
+
+export interface Diagram {
+  id: string;
+  project_id: string;
+  type: DiagramType;
+  format: DiagramFormat;
+  title: string;
+  description?: string;
+  content: string; // Mermaid code or SVG/PNG data
+  graph?: ArchitectureGraph;
+  created_at: string;
+  duration: string;
+  tokens_used: number;
+  model_id?: string;
+}
+
+export interface DiagramGenerationResult {
+  project_id: string;
+  generated_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  diagrams: Diagram[];
+  tokens_used: number;
+  model_id?: string;
+}
+
 // Deep scan (LLM-based) types
 export interface DeepFinding {
   id: string;
@@ -657,6 +1497,339 @@ export interface DeepScanResult {
   summary: SecretsScanSummary;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   error?: string;
+}
+
+// ============================================================================
+// SAST (Static Application Security Testing) Types
+// ============================================================================
+
+export type SASTVulnerabilityType = 
+  | 'sql_injection'
+  | 'xss'
+  | 'path_traversal'
+  | 'command_injection'
+  | 'hardcoded_ip'
+  | 'hardcoded_url'
+  | 'insecure_crypto'
+  | 'insecure_random'
+  | 'open_redirect'
+  | 'ssrf'
+  | 'xxe'
+  | 'insecure_deserialization'
+  | 'hardcoded_credentials';
+
+export interface SASTFinding {
+  id: string;
+  pattern_id: string;
+  pattern_name: string;
+  type: SASTVulnerabilityType;
+  severity: SecretSeverity;
+  cwe?: string;
+  owasp?: string;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  match: string;
+  context: string;
+  suggestion: string;
+  language: string;
+}
+
+export interface SASTScanSummary {
+  total_findings: number;
+  by_severity: Record<string, number>;
+  by_type: Record<string, number>;
+  by_cwe: Record<string, number>;
+  files_affected: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+}
+
+export interface SASTScanResult {
+  project_id: string;
+  scan_id: string;
+  started_at: string;
+  completed_at: string;
+  duration: string;
+  chunks_scanned: number;
+  findings: SASTFinding[];
+  summary: SASTScanSummary;
+  status: 'completed' | 'failed';
+  error?: string;
+}
+
+// ============================================================================
+// Scheduled Scans Types (v4.1.0+)
+// ============================================================================
+
+export type ScheduleFrequency = 'daily' | 'weekly' | 'monthly' | 'custom';
+export type ScanType = 'dependencies' | 'secrets' | 'quality' | 'dead_code';
+
+export interface ScheduledScan {
+  id: string;
+  project_id: string;
+  integration_id: string;
+  scan_type: ScanType;
+  frequency: ScheduleFrequency;
+  cron_expr?: string;
+  enabled: boolean;
+  notify_email?: string;
+  create_issue: boolean;
+  only_breaking: boolean;
+  last_run_at?: string;
+  next_run_at?: string;
+  last_run_status?: 'success' | 'failed' | 'running';
+  last_run_error?: string;
+  last_run_duration_ms?: number;
+  total_runs: number;
+  successful_runs: number;
+  failed_runs: number;
+  created_at: string;
+  updated_at: string;
+  project_name?: string;
+  integration_name?: string;
+}
+
+export interface ScanHistory {
+  id: string;
+  schedule_id: string;
+  project_id: string;
+  scan_type: ScanType;
+  status: 'pending' | 'running' | 'success' | 'failed';
+  started_at: string;
+  completed_at?: string;
+  duration_ms?: number;
+  error?: string;
+  dependencies_checked?: number;
+  outdated_dependencies?: number;
+  vulnerabilities_found?: number;
+  breaking_changes?: number;
+  issue_created: boolean;
+  issue_url?: string;
+  results_json?: string;
+}
+
+export interface CreateScheduledScanRequest {
+  project_id: string;
+  scan_type: ScanType;
+  frequency: ScheduleFrequency;
+  cron_expr?: string;
+  enabled: boolean;
+  notify_email?: string;
+  create_issue?: boolean;
+  only_breaking?: boolean;
+}
+
+export interface UpdateScheduledScanRequest {
+  frequency?: ScheduleFrequency;
+  cron_expr?: string;
+  enabled?: boolean;
+  notify_email?: string;
+  create_issue?: boolean;
+  only_breaking?: boolean;
+}
+
+export interface SchedulerStatus {
+  running: boolean;
+  schedule_count: number;
+}
+
+// ============================================================================
+// Analytics Dashboard Types (v4.2+)
+// ============================================================================
+
+export interface AnalyticsDashboard {
+  overview: ReviewStats;
+  top_projects: ProjectReviewStats[];
+  top_models: ModelReviewStats[];
+  review_trend: TrendPoint[];
+  issues_by_category: CategoryStats[];
+  issues_by_severity: SeverityStats[];
+  recent_activity: ActivityItem[];
+  dependency_health?: DependencyHealthStats;
+  security_score?: SecurityScoreStats;
+  team_productivity?: TeamProductivityStats;
+}
+
+export interface ReviewStats {
+  total_reviews: number;
+  completed_reviews: number;
+  failed_reviews: number;
+  pending_reviews: number;
+  total_files_reviewed: number;
+  total_lines_changed: number;
+  total_issues_found: number;
+  total_tokens_used: number;
+  avg_score: number;
+  avg_processing_time_ms: number;
+  success_rate: number;
+}
+
+export interface ProjectReviewStats {
+  project_id: string;
+  project_name: string;
+  total_reviews: number;
+  completed_reviews: number;
+  total_issues_found: number;
+  avg_score: number;
+  avg_processing_time_ms: number;
+}
+
+export interface ModelReviewStats {
+  model_id: string;
+  model_name: string;
+  total_reviews: number;
+  total_tokens_used: number;
+  avg_tokens_per_review: number;
+  avg_processing_time_ms: number;
+  avg_score: number;
+}
+
+export interface TrendPoint {
+  timestamp: string;
+  value: number;
+  count: number;
+}
+
+export interface CategoryStats {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SeverityStats {
+  severity: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: string;
+  project_name: string;
+  mr_title: string;
+  mr_iid: number;
+  timestamp: string;
+  details?: string;
+}
+
+export interface DependencyHealthStats {
+  total_dependencies: number;
+  outdated_count: number;
+  outdated_percentage: number;
+  vulnerable_count: number;
+  critical_vulns: number;
+  high_vulns: number;
+  medium_vulns: number;
+  last_scan_at?: string;
+}
+
+export interface SecurityScoreStats {
+  overall_score: number;
+  secrets_scan_score: number;
+  sast_score: number;
+  dependency_score: number;
+  total_findings: number;
+  critical_findings: number;
+  high_findings: number;
+  medium_findings: number;
+  low_findings: number;
+  score_trend?: TrendPoint[];
+}
+
+export interface TeamProductivityStats {
+  total_mrs_reviewed: number;
+  avg_review_time_minutes: number;
+  issues_found_per_mr: number;
+  auto_fix_applied: number;
+  times_saved_hours: number;
+  top_reviewers?: UserReviewStats[];
+}
+
+export interface UserReviewStats {
+  user_id: string;
+  username: string;
+  total_mrs: number;
+  total_issues_found: number;
+  avg_issues_per_mr: number;
+  avg_score: number;
+}
+
+export interface ModelComparison {
+  models: ModelReviewStats[];
+  best_quality?: ModelReviewStats;
+  fastest?: ModelReviewStats;
+  most_efficient?: ModelReviewStats;
+}
+
+export interface ProjectAnalytics {
+  stats: ReviewStats;
+  processing_time: ProcessingTimeStats;
+  token_usage: TokenUsageStats;
+  user_breakdown: UserReviewStats[];
+  issue_trend: TrendPoint[];
+}
+
+export interface ProcessingTimeStats {
+  min_ms: number;
+  max_ms: number;
+  avg_ms: number;
+  median_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+}
+
+export interface TokenUsageStats {
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  avg_per_review: number;
+  max_per_review: number;
+}
+
+// ============================================================================
+// Code Duplication Types (v4.1.0+)
+// ============================================================================
+
+export interface DuplicateBlock {
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  code_snippet: string;
+}
+
+export interface DuplicateGroup {
+  id: string;
+  occurrences: DuplicateBlock[];
+  lines_count: number;
+  similarity: number;
+  description: string;
+  suggestion: string;
+  refactor_type: string;
+}
+
+export interface DuplicationSummary {
+  total_files_analyzed: number;
+  files_with_duplicates: number;
+  total_duplicate_groups: number;
+  total_duplicate_lines: number;
+  duplication_percent: number;
+  top_duplicated_files: string[];
+}
+
+export interface DuplicationResult {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  status: 'completed' | 'failed';
+  error?: string;
+  duplicates: DuplicateGroup[];
+  summary: DuplicationSummary;
+  model_id: string;
+  tokens_used: number;
 }
 
 export default gitlabApi;

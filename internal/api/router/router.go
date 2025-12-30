@@ -3674,16 +3674,16 @@ func (r *Router) setupGitLabRoutes() {
 		// Projects
 		adminGitlab.GET("/integrations/:id/projects", r.gitlabHandler.ListProjects)
 		adminGitlab.POST("/integrations/:id/projects", r.gitlabHandler.AddProject)
-		adminGitlab.GET("/projects/:project_id", r.gitlabHandler.GetProject)
-		adminGitlab.PUT("/projects/:project_id", r.gitlabHandler.UpdateProject)
-		adminGitlab.DELETE("/projects/:project_id", r.gitlabHandler.DeleteProject)
-		adminGitlab.POST("/projects/:project_id/webhook", r.gitlabHandler.SetupWebhook)
+		adminGitlab.GET("/projects/:id", r.gitlabHandler.GetProject)
+		adminGitlab.PUT("/projects/:id", r.gitlabHandler.UpdateProject)
+		adminGitlab.DELETE("/projects/:id", r.gitlabHandler.DeleteProject)
+		adminGitlab.POST("/projects/:id/webhook", r.gitlabHandler.SetupWebhook)
 
 		// Project Indexing (RAG)
 		if r.gitlabIndexerHandler != nil {
-			adminGitlab.POST("/projects/:project_id/index", r.gitlabIndexerHandler.IndexProject)
-			adminGitlab.GET("/projects/:project_id/index/status", r.gitlabIndexerHandler.GetIndexStatus)
-			adminGitlab.DELETE("/projects/:project_id/index", r.gitlabIndexerHandler.DeleteIndex)
+			adminGitlab.POST("/projects/:id/index", r.gitlabIndexerHandler.IndexProject)
+			adminGitlab.GET("/projects/:id/index/status", r.gitlabIndexerHandler.GetIndexStatus)
+			adminGitlab.DELETE("/projects/:id/index", r.gitlabIndexerHandler.DeleteIndex)
 		}
 
 		// Dependencies scanning and changelog analysis (handlers use c.Param("id"))
@@ -3821,16 +3821,16 @@ func (r *Router) setupGitLabRoutes() {
 		adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
 		})
-		adminGitlab.GET("/projects/:project_id", func(c *gin.Context) {
+		adminGitlab.GET("/projects/:id", func(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		})
-		adminGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
+		adminGitlab.PUT("/projects/:id", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
 		})
-		adminGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
+		adminGitlab.DELETE("/projects/:id", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
 		})
-		adminGitlab.POST("/projects/:project_id/webhook", func(c *gin.Context) {
+		adminGitlab.POST("/projects/:id/webhook", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
 		})
 
@@ -3941,29 +3941,29 @@ func (r *Router) setupGitLabRoutes() {
 	userGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
-	userGitlab.GET("/projects/:project_id", func(c *gin.Context) {
+	userGitlab.GET("/projects/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 	})
-	userGitlab.PUT("/projects/:project_id", func(c *gin.Context) {
+	userGitlab.PUT("/projects/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
-	userGitlab.DELETE("/projects/:project_id", func(c *gin.Context) {
+	userGitlab.DELETE("/projects/:id", func(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 	})
 
 	// User-level Project Indexing (with ownership check)
 	if r.gitlabUserIndexerHandler != nil {
-		userGitlab.POST("/projects/:project_id/index", r.gitlabUserIndexerHandler.IndexProject)
-		userGitlab.GET("/projects/:project_id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
-		userGitlab.DELETE("/projects/:project_id/index", r.gitlabUserIndexerHandler.DeleteIndex)
+		userGitlab.POST("/projects/:id/index", r.gitlabUserIndexerHandler.IndexProject)
+		userGitlab.GET("/projects/:id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
+		userGitlab.DELETE("/projects/:id/index", r.gitlabUserIndexerHandler.DeleteIndex)
 	} else {
-		userGitlab.POST("/projects/:project_id/index", func(c *gin.Context) {
+		userGitlab.POST("/projects/:id/index", func(c *gin.Context) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
 		})
-		userGitlab.GET("/projects/:project_id/index/status", func(c *gin.Context) {
+		userGitlab.GET("/projects/:id/index/status", func(c *gin.Context) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
 		})
-		userGitlab.DELETE("/projects/:project_id/index", func(c *gin.Context) {
+		userGitlab.DELETE("/projects/:id/index", func(c *gin.Context) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
 		})
 	}

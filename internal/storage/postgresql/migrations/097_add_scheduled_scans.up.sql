@@ -1,8 +1,8 @@
 -- Scheduled scans table for dependency scanning (v4.1.0)
 CREATE TABLE IF NOT EXISTS gitlab_scheduled_scans (
-    id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES gitlab_projects(id) ON DELETE CASCADE,
-    integration_id TEXT NOT NULL REFERENCES gitlab_integrations(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES gitlab_projects(id) ON DELETE CASCADE,
+    integration_id UUID NOT NULL REFERENCES gitlab_integrations(id) ON DELETE CASCADE,
     scan_type TEXT NOT NULL DEFAULT 'dependencies',
     frequency TEXT NOT NULL DEFAULT 'daily',
     cron_expr TEXT NOT NULL,
@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS gitlab_scheduled_scans (
 
 -- Scan history table for tracking individual scan executions
 CREATE TABLE IF NOT EXISTS gitlab_scan_history (
-    id TEXT PRIMARY KEY,
-    schedule_id TEXT NOT NULL REFERENCES gitlab_scheduled_scans(id) ON DELETE CASCADE,
-    project_id TEXT NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    schedule_id UUID NOT NULL REFERENCES gitlab_scheduled_scans(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL,
     scan_type TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     started_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -63,4 +63,3 @@ CREATE INDEX IF NOT EXISTS idx_scan_history_schedule ON gitlab_scan_history(sche
 CREATE INDEX IF NOT EXISTS idx_scan_history_project ON gitlab_scan_history(project_id);
 CREATE INDEX IF NOT EXISTS idx_scan_history_started ON gitlab_scan_history(started_at);
 CREATE INDEX IF NOT EXISTS idx_scan_history_status ON gitlab_scan_history(status);
-

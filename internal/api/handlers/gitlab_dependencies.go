@@ -1,0 +1,354 @@
+// Package handlers provides HTTP handlers for GitLab dependencies API.
+package handlers
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"aigateway/internal/gitlab/client"
+	"aigateway/internal/gitlab/dependencies"
+	"aigateway/internal/gitlab/dependencies/changelog"
+	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/rag/vector"
+
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+)
+
+// GitLabDependenciesHandler handles dependency scanning API requests.
+type GitLabDependenciesHandler struct {
+	store       storage.Store
+	vectorStore *vector.QdrantStore
+	scanner     *dependencies.Scanner
+	llmBaseURL  string
+	llmAPIKey   string
+	logger      *logrus.Logger
+}
+
+// NewGitLabDependenciesHandler creates a new dependencies handler.
+func NewGitLabDependenciesHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabDependenciesHandler {
+	return &GitLabDependenciesHandler{
+		store:       store,
+		vectorStore: vectorStore,
+		scanner:     dependencies.NewScanner(vectorStore, logger),
+		llmBaseURL:  llmBaseURL,
+		llmAPIKey:   llmAPIKey,
+		logger:      logger,
+	}
+}
+
+// CheckDependencies POST /api/admin/gitlab/projects/:id/check-dependencies
+func (h *GitLabDependenciesHandler) CheckDependencies(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
+	defer cancel()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Failed to get project")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check if project is indexed
+	collectionName := project.GetCollectionName()
+	if collectionName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project has no indexed collection. Please index the repository first."})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"project_id": projectID,
+		"collection": collectionName,
+	}).Info("Starting dependency check")
+
+	// Run scan
+	result, err := h.scanner.ScanProject(ctx, dependencies.ScanRequest{
+		ProjectID:      projectID,
+		CollectionName: collectionName,
+	})
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Dependency scan failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dependency scan failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// CreateDependencyIssueRequest is the request body for creating an issue.
+type CreateDependencyIssueRequest struct {
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
+	Critical    bool     `json:"critical,omitempty"` // Include only critical/vulnerable deps
+}
+
+// CreateDependencyIssue POST /api/admin/gitlab/projects/:id/create-dependency-issue
+func (h *GitLabDependenciesHandler) CreateDependencyIssue(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	var req CreateDependencyIssueRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Failed to get project")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Get integration
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get integration")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get GitLab integration"})
+		return
+	}
+
+	// Create issue using GitLab API
+	issueURL, err := h.createGitLabIssue(ctx, integration.BaseURL, integration.AccessToken, project.GitLabProjectID, req)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to create GitLab issue")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create issue: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Issue created successfully",
+		"url":     issueURL,
+	})
+}
+
+// createGitLabIssue creates an issue in GitLab.
+func (h *GitLabDependenciesHandler) createGitLabIssue(ctx context.Context, gitlabURL, token string, projectID int64, req CreateDependencyIssueRequest) (string, error) {
+	h.logger.WithFields(logrus.Fields{
+		"gitlab_project_id": projectID,
+		"title":             req.Title,
+	}).Info("Creating GitLab issue for dependencies")
+
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     gitlabURL,
+		AccessToken: token,
+		Timeout:     30 * time.Second,
+	})
+
+	// Build labels
+	labels := req.Labels
+	if len(labels) == 0 {
+		labels = []string{"dependencies", "security"}
+	}
+
+	issueReq := &client.CreateIssueRequest{
+		Title:       req.Title,
+		Description: req.Description,
+		Labels:      labels,
+	}
+
+	issue, err := gitlabClient.CreateIssue(ctx, projectID, issueReq)
+	if err != nil {
+		return "", fmt.Errorf("create issue: %w", err)
+	}
+
+	return issue.WebURL, nil
+}
+
+// AnalyzeChangelogRequest is the request body for changelog analysis.
+type AnalyzeChangelogRequest struct {
+	PackageName    string `json:"package_name" binding:"required"`
+	CurrentVersion string `json:"current_version" binding:"required"`
+	LatestVersion  string `json:"latest_version" binding:"required"`
+	Language       string `json:"language" binding:"required"` // "go", "nodejs", "python"
+	ModelID        string `json:"model_id,omitempty"`          // Optional, uses project's analysis model if not set
+}
+
+// AnalyzeChangelog POST /api/admin/gitlab/projects/:id/analyze-changelog
+// Analyzes a specific dependency's changelog using LLM.
+func (h *GitLabDependenciesHandler) AnalyzeChangelog(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	var req AnalyzeChangelogRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
+	defer cancel()
+
+	// Get project for model ID if not specified
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Failed to get project")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	modelID := req.ModelID
+	if modelID == "" {
+		modelID = project.AnalysisModelID
+	}
+	if modelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No model ID specified and project has no default analysis model"})
+		return
+	}
+
+	// Get LLM settings - use stored values or defaults
+	llmBaseURL := h.llmBaseURL
+	if llmBaseURL == "" {
+		llmBaseURL = "http://localhost:8080" // Self-reference to internal API
+	}
+	llmAPIKey := h.llmAPIKey
+	if llmAPIKey == "" {
+		// Try to get from request header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" && len(authHeader) > 7 {
+			llmAPIKey = authHeader[7:] // Remove "Bearer "
+		}
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"project_id":      projectID,
+		"package":         req.PackageName,
+		"current_version": req.CurrentVersion,
+		"latest_version":  req.LatestVersion,
+		"language":        req.Language,
+		"model_id":        modelID,
+	}).Info("Analyzing changelog")
+
+	analyzer := changelog.NewAnalyzer(llmBaseURL, llmAPIKey, h.logger)
+	analysis, err := analyzer.AnalyzeChangelog(ctx, changelog.AnalyzeRequest{
+		PackageName:    req.PackageName,
+		CurrentVersion: req.CurrentVersion,
+		LatestVersion:  req.LatestVersion,
+		Language:       req.Language,
+		ModelID:        modelID,
+	})
+	if err != nil {
+		h.logger.WithError(err).Error("Changelog analysis failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Changelog analysis failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, analysis)
+}
+
+// AnalyzeDependenciesChangelogsRequest is the request for bulk changelog analysis.
+type AnalyzeDependenciesChangelogsRequest struct {
+	Dependencies []struct {
+		Name           string `json:"name"`
+		CurrentVersion string `json:"current_version"`
+		LatestVersion  string `json:"latest_version"`
+	} `json:"dependencies" binding:"required"`
+	Language string `json:"language" binding:"required"`
+	ModelID  string `json:"model_id,omitempty"`
+}
+
+// AnalyzeDependenciesChangelogs POST /api/admin/gitlab/projects/:id/analyze-changelogs
+// Analyzes multiple dependencies' changelogs in batch.
+func (h *GitLabDependenciesHandler) AnalyzeDependenciesChangelogs(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	var req AnalyzeDependenciesChangelogsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
+	defer cancel()
+
+	// Get project for model ID if not specified
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Failed to get project")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	modelID := req.ModelID
+	if modelID == "" {
+		modelID = project.AnalysisModelID
+	}
+	if modelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No model ID specified and project has no default analysis model"})
+		return
+	}
+
+	// Get LLM settings - use stored values or defaults
+	llmBaseURL := h.llmBaseURL
+	if llmBaseURL == "" {
+		llmBaseURL = "http://localhost:8080" // Self-reference to internal API
+	}
+	llmAPIKey := h.llmAPIKey
+	if llmAPIKey == "" {
+		// Try to get from request header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" && len(authHeader) > 7 {
+			llmAPIKey = authHeader[7:] // Remove "Bearer "
+		}
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"project_id":   projectID,
+		"dependencies": len(req.Dependencies),
+		"language":     req.Language,
+		"model_id":     modelID,
+	}).Info("Analyzing multiple changelogs")
+
+	analyzer := changelog.NewAnalyzer(llmBaseURL, llmAPIKey, h.logger)
+	results := make([]*changelog.ChangelogAnalysis, 0, len(req.Dependencies))
+
+	for _, dep := range req.Dependencies {
+		if dep.CurrentVersion == dep.LatestVersion {
+			continue // Skip if already up to date
+		}
+
+		analysis, err := analyzer.AnalyzeChangelog(ctx, changelog.AnalyzeRequest{
+			PackageName:    dep.Name,
+			CurrentVersion: dep.CurrentVersion,
+			LatestVersion:  dep.LatestVersion,
+			Language:       req.Language,
+			ModelID:        modelID,
+		})
+		if err != nil {
+			h.logger.WithError(err).WithField("package", dep.Name).Warn("Failed to analyze changelog")
+			// Continue with other dependencies
+			continue
+		}
+
+		results = append(results, analysis)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"analyses": results,
+		"total":    len(results),
+	})
+}
+

@@ -26,7 +26,8 @@
 		Database,
 		Server,
 		GitBranch,
-		Info
+		Info,
+		FileText
 	} from 'lucide-svelte';
 	import { Tooltip } from '$lib/components/ui/tooltip';
 
@@ -235,6 +236,14 @@
 							>
 								<Info class="h-4 w-4" />
 								{m.nav_about()}
+							</a>
+							<a
+								href="/docs"
+								onclick={closeMenus}
+								class="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+							>
+								<FileText class="h-4 w-4" />
+								{m.nav_docs?.() || 'Documentation'}
 							</a>
 
 							<div class="border-t border-border">

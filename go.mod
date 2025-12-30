@@ -13,6 +13,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/docker/docker v25.0.5+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/docker/go-units v0.5.0
 	github.com/ebitengine/purego v0.9.1
 	github.com/gin-contrib/sessions v1.0.4
 	github.com/gin-gonic/gin v1.10.1
@@ -41,6 +42,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0
 	golang.org/x/crypto v0.42.0
 	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8
+	golang.org/x/mod v0.27.0
 	golang.org/x/oauth2 v0.32.0
 	golang.org/x/text v0.29.0
 	golang.org/x/time v0.14.0
@@ -66,7 +68,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

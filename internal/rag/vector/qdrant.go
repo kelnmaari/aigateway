@@ -678,5 +678,181 @@ func (s *QdrantStore) Close() error {
 	return nil
 }
 
+// ScrollRequest for scrolling through all points in a collection
+type ScrollRequest struct {
+	Collection string                 // Collection name (empty = use default)
+	Filters    map[string]interface{} // Metadata filters
+	Limit      int                    // Points per page
+	Offset     *string                // Offset for pagination (nil = start from beginning)
+	WithVector bool                   // Include vectors in response
+}
+
+// ScrollResponse contains scroll results
+type ScrollResponse struct {
+	Documents  []VectorDocument
+	NextOffset *string // Nil if no more results
+}
+
+// Scroll iterates through all points in collection
+func (s *QdrantStore) Scroll(ctx context.Context, req ScrollRequest) (*ScrollResponse, error) {
+	collection := req.Collection
+	if collection == "" {
+		collection = s.collection
+	}
+
+	if req.Limit <= 0 {
+		req.Limit = 100
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"collection": collection,
+		"limit":      req.Limit,
+		"has_offset": req.Offset != nil,
+	}).Debug("Scrolling Qdrant collection")
+
+	// Build scroll request body
+	scrollReq := map[string]interface{}{
+		"limit":        req.Limit,
+		"with_payload": true,
+		"with_vector":  req.WithVector,
+	}
+
+	if req.Offset != nil {
+		scrollReq["offset"] = *req.Offset
+	}
+
+	// Add filters if any
+	if len(req.Filters) > 0 {
+		conditions := make([]qdrantCondition, 0, len(req.Filters))
+		for key, value := range req.Filters {
+			conditions = append(conditions, qdrantCondition{
+				Key:   key,
+				Match: map[string]interface{}{"value": value},
+			})
+		}
+		scrollReq["filter"] = map[string]interface{}{
+			"must": conditions,
+		}
+	}
+
+	body, err := json.Marshal(scrollReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal scroll request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/collections/%s/points/scroll", s.baseURL, collection)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	s.setHeaders(httpReq)
+
+	resp, err := s.client.Do(httpReq)
+	if err != nil {
+		s.logger.WithError(err).Error("Qdrant scroll request failed")
+		return nil, fmt.Errorf("scroll request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("scroll failed: %s", string(respBody))
+	}
+
+	var scrollResp struct {
+		Result struct {
+			Points     []qdrantSearchResult `json:"points"`
+			NextPageID interface{}          `json:"next_page_offset"`
+		} `json:"result"`
+		Status string  `json:"status"`
+		Time   float64 `json:"time"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&scrollResp); err != nil {
+		return nil, fmt.Errorf("failed to decode scroll response: %w", err)
+	}
+
+	// Convert to VectorDocuments
+	documents := make([]VectorDocument, len(scrollResp.Result.Points))
+	for i, point := range scrollResp.Result.Points {
+		doc := VectorDocument{
+			ID:       point.ID,
+			Score:    point.Score,
+			Metadata: point.Payload,
+			Vector:   point.Vector,
+		}
+
+		if text, ok := point.Payload["text"].(string); ok {
+			doc.Text = text
+		}
+		if createdAt, ok := point.Payload["created_at"].(string); ok {
+			doc.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		}
+
+		documents[i] = doc
+	}
+
+	// Handle next offset
+	var nextOffset *string
+	if scrollResp.Result.NextPageID != nil {
+		switch v := scrollResp.Result.NextPageID.(type) {
+		case string:
+			nextOffset = &v
+		case float64:
+			s := fmt.Sprintf("%.0f", v)
+			nextOffset = &s
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"documents": len(documents),
+		"has_more":  nextOffset != nil,
+	}).Debug("Qdrant scroll completed")
+
+	return &ScrollResponse{
+		Documents:  documents,
+		NextOffset: nextOffset,
+	}, nil
+}
+
+// ScrollAll scrolls through ALL points in collection using callback
+func (s *QdrantStore) ScrollAll(ctx context.Context, collection string, filters map[string]interface{}, callback func([]VectorDocument) error) error {
+	var offset *string
+	batchNum := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		resp, err := s.Scroll(ctx, ScrollRequest{
+			Collection: collection,
+			Filters:    filters,
+			Limit:      100,
+			Offset:     offset,
+			WithVector: false,
+		})
+		if err != nil {
+			return fmt.Errorf("scroll batch %d: %w", batchNum, err)
+		}
+
+		if len(resp.Documents) > 0 {
+			if err := callback(resp.Documents); err != nil {
+				return fmt.Errorf("callback batch %d: %w", batchNum, err)
+			}
+		}
+
+		if resp.NextOffset == nil {
+			break
+		}
+		offset = resp.NextOffset
+		batchNum++
+	}
+
+	return nil
+}
+
 // Ensure QdrantStore implements VectorStore interface
 var _ VectorStore = (*QdrantStore)(nil)

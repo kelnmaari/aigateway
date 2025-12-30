@@ -24,7 +24,8 @@
 		Clock,
 		BarChart3
 	} from 'lucide-svelte';
-	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview } from '$lib/api/gitlab';
+	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview, type SecretsScanResult, type SecretFinding, type DeepScanResult, type DeepFinding, type DependencyScanResult, type DependencyWithVulns, type QualityScore, type QualityCategory, type DeadCodeResult, type DocScanResult, type DocGenerationResult, type TestScanResult, type TestGenerationResult, type ChangelogAnalysis, type BreakingChange } from '$lib/api/gitlab';
+	import { Shield, Brain, Package, Trash2 as TrashIcon, FileEdit, TestTube } from 'lucide-svelte';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
@@ -76,6 +77,58 @@
 
 	// Indexing state
 	let indexingProjects = $state<Set<string>>(new Set());
+
+	// Secrets scanning state
+	let showSecretsModal = $state(false);
+	let secretsScanResult = $state<SecretsScanResult | null>(null);
+	let isScanning = $state(false);
+	let scanningProjectId = $state<string | null>(null);
+	
+	// Deep scan (LLM) state
+	let showDeepScanModal = $state(false);
+	let deepScanResult = $state<DeepScanResult | null>(null);
+	let isDeepScanning = $state(false);
+	let deepScanningProjectId = $state<string | null>(null);
+	
+	// Dependency scan state
+	let showDependenciesModal = $state(false);
+	let dependenciesScanResult = $state<DependencyScanResult | null>(null);
+	let isCheckingDependencies = $state(false);
+	let checkingDependenciesProjectId = $state<string | null>(null);
+	
+	// Changelog analysis state
+	let showChangelogModal = $state(false);
+	let changelogResult = $state<ChangelogAnalysis | null>(null);
+	let isAnalyzingChangelog = $state(false);
+	let analyzingPackage = $state<{ name: string; current: string; latest: string; language: string } | null>(null);
+	
+	// Quality analysis state
+	let showQualityModal = $state(false);
+	let qualityResult = $state<QualityScore | null>(null);
+	let isAnalyzingQuality = $state(false);
+	let analyzingQualityProjectId = $state<string | null>(null);
+	
+	// Dead code detection state
+	let showDeadCodeModal = $state(false);
+	let deadCodeResult = $state<DeadCodeResult | null>(null);
+	let isDetectingDeadCode = $state(false);
+	let detectingDeadCodeProjectId = $state<string | null>(null);
+	
+	// Auto-documentation state
+	let showAutoDocModal = $state(false);
+	let docScanResult = $state<DocScanResult | null>(null);
+	let docGenResult = $state<DocGenerationResult | null>(null);
+	let isGeneratingDocs = $state(false);
+	let generatingDocsProjectId = $state<string | null>(null);
+	let autoDocStep = $state<'scan' | 'generate' | 'results'>('scan');
+	
+	// Test generation state
+	let showTestGenModal = $state(false);
+	let testScanResult = $state<TestScanResult | null>(null);
+	let testGenResult = $state<TestGenerationResult | null>(null);
+	let isGeneratingTests = $state(false);
+	let generatingTestsProjectId = $state<string | null>(null);
+	let testGenStep = $state<'scan' | 'generate' | 'results'>('scan');
 
 	// Add Project form
 	let formGitLabProjectId = $state('');
@@ -350,6 +403,447 @@
 			await loadReviews();
 		} catch (error) {
 			alert(m.alert_failed_retry_review());
+		}
+	}
+
+	async function handleScanSecrets(project: GitLabProject) {
+		if (project.index_status !== 'completed') {
+			alert(m.alert_index_required_for_scan?.() || 'Please index the repository first before scanning for secrets.');
+			return;
+		}
+
+		scanningProjectId = project.id;
+		isScanning = true;
+		secretsScanResult = null;
+		showSecretsModal = true;
+
+		try {
+			const result = await gitlabApi.scanSecrets(project.id);
+			secretsScanResult = result;
+		} catch (error) {
+			console.error('Secrets scan failed:', error);
+			secretsScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				started_at: new Date().toISOString(),
+				completed_at: new Date().toISOString(),
+				duration: '0s',
+				chunks_scanned: 0,
+				findings: [],
+				summary: { total_findings: 0, by_severity: {}, by_category: {}, files_affected: 0 },
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Scan failed'
+			};
+		} finally {
+			isScanning = false;
+			scanningProjectId = null;
+		}
+	}
+	
+	async function handleDeepScan(project: GitLabProject) {
+		if (project.index_status !== 'completed') {
+			alert(m.alert_index_required_for_scan?.() || 'Please index the repository first before scanning for secrets.');
+			return;
+		}
+		
+		if (!project.analysis_model_id) {
+			alert(m.alert_analysis_model_required?.() || 'Please configure an analysis model for this project first.');
+			return;
+		}
+
+		deepScanningProjectId = project.id;
+		isDeepScanning = true;
+		deepScanResult = null;
+		showDeepScanModal = true;
+
+		try {
+			const result = await gitlabApi.deepScanSecrets(project.id);
+			deepScanResult = result;
+		} catch (error) {
+			console.error('Deep secrets scan failed:', error);
+			deepScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				model_id: project.analysis_model_id || '',
+				started_at: new Date().toISOString(),
+				completed_at: new Date().toISOString(),
+				duration: '0s',
+				chunks_scanned: 0,
+				tokens_used: 0,
+				findings: [],
+				summary: { total_findings: 0, by_severity: {}, by_category: {}, files_affected: 0 },
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Deep scan failed'
+			};
+		} finally {
+			isDeepScanning = false;
+			deepScanningProjectId = null;
+		}
+	}
+	
+	function getConfidenceColor(confidence: string): string {
+		switch (confidence) {
+			case 'high': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+			case 'medium': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+			case 'low': return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+			default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+		}
+	}
+	
+	async function handleCheckDependencies(project: GitLabProject) {
+		if (project.index_status !== 'completed') {
+			alert(m.alert_index_required_for_scan?.() || 'Please index the repository first.');
+			return;
+		}
+
+		checkingDependenciesProjectId = project.id;
+		isCheckingDependencies = true;
+		dependenciesScanResult = null;
+		showDependenciesModal = true;
+
+		try {
+			const result = await gitlabApi.checkDependencies(project.id);
+			dependenciesScanResult = result;
+		} catch (error) {
+			console.error('Dependencies check failed:', error);
+			dependenciesScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				language: '',
+				file_path: '',
+				scanned_at: new Date().toISOString(),
+				duration: '0s',
+				dependencies: [],
+				summary: { 
+					total_dependencies: 0, 
+					direct_dependencies: 0,
+					outdated_count: 0,
+					vulnerable_count: 0,
+					up_to_date_count: 0,
+					by_update_type: {}, 
+					by_severity: {},
+					critical_vulns: 0
+				},
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Check failed'
+			};
+		} finally {
+			isCheckingDependencies = false;
+			checkingDependenciesProjectId = null;
+		}
+	}
+	
+	async function handleAnalyzeChangelog(dep: DependencyWithVulns, projectId: string, language: string) {
+		if (!dep.dependency.has_update) return;
+		
+		analyzingPackage = {
+			name: dep.dependency.name,
+			current: dep.dependency.current_version,
+			latest: dep.dependency.latest_version,
+			language: language
+		};
+		isAnalyzingChangelog = true;
+		changelogResult = null;
+		showChangelogModal = true;
+
+		try {
+			const result = await gitlabApi.analyzeChangelog(projectId, {
+				package_name: dep.dependency.name,
+				current_version: dep.dependency.current_version,
+				latest_version: dep.dependency.latest_version,
+				language: language
+			});
+			changelogResult = result;
+		} catch (error) {
+			console.error('Changelog analysis failed:', error);
+			changelogResult = {
+				package_name: dep.dependency.name,
+				current_version: dep.dependency.current_version,
+				latest_version: dep.dependency.latest_version,
+				language: language,
+				summary: 'Analysis failed: ' + (error instanceof Error ? error.message : 'Unknown error'),
+				breaking_changes: [],
+				new_features: [],
+				bug_fixes: [],
+				security_fixes: [],
+				deprecated_features: [],
+				migration_guide: '',
+				risk_level: 'medium',
+				confidence: 'low',
+				tokens_used: 0,
+				analyzed_at: new Date().toISOString()
+			};
+		} finally {
+			isAnalyzingChangelog = false;
+		}
+	}
+	
+	function getRiskLevelColor(level: string): string {
+		switch (level) {
+			case 'low': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+			case 'medium': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+			case 'high': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/30';
+			case 'critical': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+			default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+		}
+	}
+	
+	function getUpdateTypeColor(updateType: string): string {
+		switch (updateType) {
+			case 'major': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+			case 'minor': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+			case 'patch': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+			default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+		}
+	}
+	
+	async function handleAnalyzeQuality(project: GitLabProject) {
+		if (project.index_status !== 'completed' || !project.analysis_model_id) {
+			alert(m.alert_index_and_model_required?.() || 'Please index the repository and configure an analysis model.');
+			return;
+		}
+
+		analyzingQualityProjectId = project.id;
+		isAnalyzingQuality = true;
+		qualityResult = null;
+		showQualityModal = true;
+
+		try {
+			const result = await gitlabApi.analyzeQuality(project.id, { max_files: 30 });
+			qualityResult = result;
+		} catch (error) {
+			console.error('Quality analysis failed:', error);
+			qualityResult = {
+				project_id: project.id,
+				scan_id: '',
+				scanned_at: new Date().toISOString(),
+				duration: '0s',
+				overall_score: 0,
+				breakdown: {} as Record<QualityCategory, number>,
+				file_scores: [],
+				recommendations: [],
+				summary: { 
+					total_files: 0, 
+					total_lines_of_code: 0,
+					total_functions: 0,
+					issues_count: 0,
+					high_severity_count: 0,
+					medium_severity_count: 0,
+					low_severity_count: 0,
+					top_issue_categories: [],
+					best_scoring_files: [],
+					worst_scoring_files: []
+				},
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Analysis failed',
+				model_id: '',
+				tokens_used: 0
+			};
+		} finally {
+			isAnalyzingQuality = false;
+			analyzingQualityProjectId = null;
+		}
+	}
+	
+	function getScoreColor(score: number): string {
+		if (score >= 80) return 'text-green-600';
+		if (score >= 60) return 'text-yellow-600';
+		if (score >= 40) return 'text-orange-600';
+		return 'text-red-600';
+	}
+	
+	function getScoreBgColor(score: number): string {
+		if (score >= 80) return 'bg-green-500';
+		if (score >= 60) return 'bg-yellow-500';
+		if (score >= 40) return 'bg-orange-500';
+		return 'bg-red-500';
+	}
+	
+	async function handleDetectDeadCode(project: GitLabProject) {
+		if (project.index_status !== 'completed' || !project.analysis_model_id) {
+			alert(m.alert_index_and_model_required?.() || 'Please index the repository and configure an analysis model.');
+			return;
+		}
+
+		detectingDeadCodeProjectId = project.id;
+		isDetectingDeadCode = true;
+		deadCodeResult = null;
+		showDeadCodeModal = true;
+
+		try {
+			const result = await gitlabApi.detectDeadCode(project.id, { max_chunks: 100 });
+			deadCodeResult = result;
+		} catch (error) {
+			console.error('Dead code detection failed:', error);
+			deadCodeResult = {
+				project_id: project.id,
+				scan_id: '',
+				scanned_at: new Date().toISOString(),
+				duration: '0s',
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Detection failed',
+				dead_symbols: [],
+				summary: {
+					total_dead_symbols: 0,
+					by_type: {} as Record<string, number>,
+					by_confidence: {} as Record<string, number>,
+					estimated_dead_lines: 0,
+					top_affected_files: []
+				},
+				model_id: '',
+				tokens_used: 0,
+				files_scanned: 0,
+				chunks_scanned: 0
+			};
+		} finally {
+			isDetectingDeadCode = false;
+			detectingDeadCodeProjectId = null;
+		}
+	}
+	
+	function getSymbolTypeIcon(type: string): string {
+		switch (type) {
+			case 'function': return '𝑓';
+			case 'type': return 'T';
+			case 'class': return 'C';
+			case 'interface': return 'I';
+			case 'variable': return 'v';
+			case 'constant': return 'K';
+			default: return '?';
+		}
+	}
+	
+	async function handleAutoDoc(project: GitLabProject) {
+		if (project.index_status !== 'completed' || !project.analysis_model_id) {
+			alert(m.alert_index_and_model_required?.() || 'Please index the repository and configure an analysis model.');
+			return;
+		}
+
+		generatingDocsProjectId = project.id;
+		isGeneratingDocs = true;
+		docScanResult = null;
+		docGenResult = null;
+		autoDocStep = 'scan';
+		showAutoDocModal = true;
+
+		try {
+			// Step 1: Scan for undocumented code
+			autoDocStep = 'scan';
+			const scanResult = await gitlabApi.scanDocs(project.id, { exported_only: true });
+			docScanResult = scanResult;
+			
+			if (scanResult.symbols.length === 0) {
+				autoDocStep = 'results';
+				return;
+			}
+
+			// Step 2: Generate documentation
+			autoDocStep = 'generate';
+			const genResult = await gitlabApi.generateDocs(project.id, { max_symbols: 15 });
+			docGenResult = genResult;
+			autoDocStep = 'results';
+		} catch (error) {
+			console.error('Auto-documentation failed:', error);
+			docScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				scanned_at: new Date().toISOString(),
+				duration: '0s',
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Failed',
+				symbols: [],
+				summary: {
+					total_symbols: 0,
+					exported_count: 0,
+					by_type: {},
+					by_language: {},
+					by_importance: {},
+					top_affected_files: []
+				},
+				files_scanned: 0
+			};
+			autoDocStep = 'results';
+		} finally {
+			isGeneratingDocs = false;
+			generatingDocsProjectId = null;
+		}
+	}
+	
+	async function handleTestGen(project: GitLabProject) {
+		if (project.index_status !== 'completed' || !project.analysis_model_id) {
+			alert(m.alert_index_and_model_required?.() || 'Please index the repository and configure an analysis model.');
+			return;
+		}
+
+		generatingTestsProjectId = project.id;
+		isGeneratingTests = true;
+		testScanResult = null;
+		testGenResult = null;
+		testGenStep = 'scan';
+		showTestGenModal = true;
+
+		try {
+			// Step 1: Scan for testable functions
+			testGenStep = 'scan';
+			const scanResult = await gitlabApi.scanTests(project.id);
+			testScanResult = scanResult;
+			
+			if (scanResult.summary.without_tests === 0) {
+				testGenStep = 'results';
+				return;
+			}
+
+			// Step 2: Generate tests
+			testGenStep = 'generate';
+			const genResult = await gitlabApi.generateTests(project.id, { max_functions: 10 });
+			testGenResult = genResult;
+			testGenStep = 'results';
+		} catch (error) {
+			console.error('Test generation failed:', error);
+			testScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				scanned_at: new Date().toISOString(),
+				duration: '0s',
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Failed',
+				functions: [],
+				summary: {
+					total_functions: 0,
+					without_tests: 0,
+					with_tests: 0,
+					by_language: {},
+					by_complexity: {},
+					top_files: []
+				},
+				files_scanned: 0
+			};
+			testGenStep = 'results';
+		} finally {
+			isGeneratingTests = false;
+			generatingTestsProjectId = null;
+		}
+	}
+
+	function getSeverityColor(severity: string): string {
+		switch (severity) {
+			case 'critical': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+			case 'high': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/30';
+			case 'medium': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+			case 'low': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
+			default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+		}
+	}
+
+	function getSeverityIcon(severity: string) {
+		switch (severity) {
+			case 'critical':
+			case 'high':
+				return XCircle;
+			case 'medium':
+				return AlertCircle;
+			default:
+				return CheckCircle;
 		}
 	}
 
@@ -668,6 +1162,111 @@
 											title="View Details"
 										>
 											<Eye class="h-4 w-4" />
+										</button>
+										<button
+											onclick={() => handleScanSecrets(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												project.index_status !== 'completed' && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' ? m.gitlab_scan_secrets?.() || 'Scan Secrets (Regex)' : m.gitlab_index_first?.() || 'Index first'}
+											disabled={scanningProjectId === project.id || project.index_status !== 'completed'}
+										>
+											{#if scanningProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<Shield class="h-4 w-4" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleDeepScan(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_deep_scan?.() || 'Deep Scan (LLM)' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
+											disabled={deepScanningProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+										>
+											{#if deepScanningProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<Brain class="h-4 w-4 text-purple-500" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleCheckDependencies(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												project.index_status !== 'completed' && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' ? m.gitlab_check_dependencies?.() || 'Check Dependencies' : m.gitlab_index_first?.() || 'Index first'}
+											disabled={checkingDependenciesProjectId === project.id || project.index_status !== 'completed'}
+										>
+											{#if checkingDependenciesProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<Package class="h-4 w-4 text-blue-500" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleAnalyzeQuality(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_quality_score?.() || 'Quality Score' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
+											disabled={analyzingQualityProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+										>
+											{#if analyzingQualityProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<BarChart3 class="h-4 w-4 text-indigo-500" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleDetectDeadCode(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_dead_code?.() || 'Dead Code' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
+											disabled={detectingDeadCodeProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+										>
+											{#if detectingDeadCodeProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<FileCode class="h-4 w-4 text-orange-500" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleAutoDoc(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_auto_doc?.() || 'Auto Doc' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
+											disabled={generatingDocsProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+										>
+											{#if generatingDocsProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<FileEdit class="h-4 w-4 text-purple-500" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleTestGen(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_test_gen?.() || 'Generate Tests' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
+											disabled={generatingTestsProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+										>
+											{#if generatingTestsProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<TestTube class="h-4 w-4 text-green-500" />
+											{/if}
 										</button>
 										<button
 											onclick={() => openEditProject(project)}
@@ -1493,6 +2092,1164 @@
 						{m.table_open_gitlab()}
 					</Button>
 				</a>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Secrets Scan Modal -->
+{#if showSecretsModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showSecretsModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showSecretsModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-xl">
+			<div class="mb-4 flex items-center justify-between">
+				<h3 class="text-xl font-semibold flex items-center gap-2">
+					<Shield class="h-5 w-5 text-primary" />
+					{m.gitlab_secrets_scan_title?.() || 'Secrets Scan Results'}
+				</h3>
+				<button onclick={() => (showSecretsModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isScanning}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-primary" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_secrets?.() || 'Scanning for secrets...'}</p>
+				</div>
+			{:else if secretsScanResult}
+				{#if secretsScanResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Scan Failed'}</p>
+						<p class="text-sm">{secretsScanResult.error}</p>
+					</div>
+				{:else}
+					<!-- Summary -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.summary.total_findings}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_secrets_total?.() || 'Total Findings'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.summary.files_affected}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_files_affected?.() || 'Files Affected'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.chunks_scanned}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_chunks_scanned?.() || 'Chunks Scanned'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.duration}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_scan_duration?.() || 'Duration'}</div>
+						</div>
+					</div>
+
+					<!-- Severity breakdown -->
+					{#if Object.keys(secretsScanResult.summary.by_severity).length > 0}
+						<div class="mb-4 flex flex-wrap gap-2">
+							{#each Object.entries(secretsScanResult.summary.by_severity) as [severity, count]}
+								<span class={cn('px-3 py-1 rounded-full text-sm font-medium', getSeverityColor(severity))}>
+									{severity}: {count}
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Findings list -->
+					{#if secretsScanResult.findings.length > 0}
+						<div class="space-y-3 max-h-[50vh] overflow-auto">
+							{#each secretsScanResult.findings as finding}
+								<div class="rounded-lg border p-4 hover:bg-muted/50">
+									<div class="flex items-start justify-between gap-4">
+										<div class="flex-1">
+											<div class="flex items-center gap-2 mb-1">
+												{#if true}
+													{@const SevIcon = getSeverityIcon(finding.severity)}
+													<span class={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getSeverityColor(finding.severity))}>
+														{finding.severity}
+													</span>
+												{/if}
+												<span class="font-medium">{finding.pattern_name}</span>
+												<span class="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded">{finding.category}</span>
+											</div>
+											<div class="text-sm text-muted-foreground mb-2">
+												<code class="px-1 bg-muted rounded">{finding.file_path}</code>
+												{#if finding.start_line > 0}
+													<span class="ml-1">:{finding.start_line}</span>
+												{/if}
+											</div>
+											<div class="text-sm font-mono bg-muted p-2 rounded overflow-x-auto">
+												{finding.match}
+											</div>
+											{#if finding.context}
+												<details class="mt-2">
+													<summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+														{m.gitlab_show_context?.() || 'Show context'}
+													</summary>
+													<pre class="mt-1 text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">{finding.context}</pre>
+												</details>
+											{/if}
+										</div>
+									</div>
+									{#if finding.suggestion}
+										<div class="mt-2 text-sm text-muted-foreground border-t pt-2">
+											<strong>{m.gitlab_suggestion?.() || 'Suggestion'}:</strong> {finding.suggestion}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="flex flex-col items-center justify-center py-12 text-center">
+							<CheckCircle class="h-16 w-16 text-green-500" />
+							<p class="mt-4 text-lg font-medium text-green-600 dark:text-green-400">
+								{m.gitlab_no_secrets_found?.() || 'No secrets found!'}
+							</p>
+							<p class="text-sm text-muted-foreground">
+								{m.gitlab_code_looks_safe?.() || 'Your code looks safe from hardcoded secrets.'}
+							</p>
+						</div>
+					{/if}
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showSecretsModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Deep Scan (LLM) Modal -->
+{#if showDeepScanModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showDeepScanModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDeepScanModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<Brain class="h-6 w-6 text-purple-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_deep_scan_title?.() || 'Deep Scan Results (LLM Analysis)'}
+					</h3>
+				</div>
+				<button onclick={() => (showDeepScanModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isDeepScanning}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_deep_scanning?.() || 'Analyzing code with LLM...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_deep_scan_patience?.() || 'This may take several minutes for large repositories'}</p>
+				</div>
+			{:else if deepScanResult}
+				{#if deepScanResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Scan Failed'}</p>
+						<p class="text-sm">{deepScanResult.error}</p>
+					</div>
+				{:else}
+					<!-- Summary stats -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.summary.total_findings}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_secrets_total?.() || 'Total Findings'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.summary.files_affected}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_files_affected?.() || 'Files Affected'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.chunks_scanned}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_chunks_scanned?.() || 'Chunks Scanned'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.tokens_used.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tokens_used?.() || 'Tokens Used'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.duration}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_scan_duration?.() || 'Duration'}</div>
+						</div>
+					</div>
+					
+					<!-- Model info -->
+					<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
+						<Bot class="h-4 w-4" />
+						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{deepScanResult.model_id}</strong></span>
+					</div>
+
+					<!-- Severity breakdown -->
+					{#if Object.keys(deepScanResult.summary.by_severity).length > 0}
+						<div class="mb-4 flex flex-wrap gap-2">
+							{#each Object.entries(deepScanResult.summary.by_severity) as [severity, count]}
+								<span class={cn('px-3 py-1 rounded-full text-sm font-medium', getSeverityColor(severity))}>
+									{severity}: {count}
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Findings list -->
+					{#if deepScanResult.findings.length > 0}
+						<div class="space-y-3 max-h-[50vh] overflow-auto">
+							{#each deepScanResult.findings as finding}
+								<div class="rounded-lg border p-4 hover:bg-muted/50">
+									<div class="flex items-start justify-between gap-4">
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center gap-2 flex-wrap">
+												<span class={cn('px-2 py-0.5 rounded text-xs font-medium', getSeverityColor(finding.severity))}>
+													{finding.severity}
+												</span>
+												<span class="text-xs text-muted-foreground">{finding.type}</span>
+												<span class={cn('px-2 py-0.5 rounded text-xs', getConfidenceColor(finding.confidence))}>
+													{m.gitlab_confidence?.() || 'Confidence'}: {finding.confidence}
+												</span>
+											</div>
+											<div class="mt-2 font-medium text-sm">
+												{finding.description}
+											</div>
+											<div class="mt-1 text-xs text-muted-foreground flex items-center gap-2">
+												<FileCode class="h-3 w-3" />
+												{finding.file_path}:{finding.start_line}-{finding.end_line}
+											</div>
+											{#if finding.code_snippet}
+												<pre class="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap font-mono">{finding.code_snippet}</pre>
+											{/if}
+										</div>
+									</div>
+									{#if finding.suggestion}
+										<div class="mt-2 text-sm text-muted-foreground border-t pt-2">
+											<strong>{m.gitlab_suggestion?.() || 'Suggestion'}:</strong> {finding.suggestion}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="flex flex-col items-center justify-center py-12 text-center">
+							<CheckCircle class="h-16 w-16 text-green-500" />
+							<p class="mt-4 text-lg font-medium text-green-600 dark:text-green-400">
+								{m.gitlab_no_secrets_found?.() || 'No secrets found!'}
+							</p>
+							<p class="text-sm text-muted-foreground">
+								{m.gitlab_llm_analysis_clean?.() || 'LLM analysis did not detect any security issues.'}
+							</p>
+						</div>
+					{/if}
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showDeepScanModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Dependencies Check Modal -->
+{#if showDependenciesModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showDependenciesModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDependenciesModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<Package class="h-6 w-6 text-blue-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_dependencies_title?.() || 'Dependencies Check Results'}
+					</h3>
+				</div>
+				<button onclick={() => (showDependenciesModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isCheckingDependencies}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-blue-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_checking_dependencies?.() || 'Checking dependencies...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_deps_patience?.() || 'Fetching version info from registries'}</p>
+				</div>
+			{:else if dependenciesScanResult}
+				{#if dependenciesScanResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Check Failed'}</p>
+						<p class="text-sm">{dependenciesScanResult.error}</p>
+					</div>
+				{:else}
+					<!-- File info -->
+					<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
+						<FileCode class="h-4 w-4" />
+						<span>{dependenciesScanResult.file_path} ({dependenciesScanResult.language})</span>
+						<span class="mx-2">•</span>
+						<Clock class="h-4 w-4" />
+						<span>{dependenciesScanResult.duration}</span>
+					</div>
+
+					<!-- Summary stats -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{dependenciesScanResult.summary.total_dependencies}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_deps_total?.() || 'Total'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{dependenciesScanResult.summary.direct_dependencies}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_deps_direct?.() || 'Direct'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold text-yellow-600">{dependenciesScanResult.summary.outdated_count}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_deps_outdated?.() || 'Outdated'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold text-red-600">{dependenciesScanResult.summary.vulnerable_count}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_deps_vulnerable?.() || 'Vulnerable'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold text-green-600">{dependenciesScanResult.summary.up_to_date_count}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_deps_uptodate?.() || 'Up to Date'}</div>
+						</div>
+					</div>
+
+					<!-- Update type breakdown -->
+					{#if Object.keys(dependenciesScanResult.summary.by_update_type).length > 0}
+						<div class="mb-4 flex flex-wrap gap-2">
+							{#each Object.entries(dependenciesScanResult.summary.by_update_type) as [updateType, count]}
+								<span class={cn('px-3 py-1 rounded-full text-sm font-medium', getUpdateTypeColor(updateType))}>
+									{updateType}: {count}
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Dependencies list -->
+					{#if dependenciesScanResult.dependencies.length > 0}
+						<div class="space-y-2 max-h-[50vh] overflow-auto">
+							<!-- Header -->
+							<div class="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground border-b">
+								<div class="col-span-4">{m.gitlab_deps_package?.() || 'Package'}</div>
+								<div class="col-span-2">{m.gitlab_deps_current?.() || 'Current'}</div>
+								<div class="col-span-2">{m.gitlab_deps_latest?.() || 'Latest'}</div>
+								<div class="col-span-1">{m.gitlab_deps_update?.() || 'Update'}</div>
+								<div class="col-span-1">{m.gitlab_deps_status?.() || 'Status'}</div>
+								<div class="col-span-2">{m.gitlab_deps_actions?.() || 'Actions'}</div>
+							</div>
+							
+							{#each dependenciesScanResult.dependencies as depWithVulns}
+								<div class={cn(
+									'grid grid-cols-12 gap-2 px-3 py-2 rounded-lg text-sm',
+									depWithVulns.is_vulnerable ? 'bg-red-50 dark:bg-red-900/20' : 
+									depWithVulns.dependency.has_update ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-muted/50'
+								)}>
+									<div class="col-span-4 font-mono text-xs truncate" title={depWithVulns.dependency.name}>
+										{depWithVulns.dependency.name}
+										{#if depWithVulns.dependency.indirect}
+											<span class="text-muted-foreground ml-1">(indirect)</span>
+										{/if}
+									</div>
+									<div class="col-span-2 font-mono text-xs">{depWithVulns.dependency.current_version}</div>
+									<div class="col-span-2 font-mono text-xs">{depWithVulns.dependency.latest_version}</div>
+									<div class="col-span-1">
+										{#if depWithVulns.dependency.update_type !== 'none'}
+											<span class={cn('px-2 py-0.5 rounded text-xs font-medium', getUpdateTypeColor(depWithVulns.dependency.update_type))}>
+												{depWithVulns.dependency.update_type}
+											</span>
+										{:else}
+											<span class="text-green-600 text-xs">✓</span>
+										{/if}
+									</div>
+									<div class="col-span-1">
+										{#if depWithVulns.is_vulnerable}
+											<span class="text-red-600" title={`${depWithVulns.vulnerabilities.length} vulnerabilities`}>
+												⚠️ {depWithVulns.vulnerabilities.length}
+											</span>
+										{:else}
+											<span class="text-green-600">✓</span>
+										{/if}
+									</div>
+									<div class="col-span-2">
+										{#if depWithVulns.dependency.has_update}
+											<button
+												onclick={() => handleAnalyzeChangelog(depWithVulns, dependenciesScanResult!.project_id, dependenciesScanResult!.language)}
+												class="px-2 py-1 text-xs rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+												title={m.gitlab_analyze_changelog?.() || 'Analyze Changelog'}
+											>
+												{m.gitlab_analyze_changelog_short?.() || 'Analyze'}
+											</button>
+										{/if}
+									</div>
+								</div>
+								
+								<!-- Vulnerabilities expandable -->
+								{#if depWithVulns.is_vulnerable}
+									<div class="ml-4 mb-2 space-y-1">
+										{#each depWithVulns.vulnerabilities as vuln}
+											<div class="text-xs p-2 rounded bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500">
+												<div class="flex items-center gap-2">
+													<span class={cn('px-1.5 py-0.5 rounded text-xs font-bold', getSeverityColor(vuln.severity))}>
+														{vuln.severity.toUpperCase()}
+													</span>
+													<a href={vuln.references?.[0]} target="_blank" class="text-blue-600 hover:underline font-medium">
+														{vuln.id}
+													</a>
+												</div>
+												<p class="mt-1 text-muted-foreground">{vuln.summary}</p>
+												{#if vuln.fixed_in}
+													<p class="mt-1"><strong>Fix:</strong> Upgrade to {vuln.fixed_in}</p>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								{/if}
+							{/each}
+						</div>
+					{:else}
+						<div class="flex flex-col items-center justify-center py-12 text-center">
+							<Package class="h-16 w-16 text-muted-foreground/50" />
+							<p class="mt-4 text-lg font-medium text-muted-foreground">
+								{m.gitlab_no_dependencies?.() || 'No dependencies found'}
+							</p>
+							<p class="text-sm text-muted-foreground">
+								{m.gitlab_deps_file_not_found?.() || 'Could not find dependency file in indexed code.'}
+							</p>
+						</div>
+					{/if}
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showDependenciesModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Changelog Analysis Modal -->
+{#if showChangelogModal}
+	<div
+		class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showChangelogModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showChangelogModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<FileCode class="h-6 w-6 text-blue-500" />
+					<div>
+						<h3 class="text-lg font-semibold">
+							{m.gitlab_changelog_title?.() || 'Changelog Analysis'}
+						</h3>
+						{#if analyzingPackage}
+							<p class="text-sm text-muted-foreground font-mono">
+								{analyzingPackage.name}: {analyzingPackage.current} → {analyzingPackage.latest}
+							</p>
+						{/if}
+					</div>
+				</div>
+				<button onclick={() => (showChangelogModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isAnalyzingChangelog}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-blue-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_analyzing_changelog?.() || 'Analyzing changelog...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_changelog_patience?.() || 'Fetching changelog and analyzing with LLM'}</p>
+				</div>
+			{:else if changelogResult}
+				<!-- Risk Level Badge -->
+				<div class="mb-4 flex items-center gap-4">
+					<span class={cn('px-3 py-1 rounded-full text-sm font-bold uppercase', getRiskLevelColor(changelogResult.risk_level))}>
+						{changelogResult.risk_level} {m.gitlab_risk?.() || 'Risk'}
+					</span>
+					<span class={cn('px-3 py-1 rounded-full text-sm', getConfidenceColor(changelogResult.confidence))}>
+						{changelogResult.confidence} {m.gitlab_confidence?.() || 'confidence'}
+					</span>
+				</div>
+
+				<!-- Summary -->
+				<div class="mb-6 p-4 rounded-lg bg-muted">
+					<h4 class="font-semibold mb-2">{m.gitlab_summary?.() || 'Summary'}</h4>
+					<p class="text-sm">{changelogResult.summary}</p>
+				</div>
+
+				<!-- Breaking Changes -->
+				{#if changelogResult.breaking_changes.length > 0}
+					<div class="mb-6">
+						<h4 class="font-semibold mb-2 text-red-600 flex items-center gap-2">
+							<AlertCircle class="h-5 w-5" />
+							{m.gitlab_breaking_changes?.() || 'Breaking Changes'} ({changelogResult.breaking_changes.length})
+						</h4>
+						<div class="space-y-2">
+							{#each changelogResult.breaking_changes as bc}
+								<div class="p-3 rounded border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20">
+									<div class="flex items-center gap-2 mb-1">
+										<span class={cn('px-1.5 py-0.5 rounded text-xs font-bold', 
+											bc.severity === 'high' ? 'bg-red-200 text-red-800' : 
+											bc.severity === 'medium' ? 'bg-yellow-200 text-yellow-800' : 
+											'bg-gray-200 text-gray-800'
+										)}>
+											{bc.severity.toUpperCase()}
+										</span>
+										<span class="text-xs text-muted-foreground">{bc.affected_area}</span>
+									</div>
+									<p class="text-sm font-medium">{bc.description}</p>
+									{#if bc.workaround}
+										<p class="text-xs text-muted-foreground mt-1">
+											<strong>{m.gitlab_workaround?.() || 'Workaround'}:</strong> {bc.workaround}
+										</p>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- New Features -->
+				{#if changelogResult.new_features.length > 0}
+					<div class="mb-4">
+						<h4 class="font-semibold mb-2 text-green-600">{m.gitlab_new_features?.() || 'New Features'}</h4>
+						<ul class="list-disc list-inside text-sm space-y-1">
+							{#each changelogResult.new_features as feature}
+								<li>{feature}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+
+				<!-- Bug Fixes -->
+				{#if changelogResult.bug_fixes.length > 0}
+					<div class="mb-4">
+						<h4 class="font-semibold mb-2 text-blue-600">{m.gitlab_bug_fixes?.() || 'Bug Fixes'}</h4>
+						<ul class="list-disc list-inside text-sm space-y-1">
+							{#each changelogResult.bug_fixes as fix}
+								<li>{fix}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+
+				<!-- Security Fixes -->
+				{#if changelogResult.security_fixes.length > 0}
+					<div class="mb-4">
+						<h4 class="font-semibold mb-2 text-orange-600">{m.gitlab_security_fixes?.() || 'Security Fixes'}</h4>
+						<ul class="list-disc list-inside text-sm space-y-1">
+							{#each changelogResult.security_fixes as fix}
+								<li>{fix}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+
+				<!-- Deprecated Features -->
+				{#if changelogResult.deprecated_features.length > 0}
+					<div class="mb-4">
+						<h4 class="font-semibold mb-2 text-yellow-600">{m.gitlab_deprecated?.() || 'Deprecated Features'}</h4>
+						<ul class="list-disc list-inside text-sm space-y-1">
+							{#each changelogResult.deprecated_features as dep}
+								<li>{dep}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+
+				<!-- Migration Guide -->
+				{#if changelogResult.migration_guide}
+					<div class="mb-4">
+						<h4 class="font-semibold mb-2">{m.gitlab_migration_guide?.() || 'Migration Guide'}</h4>
+						<div class="p-3 rounded bg-muted text-sm whitespace-pre-wrap">{changelogResult.migration_guide}</div>
+					</div>
+				{/if}
+
+				<!-- Tokens Used -->
+				<div class="text-xs text-muted-foreground text-right">
+					{m.gitlab_tokens_used?.() || 'Tokens used'}: {changelogResult.tokens_used}
+				</div>
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showChangelogModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Code Quality Modal -->
+{#if showQualityModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showQualityModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showQualityModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<BarChart3 class="h-6 w-6 text-indigo-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_quality_title?.() || 'Code Quality Score'}
+					</h3>
+				</div>
+				<button onclick={() => (showQualityModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isAnalyzingQuality}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-indigo-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_analyzing_quality?.() || 'Analyzing code quality...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_quality_patience?.() || 'This may take a few minutes for large projects'}</p>
+				</div>
+			{:else if qualityResult}
+				{#if qualityResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Analysis Failed'}</p>
+						<p class="text-sm">{qualityResult.error}</p>
+					</div>
+				{:else}
+					<!-- Overall Score Gauge -->
+					<div class="mb-8 flex flex-col items-center">
+						<div class="relative w-48 h-48">
+							<!-- Background circle -->
+							<svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+								<circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" class="text-muted" stroke-width="10" />
+								<circle 
+									cx="50" cy="50" r="45" fill="none" 
+									class={getScoreBgColor(qualityResult.overall_score)} 
+									stroke-width="10"
+									stroke-dasharray={`${qualityResult.overall_score * 2.83} 283`}
+									stroke-linecap="round"
+								/>
+							</svg>
+							<!-- Score text -->
+							<div class="absolute inset-0 flex flex-col items-center justify-center">
+								<span class={cn('text-5xl font-bold', getScoreColor(qualityResult.overall_score))}>
+									{qualityResult.overall_score}
+								</span>
+								<span class="text-sm text-muted-foreground">/100</span>
+							</div>
+						</div>
+						<p class="mt-2 text-muted-foreground">{m.gitlab_overall_score?.() || 'Overall Score'}</p>
+					</div>
+
+					<!-- Category Breakdown -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+						{#each Object.entries(qualityResult.breakdown) as [category, score]}
+							<div class="rounded-lg bg-muted p-3 text-center">
+								<div class={cn('text-2xl font-bold', getScoreColor(score))}>{score}</div>
+								<div class="text-xs text-muted-foreground capitalize">{category.replace('_', ' ')}</div>
+							</div>
+						{/each}
+					</div>
+
+					<!-- Summary -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div class="rounded-lg border p-3">
+							<div class="text-2xl font-bold">{qualityResult.summary.total_files}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_quality_files?.() || 'Files Analyzed'}</div>
+						</div>
+						<div class="rounded-lg border p-3">
+							<div class="text-2xl font-bold">{qualityResult.summary.total_lines_of_code.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_quality_loc?.() || 'Lines of Code'}</div>
+						</div>
+						<div class="rounded-lg border p-3">
+							<div class="text-2xl font-bold">{qualityResult.summary.issues_count}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_quality_issues?.() || 'Issues Found'}</div>
+						</div>
+						<div class="rounded-lg border p-3">
+							<div class="text-2xl font-bold">{qualityResult.tokens_used.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tokens_used?.() || 'Tokens Used'}</div>
+						</div>
+					</div>
+
+					<!-- Severity breakdown -->
+					<div class="mb-6 flex gap-4">
+						<span class="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+							{qualityResult.summary.high_severity_count} High
+						</span>
+						<span class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+							{qualityResult.summary.medium_severity_count} Medium
+						</span>
+						<span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+							{qualityResult.summary.low_severity_count} Low
+						</span>
+					</div>
+
+					<!-- Recommendations -->
+					{#if qualityResult.recommendations.length > 0}
+						<div class="mb-6">
+							<h4 class="text-sm font-semibold mb-3">{m.gitlab_recommendations?.() || 'Recommendations'}</h4>
+							<div class="space-y-2">
+								{#each qualityResult.recommendations.slice(0, 5) as rec}
+									<div class={cn(
+										'p-3 rounded-lg border-l-4',
+										rec.priority === 'high' ? 'border-red-500 bg-red-50 dark:bg-red-900/10' :
+										rec.priority === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10' :
+										'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
+									)}>
+										<div class="font-medium">{rec.title}</div>
+										<div class="text-sm text-muted-foreground">{rec.description}</div>
+										{#if rec.impact}
+											<div class="text-xs text-green-600 mt-1">{rec.impact}</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Best/Worst files -->
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						{#if qualityResult.summary.best_scoring_files.length > 0}
+							<div class="rounded-lg border p-3">
+								<h4 class="text-sm font-semibold text-green-600 mb-2">✅ {m.gitlab_best_files?.() || 'Best Files'}</h4>
+								<ul class="text-xs space-y-1">
+									{#each qualityResult.summary.best_scoring_files as file}
+										<li class="truncate font-mono">{file}</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+						{#if qualityResult.summary.worst_scoring_files.length > 0}
+							<div class="rounded-lg border p-3">
+								<h4 class="text-sm font-semibold text-red-600 mb-2">⚠️ {m.gitlab_worst_files?.() || 'Needs Improvement'}</h4>
+								<ul class="text-xs space-y-1">
+									{#each qualityResult.summary.worst_scoring_files as file}
+										<li class="truncate font-mono">{file}</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Model info -->
+					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
+						<Bot class="h-4 w-4" />
+						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{qualityResult.model_id}</strong></span>
+						<span class="mx-2">•</span>
+						<Clock class="h-4 w-4" />
+						<span>{qualityResult.duration}</span>
+					</div>
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showQualityModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Dead Code Modal -->
+{#if showDeadCodeModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showDeadCodeModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDeadCodeModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<FileCode class="h-6 w-6 text-orange-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_dead_code_title?.() || 'Dead Code Detection'}
+					</h3>
+				</div>
+				<button onclick={() => (showDeadCodeModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isDetectingDeadCode}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-orange-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_detecting_dead_code?.() || 'Detecting unused code...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_dead_code_patience?.() || 'Analyzing symbols and references...'}</p>
+				</div>
+			{:else if deadCodeResult}
+				{#if deadCodeResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Detection Failed'}</p>
+						<p class="text-sm">{deadCodeResult.error}</p>
+					</div>
+				{:else}
+					<!-- Summary Stats -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold text-orange-600">{deadCodeResult.summary.total_dead_symbols}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_dead_symbols?.() || 'Dead Symbols'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{deadCodeResult.summary.estimated_dead_lines}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_dead_lines?.() || 'Lines'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{deadCodeResult.files_scanned}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_files_scanned?.() || 'Files Scanned'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{deadCodeResult.tokens_used.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tokens_used?.() || 'Tokens'}</div>
+						</div>
+					</div>
+
+					<!-- Confidence breakdown -->
+					<div class="mb-6 flex gap-4">
+						{#if deadCodeResult.summary.by_confidence['high']}
+							<span class="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+								{deadCodeResult.summary.by_confidence['high']} High confidence
+							</span>
+						{/if}
+						{#if deadCodeResult.summary.by_confidence['medium']}
+							<span class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+								{deadCodeResult.summary.by_confidence['medium']} Medium
+							</span>
+						{/if}
+						{#if deadCodeResult.summary.by_confidence['low']}
+							<span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+								{deadCodeResult.summary.by_confidence['low']} Low
+							</span>
+						{/if}
+					</div>
+
+					<!-- Dead Symbols List -->
+					{#if deadCodeResult.dead_symbols.length > 0}
+						<div class="mb-6">
+							<h4 class="text-sm font-semibold mb-3">{m.gitlab_dead_symbols_list?.() || 'Unused Symbols'}</h4>
+							<div class="space-y-2 max-h-80 overflow-y-auto">
+								{#each deadCodeResult.dead_symbols as symbol}
+									<div class={cn(
+										'p-3 rounded-lg border-l-4',
+										symbol.confidence === 'high' ? 'border-red-500 bg-red-50 dark:bg-red-900/10' :
+										symbol.confidence === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10' :
+										'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
+									)}>
+										<div class="flex items-center gap-2">
+											<span class="w-6 h-6 flex items-center justify-center rounded bg-muted font-mono text-xs">
+												{getSymbolTypeIcon(symbol.type)}
+											</span>
+											<span class="font-mono font-medium">{symbol.name}</span>
+											<span class={cn('text-xs px-2 py-0.5 rounded-full', getConfidenceColor(symbol.confidence))}>
+												{symbol.confidence}
+											</span>
+											<span class="text-xs text-muted-foreground capitalize">{symbol.type}</span>
+										</div>
+										<div class="mt-1 text-sm text-muted-foreground">
+											<span class="font-mono text-xs">{symbol.file_path}</span>
+										</div>
+										<div class="mt-1 text-sm">{symbol.reason}</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{:else}
+						<div class="text-center py-8 text-muted-foreground">
+							<CheckCircle class="h-12 w-12 mx-auto text-green-500 mb-3" />
+							<p class="font-medium">{m.gitlab_no_dead_code?.() || 'No dead code detected!'}</p>
+							<p class="text-sm">{m.gitlab_code_clean?.() || 'Your codebase looks clean.'}</p>
+						</div>
+					{/if}
+
+					<!-- Top affected files -->
+					{#if deadCodeResult.summary.top_affected_files.length > 0}
+						<div class="mb-4">
+							<h4 class="text-sm font-semibold mb-2">{m.gitlab_top_affected?.() || 'Most Affected Files'}</h4>
+							<div class="space-y-1">
+								{#each deadCodeResult.summary.top_affected_files as file}
+									<div class="flex items-center justify-between text-sm p-2 rounded bg-muted">
+										<span class="font-mono truncate flex-1">{file.file_path}</span>
+										<span class="text-muted-foreground">{file.dead_symbols} symbols, {file.dead_lines} lines</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Model info -->
+					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
+						<Bot class="h-4 w-4" />
+						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{deadCodeResult.model_id}</strong></span>
+						<span class="mx-2">•</span>
+						<Clock class="h-4 w-4" />
+						<span>{deadCodeResult.duration}</span>
+					</div>
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showDeadCodeModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Auto-Documentation Modal -->
+{#if showAutoDocModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showAutoDocModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showAutoDocModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<FileEdit class="h-6 w-6 text-purple-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_auto_doc_title?.() || 'Auto-Documentation'}
+					</h3>
+				</div>
+				<button onclick={() => (showAutoDocModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if autoDocStep === 'scan'}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_docs?.() || 'Scanning for undocumented code...'}</p>
+				</div>
+			{:else if autoDocStep === 'generate'}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_generating_docs?.() || 'Generating documentation...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{docScanResult?.summary.total_symbols || 0} {m.gitlab_symbols_to_document?.() || 'symbols to document'}</p>
+				</div>
+			{:else if autoDocStep === 'results'}
+				{#if docScanResult?.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Scan Failed'}</p>
+						<p class="text-sm">{docScanResult.error}</p>
+					</div>
+				{:else if docScanResult && docScanResult.symbols.length === 0}
+					<div class="text-center py-8 text-muted-foreground">
+						<CheckCircle class="h-12 w-12 mx-auto text-green-500 mb-3" />
+						<p class="font-medium">{m.gitlab_all_documented?.() || 'All code is documented!'}</p>
+						<p class="text-sm">{m.gitlab_no_undocumented?.() || 'No undocumented exported symbols found.'}</p>
+					</div>
+				{:else if docGenResult}
+					<!-- Summary -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold text-purple-600">{docScanResult?.summary.total_symbols || 0}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_undocumented?.() || 'Undocumented'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold text-green-600">{docGenResult.docs.length}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_docs_generated?.() || 'Docs Generated'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{docScanResult?.files_scanned || 0}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_files_scanned?.() || 'Files'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{docGenResult.tokens_used.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tokens_used?.() || 'Tokens'}</div>
+						</div>
+					</div>
+
+					<!-- Generated Docs -->
+					<div class="mb-4">
+						<h4 class="text-sm font-semibold mb-3">{m.gitlab_generated_docs?.() || 'Generated Documentation'}</h4>
+						<div class="space-y-4 max-h-96 overflow-y-auto">
+							{#each docGenResult.docs as doc}
+								<div class="rounded-lg border p-4">
+									<div class="flex items-center justify-between mb-2">
+										<div class="flex items-center gap-2">
+											<span class="w-6 h-6 flex items-center justify-center rounded bg-muted font-mono text-xs">
+												{getSymbolTypeIcon(doc.symbol.type)}
+											</span>
+											<span class="font-mono font-medium">{doc.symbol.name}</span>
+											<span class="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+												{doc.symbol.language}
+											</span>
+										</div>
+										<button 
+											onclick={() => navigator.clipboard.writeText(doc.documentation)}
+											class="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80"
+										>
+											📋 Copy
+										</button>
+									</div>
+									<p class="text-xs text-muted-foreground mb-2 font-mono">{doc.symbol.file_path}:{doc.symbol.start_line}</p>
+									<pre class="text-sm bg-muted p-3 rounded overflow-x-auto"><code>{doc.preview}</code></pre>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Model info -->
+					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
+						<Bot class="h-4 w-4" />
+						<span>{m.gitlab_analyzed_by?.() || 'Generated by'}: <strong>{docGenResult.model_id}</strong></span>
+						<span class="mx-2">•</span>
+						<Clock class="h-4 w-4" />
+						<span>{docGenResult.duration}</span>
+					</div>
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showAutoDocModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Test Generation Modal -->
+{#if showTestGenModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showTestGenModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showTestGenModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<TestTube class="h-6 w-6 text-green-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_test_gen_title?.() || 'Test Generation'}
+					</h3>
+				</div>
+				<button onclick={() => (showTestGenModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if testGenStep === 'scan'}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-green-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_tests?.() || 'Scanning for testable functions...'}</p>
+				</div>
+			{:else if testGenStep === 'generate'}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-green-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_generating_tests?.() || 'Generating tests...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{testScanResult?.summary.without_tests || 0} {m.gitlab_functions_to_test?.() || 'functions to test'}</p>
+				</div>
+			{:else if testGenStep === 'results'}
+				{#if testScanResult?.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Scan Failed'}</p>
+						<p class="text-sm">{testScanResult.error}</p>
+					</div>
+				{:else if testScanResult && testScanResult.summary.without_tests === 0}
+					<div class="text-center py-8 text-muted-foreground">
+						<CheckCircle class="h-12 w-12 mx-auto text-green-500 mb-3" />
+						<p class="font-medium">{m.gitlab_all_tested?.() || 'All functions have tests!'}</p>
+						<p class="text-sm">{m.gitlab_good_coverage?.() || 'Great test coverage.'}</p>
+					</div>
+				{:else if testGenResult}
+					<!-- Summary -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{testScanResult?.summary.total_functions || 0}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_total_functions?.() || 'Total Functions'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold text-red-600">{testScanResult?.summary.without_tests || 0}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_without_tests?.() || 'Without Tests'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold text-green-600">{testGenResult.tests.length}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tests_generated?.() || 'Tests Generated'}</div>
+						</div>
+						<div class="rounded-lg border p-3 text-center">
+							<div class="text-3xl font-bold">{testGenResult.tokens_used.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tokens_used?.() || 'Tokens'}</div>
+						</div>
+					</div>
+
+					<!-- Generated Tests -->
+					<div class="mb-4">
+						<h4 class="text-sm font-semibold mb-3">{m.gitlab_generated_tests?.() || 'Generated Tests'}</h4>
+						<div class="space-y-4 max-h-96 overflow-y-auto">
+							{#each testGenResult.tests as test}
+								<div class="rounded-lg border p-4">
+									<div class="flex items-center justify-between mb-2">
+										<div class="flex items-center gap-2">
+											<span class="font-mono font-medium">{test.test_name}</span>
+											<span class="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+												{test.framework}
+											</span>
+											<span class="text-xs text-muted-foreground">→ {test.function.name}</span>
+										</div>
+										<button 
+											onclick={() => navigator.clipboard.writeText(test.test_code)}
+											class="text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80"
+										>
+											📋 Copy
+										</button>
+									</div>
+									<p class="text-xs text-muted-foreground mb-2 font-mono">{test.function.file_path}:{test.function.start_line}</p>
+									<pre class="text-sm bg-muted p-3 rounded overflow-x-auto max-h-48"><code>{test.test_code}</code></pre>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Model info -->
+					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
+						<Bot class="h-4 w-4" />
+						<span>{m.gitlab_analyzed_by?.() || 'Generated by'}: <strong>{testGenResult.model_id}</strong></span>
+						<span class="mx-2">•</span>
+						<Clock class="h-4 w-4" />
+						<span>{testGenResult.duration}</span>
+					</div>
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showTestGenModal = false)}>
+					{m.common_close()}
+				</Button>
 			</div>
 		</div>
 	</div>

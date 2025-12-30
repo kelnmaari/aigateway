@@ -44,6 +44,7 @@ import (
 	gitlabStorage "aigateway/internal/gitlab/storage"
 	gitlabWebhook "aigateway/internal/gitlab/webhook"
 	gitlabWorker "aigateway/internal/gitlab/worker"
+	"aigateway/internal/gitlab/dependencies/schedule"
 	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
 	"aigateway/internal/inference"
@@ -237,12 +238,15 @@ type Router struct {
 	frameworkHandler *framework.Handler // Framework asset handler
 
 	// GitLab Integration (v3.1.0+)
-	gitlabHandler            *handlers.GitLabAdminHandler       // GitLab admin handler
-	gitlabWebhookHandler     *handlers.GitLabWebhookHandler     // GitLab webhook handler
-	gitlabWorkerPool         *gitlabWorker.Pool                 // GitLab worker pool for MR analysis
-	gitlabIndexerHandler     *handlers.GitLabIndexerHandler     // GitLab indexer handler (admin)
-	gitlabUserIndexerHandler *handlers.GitLabUserIndexerHandler // GitLab indexer handler (user-level)
-	gitlabIndexer            *gitlabIndexer.Indexer             // GitLab repository indexer
+	gitlabHandler             *handlers.GitLabAdminHandler         // GitLab admin handler
+	gitlabWebhookHandler      *handlers.GitLabWebhookHandler       // GitLab webhook handler
+	gitlabWorkerPool          *gitlabWorker.Pool                   // GitLab worker pool for MR analysis
+	gitlabIndexerHandler      *handlers.GitLabIndexerHandler       // GitLab indexer handler (admin)
+	gitlabUserIndexerHandler  *handlers.GitLabUserIndexerHandler   // GitLab indexer handler (user-level)
+	gitlabIndexer             *gitlabIndexer.Indexer               // GitLab repository indexer
+	gitlabDependenciesHandler *handlers.GitLabDependenciesHandler  // GitLab dependencies scanner handler
+	gitlabScheduleHandler     *handlers.GitLabScheduleHandler      // GitLab scheduled scans handler
+	gitlabScheduler           *schedule.Scheduler                 // GitLab dependency scan scheduler
 }
 
 // NewOptions содержит опции для создания роутера
@@ -3207,6 +3211,49 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					}
 
 					gitlabLogger.Info("✅ GitLab repository indexer initialized for RAG (logs: logs/gitlab-indexer.log)")
+
+					// Initialize dependencies handler with vector store for changelog analysis
+					if qdrantStore, ok := r.vectorStore.(*vector.QdrantStore); ok && qdrantStore != nil {
+						r.gitlabDependenciesHandler = handlers.NewGitLabDependenciesHandler(
+							glStore,
+							qdrantStore,
+							"http://localhost:8080", // Self-reference to internal API
+							"",                      // API key will be extracted from request headers
+							gitlabLogger,
+						)
+						gitlabLogger.Info("✅ GitLab dependencies handler initialized")
+
+						// Initialize scheduled scans handler and scheduler
+						// PostgresStore implements schedule.ScheduleStore interface
+						var scheduleStore schedule.ScheduleStore = glStore
+						llmURL := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
+						r.gitlabScheduler = schedule.NewScheduler(
+							glStore,
+							scheduleStore,
+							qdrantStore,
+							llmURL, // Self-reference to internal API
+							"",     // API key will be extracted from request headers
+							gitlabLogger,
+						)
+						if r.gitlabScheduler != nil {
+							r.gitlabScheduleHandler = handlers.NewGitLabScheduleHandler(
+								r.gitlabScheduler,
+								scheduleStore,
+								gitlabLogger,
+							)
+							gitlabLogger.Info("✅ GitLab scheduled scans handler initialized")
+							
+							// Start scheduler in background
+							go func() {
+								ctx := context.Background()
+								if err := r.gitlabScheduler.Start(ctx); err != nil {
+									gitlabLogger.WithError(err).Error("Failed to start dependency scan scheduler")
+								} else {
+									gitlabLogger.Info("✅ GitLab dependency scan scheduler started")
+								}
+							}()
+						}
+					}
 				}
 
 				// Note: Webhook route registered in setupGitLabRoutes (after engine is created)
@@ -3620,6 +3667,28 @@ func (r *Router) setupGitLabRoutes() {
 			adminGitlab.POST("/projects/:project_id/index", r.gitlabIndexerHandler.IndexProject)
 			adminGitlab.GET("/projects/:project_id/index/status", r.gitlabIndexerHandler.GetIndexStatus)
 			adminGitlab.DELETE("/projects/:project_id/index", r.gitlabIndexerHandler.DeleteIndex)
+		}
+
+		// Dependencies scanning and changelog analysis
+		if r.gitlabDependenciesHandler != nil {
+			adminGitlab.POST("/projects/:project_id/check-dependencies", r.gitlabDependenciesHandler.CheckDependencies)
+			adminGitlab.POST("/projects/:project_id/create-dependency-issue", r.gitlabDependenciesHandler.CreateDependencyIssue)
+			adminGitlab.POST("/projects/:project_id/analyze-changelog", r.gitlabDependenciesHandler.AnalyzeChangelog)
+			adminGitlab.POST("/projects/:project_id/analyze-changelogs", r.gitlabDependenciesHandler.AnalyzeDependenciesChangelogs)
+			r.logger.Info("✅ GitLab dependencies routes registered")
+		}
+
+		// Scheduled scans management
+		if r.gitlabScheduleHandler != nil {
+			adminGitlab.POST("/schedules", r.gitlabScheduleHandler.CreateSchedule)
+			adminGitlab.GET("/schedules", r.gitlabScheduleHandler.ListSchedules)
+			adminGitlab.GET("/schedules/status", r.gitlabScheduleHandler.GetSchedulerStatus)
+			adminGitlab.GET("/schedules/:id", r.gitlabScheduleHandler.GetSchedule)
+			adminGitlab.PUT("/schedules/:id", r.gitlabScheduleHandler.UpdateSchedule)
+			adminGitlab.DELETE("/schedules/:id", r.gitlabScheduleHandler.DeleteSchedule)
+			adminGitlab.POST("/schedules/:id/trigger", r.gitlabScheduleHandler.TriggerSchedule)
+			adminGitlab.GET("/schedules/:id/history", r.gitlabScheduleHandler.GetScheduleHistory)
+			r.logger.Info("✅ GitLab scheduled scans routes registered")
 		}
 
 		// Reviews

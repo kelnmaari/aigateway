@@ -38,13 +38,13 @@ import (
 	"aigateway/internal/extractors"
 	"aigateway/internal/filestorage"
 	filestorageBackend "aigateway/internal/filestorage/storage"
+	"aigateway/internal/gitlab/dependencies/schedule"
 	gitlabIndexer "aigateway/internal/gitlab/indexer"
 	gitlabProcessor "aigateway/internal/gitlab/processor"
 	gitlabRAG "aigateway/internal/gitlab/rag"
 	gitlabStorage "aigateway/internal/gitlab/storage"
 	gitlabWebhook "aigateway/internal/gitlab/webhook"
 	gitlabWorker "aigateway/internal/gitlab/worker"
-	"aigateway/internal/gitlab/dependencies/schedule"
 	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
 	"aigateway/internal/inference"
@@ -238,23 +238,24 @@ type Router struct {
 	frameworkHandler *framework.Handler // Framework asset handler
 
 	// GitLab Integration (v3.1.0+)
-	gitlabHandler             *handlers.GitLabAdminHandler         // GitLab admin handler
-	gitlabWebhookHandler      *handlers.GitLabWebhookHandler       // GitLab webhook handler
-	gitlabWorkerPool          *gitlabWorker.Pool                   // GitLab worker pool for MR analysis
-	gitlabIndexerHandler      *handlers.GitLabIndexerHandler       // GitLab indexer handler (admin)
-	gitlabUserIndexerHandler  *handlers.GitLabUserIndexerHandler   // GitLab indexer handler (user-level)
-	gitlabIndexer             *gitlabIndexer.Indexer               // GitLab repository indexer
-	gitlabDependenciesHandler *handlers.GitLabDependenciesHandler  // GitLab dependencies scanner handler
-	gitlabScheduleHandler     *handlers.GitLabScheduleHandler      // GitLab scheduled scans handler
+	gitlabHandler             *handlers.GitLabAdminHandler        // GitLab admin handler
+	gitlabWebhookHandler      *handlers.GitLabWebhookHandler      // GitLab webhook handler
+	gitlabWorkerPool          *gitlabWorker.Pool                  // GitLab worker pool for MR analysis
+	gitlabIndexerHandler      *handlers.GitLabIndexerHandler      // GitLab indexer handler (admin)
+	gitlabUserIndexerHandler  *handlers.GitLabUserIndexerHandler  // GitLab indexer handler (user-level)
+	gitlabIndexer             *gitlabIndexer.Indexer              // GitLab repository indexer
+	gitlabDependenciesHandler *handlers.GitLabDependenciesHandler // GitLab dependencies scanner handler
+	gitlabScheduleHandler     *handlers.GitLabScheduleHandler     // GitLab scheduled scans handler
 	gitlabScheduler           *schedule.Scheduler                 // GitLab dependency scan scheduler
+	gitlabStore               gitlabStorage.Store                 // GitLab storage (v4.1.0+)
 }
 
 // NewOptions содержит опции для создания роутера
 type NewOptions struct {
 	Config               *config.Config
 	Logger               *logrus.Logger
-	HTTPLogger           *logrus.Logger                    // Опциональный логгер для HTTP запросов (отдельный файл)
-	MetricsLogger        *logrus.Logger                    // Опциональный логгер для GPU/performance метрик (отдельный файл)
+	HTTPLogger           *logrus.Logger // Опциональный логгер для HTTP запросов (отдельный файл)
+	MetricsLogger        *logrus.Logger // Опциональный логгер для GPU/performance метрик (отдельный файл)
 	Version              string
 	Database             storage.Database                  // Опциональная база данных для user auth
 	JWTManager           *jwt.Manager                      // Опциональный JWT manager
@@ -525,7 +526,7 @@ func (r *Router) setupMiddleware() {
 	// Structured logging middleware
 	loggingConfig := middleware.LoggingConfig{
 		Logger:         r.logger,
-		DetailedLogger: r.httpLogger, // Детальные HTTP логи в отдельный файл
+		DetailedLogger: r.httpLogger,                                                                                            // Детальные HTTP логи в отдельный файл
 		SkipPaths:      []string{"/health", "/healthz", "/ready", "/api/stats", "/api/config", r.config.Metrics.PrometheusPath}, // Пропускаем health checks, stats, config и metrics
 	}
 	r.engine.Use(middleware.RequestLogging(loggingConfig))
@@ -621,7 +622,7 @@ func (r *Router) setupInferenceRoutes() {
 		// Repository download (v3.3.x+) - download all model files locally
 		group.POST("/download-repo", r.inferenceHandler.PostDownloadRepository)
 		group.GET("/repo-downloads", r.inferenceHandler.GetRepoDownloads)
-		group.POST("/repo-downloads/status", r.inferenceHandler.GetRepoDownloadStatus)  // POST because model_id contains /
+		group.POST("/repo-downloads/status", r.inferenceHandler.GetRepoDownloadStatus) // POST because model_id contains /
 		group.POST("/repo-downloads/cancel", r.inferenceHandler.CancelRepoDownload)
 		group.POST("/repo-downloads/remove", r.inferenceHandler.RemoveRepoDownload)
 	}
@@ -756,7 +757,7 @@ func (r *Router) setupInferenceProxyRoutes() {
 		v1inf.GET("/models", r.inferenceProxyHandler.HandleModels)
 	}
 	r.logger.Info("Inference v4 OpenAI proxy routes configured: /v1/inference/*")
-	
+
 	// /api/chat/completions - Chat with tools support (web search etc.)
 	if r.chatToolsHandler != nil {
 		apiChat := r.engine.Group("/api/chat")
@@ -2773,7 +2774,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		r.inferenceRouter = inference.NewRouter(r.inferenceMgr)
 		r.inferenceHandler = handlers.NewInferenceHandler(r.inferenceRouter, logger)
 		r.inferenceProxyHandler = handlers.NewInferenceProxyHandler(r.inferenceRouter, logger)
-		
+
 		// Initialize chat tools handler with Tavily web search (v4.0.3+)
 		if cfg.Tools.TavilyAPIKey != "" {
 			toolsReg := tools.NewRegistry(cfg.Tools.TavilyAPIKey)
@@ -2784,7 +2785,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			r.chatToolsHandler = handlers.NewChatToolsHandler(r.inferenceRouter, nil, logger)
 			logger.Info("Chat tools handler initialized (no Tavily key configured)")
 		}
-		
+
 		// Initialize model store for persistence (store in data/ directory)
 		modelStore, storeErr := inference.NewModelStore("./data", logger)
 		if storeErr != nil {
@@ -3069,6 +3070,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 					logger.Error("Failed to create GitLab PostgresStore")
 					return
 				}
+				r.gitlabStore = glStore // Save for use in setupGitLabRoutes
 
 				glHandler := handlers.NewGitLabAdminHandler(glStore, gitlabLogger)
 				if glHandler == nil {
@@ -3201,7 +3203,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 				if ragService != nil {
 					// Connect RAG service to handler for index statistics
 					r.gitlabHandler.SetQdrantStats(ragService)
-					
+
 					// Create dedicated logger for indexer with log rotation
 					indexerLogger := internalLogger.NewFileLogger("logs/gitlab-indexer.log", cfg.Logging.Level)
 					if indexerLogger == nil {
@@ -3211,7 +3213,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 					r.gitlabIndexer = gitlabIndexer.NewIndexer(ragService, indexerLogger)
 					r.gitlabIndexer.SetStore(glStore) // Enable DB persistence for index status
-					
+
 					// Enable Redis for fast index status updates (v4.1.0+)
 					if r.redisManager != nil && r.redisManager.Client != nil {
 						redisStatusStore := gitlabIndexer.NewRedisStatusStore(r.redisManager.Client, indexerLogger)
@@ -3257,7 +3259,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 								gitlabLogger,
 							)
 							gitlabLogger.Info("✅ GitLab scheduled scans handler initialized")
-							
+
 							// Start scheduler in background
 							go func() {
 								ctx := context.Background()
@@ -3684,12 +3686,12 @@ func (r *Router) setupGitLabRoutes() {
 			adminGitlab.DELETE("/projects/:project_id/index", r.gitlabIndexerHandler.DeleteIndex)
 		}
 
-		// Dependencies scanning and changelog analysis
+		// Dependencies scanning and changelog analysis (handlers use c.Param("id"))
 		if r.gitlabDependenciesHandler != nil {
-			adminGitlab.POST("/projects/:project_id/check-dependencies", r.gitlabDependenciesHandler.CheckDependencies)
-			adminGitlab.POST("/projects/:project_id/create-dependency-issue", r.gitlabDependenciesHandler.CreateDependencyIssue)
-			adminGitlab.POST("/projects/:project_id/analyze-changelog", r.gitlabDependenciesHandler.AnalyzeChangelog)
-			adminGitlab.POST("/projects/:project_id/analyze-changelogs", r.gitlabDependenciesHandler.AnalyzeDependenciesChangelogs)
+			adminGitlab.POST("/projects/:id/check-dependencies", r.gitlabDependenciesHandler.CheckDependencies)
+			adminGitlab.POST("/projects/:id/create-dependency-issue", r.gitlabDependenciesHandler.CreateDependencyIssue)
+			adminGitlab.POST("/projects/:id/analyze-changelog", r.gitlabDependenciesHandler.AnalyzeChangelog)
+			adminGitlab.POST("/projects/:id/analyze-changelogs", r.gitlabDependenciesHandler.AnalyzeDependenciesChangelogs)
 			r.logger.Info("✅ GitLab dependencies routes registered")
 		}
 
@@ -3704,6 +3706,58 @@ func (r *Router) setupGitLabRoutes() {
 			adminGitlab.POST("/schedules/:id/trigger", r.gitlabScheduleHandler.TriggerSchedule)
 			adminGitlab.GET("/schedules/:id/history", r.gitlabScheduleHandler.GetScheduleHistory)
 			r.logger.Info("✅ GitLab scheduled scans routes registered")
+		}
+
+		// Security, Quality, Dead Code, Auto-Doc, Test Gen routes (v4.1.0+)
+		// These require Qdrant vector store and GitLab store
+		if qdrantStore, ok := r.vectorStore.(*vector.QdrantStore); ok && qdrantStore != nil && r.gitlabStore != nil {
+			glStore := r.gitlabStore
+			llmBaseURL := fmt.Sprintf("http://localhost:%d", r.config.Server.Port)
+			llmAPIKey := "" // API key extracted from request headers
+
+			// Secrets scanning (handlers use c.Param("id"))
+			secretsHandler := handlers.NewGitLabSecretsHandler(glStore, qdrantStore, r.logger)
+			adminGitlab.POST("/projects/:id/scan-secrets", secretsHandler.ScanSecrets)
+			adminGitlab.POST("/projects/:id/deep-scan-secrets", secretsHandler.DeepScanSecrets)
+			adminGitlab.POST("/projects/:id/sast-scan", secretsHandler.SASTScan)
+			adminGitlab.GET("/secrets/patterns", secretsHandler.GetPatterns)
+			r.logger.Info("✅ GitLab secrets scanning routes registered")
+
+			// Code quality analysis (handlers use c.Param("id"))
+			qualityHandler := handlers.NewGitLabQualityHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+			adminGitlab.POST("/projects/:id/quality-score", qualityHandler.AnalyzeQuality)
+			adminGitlab.POST("/projects/:id/detect-duplication", qualityHandler.DetectDuplication)
+			r.logger.Info("✅ GitLab quality analysis routes registered")
+
+			// Dead code detection (handlers use c.Param("id"))
+			deadCodeHandler := handlers.NewGitLabDeadCodeHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+			adminGitlab.POST("/projects/:id/dead-code", deadCodeHandler.DetectDeadCode)
+			adminGitlab.POST("/projects/:id/unreachable-code", deadCodeHandler.DetectUnreachable)
+			adminGitlab.POST("/projects/:id/commented-code", deadCodeHandler.DetectCommentedCode)
+			adminGitlab.POST("/projects/:id/dead-code-issue", deadCodeHandler.CreateDeadCodeIssue)
+			r.logger.Info("✅ GitLab dead code detection routes registered")
+
+			// Auto-documentation (handlers use c.Param("id"))
+			autoDocHandler := handlers.NewGitLabAutoDocHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+			adminGitlab.POST("/projects/:id/scan-undocumented", autoDocHandler.ScanUndocumented)
+			adminGitlab.POST("/projects/:id/generate-docs", autoDocHandler.GenerateDocs)
+			adminGitlab.POST("/projects/:id/bulk-apply-docs", autoDocHandler.BulkApplyDocs)
+			adminGitlab.POST("/projects/:id/create-docs-mr", autoDocHandler.CreateDocsMR)
+			r.logger.Info("✅ GitLab auto-documentation routes registered")
+
+			// Test generation (handlers use c.Param("id"))
+			testGenHandler := handlers.NewGitLabTestGenHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+			adminGitlab.POST("/projects/:id/scan-testable", testGenHandler.ScanTestable)
+			adminGitlab.POST("/projects/:id/generate-tests", testGenHandler.GenerateTests)
+			adminGitlab.POST("/projects/:id/download-tests", testGenHandler.DownloadTests)
+			r.logger.Info("✅ GitLab test generation routes registered")
+
+			// Architecture diagrams (handlers use c.Param("id"))
+			architectureHandler := handlers.NewGitLabArchitectureHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+			adminGitlab.POST("/projects/:id/scan-architecture", architectureHandler.ScanArchitecture)
+			adminGitlab.POST("/projects/:id/generate-diagram", architectureHandler.GenerateDiagram)
+			adminGitlab.GET("/projects/:id/architecture", architectureHandler.GetArchitecture)
+			r.logger.Info("✅ GitLab architecture diagram routes registered")
 		}
 
 		// Reviews

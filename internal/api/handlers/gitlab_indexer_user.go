@@ -80,7 +80,7 @@ func (h *GitLabUserIndexerHandler) canAccessProject(c *gin.Context, project *mod
 // IndexProject handles POST /api/gitlab/projects/:project_id/index
 // User-level endpoint - checks ownership before allowing indexing
 func (h *GitLabUserIndexerHandler) IndexProject(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 	if projectID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID required"})
 		return
@@ -169,7 +169,7 @@ func (h *GitLabUserIndexerHandler) IndexProject(c *gin.Context) {
 
 // GetIndexStatus handles GET /api/gitlab/projects/:project_id/index/status
 func (h *GitLabUserIndexerHandler) GetIndexStatus(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 	if projectID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID required"})
 		return
@@ -204,7 +204,7 @@ func (h *GitLabUserIndexerHandler) GetIndexStatus(c *gin.Context) {
 
 // DeleteIndex handles DELETE /api/gitlab/projects/:project_id/index
 func (h *GitLabUserIndexerHandler) DeleteIndex(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 	if projectID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID required"})
 		return

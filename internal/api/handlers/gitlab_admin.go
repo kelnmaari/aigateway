@@ -386,7 +386,7 @@ func (h *GitLabAdminHandler) ListProjects(c *gin.Context) {
 
 // GetProject GET /api/admin/gitlab/projects/:project_id
 func (h *GitLabAdminHandler) GetProject(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
@@ -481,7 +481,7 @@ func (h *GitLabAdminHandler) AddProject(c *gin.Context) {
 
 // UpdateProject PUT /api/admin/gitlab/projects/:project_id
 func (h *GitLabAdminHandler) UpdateProject(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	var req models.UpdateGitLabProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -519,7 +519,7 @@ func (h *GitLabAdminHandler) UpdateProject(c *gin.Context) {
 
 // DeleteProject DELETE /api/admin/gitlab/projects/:project_id
 func (h *GitLabAdminHandler) DeleteProject(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
@@ -549,7 +549,7 @@ func (h *GitLabAdminHandler) DeleteProject(c *gin.Context) {
 
 // SetupWebhook POST /api/admin/gitlab/projects/:project_id/webhook
 func (h *GitLabAdminHandler) SetupWebhook(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	var req struct {
 		WebhookURL string `json:"webhook_url" binding:"required"`

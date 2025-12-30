@@ -38,7 +38,7 @@ type IndexProjectRequest struct {
 // IndexProject handles POST /api/admin/gitlab/projects/:project_id/index
 // Triggers indexing of the project's target branch for RAG
 func (h *GitLabIndexerHandler) IndexProject(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 	if projectID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID required"})
 		return
@@ -132,7 +132,7 @@ func (h *GitLabIndexerHandler) IndexProject(c *gin.Context) {
 // GetIndexStatus handles GET /api/admin/gitlab/projects/:project_id/index/status
 // Returns the current indexing status for a project
 func (h *GitLabIndexerHandler) GetIndexStatus(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 	if projectID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID required"})
 		return
@@ -160,7 +160,7 @@ func (h *GitLabIndexerHandler) GetIndexStatus(c *gin.Context) {
 // DeleteIndex handles DELETE /api/admin/gitlab/projects/:project_id/index
 // Deletes the index for a project's branch
 func (h *GitLabIndexerHandler) DeleteIndex(c *gin.Context) {
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 	if projectID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID required"})
 		return

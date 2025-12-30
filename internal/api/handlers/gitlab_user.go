@@ -282,7 +282,7 @@ func (h *GitLabUserHandler) AddMyProject(c *gin.Context) {
 // GetMyProject gets a specific project owned by user
 func (h *GitLabUserHandler) GetMyProject(c *gin.Context) {
 	userID := h.getUserID(c)
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	project, err := h.store.GetProject(c.Request.Context(), projectID)
 	if err != nil || project == nil {
@@ -303,7 +303,7 @@ func (h *GitLabUserHandler) GetMyProject(c *gin.Context) {
 // UpdateMyProject updates user's project
 func (h *GitLabUserHandler) UpdateMyProject(c *gin.Context) {
 	userID := h.getUserID(c)
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	project, err := h.store.GetProject(c.Request.Context(), projectID)
 	if err != nil || project == nil {
@@ -338,7 +338,7 @@ func (h *GitLabUserHandler) UpdateMyProject(c *gin.Context) {
 // DeleteMyProject deletes user's project
 func (h *GitLabUserHandler) DeleteMyProject(c *gin.Context) {
 	userID := h.getUserID(c)
-	projectID := c.Param("project_id")
+	projectID := c.Param("id")
 
 	project, err := h.store.GetProject(c.Request.Context(), projectID)
 	if err != nil || project == nil {

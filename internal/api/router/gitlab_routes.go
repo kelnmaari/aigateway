@@ -49,9 +49,9 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 	// ============================================================================
 	gitlab.GET("/integrations/:id/projects", userHandler.ListMyProjects)
 	gitlab.POST("/integrations/:id/projects", userHandler.AddMyProject)
-	gitlab.GET("/projects/:project_id", userHandler.GetMyProject)
-	gitlab.PUT("/projects/:project_id", userHandler.UpdateMyProject)
-	gitlab.DELETE("/projects/:project_id", userHandler.DeleteMyProject)
+	gitlab.GET("/projects/:id", userHandler.GetMyProject)
+	gitlab.PUT("/projects/:id", userHandler.UpdateMyProject)
+	gitlab.DELETE("/projects/:id", userHandler.DeleteMyProject)
 
 	// ============================================================================
 	// User's Reviews
@@ -114,10 +114,10 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	// ============================================================================
 	// Project Management (direct)
 	// ============================================================================
-	gitlab.GET("/projects/:project_id", gitlabHandler.GetProject)
-	gitlab.PUT("/projects/:project_id", gitlabHandler.UpdateProject)
-	gitlab.DELETE("/projects/:project_id", gitlabHandler.DeleteProject)
-	gitlab.POST("/projects/:project_id/webhook", gitlabHandler.SetupWebhook)
+	gitlab.GET("/projects/:id", gitlabHandler.GetProject)
+	gitlab.PUT("/projects/:id", gitlabHandler.UpdateProject)
+	gitlab.DELETE("/projects/:id", gitlabHandler.DeleteProject)
+	gitlab.POST("/projects/:id/webhook", gitlabHandler.SetupWebhook)
 
 	// ============================================================================
 	// Secrets Scanning (v4.0+)

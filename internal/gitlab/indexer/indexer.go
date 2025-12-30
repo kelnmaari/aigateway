@@ -85,9 +85,10 @@ type Indexer struct {
 	ragService *rag.RAGService
 	chunker    *chunker.CodeChunker
 	logger     *logrus.Logger
-	store      ProjectStore // For persisting index status to DB
+	store      ProjectStore       // For persisting index status to DB
+	redisStore *RedisStatusStore  // For fast status updates via Redis
 
-	// Track indexing status per project+branch
+	// Track indexing status per project+branch (fallback when Redis unavailable)
 	statusMu sync.RWMutex
 	status   map[string]*IndexInfo // key: "projectID:branch"
 
@@ -135,6 +136,12 @@ func (i *Indexer) SetStore(store ProjectStore) {
 	i.store = store
 }
 
+// SetRedisStore sets the Redis store for fast status updates
+func (i *Indexer) SetRedisStore(redisStore *RedisStatusStore) {
+	i.redisStore = redisStore
+	i.logger.Info("Redis status store enabled for indexer")
+}
+
 // statusKey generates a key for status map
 func statusKey(projectID, branch string) string {
 	return fmt.Sprintf("%s:%s", projectID, branch)
@@ -142,6 +149,17 @@ func statusKey(projectID, branch string) string {
 
 // GetStatus returns the current indexing status for a project+branch
 func (i *Indexer) GetStatus(projectID, branch string) *IndexInfo {
+	// Try Redis first (preferred for distributed deployments)
+	if i.redisStore != nil && i.redisStore.IsAvailable() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		
+		if info, err := i.redisStore.GetStatus(ctx, projectID, branch); err == nil && info != nil {
+			return info
+		}
+	}
+
+	// Fallback to in-memory cache
 	i.statusMu.RLock()
 	defer i.statusMu.RUnlock()
 
@@ -157,17 +175,31 @@ func (i *Indexer) GetStatus(projectID, branch string) *IndexInfo {
 	}
 }
 
-// setStatus updates indexing status in memory and optionally in DB
+// setStatus updates indexing status in memory, Redis, and DB
 func (i *Indexer) setStatus(projectID, branch string, info *IndexInfo) {
+	// Update in-memory cache (always, for fallback)
 	i.statusMu.Lock()
 	i.status[statusKey(projectID, branch)] = info
 	i.statusMu.Unlock()
 
-	// Persist to DB if store is available
-	if i.store != nil && (info.Status == IndexStatusCompleted || info.Status == IndexStatusFailed) {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	// Save to Redis (fast, for real-time status)
+	if i.redisStore != nil && i.redisStore.IsAvailable() {
+		if err := i.redisStore.SetStatus(ctx, info); err != nil {
+			i.logger.WithError(err).WithField("project_id", projectID).Debug("Failed to save index status to Redis")
+		} else {
+			i.logger.WithFields(logrus.Fields{
+				"project_id": projectID,
+				"status":     info.Status,
+				"store":      "redis",
+			}).Debug("Index status saved to Redis")
+		}
+	}
+
+	// Persist to DB (for durability, only final states)
+	if i.store != nil && (info.Status == IndexStatusCompleted || info.Status == IndexStatusFailed) {
 		if err := i.store.UpdateProjectIndexStatus(ctx, projectID, string(info.Status), int64(info.ChunksTotal)); err != nil {
 			i.logger.WithError(err).WithField("project_id", projectID).Warn("Failed to persist index status to DB")
 		} else {
@@ -175,9 +207,50 @@ func (i *Indexer) setStatus(projectID, branch string, info *IndexInfo) {
 				"project_id": projectID,
 				"status":     info.Status,
 				"chunks":     info.ChunksTotal,
+				"store":      "db",
 			}).Debug("Index status persisted to DB")
 		}
 	}
+}
+
+// Shutdown gracefully stops the indexer and marks all in-progress indexations as failed
+func (i *Indexer) Shutdown(ctx context.Context) error {
+	i.logger.Info("Shutting down indexer, invalidating in-progress indexations...")
+
+	i.statusMu.Lock()
+	inProgressCount := 0
+	now := time.Now()
+	
+	for key, info := range i.status {
+		if info.Status == IndexStatusInProgress {
+			info.Status = IndexStatusFailed
+			info.Error = "indexing interrupted by server shutdown"
+			info.CompletedAt = &now
+			i.status[key] = info
+			inProgressCount++
+			
+			// Update Redis
+			if i.redisStore != nil && i.redisStore.IsAvailable() {
+				if err := i.redisStore.SetStatus(ctx, info); err != nil {
+					i.logger.WithError(err).WithField("project_id", info.ProjectID).Debug("Failed to update Redis on shutdown")
+				}
+			}
+			
+			// Update DB
+			if i.store != nil {
+				if err := i.store.UpdateProjectIndexStatus(ctx, info.ProjectID, string(info.Status), int64(info.ChunksTotal)); err != nil {
+					i.logger.WithError(err).WithField("project_id", info.ProjectID).Warn("Failed to update DB on shutdown")
+				}
+			}
+		}
+	}
+	i.statusMu.Unlock()
+
+	if inProgressCount > 0 {
+		i.logger.WithField("count", inProgressCount).Info("Invalidated in-progress indexations on shutdown")
+	}
+
+	return nil
 }
 
 // IndexRequest holds parameters for indexing

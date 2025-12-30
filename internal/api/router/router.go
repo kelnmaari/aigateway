@@ -409,6 +409,15 @@ func (r *Router) Close() error {
 		}
 	}
 
+	// Shutdown GitLab indexer (v4.1.0+: invalidate in-progress indexations)
+	if r.gitlabIndexer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := r.gitlabIndexer.Shutdown(shutdownCtx); err != nil {
+			r.logger.WithError(err).Error("Failed to shutdown GitLab indexer")
+		}
+		cancel()
+	}
+
 	// Close Redis connections (v3.0.6+)
 	if r.redisManager != nil {
 		if err := r.redisManager.Close(); err != nil {
@@ -3202,6 +3211,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 					r.gitlabIndexer = gitlabIndexer.NewIndexer(ragService, indexerLogger)
 					r.gitlabIndexer.SetStore(glStore) // Enable DB persistence for index status
+					
+					// Enable Redis for fast index status updates (v4.1.0+)
+					if r.redisManager != nil && r.redisManager.Client != nil {
+						redisStatusStore := gitlabIndexer.NewRedisStatusStore(r.redisManager.Client, indexerLogger)
+						r.gitlabIndexer.SetRedisStore(redisStatusStore)
+					}
 					r.gitlabIndexerHandler = handlers.NewGitLabIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
 					r.gitlabUserIndexerHandler = handlers.NewGitLabUserIndexerHandler(r.gitlabIndexer, glStore, indexerLogger)
 

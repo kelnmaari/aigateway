@@ -187,6 +187,14 @@
 			});
 			projects = response.data || [];
 			totalProjects = response.total || projects.length;
+			
+			// Start polling for any projects with in_progress status
+			for (const project of projects) {
+				if (project.index_status === 'in_progress' && !indexingProjects.has(project.id)) {
+					indexingProjects = new Set([...indexingProjects, project.id]);
+					pollIndexStatus(project.id);
+				}
+			}
 		} catch (error) {
 			console.error('Failed to load projects:', error);
 			projects = [];
@@ -1119,7 +1127,7 @@
 									{/if}
 								</td>
 								<td class="px-4 py-3">
-								{#if indexingProjects.has(project.id)}
+								{#if indexingProjects.has(project.id) || project.index_status === 'in_progress'}
 									<span class="flex items-center gap-1 text-sm text-yellow-500">
 										<Loader2 class="h-4 w-4 animate-spin" />
 										Indexing...
@@ -1138,6 +1146,11 @@
 									<span class="flex items-center gap-1 text-sm text-red-500">
 										<XCircle class="h-4 w-4" />
 										Failed
+									</span>
+								{:else if project.index_status === 'pending'}
+									<span class="flex items-center gap-1 text-sm text-blue-500">
+										<Clock class="h-4 w-4" />
+										Pending
 									</span>
 								{:else}
 									<span class="text-sm text-muted-foreground">Not indexed</span>

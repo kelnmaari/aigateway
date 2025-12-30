@@ -28,6 +28,7 @@
 	import { Shield, Brain, Package, Trash2 as TrashIcon, FileEdit, TestTube } from 'lucide-svelte';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import { ActionButton } from '$lib/components/ui/action-button';
 	import * as m from '$lib/paraglide/messages';
 
 	let integration = $state<GitLabIntegration | null>(null);
@@ -1160,141 +1161,146 @@
 									<span class="text-sm">{project.review_count || 0}</span>
 								</td>
 								<td class="px-4 py-3">
-									<div class="flex items-center gap-2">
-										<button
+									<div class="flex items-center gap-1">
+										<ActionButton
+											label={project.index_status === 'completed' ? 'Reindex' : 'Index'}
 											onclick={() => handleStartIndexing(project)}
-											class="rounded p-1.5 hover:bg-muted"
-											title={project.index_status === 'completed' ? 'Reindex' : 'Start Indexing'}
 											disabled={indexingProjects.has(project.id)}
+											loading={indexingProjects.has(project.id)}
 										>
-											<RefreshCw class={cn('h-4 w-4', indexingProjects.has(project.id) && 'animate-spin')} />
-										</button>
-										<button
+											{#snippet children()}
+												<RefreshCw class="h-4 w-4" />
+											{/snippet}
+											{#snippet loadingIcon()}
+												<RefreshCw class="h-4 w-4 animate-spin" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Details"
 											onclick={() => viewProjectDetails(project)}
-											class="rounded p-1.5 hover:bg-muted"
-											title="View Details"
 										>
-											<Eye class="h-4 w-4" />
-										</button>
-										<button
+											{#snippet children()}
+												<Eye class="h-4 w-4" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Secrets"
 											onclick={() => handleScanSecrets(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												project.index_status !== 'completed' && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' ? m.gitlab_scan_secrets?.() || 'Scan Secrets (Regex)' : m.gitlab_index_first?.() || 'Index first'}
 											disabled={scanningProjectId === project.id || project.index_status !== 'completed'}
+											loading={scanningProjectId === project.id}
 										>
-											{#if scanningProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<Shield class="h-4 w-4" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Deep Scan"
 											onclick={() => handleDeepScan(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_deep_scan?.() || 'Deep Scan (LLM)' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
 											disabled={deepScanningProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+											loading={deepScanningProjectId === project.id}
 										>
-											{#if deepScanningProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<Brain class="h-4 w-4 text-purple-500" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin text-purple-500" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Dependencies"
 											onclick={() => handleCheckDependencies(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												project.index_status !== 'completed' && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' ? m.gitlab_check_dependencies?.() || 'Check Dependencies' : m.gitlab_index_first?.() || 'Index first'}
 											disabled={checkingDependenciesProjectId === project.id || project.index_status !== 'completed'}
+											loading={checkingDependenciesProjectId === project.id}
 										>
-											{#if checkingDependenciesProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<Package class="h-4 w-4 text-blue-500" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Quality"
 											onclick={() => handleAnalyzeQuality(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_quality_score?.() || 'Quality Score' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
 											disabled={analyzingQualityProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+											loading={analyzingQualityProjectId === project.id}
 										>
-											{#if analyzingQualityProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<BarChart3 class="h-4 w-4 text-indigo-500" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin text-indigo-500" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Dead Code"
 											onclick={() => handleDetectDeadCode(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_dead_code?.() || 'Dead Code' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
 											disabled={detectingDeadCodeProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+											loading={detectingDeadCodeProjectId === project.id}
 										>
-											{#if detectingDeadCodeProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<FileCode class="h-4 w-4 text-orange-500" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin text-orange-500" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Auto Doc"
 											onclick={() => handleAutoDoc(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_auto_doc?.() || 'Auto Doc' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
 											disabled={generatingDocsProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+											loading={generatingDocsProjectId === project.id}
 										>
-											{#if generatingDocsProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<FileEdit class="h-4 w-4 text-purple-500" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin text-purple-500" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Tests"
 											onclick={() => handleTestGen(project)}
-											class={cn(
-												'rounded p-1.5 hover:bg-muted',
-												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
-											)}
-											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_test_gen?.() || 'Generate Tests' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
 											disabled={generatingTestsProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+											loading={generatingTestsProjectId === project.id}
 										>
-											{#if generatingTestsProjectId === project.id}
-												<Loader2 class="h-4 w-4 animate-spin" />
-											{:else}
+											{#snippet children()}
 												<TestTube class="h-4 w-4 text-green-500" />
-											{/if}
-										</button>
-										<button
+											{/snippet}
+											{#snippet loadingIcon()}
+												<Loader2 class="h-4 w-4 animate-spin text-green-500" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Settings"
 											onclick={() => openEditProject(project)}
-											class="rounded p-1.5 hover:bg-muted"
-											title="Edit Settings"
 										>
-											<Settings class="h-4 w-4" />
-										</button>
-										<button
+											{#snippet children()}
+												<Settings class="h-4 w-4" />
+											{/snippet}
+										</ActionButton>
+
+										<ActionButton
+											label="Delete"
 											onclick={() => handleDeleteProject(project)}
-											class="rounded p-1.5 text-red-500 hover:bg-red-500/10"
-											title="Remove"
+											class="text-red-500 hover:bg-red-500/10"
 										>
-											<Trash2 class="h-4 w-4" />
-										</button>
+											{#snippet children()}
+												<Trash2 class="h-4 w-4" />
+											{/snippet}
+										</ActionButton>
 									</div>
 								</td>
 							</tr>

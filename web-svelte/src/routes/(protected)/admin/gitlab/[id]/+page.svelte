@@ -24,7 +24,8 @@
 		Clock,
 		BarChart3
 	} from 'lucide-svelte';
-	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview } from '$lib/api/gitlab';
+	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview, type SecretsScanResult, type SecretFinding, type DeepScanResult, type DeepFinding } from '$lib/api/gitlab';
+	import { Shield, Brain } from 'lucide-svelte';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
@@ -76,6 +77,18 @@
 
 	// Indexing state
 	let indexingProjects = $state<Set<string>>(new Set());
+
+	// Secrets scanning state
+	let showSecretsModal = $state(false);
+	let secretsScanResult = $state<SecretsScanResult | null>(null);
+	let isScanning = $state(false);
+	let scanningProjectId = $state<string | null>(null);
+	
+	// Deep scan (LLM) state
+	let showDeepScanModal = $state(false);
+	let deepScanResult = $state<DeepScanResult | null>(null);
+	let isDeepScanning = $state(false);
+	let deepScanningProjectId = $state<string | null>(null);
 
 	// Add Project form
 	let formGitLabProjectId = $state('');
@@ -350,6 +363,112 @@
 			await loadReviews();
 		} catch (error) {
 			alert(m.alert_failed_retry_review());
+		}
+	}
+
+	async function handleScanSecrets(project: GitLabProject) {
+		if (project.index_status !== 'completed') {
+			alert(m.alert_index_required_for_scan?.() || 'Please index the repository first before scanning for secrets.');
+			return;
+		}
+
+		scanningProjectId = project.id;
+		isScanning = true;
+		secretsScanResult = null;
+		showSecretsModal = true;
+
+		try {
+			const result = await gitlabApi.scanSecrets(project.id);
+			secretsScanResult = result;
+		} catch (error) {
+			console.error('Secrets scan failed:', error);
+			secretsScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				started_at: new Date().toISOString(),
+				completed_at: new Date().toISOString(),
+				duration: '0s',
+				chunks_scanned: 0,
+				findings: [],
+				summary: { total_findings: 0, by_severity: {}, by_category: {}, files_affected: 0 },
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Scan failed'
+			};
+		} finally {
+			isScanning = false;
+			scanningProjectId = null;
+		}
+	}
+	
+	async function handleDeepScan(project: GitLabProject) {
+		if (project.index_status !== 'completed') {
+			alert(m.alert_index_required_for_scan?.() || 'Please index the repository first before scanning for secrets.');
+			return;
+		}
+		
+		if (!project.analysis_model_id) {
+			alert(m.alert_analysis_model_required?.() || 'Please configure an analysis model for this project first.');
+			return;
+		}
+
+		deepScanningProjectId = project.id;
+		isDeepScanning = true;
+		deepScanResult = null;
+		showDeepScanModal = true;
+
+		try {
+			const result = await gitlabApi.deepScanSecrets(project.id);
+			deepScanResult = result;
+		} catch (error) {
+			console.error('Deep secrets scan failed:', error);
+			deepScanResult = {
+				project_id: project.id,
+				scan_id: '',
+				model_id: project.analysis_model_id || '',
+				started_at: new Date().toISOString(),
+				completed_at: new Date().toISOString(),
+				duration: '0s',
+				chunks_scanned: 0,
+				tokens_used: 0,
+				findings: [],
+				summary: { total_findings: 0, by_severity: {}, by_category: {}, files_affected: 0 },
+				status: 'failed',
+				error: error instanceof Error ? error.message : 'Deep scan failed'
+			};
+		} finally {
+			isDeepScanning = false;
+			deepScanningProjectId = null;
+		}
+	}
+	
+	function getConfidenceColor(confidence: string): string {
+		switch (confidence) {
+			case 'high': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+			case 'medium': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+			case 'low': return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+			default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+		}
+	}
+
+	function getSeverityColor(severity: string): string {
+		switch (severity) {
+			case 'critical': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+			case 'high': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/30';
+			case 'medium': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+			case 'low': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
+			default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/30';
+		}
+	}
+
+	function getSeverityIcon(severity: string) {
+		switch (severity) {
+			case 'critical':
+			case 'high':
+				return XCircle;
+			case 'medium':
+				return AlertCircle;
+			default:
+				return CheckCircle;
 		}
 	}
 
@@ -668,6 +787,36 @@
 											title="View Details"
 										>
 											<Eye class="h-4 w-4" />
+										</button>
+										<button
+											onclick={() => handleScanSecrets(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												project.index_status !== 'completed' && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' ? m.gitlab_scan_secrets?.() || 'Scan Secrets (Regex)' : m.gitlab_index_first?.() || 'Index first'}
+											disabled={scanningProjectId === project.id || project.index_status !== 'completed'}
+										>
+											{#if scanningProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<Shield class="h-4 w-4" />
+											{/if}
+										</button>
+										<button
+											onclick={() => handleDeepScan(project)}
+											class={cn(
+												'rounded p-1.5 hover:bg-muted',
+												(project.index_status !== 'completed' || !project.analysis_model_id) && 'opacity-50 cursor-not-allowed'
+											)}
+											title={project.index_status === 'completed' && project.analysis_model_id ? m.gitlab_deep_scan?.() || 'Deep Scan (LLM)' : m.gitlab_index_and_model_required?.() || 'Requires index + analysis model'}
+											disabled={deepScanningProjectId === project.id || project.index_status !== 'completed' || !project.analysis_model_id}
+										>
+											{#if deepScanningProjectId === project.id}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<Brain class="h-4 w-4 text-purple-500" />
+											{/if}
 										</button>
 										<button
 											onclick={() => openEditProject(project)}
@@ -1493,6 +1642,273 @@
 						{m.table_open_gitlab()}
 					</Button>
 				</a>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Secrets Scan Modal -->
+{#if showSecretsModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showSecretsModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showSecretsModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-xl">
+			<div class="mb-4 flex items-center justify-between">
+				<h3 class="text-xl font-semibold flex items-center gap-2">
+					<Shield class="h-5 w-5 text-primary" />
+					{m.gitlab_secrets_scan_title?.() || 'Secrets Scan Results'}
+				</h3>
+				<button onclick={() => (showSecretsModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isScanning}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-primary" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_secrets?.() || 'Scanning for secrets...'}</p>
+				</div>
+			{:else if secretsScanResult}
+				{#if secretsScanResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Scan Failed'}</p>
+						<p class="text-sm">{secretsScanResult.error}</p>
+					</div>
+				{:else}
+					<!-- Summary -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.summary.total_findings}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_secrets_total?.() || 'Total Findings'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.summary.files_affected}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_files_affected?.() || 'Files Affected'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.chunks_scanned}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_chunks_scanned?.() || 'Chunks Scanned'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{secretsScanResult.duration}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_scan_duration?.() || 'Duration'}</div>
+						</div>
+					</div>
+
+					<!-- Severity breakdown -->
+					{#if Object.keys(secretsScanResult.summary.by_severity).length > 0}
+						<div class="mb-4 flex flex-wrap gap-2">
+							{#each Object.entries(secretsScanResult.summary.by_severity) as [severity, count]}
+								<span class={cn('px-3 py-1 rounded-full text-sm font-medium', getSeverityColor(severity))}>
+									{severity}: {count}
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Findings list -->
+					{#if secretsScanResult.findings.length > 0}
+						<div class="space-y-3 max-h-[50vh] overflow-auto">
+							{#each secretsScanResult.findings as finding}
+								<div class="rounded-lg border p-4 hover:bg-muted/50">
+									<div class="flex items-start justify-between gap-4">
+										<div class="flex-1">
+											<div class="flex items-center gap-2 mb-1">
+												{#if true}
+													{@const SevIcon = getSeverityIcon(finding.severity)}
+													<span class={cn('px-2 py-0.5 rounded text-xs font-medium uppercase', getSeverityColor(finding.severity))}>
+														{finding.severity}
+													</span>
+												{/if}
+												<span class="font-medium">{finding.pattern_name}</span>
+												<span class="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded">{finding.category}</span>
+											</div>
+											<div class="text-sm text-muted-foreground mb-2">
+												<code class="px-1 bg-muted rounded">{finding.file_path}</code>
+												{#if finding.start_line > 0}
+													<span class="ml-1">:{finding.start_line}</span>
+												{/if}
+											</div>
+											<div class="text-sm font-mono bg-muted p-2 rounded overflow-x-auto">
+												{finding.match}
+											</div>
+											{#if finding.context}
+												<details class="mt-2">
+													<summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+														{m.gitlab_show_context?.() || 'Show context'}
+													</summary>
+													<pre class="mt-1 text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">{finding.context}</pre>
+												</details>
+											{/if}
+										</div>
+									</div>
+									{#if finding.suggestion}
+										<div class="mt-2 text-sm text-muted-foreground border-t pt-2">
+											<strong>{m.gitlab_suggestion?.() || 'Suggestion'}:</strong> {finding.suggestion}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="flex flex-col items-center justify-center py-12 text-center">
+							<CheckCircle class="h-16 w-16 text-green-500" />
+							<p class="mt-4 text-lg font-medium text-green-600 dark:text-green-400">
+								{m.gitlab_no_secrets_found?.() || 'No secrets found!'}
+							</p>
+							<p class="text-sm text-muted-foreground">
+								{m.gitlab_code_looks_safe?.() || 'Your code looks safe from hardcoded secrets.'}
+							</p>
+						</div>
+					{/if}
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showSecretsModal = false)}>
+					{m.common_close()}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Deep Scan (LLM) Modal -->
+{#if showDeepScanModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => e.target === e.currentTarget && (showDeepScanModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDeepScanModal = false)}
+		tabindex="-1"
+	>
+		<div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<Brain class="h-6 w-6 text-purple-500" />
+					<h3 class="text-lg font-semibold">
+						{m.gitlab_deep_scan_title?.() || 'Deep Scan Results (LLM Analysis)'}
+					</h3>
+				</div>
+				<button onclick={() => (showDeepScanModal = false)} class="rounded p-1 hover:bg-muted">
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			{#if isDeepScanning}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<p class="mt-4 text-muted-foreground">{m.gitlab_deep_scanning?.() || 'Analyzing code with LLM...'}</p>
+					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_deep_scan_patience?.() || 'This may take several minutes for large repositories'}</p>
+				</div>
+			{:else if deepScanResult}
+				{#if deepScanResult.status === 'failed'}
+					<div class="rounded-lg bg-red-100 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400">
+						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Scan Failed'}</p>
+						<p class="text-sm">{deepScanResult.error}</p>
+					</div>
+				{:else}
+					<!-- Summary stats -->
+					<div class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.summary.total_findings}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_secrets_total?.() || 'Total Findings'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.summary.files_affected}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_files_affected?.() || 'Files Affected'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.chunks_scanned}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_chunks_scanned?.() || 'Chunks Scanned'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.tokens_used.toLocaleString()}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_tokens_used?.() || 'Tokens Used'}</div>
+						</div>
+						<div class="rounded-lg bg-muted p-4">
+							<div class="text-2xl font-bold">{deepScanResult.duration}</div>
+							<div class="text-sm text-muted-foreground">{m.gitlab_scan_duration?.() || 'Duration'}</div>
+						</div>
+					</div>
+					
+					<!-- Model info -->
+					<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
+						<Bot class="h-4 w-4" />
+						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{deepScanResult.model_id}</strong></span>
+					</div>
+
+					<!-- Severity breakdown -->
+					{#if Object.keys(deepScanResult.summary.by_severity).length > 0}
+						<div class="mb-4 flex flex-wrap gap-2">
+							{#each Object.entries(deepScanResult.summary.by_severity) as [severity, count]}
+								<span class={cn('px-3 py-1 rounded-full text-sm font-medium', getSeverityColor(severity))}>
+									{severity}: {count}
+								</span>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Findings list -->
+					{#if deepScanResult.findings.length > 0}
+						<div class="space-y-3 max-h-[50vh] overflow-auto">
+							{#each deepScanResult.findings as finding}
+								<div class="rounded-lg border p-4 hover:bg-muted/50">
+									<div class="flex items-start justify-between gap-4">
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center gap-2 flex-wrap">
+												<span class={cn('px-2 py-0.5 rounded text-xs font-medium', getSeverityColor(finding.severity))}>
+													{finding.severity}
+												</span>
+												<span class="text-xs text-muted-foreground">{finding.type}</span>
+												<span class={cn('px-2 py-0.5 rounded text-xs', getConfidenceColor(finding.confidence))}>
+													{m.gitlab_confidence?.() || 'Confidence'}: {finding.confidence}
+												</span>
+											</div>
+											<div class="mt-2 font-medium text-sm">
+												{finding.description}
+											</div>
+											<div class="mt-1 text-xs text-muted-foreground flex items-center gap-2">
+												<FileCode class="h-3 w-3" />
+												{finding.file_path}:{finding.start_line}-{finding.end_line}
+											</div>
+											{#if finding.code_snippet}
+												<pre class="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap font-mono">{finding.code_snippet}</pre>
+											{/if}
+										</div>
+									</div>
+									{#if finding.suggestion}
+										<div class="mt-2 text-sm text-muted-foreground border-t pt-2">
+											<strong>{m.gitlab_suggestion?.() || 'Suggestion'}:</strong> {finding.suggestion}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="flex flex-col items-center justify-center py-12 text-center">
+							<CheckCircle class="h-16 w-16 text-green-500" />
+							<p class="mt-4 text-lg font-medium text-green-600 dark:text-green-400">
+								{m.gitlab_no_secrets_found?.() || 'No secrets found!'}
+							</p>
+							<p class="text-sm text-muted-foreground">
+								{m.gitlab_llm_analysis_clean?.() || 'LLM analysis did not detect any security issues.'}
+							</p>
+						</div>
+					{/if}
+				{/if}
+			{/if}
+
+			<div class="mt-6 flex justify-end">
+				<Button variant="outline" onclick={() => (showDeepScanModal = false)}>
+					{m.common_close()}
+				</Button>
 			</div>
 		</div>
 	</div>

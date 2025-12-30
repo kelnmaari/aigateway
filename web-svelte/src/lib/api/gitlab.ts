@@ -467,6 +467,35 @@ export const gitlabApi = {
     if (params?.per_page) searchParams.set('per_page', params.per_page.toString());
     return apiRequest(`/integrations/${integrationId}/available-projects?${searchParams}`);
   },
+
+  // ============================================================================
+  // Secrets Scanning (v4.0+)
+  // ============================================================================
+  
+  async scanSecrets(projectId: string, params?: {
+    categories?: string[];
+    min_severity?: SecretSeverity;
+  }): Promise<SecretsScanResult> {
+    return apiRequest(`/projects/${projectId}/scan-secrets`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async deepScanSecrets(projectId: string, params?: {
+    model_id?: string;
+    max_chunks?: number;
+    language?: string;
+  }): Promise<DeepScanResult> {
+    return apiRequest(`/projects/${projectId}/deep-scan-secrets`, {
+      method: 'POST',
+      body: params || {},
+    });
+  },
+
+  async getSecretsPatterns(): Promise<SecretsPatternsResponse> {
+    return apiRequest('/secrets/patterns');
+  },
 };
 
 // Model types
@@ -546,6 +575,88 @@ export interface AvailableProjectsResponse {
   total: number;
   page: number;
   per_page: number;
+}
+
+// ============================================================================
+// Secrets Scanning Types (v4.0+)
+// ============================================================================
+
+export type SecretSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+export interface SecretFinding {
+  id: string;
+  pattern_id: string;
+  pattern_name: string;
+  category: string;
+  severity: SecretSeverity;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  match: string; // Redacted
+  context: string; // Redacted surrounding code
+  suggestion: string;
+}
+
+export interface SecretsScanSummary {
+  total_findings: number;
+  by_severity: Record<string, number>;
+  by_category: Record<string, number>;
+  files_affected: number;
+}
+
+export interface SecretsScanResult {
+  project_id: string;
+  scan_id: string;
+  started_at: string;
+  completed_at: string;
+  duration: string;
+  chunks_scanned: number;
+  findings: SecretFinding[];
+  summary: SecretsScanSummary;
+  status: 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
+export interface SecretsPattern {
+  id: string;
+  name: string;
+  description: string;
+  severity: SecretSeverity;
+  category: string;
+}
+
+export interface SecretsPatternsResponse {
+  patterns: SecretsPattern[];
+  total: number;
+}
+
+// Deep scan (LLM-based) types
+export interface DeepFinding {
+  id: string;
+  type: string; // "hardcoded_secret", "sensitive_data", "security_issue"
+  severity: SecretSeverity;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  description: string;
+  code_snippet: string;
+  suggestion: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface DeepScanResult {
+  project_id: string;
+  scan_id: string;
+  model_id: string;
+  started_at: string;
+  completed_at: string;
+  duration: string;
+  chunks_scanned: number;
+  tokens_used: number;
+  findings: DeepFinding[];
+  summary: SecretsScanSummary;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  error?: string;
 }
 
 export default gitlabApi;

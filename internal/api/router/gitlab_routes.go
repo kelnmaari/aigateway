@@ -115,6 +115,11 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	gitlab.POST("/projects/:project_id/webhook", gitlabHandler.SetupWebhook)
 
 	// ============================================================================
+	// Secrets Scanning (v4.0+)
+	// ============================================================================
+	// Note: Secrets handler is registered separately via SetupGitLabSecretsRoutes
+
+	// ============================================================================
 	// Review Management
 	// ============================================================================
 	gitlab.GET("/reviews", gitlabHandler.ListReviews)
@@ -175,5 +180,52 @@ func (r *Router) SetupGitLabWebhookRoute(webhookHandler handlers.WebhookHandler)
 // Defined in handlers package, re-exported here for convenience
 type WebhookHandlerInterface interface {
 	HandleWebhook(c interface{})
+}
+
+// SetupGitLabSecretsRoutes registers GitLab secrets scanning routes
+func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore interface{}) {
+	if store == nil {
+		r.logger.Warn("GitLab secrets routes: Store is nil, skipping setup")
+		return
+	}
+
+	// Check if vectorStore is a QdrantStore
+	qdrantStore, ok := vectorStore.(*handlers.QdrantStoreInterface)
+	if !ok || qdrantStore == nil {
+		// Try direct type assertion
+		if vs, ok := vectorStore.(handlers.QdrantStoreForSecrets); ok {
+			r.logger.Info("Setting up GitLab secrets scanning routes")
+			secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, vs, r.logger)
+			r.registerSecretsRoutes(secretsHandler)
+			return
+		}
+		r.logger.Warn("GitLab secrets routes: VectorStore is not available, skipping setup")
+		return
+	}
+
+	r.logger.Info("Setting up GitLab secrets scanning routes")
+	
+	secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, *qdrantStore, r.logger)
+	r.registerSecretsRoutes(secretsHandler)
+}
+
+func (r *Router) registerSecretsRoutes(secretsHandler *handlers.GitLabSecretsHandler) {
+	gitlab := r.engine.Group("/api/admin/gitlab")
+
+	// Apply authentication
+	if r.jwtManager != nil && r.db != nil {
+		gitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		gitlab.Use(middleware.RequireAdmin(r.db, r.logger))
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		gitlab.Use(r.authenticator.AuthenticationMiddleware())
+		gitlab.Use(r.authenticator.PermissionMiddleware("admin"))
+	}
+
+	// Secrets scanning endpoints
+	gitlab.POST("/projects/:id/scan-secrets", secretsHandler.ScanSecrets)
+	gitlab.POST("/projects/:id/deep-scan-secrets", secretsHandler.DeepScanSecrets)
+	gitlab.GET("/secrets/patterns", secretsHandler.GetPatterns)
+
+	r.logger.Info("GitLab secrets scanning routes configured: POST /api/admin/gitlab/projects/:id/scan-secrets, POST /api/admin/gitlab/projects/:id/deep-scan-secrets")
 }
 

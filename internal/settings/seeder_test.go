@@ -182,6 +182,34 @@ func TestSeedFromYAML_SuccessfulSeed(t *testing.T) {
 	mockStorage.AssertExpectations(t)
 }
 
+func TestSeedFromYAML_BulkUpsertError(t *testing.T) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.FatalLevel)
+	mockStorage := new(MockStorage)
+
+	// Mock: settings table is empty
+	mockStorage.On("GetAllSettings", mock.Anything).Return([]*Setting{}, nil)
+
+	// Mock: BulkUpsertSettings fails
+	expectedErr := assert.AnError
+	mockStorage.On("BulkUpsertSettings", mock.Anything, mock.AnythingOfType("[]*settings.Setting")).Return(expectedErr)
+
+	seeder := NewConfigSeeder(mockStorage, logger)
+	cfg := &config.Config{
+		Server: config.ServerConfig{
+			Host: "localhost",
+			Port: 8085,
+		},
+	}
+
+	ctx := context.Background()
+	count, err := seeder.SeedFromYAML(ctx, cfg)
+
+	assert.Error(t, err, "Should return error when BulkUpsertSettings fails")
+	assert.Equal(t, 0, count, "Should return 0 count on error")
+	mockStorage.AssertExpectations(t)
+}
+
 func TestMapConfigToSettings_ServerSettings(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.FatalLevel)

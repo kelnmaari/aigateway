@@ -1120,7 +1120,62 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 	}
 
 	analytics.Range = rangeParam
-	c.JSON(http.StatusOK, analytics)
+
+	// Calculate success rate
+	successRate := 0.0
+	if analytics.TotalReviews > 0 {
+		successRate = float64(analytics.CompletedReviews) / float64(analytics.TotalReviews)
+	}
+
+	// Convert to format expected by frontend
+	overview := gin.H{
+		"total_reviews":          analytics.TotalReviews,
+		"completed_reviews":      analytics.CompletedReviews,
+		"failed_reviews":         analytics.FailedReviews,
+		"pending_reviews":        analytics.PendingReviews,
+		"total_files_reviewed":   0, // TODO: Add to analytics query
+		"total_lines_changed":    0, // TODO: Add to analytics query
+		"total_issues_found":     analytics.TotalIssuesFound,
+		"total_tokens_used":      analytics.TotalTokensUsed,
+		"avg_score":              analytics.AvgRating,
+		"avg_processing_time_ms": analytics.AvgProcessingMs,
+		"success_rate":           successRate,
+	}
+
+	// Convert project stats
+	topProjects := make([]gin.H, 0, len(analytics.ReviewsByProject))
+	for _, p := range analytics.ReviewsByProject {
+		topProjects = append(topProjects, gin.H{
+			"project_id":        p.ProjectID,
+			"project_name":      p.ProjectName,
+			"total_reviews":     p.TotalReviews,
+			"completed_reviews": p.CompletedReviews,
+			"total_issues_found": p.IssuesFound,
+			"avg_score":         0.0, // TODO: Add to analytics query
+		})
+	}
+
+	// Issues by category (from status distribution as placeholder)
+	issuesByCategory := make([]gin.H, 0)
+	totalIssues := analytics.TotalIssuesFound
+	if totalIssues > 0 {
+		// Use status distribution as categories for now
+		for status, count := range analytics.ReviewsByStatus {
+			issuesByCategory = append(issuesByCategory, gin.H{
+				"category":   status,
+				"count":      count,
+				"percentage": float64(count) / float64(totalIssues) * 100,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"overview":            overview,
+		"top_projects":        topProjects,
+		"top_models":          []gin.H{}, // TODO: Add model stats to analytics query
+		"issues_by_category":  issuesByCategory,
+		"reviews_by_day":      analytics.ReviewsByDay,
+	})
 }
 
 // ============================================================================
@@ -1130,11 +1185,11 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 // ListFeedback GET /api/admin/gitlab/feedback
 func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
 	req := models.GitLabFeedbackListRequest{
-		Limit:  20,
+		Limit:  50, // Increase limit for stats calculation
 		Offset: 0,
 	}
 
-	if limit, err := strconv.Atoi(c.DefaultQuery("limit", "20")); err == nil && limit > 0 {
+	if limit, err := strconv.Atoi(c.DefaultQuery("limit", "50")); err == nil && limit > 0 {
 		req.Limit = limit
 	}
 	if offset, err := strconv.Atoi(c.DefaultQuery("offset", "0")); err == nil && offset >= 0 {
@@ -1143,7 +1198,7 @@ func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
 	if reviewID := c.Query("review_id"); reviewID != "" {
 		req.ReviewID = &reviewID
 	}
-	if feedbackType := c.Query("type"); feedbackType != "" {
+	if feedbackType := c.Query("type"); feedbackType != "" && feedbackType != "all" {
 		req.FeedbackType = &feedbackType
 	}
 
@@ -1157,14 +1212,113 @@ func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
 		return
 	}
 
+	// Calculate stats from feedback
+	var approvedCount, rejectedCount, editedCount, ignoredCount int
+	categoryStats := make(map[string]struct{ total, approved, rejected int })
+
+	for _, fb := range feedback {
+		switch fb.FeedbackType {
+		case "approve", models.FeedbackTypeGeneral:
+			approvedCount++
+		case "reject", models.FeedbackTypeFalsePositive:
+			rejectedCount++
+		case "edit", models.FeedbackTypeAccuracy:
+			editedCount++
+		case "ignore":
+			ignoredCount++
+		default:
+			// Count by feedback type as category
+			approvedCount++ // Default to approved if unknown type
+		}
+
+		// Track category accuracy based on feedback type
+		cat := fb.FeedbackType
+		if cat == "" {
+			cat = "general"
+		}
+		stats := categoryStats[cat]
+		stats.total++
+		if fb.FeedbackType == "approve" || fb.FeedbackType == models.FeedbackTypeGeneral {
+			stats.approved++
+		} else if fb.FeedbackType == "reject" || fb.FeedbackType == models.FeedbackTypeFalsePositive {
+			stats.rejected++
+		}
+		categoryStats[cat] = stats
+	}
+
+	// Calculate rates
+	approvalRate := 0.0
+	accuracyRate := 0.0
+	if total > 0 {
+		approvalRate = float64(approvedCount) / float64(total)
+		// Accuracy = approved / (approved + rejected)
+		reviewedCount := approvedCount + rejectedCount
+		if reviewedCount > 0 {
+			accuracyRate = float64(approvedCount) / float64(reviewedCount)
+		}
+	}
+
+	// Build stats response
+	stats := gin.H{
+		"total_feedback": total,
+		"approved_count": approvedCount,
+		"rejected_count": rejectedCount,
+		"edited_count":   editedCount,
+		"ignored_count":  ignoredCount,
+		"approval_rate":  approvalRate,
+		"accuracy_rate":  accuracyRate,
+	}
+
+	// Build category accuracy
+	categoryAccuracy := make([]gin.H, 0)
+	for cat, s := range categoryStats {
+		accRate := 0.0
+		if s.approved+s.rejected > 0 {
+			accRate = float64(s.approved) / float64(s.approved+s.rejected)
+		}
+		categoryAccuracy = append(categoryAccuracy, gin.H{
+			"category":       cat,
+			"total_issues":   s.total,
+			"approved_count": s.approved,
+			"rejected_count": s.rejected,
+			"accuracy_rate":  accRate,
+		})
+	}
+
+	// Convert feedback to recent items format
+	recentItems := make([]gin.H, 0, len(feedback))
+	for _, fb := range feedback {
+		if len(recentItems) >= 20 {
+			break
+		}
+		username := "anonymous"
+		if fb.UserID != nil {
+			username = *fb.UserID
+		}
+		issueIndex := 0
+		if fb.IssueIndex != nil {
+			issueIndex = *fb.IssueIndex
+		}
+		recentItems = append(recentItems, gin.H{
+			"id":             fb.ID,
+			"review_id":      fb.ReviewID,
+			"issue_category": fb.FeedbackType, // Use feedback type as category
+			"issue_severity": "medium",        // Default severity
+			"issue_message":  fb.Comment,      // Use comment as message
+			"issue_file":     "",              // Not available in current schema
+			"issue_line":     issueIndex,      // Use issue index as line placeholder
+			"type":           fb.FeedbackType,
+			"comment":        fb.Comment,
+			"username":       username,
+			"created_at":     fb.CreatedAt,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":  feedback,
-		"total": total,
-		"pagination": gin.H{
-			"limit":  req.Limit,
-			"offset": req.Offset,
-			"total":  total,
-		},
+		"stats":             stats,
+		"category_accuracy": categoryAccuracy,
+		"model_accuracy":    []gin.H{}, // TODO: Add model accuracy tracking
+		"recent":            recentItems,
 	})
 }
 

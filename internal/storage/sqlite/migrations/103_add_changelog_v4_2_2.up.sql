@@ -12,4 +12,3 @@ INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
 ### Technical
 
 - internal/inference/provider_builders.go: Updated buildLlamaCppRequest to use explicit on/off values');
-

@@ -15,4 +15,3 @@ INSERT INTO changelogs (version, release_date, content) VALUES
 ON CONFLICT (version) DO UPDATE SET
   release_date = EXCLUDED.release_date,
   content = EXCLUDED.content;
-

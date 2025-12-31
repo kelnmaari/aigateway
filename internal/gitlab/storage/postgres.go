@@ -363,10 +363,10 @@ func (s *PostgresStore) CreateProject(ctx context.Context, project *models.GitLa
 
 	query := `
 		INSERT INTO gitlab_projects (
-			id, integration_id, gitlab_project_id, name, path_with_namespace, webhook_id,
+			id, integration_id, gitlab_project_id, name, path_with_namespace, default_branch, webhook_id,
 			status, auto_review, analysis_model_id, embedding_model_id, review_prompt, settings,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 
 	_, err = s.db.ExecContext(ctx, query,
@@ -375,6 +375,7 @@ func (s *PostgresStore) CreateProject(ctx context.Context, project *models.GitLa
 		project.GitLabProjectID,
 		project.Name,
 		project.PathWithNamespace,
+		project.DefaultBranch,
 		project.WebhookID,
 		project.Status,
 		project.AutoReview,
@@ -721,6 +722,11 @@ func (s *PostgresStore) UpdateProject(ctx context.Context, id string, req *model
 	if req.Status != nil {
 		sets = append(sets, fmt.Sprintf("status = $%d", argNum))
 		args = append(args, *req.Status)
+		argNum++
+	}
+	if req.DefaultBranch != nil {
+		sets = append(sets, fmt.Sprintf("default_branch = $%d", argNum))
+		args = append(args, *req.DefaultBranch)
 		argNum++
 	}
 	if req.AnalysisModelID != nil {

@@ -485,6 +485,9 @@ func (h *GitLabTestGenHandler) CreateTestsMR(c *gin.Context) {
 	if targetBranch == "" {
 		targetBranch = project.DefaultBranch
 	}
+	if targetBranch == "" {
+		targetBranch = "main" // Fallback if not set
+	}
 
 	commitMessage := req.CommitMessage
 	if commitMessage == "" {

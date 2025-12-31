@@ -326,6 +326,7 @@ export const gitlabApi = {
   async updateProject(projectId: string, data: {
     auto_review?: boolean;
     status?: string;
+    default_branch?: string;
     analysis_model_id?: string;
     embedding_model_id?: string;
     review_prompt?: string;

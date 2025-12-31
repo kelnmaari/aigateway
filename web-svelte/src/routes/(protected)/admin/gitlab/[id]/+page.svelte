@@ -56,6 +56,7 @@
 	let selectedReview = $state<GitLabReview | null>(null);
 
 	// Edit Project form
+	let editDefaultBranch = $state('');
 	let editAnalysisModelId = $state('');
 	let editEmbeddingModelId = $state('');
 	let editAutoReview = $state(true);
@@ -1151,6 +1152,7 @@
 	function openEditProject(project: GitLabProject) {
 		selectedProject = project;
 		// Populate edit form with current values
+		editDefaultBranch = project.default_branch || '';
 		editAnalysisModelId = project.analysis_model_id || '';
 		editEmbeddingModelId = project.embedding_model_id || '';
 		editAutoReview = project.auto_review;
@@ -1191,6 +1193,7 @@
 			await gitlabApi.updateProject(selectedProject.id, {
 				auto_review: editAutoReview,
 				status: editStatus,
+				default_branch: editDefaultBranch || undefined,
 				analysis_model_id: editAnalysisModelId || undefined,
 				embedding_model_id: editEmbeddingModelId || undefined,
 				review_prompt: editReviewPrompt || undefined,
@@ -2103,6 +2106,19 @@
 							class="mt-1 w-full rounded-md border bg-background px-3 py-2"
 						/>
 					</div>
+				</div>
+
+				<!-- Default Branch -->
+				<div>
+					<label for="edit-default-branch" class="text-sm font-medium">Default Branch</label>
+					<input
+						id="edit-default-branch"
+						type="text"
+						bind:value={editDefaultBranch}
+						placeholder="e.g., main, master"
+						class="mt-1 w-full rounded-md border bg-background px-3 py-2"
+					/>
+					<p class="text-xs text-muted-foreground mt-1">Target branch for MR creation and indexing</p>
 				</div>
 
 				<!-- Review Prompt -->

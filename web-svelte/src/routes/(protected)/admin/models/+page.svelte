@@ -39,14 +39,16 @@
 	let repoDownloads = $state<RepoDownload[]>([]);
 	let repoDownloadsInterval: ReturnType<typeof setInterval> | null = null;
 	
-	// HuggingFace Browser state
+	// HuggingFace Browser state - compatible with both local and API types
 	interface HFModel {
 		id: string;
 		author: string;
-		modelId: string;
+		model_name?: string;      // From API
+		modelId?: string;         // Legacy
 		downloads: number;
 		likes: number;
-		lastModified: string;
+		last_modified?: string;   // From API
+		lastModified?: string;    // Legacy
 		tags: string[];
 		pipeline_tag?: string;
 		has_gguf?: boolean;
@@ -459,6 +461,9 @@
 			// Create minimal model object from manual input for calculation
 			modelForCalc = {
 				id: form.hf_repo,
+				author: '',
+				downloads: 0,
+				likes: 0,
 				tags: [],
 				safetensors: undefined
 			} as HFModel;
@@ -483,12 +488,12 @@
 		hfSearchPerformed = true;
 		try {
 			const res = await downloadsApi.searchHuggingFace(hfSearchQuery, hfProviderFilter);
-			hfSearchResults = res.models || [];
+			hfSearchResults = (res.models || []) as HFModel[];
 			if (hfSearchResults.length === 0 && hfSearchQuery) {
 				hfSearchError = `No models found for "${hfSearchQuery}"`;
 			}
-		} catch (e: any) {
-			hfSearchError = e?.message || 'Failed to search HuggingFace';
+		} catch (e: unknown) {
+			hfSearchError = (e as Error)?.message || 'Failed to search HuggingFace';
 			hfSearchResults = [];
 		} finally {
 			hfSearching = false;
@@ -506,14 +511,14 @@
 		}
 		try {
 			const res = await downloadsApi.getPopularModels(hfProviderFilter, HF_PAGE_SIZE, hfCurrentPage);
-			const newModels = res.models || [];
+			const newModels = (res.models || []) as HFModel[];
 			if (reset) {
 				hfPopularModels = newModels;
 			} else {
 				hfPopularModels = [...hfPopularModels, ...newModels];
 			}
 			hfHasMore = newModels.length >= HF_PAGE_SIZE;
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error('Failed to load popular models:', e);
 		} finally {
 			hfSearching = false;

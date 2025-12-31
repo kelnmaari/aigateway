@@ -273,7 +273,7 @@
 									<input
 										placeholder={m.placeholder_branches()}
 										value={rule.branches.join(', ')}
-										onchange={(e) => rule.branches = e.target.value.split(',').map(b => b.trim()).filter(Boolean)}
+										onchange={(e) => rule.branches = (e.target as HTMLInputElement).value.split(',').map((b: string) => b.trim()).filter(Boolean)}
 										class="flex-1 h-10 rounded-md border bg-background px-3 text-sm"
 									/>
 								</div>
@@ -336,7 +336,7 @@
 									checked={languagePrompts.find(p => p.language === selectedLanguage)?.enabled}
 									onchange={(e) => {
 										languagePrompts = languagePrompts.map(p =>
-											p.language === selectedLanguage ? { ...p, enabled: e.target.checked } : p
+											p.language === selectedLanguage ? { ...p, enabled: (e.target as HTMLInputElement).checked } : p
 										);
 									}}
 									class="h-4 w-4"

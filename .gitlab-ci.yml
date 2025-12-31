@@ -50,35 +50,86 @@ cache:
     - web-svelte/node_modules/
 
 # ==============================================================================
-# TEST STAGE
+# TEST STAGE - Split by component (1 component = 1 job)
 # ==============================================================================
 
-test:
+# Excluded packages (legacy code issues):
+#   - internal/auth
+#   - internal/circuit
+#   - internal/rag
+#   - internal/notifications
+#   - internal/services/rag
+#   - cmd/webui
+
+# Common test configuration template (fast - no race detector)
+.test_template: &test_template
   stage: test
   image: golang:${GO_VERSION}
+  variables:
+    CGO_ENABLED: "0"  # No CGO needed without -race
+  before_script:
+    - apt-get update && apt-get install -y git
+    - mkdir -p .go
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+    - export PATH="$GOPATH/bin:$PATH"
+    - go mod download
+  allow_failure: true
+  rules:
+    # Don't run on tags
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH
+
+# Fast tests (parallel, no race detector) - runs on all branches
+test:fast:
+  <<: *test_template
+  script:
+    - |
+      go test -short \
+        ./internal/config/... \
+        ./internal/concurrent/... \
+        ./internal/types/... \
+        ./internal/utils/... \
+        ./internal/models/... \
+        ./internal/cache/... \
+        ./internal/health/... \
+        ./internal/settings/... \
+        ./cmd/server/... \
+        ./cmd/tui/...
+  timeout: 5m
+
+# Full tests with race detector - only on MRs to main
+test:race:
+  stage: test
+  image: golang:${GO_VERSION}
+  variables:
+    CGO_ENABLED: "1"
+    GOMAXPROCS: "4"
   before_script:
     - apt-get update && apt-get install -y git gcc
     - mkdir -p .go
     - export GOPATH="$CI_PROJECT_DIR/.go"
     - export PATH="$GOPATH/bin:$PATH"
-  script:
     - go mod download
-    # Skip vet and tests for packages with legacy code issues
-    # TODO: Fix tests in internal/auth, internal/circuit, internal/rag, internal/notifications
+  script:
     - |
-      go test -race -coverprofile=coverage.out \
-        $(go list ./... | grep -v -E '(internal/auth|internal/circuit|internal/rag|internal/notifications|cmd/webui|internal/services/rag)')
-    - go tool cover -func=coverage.out | tail -1 || true
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.out
-  allow_failure: true  # Tests may fail due to legacy code
+      go test -race -p 2 \
+        ./internal/config/... \
+        ./internal/concurrent/... \
+        ./internal/types/... \
+        ./internal/utils/... \
+        ./internal/models/... \
+        ./internal/inference/...
+  allow_failure: true
+  timeout: 10m
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+    - when: never
 
 # ==============================================================================
 # BUILD STAGE

@@ -36,11 +36,12 @@ func BenchmarkMockRuntime_ParallelStart(b *testing.B) {
 			GGUFCacheDir: tmpDir,
 			Logger:       logger,
 		},
-		orch:       orch,
-		runtime:    mockRuntime,
-		downloader: dl,
-		logger:     logger,
-		registry:   NewSpecRegistry(),
+		orch:           orch,
+		runtime:        mockRuntime,
+		downloader:     dl,
+		logger:         logger,
+		registry:       NewSpecRegistry(),
+		providerLogger: NewProviderLogger(tmpDir, logger),
 	}
 
 	mgr := NewManager(svc)
@@ -90,11 +91,12 @@ func BenchmarkMockRuntime_SequentialStartStop(b *testing.B) {
 			GGUFCacheDir: tmpDir,
 			Logger:       logger,
 		},
-		orch:       orch,
-		runtime:    mockRuntime,
-		downloader: dl,
-		logger:     logger,
-		registry:   NewSpecRegistry(),
+		orch:           orch,
+		runtime:        mockRuntime,
+		downloader:     dl,
+		logger:         logger,
+		registry:       NewSpecRegistry(),
+		providerLogger: NewProviderLogger(tmpDir, logger),
 	}
 
 	mgr := NewManager(svc)
@@ -142,11 +144,12 @@ func BenchmarkRouter_Resolution(b *testing.B) {
 			GGUFCacheDir: tmpDir,
 			Logger:       logger,
 		},
-		orch:       orch,
-		runtime:    mockRuntime,
-		downloader: dl,
-		logger:     logger,
-		registry:   NewSpecRegistry(),
+		orch:           orch,
+		runtime:        mockRuntime,
+		downloader:     dl,
+		logger:         logger,
+		registry:       NewSpecRegistry(),
+		providerLogger: NewProviderLogger(tmpDir, logger),
 	}
 
 	mgr := NewManager(svc)
@@ -207,11 +210,12 @@ func TestLoadTest_HighConcurrency(t *testing.T) {
 			GGUFCacheDir: tmpDir,
 			Logger:       logger,
 		},
-		orch:       orch,
-		runtime:    mockRuntime,
-		downloader: dl,
-		logger:     logger,
-		registry:   NewSpecRegistry(),
+		orch:           orch,
+		runtime:        mockRuntime,
+		downloader:     dl,
+		logger:         logger,
+		registry:       NewSpecRegistry(),
+		providerLogger: NewProviderLogger(tmpDir, logger),
 	}
 
 	mgr := NewManager(svc)
@@ -296,11 +300,12 @@ func TestLoadTest_RapidStartStop(t *testing.T) {
 			GGUFCacheDir: tmpDir,
 			Logger:       logger,
 		},
-		orch:       orch,
-		runtime:    mockRuntime,
-		downloader: dl,
-		logger:     logger,
-		registry:   NewSpecRegistry(),
+		orch:           orch,
+		runtime:        mockRuntime,
+		downloader:     dl,
+		logger:         logger,
+		registry:       NewSpecRegistry(),
+		providerLogger: NewProviderLogger(tmpDir, logger),
 	}
 
 	mgr := NewManager(svc)

@@ -403,7 +403,8 @@ func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 		Summary      string `json:"summary"`
 	}
 	
-	if err := json.Unmarshal([]byte(cleaned), &altFormat); err == nil && len(altFormat.Issues) > 0 {
+	// Parse alternative format - allow empty issues array (means no issues found)
+	if err := json.Unmarshal([]byte(cleaned), &altFormat); err == nil && altFormat.Issues != nil {
 		result := &AnalysisResultParsed{
 			Summary:     altFormat.Summary,
 			Score:       altFormat.OverallScore,
@@ -414,7 +415,11 @@ func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 			result.Score = altFormat.Score
 		}
 		if result.Score == 0 {
-			result.Score = 70 // Default moderate score
+			if len(altFormat.Issues) == 0 {
+				result.Score = 100 // No issues = perfect score
+			} else {
+				result.Score = 70 // Default moderate score for issues
+			}
 		}
 		
 		for _, issue := range altFormat.Issues {
@@ -487,6 +492,12 @@ func convertFullResult(fullResult *AnalysisResult) *AnalysisResultParsed {
 			Description: suggestion.Description,
 			Priority:    suggestion.Priority,
 		})
+	}
+	
+	// Apply sensible default score if LLM didn't provide one
+	// Score 0 with no issues means LLM didn't return score - give perfect score
+	if result.Score == 0 && len(result.Issues) == 0 {
+		result.Score = 100
 	}
 	
 	return result

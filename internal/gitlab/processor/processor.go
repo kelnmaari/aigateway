@@ -207,6 +207,7 @@ func (p *Processor) ProcessJob(ctx context.Context, job *models.GitLabAnalysisJo
 		IssuesFound:      reviewResult.IssuesFound,
 		ProcessingTimeMs: processingTime,
 		TokensUsed:       tokensUsed,
+		Model:            project.AnalysisModelID,
 	}
 	commentText := p.commentBuilder.BuildReviewComment(&reviewResult.Result, stats)
 	
@@ -536,11 +537,24 @@ func (p *Processor) analyzePerFile(
 
 // buildReviewResult converts analysis result to review result
 func (p *Processor) buildReviewResult(analysis *analyzer.AnalysisResultParsed, diffs []client.Diff) *ReviewResult {
+	// Calculate score: if no issues found and LLM returned 0 or didn't provide score,
+	// give perfect score. If issues exist but score is 0, calculate based on issues.
+	score := analysis.Score
+	if score == 0 {
+		if len(analysis.Issues) == 0 {
+			score = 100 // No issues = perfect score
+		} else {
+			// Estimate score based on number of issues per file
+			issuesPerFile := float64(len(analysis.Issues)) / float64(max(len(diffs), 1))
+			score = max(30, 100-int(issuesPerFile*20)) // Each issue reduces score, min 30
+		}
+	}
+	
 	result := &ReviewResult{
 		IssuesFound: len(analysis.Issues),
 		Result: models.GitLabReviewResult{
 			Summary:      analysis.Summary,
-			OverallScore: analysis.Score,
+			OverallScore: score,
 			Categories:   make([]models.GitLabReviewCategory, 0),
 			FileReviews:  make([]models.GitLabFileReview, 0),
 			Suggestions:  make([]models.GitLabSuggestion, 0),

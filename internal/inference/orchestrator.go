@@ -194,17 +194,19 @@ func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*Model
 		}
 
 		if err != nil {
-			inst.Status = StatusFailed
-			inst.Error = err.Error()
-			o.saveInstance(inst)
+			o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+				i.Status = StatusFailed
+				i.Error = err.Error()
+			})
 			return inst, err
 		}
 	}
 
-	inst.Spec.LocalPath = localPath
-	inst.Status = StatusReady
-	inst.LastUsed = time.Now()
-	o.saveInstance(inst)
+	o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+		i.Spec.LocalPath = localPath
+		i.Status = StatusReady
+		i.LastUsed = time.Now()
+	})
 	return inst, nil
 }
 
@@ -238,14 +240,16 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 		return inst, fmt.Errorf("container runtime is not configured")
 	}
 
-	inst.Status = StatusStarting
-	o.saveInstance(inst)
+	o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+		i.Status = StatusStarting
+	})
 
 	handle, err := o.runtime.Start(opCtx, startReq)
 	if err != nil {
-		inst.Status = StatusFailed
-		inst.Error = err.Error()
-		o.saveInstance(inst)
+		o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+			i.Status = StatusFailed
+			i.Error = err.Error()
+		})
 		metrics.InferenceStartupFailures.WithLabelValues(string(spec.Provider)).Inc()
 		o.logger.WithFields(logrus.Fields{
 			"event":    "container_start_failed",
@@ -256,9 +260,10 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 		return inst, err
 	}
 
-	inst.Handle = handle
-	inst.Status = StatusStarting
-	o.saveInstance(inst)
+	o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+		i.Handle = handle
+		i.Status = StatusStarting
+	})
 
 	// Health wait with configurable timeout
 	// Use background context to prevent cancellation from HTTP request refresh
@@ -267,10 +272,11 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 		defer cancel()
 		healthURL := providerHealthURL(handle.Provider, handle.Endpoint)
 		if err := waitForHealth(healthCtx, healthURL, 2*time.Second); err != nil {
-			inst.Status = StatusFailed
-			inst.Error = fmt.Sprintf("health check failed: %v", err)
+			o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+				i.Status = StatusFailed
+				i.Error = fmt.Sprintf("health check failed: %v", err)
+			})
 			_ = o.runtime.Stop(context.Background(), handle.ID)
-			o.saveInstance(inst)
 			metrics.InferenceHealthFailures.WithLabelValues(string(spec.Provider)).Inc()
 			// Alert: health check timeout/failure
 			o.logger.WithFields(logrus.Fields{
@@ -285,9 +291,10 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 		}
 	}
 
-	inst.Status = StatusRunning
-	inst.LastUsed = time.Now()
-	o.saveInstance(inst)
+	o.updateOrCreateInstance(inst, func(i *ModelInstance) {
+		i.Status = StatusRunning
+		i.LastUsed = time.Now()
+	})
 	metrics.InferenceContainersStarted.WithLabelValues(string(spec.Provider)).Inc()
 	o.logger.WithFields(logrus.Fields{
 		"event":    "container_started",
@@ -300,23 +307,27 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 
 // StopModel stops container if running.
 func (o *Orchestrator) StopModel(ctx context.Context, alias string) error {
-	o.mu.Lock()
+	o.mu.RLock()
 	inst, ok := o.models[alias]
-	o.mu.Unlock()
 	if !ok {
+		o.mu.RUnlock()
 		return fmt.Errorf("model not found: %s", alias)
 	}
-	if inst.Handle == nil || o.runtime == nil {
+	handle := inst.Handle
+	o.mu.RUnlock()
+
+	if handle == nil || o.runtime == nil {
 		return nil
 	}
 
-	if err := o.runtime.Stop(ctx, inst.Handle.ID); err != nil {
+	if err := o.runtime.Stop(ctx, handle.ID); err != nil {
 		return err
 	}
 
-	inst.Status = StatusReady
-	inst.Handle = nil
-	o.saveInstance(inst)
+	o.updateInstance(alias, func(i *ModelInstance) {
+		i.Status = StatusReady
+		i.Handle = nil
+	})
 	return nil
 }
 
@@ -332,6 +343,24 @@ func (o *Orchestrator) ForgetModel(alias string) {
 func (o *Orchestrator) saveInstance(inst *ModelInstance) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	o.models[inst.Spec.Alias] = inst
+}
+
+// updateInstance atomically updates instance fields under the write lock.
+// The modifier function receives a pointer to the instance to modify.
+func (o *Orchestrator) updateInstance(alias string, modifier func(*ModelInstance)) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if inst, ok := o.models[alias]; ok {
+		modifier(inst)
+	}
+}
+
+// updateOrCreateInstance atomically updates or creates an instance under write lock.
+func (o *Orchestrator) updateOrCreateInstance(inst *ModelInstance, modifier func(*ModelInstance)) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	modifier(inst)
 	o.models[inst.Spec.Alias] = inst
 }
 

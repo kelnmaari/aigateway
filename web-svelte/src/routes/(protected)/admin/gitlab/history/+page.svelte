@@ -371,12 +371,12 @@
 
 <!-- Detail Modal -->
 {#if showDetailModal && selectedResult}
+	{@const ModalTypeIcon = getScanTypeIcon(selectedResult.scan_type)}
 	<div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
 		<div class="bg-card border rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
 			<div class="flex items-center justify-between p-4 border-b">
 				<div class="flex items-center gap-3">
-					{@const TypeIcon = getScanTypeIcon(selectedResult.scan_type)}
-					<TypeIcon class="h-5 w-5" />
+					<ModalTypeIcon class="h-5 w-5" />
 					<div>
 						<h2 class="font-semibold">{getScanTypeLabel(selectedResult.scan_type)} Results</h2>
 						<p class="text-sm text-muted-foreground">

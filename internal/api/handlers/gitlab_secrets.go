@@ -4,9 +4,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
+	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/scanner"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/models"
@@ -374,5 +376,91 @@ func (h *GitLabSecretsHandler) SASTScan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// CreateSecretsIssueRequest is the request body for creating an issue.
+type CreateSecretsIssueRequest struct {
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
+}
+
+// CreateSecretsIssue POST /api/admin/gitlab/projects/:id/secrets/create-issue
+func (h *GitLabSecretsHandler) CreateSecretsIssue(c *gin.Context) {
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	var req CreateSecretsIssueRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Failed to get project")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Get integration
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get integration")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get GitLab integration"})
+		return
+	}
+
+	// Create issue using GitLab API
+	issueURL, err := h.createGitLabIssue(ctx, integration.BaseURL, integration.AccessToken, project.GitLabProjectID, req)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to create GitLab issue")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create issue: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Issue created successfully",
+		"url":     issueURL,
+	})
+}
+
+// createGitLabIssue creates an issue in GitLab for secrets.
+func (h *GitLabSecretsHandler) createGitLabIssue(ctx context.Context, gitlabURL, token string, projectID int64, req CreateSecretsIssueRequest) (string, error) {
+	h.logger.WithFields(logrus.Fields{
+		"gitlab_project_id": projectID,
+		"title":             req.Title,
+	}).Info("Creating GitLab issue for secrets")
+
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     gitlabURL,
+		AccessToken: token,
+		Timeout:     30 * time.Second,
+	})
+
+	// Build labels
+	labels := req.Labels
+	if len(labels) == 0 {
+		labels = []string{"security", "secrets", "urgent"}
+	}
+
+	issueReq := &client.CreateIssueRequest{
+		Title:       req.Title,
+		Description: req.Description,
+		Labels:      labels,
+	}
+
+	issue, err := gitlabClient.CreateIssue(ctx, projectID, issueReq)
+	if err != nil {
+		return "", fmt.Errorf("create issue: %w", err)
+	}
+
+	return issue.WebURL, nil
 }
 

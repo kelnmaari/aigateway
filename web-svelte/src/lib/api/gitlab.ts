@@ -546,6 +546,39 @@ export const gitlabApi = {
     });
   },
 
+  async createSecretsIssue(projectId: string, params: {
+    title: string;
+    description?: string;
+    labels?: string[];
+  }): Promise<{ message: string; url: string }> {
+    return apiRequest(`/projects/${projectId}/secrets/create-issue`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async createQualityIssue(projectId: string, params: {
+    title: string;
+    description?: string;
+    labels?: string[];
+  }): Promise<{ message: string; url: string }> {
+    return apiRequest(`/projects/${projectId}/quality/create-issue`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
+  async createDeadCodeIssue(projectId: string, params: {
+    title: string;
+    description?: string;
+    labels?: string[];
+  }): Promise<{ message: string; url: string }> {
+    return apiRequest(`/projects/${projectId}/dead-code-issue`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
   // ============================================================================
   // Changelog Analysis (v4.2+)
   // ============================================================================

@@ -65,6 +65,8 @@ cache:
 .test_template: &test_template
   stage: test
   image: golang:${GO_VERSION}
+  variables:
+    CGO_ENABLED: "1"  # Required for -race flag
   before_script:
     - apt-get update && apt-get install -y git gcc
     - mkdir -p .go

@@ -2163,8 +2163,8 @@
 			<div class="space-y-4 max-h-[60vh] overflow-y-auto">
 				<!-- Capabilities -->
 				<div>
-					<label class="block text-sm font-medium mb-2">Capabilities</label>
-					<div class="flex flex-wrap gap-2">
+					<span class="block text-sm font-medium mb-2">Capabilities</span>
+					<div class="flex flex-wrap gap-2" role="group" aria-label="Capabilities">
 						{#each capabilities as cap}
 							<button 
 								type="button" 

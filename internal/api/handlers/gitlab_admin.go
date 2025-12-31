@@ -1184,16 +1184,20 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 
 // ListFeedback GET /api/admin/gitlab/feedback
 func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
-	req := models.GitLabFeedbackListRequest{
-		Limit:  50, // Increase limit for stats calculation
-		Offset: 0,
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	// Get aggregated stats from database (O(1) on Go side)
+	feedbackStats, err := h.store.GetFeedbackStats(ctx)
+	if err != nil {
+		h.logger.WithError(err).Warn("Failed to get feedback stats, falling back to manual calculation")
+		feedbackStats = nil
 	}
 
-	if limit, err := strconv.Atoi(c.DefaultQuery("limit", "50")); err == nil && limit > 0 {
-		req.Limit = limit
-	}
-	if offset, err := strconv.Atoi(c.DefaultQuery("offset", "0")); err == nil && offset >= 0 {
-		req.Offset = offset
+	// Get recent feedback items for display
+	req := models.GitLabFeedbackListRequest{
+		Limit:  20, // Only need recent items for display
+		Offset: 0,
 	}
 	if reviewID := c.Query("review_id"); reviewID != "" {
 		req.ReviewID = &reviewID
@@ -1202,87 +1206,50 @@ func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
 		req.FeedbackType = &feedbackType
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-	defer cancel()
-
-	feedback, total, err := h.store.ListFeedback(ctx, &req)
+	feedback, _, err := h.store.ListFeedback(ctx, &req)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list feedback")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list feedback"})
 		return
 	}
 
-	// Calculate stats from feedback
-	var approvedCount, rejectedCount, editedCount, ignoredCount int
-	categoryStats := make(map[string]struct{ total, approved, rejected int })
+	// Build stats response from SQL aggregation
+	var stats gin.H
+	var categoryAccuracy []gin.H
 
-	for _, fb := range feedback {
-		switch fb.FeedbackType {
-		case "approve", models.FeedbackTypeGeneral:
-			approvedCount++
-		case "reject", models.FeedbackTypeFalsePositive:
-			rejectedCount++
-		case "edit", models.FeedbackTypeAccuracy:
-			editedCount++
-		case "ignore":
-			ignoredCount++
-		default:
-			// Count by feedback type as category
-			approvedCount++ // Default to approved if unknown type
+	if feedbackStats != nil {
+		stats = gin.H{
+			"total_feedback": feedbackStats.TotalFeedback,
+			"approved_count": feedbackStats.ApprovedCount,
+			"rejected_count": feedbackStats.RejectedCount,
+			"edited_count":   feedbackStats.EditedCount,
+			"ignored_count":  feedbackStats.IgnoredCount,
+			"approval_rate":  feedbackStats.ApprovalRate,
+			"accuracy_rate":  feedbackStats.AccuracyRate,
 		}
 
-		// Track category accuracy based on feedback type
-		cat := fb.FeedbackType
-		if cat == "" {
-			cat = "general"
+		categoryAccuracy = make([]gin.H, 0, len(feedbackStats.ByCategory))
+		for _, cat := range feedbackStats.ByCategory {
+			categoryAccuracy = append(categoryAccuracy, gin.H{
+				"category":       cat.Category,
+				"total_issues":   cat.TotalIssues,
+				"approved_count": cat.ApprovedCount,
+				"rejected_count": cat.RejectedCount,
+				"accuracy_rate":  cat.AccuracyRate,
+			})
 		}
-		stats := categoryStats[cat]
-		stats.total++
-		if fb.FeedbackType == "approve" || fb.FeedbackType == models.FeedbackTypeGeneral {
-			stats.approved++
-		} else if fb.FeedbackType == "reject" || fb.FeedbackType == models.FeedbackTypeFalsePositive {
-			stats.rejected++
+	} else {
+		// Fallback: empty stats if SQL aggregation failed
+		stats = gin.H{
+			"total_feedback": 0,
+			"approved_count": 0,
+			"rejected_count": 0,
+			"edited_count":   0,
+			"ignored_count":  0,
+			"approval_rate":  0.0,
+			"accuracy_rate":  0.0,
 		}
-		categoryStats[cat] = stats
-	}
-
-	// Calculate rates
-	approvalRate := 0.0
-	accuracyRate := 0.0
-	if total > 0 {
-		approvalRate = float64(approvedCount) / float64(total)
-		// Accuracy = approved / (approved + rejected)
-		reviewedCount := approvedCount + rejectedCount
-		if reviewedCount > 0 {
-			accuracyRate = float64(approvedCount) / float64(reviewedCount)
-		}
-	}
-
-	// Build stats response
-	stats := gin.H{
-		"total_feedback": total,
-		"approved_count": approvedCount,
-		"rejected_count": rejectedCount,
-		"edited_count":   editedCount,
-		"ignored_count":  ignoredCount,
-		"approval_rate":  approvalRate,
-		"accuracy_rate":  accuracyRate,
-	}
-
-	// Build category accuracy
-	categoryAccuracy := make([]gin.H, 0)
-	for cat, s := range categoryStats {
-		accRate := 0.0
-		if s.approved+s.rejected > 0 {
-			accRate = float64(s.approved) / float64(s.approved+s.rejected)
-		}
-		categoryAccuracy = append(categoryAccuracy, gin.H{
-			"category":       cat,
-			"total_issues":   s.total,
-			"approved_count": s.approved,
-			"rejected_count": s.rejected,
-			"accuracy_rate":  accRate,
-		})
+		categoryAccuracy = []gin.H{}
 	}
 
 	// Convert feedback to recent items format

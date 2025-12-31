@@ -341,8 +341,11 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	if spec.LlamaNParallel > 0 {
 		cmd = append(cmd, "--parallel", fmt.Sprintf("%d", spec.LlamaNParallel))
 	}
+	// Flash attention: explicit on/off (default in llama.cpp is 'auto')
 	if spec.LlamaFlashAttn {
-		cmd = append(cmd, "--flash-attn")
+		cmd = append(cmd, "--flash-attn", "on")
+	} else {
+		cmd = append(cmd, "--flash-attn", "off")
 	}
 	if spec.LlamaMainGPU > 0 {
 		cmd = append(cmd, "--main-gpu", fmt.Sprintf("%d", spec.LlamaMainGPU))

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.2] - 2024-12-31
+
+### Fixed
+
+- **llama.cpp Flash Attention**: Fixed `--flash-attn` flag for new llama.cpp versions
+  - New llama.cpp server requires value: `--flash-attn [on|off|auto]`
+  - Changed from `--flash-attn` to `--flash-attn on` when enabled
+  - Added `--flash-attn off` when disabled (explicit control)
+  - Fixes: `error while handling argument "--flash-attn": expected value for argument`
+
+### Technical
+
+- `internal/inference/provider_builders.go`: Updated `buildLlamaCppRequest` to use explicit on/off values
+
 ## [4.2.1] - 2024-12-31
 
 ### Added

@@ -562,3 +562,269 @@ func (c *Client) CreateIssue(ctx context.Context, projectID int64, req *CreateIs
 	return &issue, nil
 }
 
+// ============================================================================
+// Branch & Commit & Merge Request Creation
+// ============================================================================
+
+// Branch represents a GitLab branch
+type Branch struct {
+	Name               string `json:"name"`
+	Merged             bool   `json:"merged"`
+	Protected          bool   `json:"protected"`
+	Default            bool   `json:"default"`
+	DevelopersCanPush  bool   `json:"developers_can_push"`
+	DevelopersCanMerge bool   `json:"developers_can_merge"`
+	CanPush            bool   `json:"can_push"`
+	WebURL             string `json:"web_url"`
+	Commit             *struct {
+		ID        string `json:"id"`
+		ShortID   string `json:"short_id"`
+		Title     string `json:"title"`
+		CreatedAt string `json:"created_at"`
+	} `json:"commit,omitempty"`
+}
+
+// CreateBranchRequest contains the data for creating a branch
+type CreateBranchRequest struct {
+	Branch string `json:"branch"` // New branch name
+	Ref    string `json:"ref"`    // Source branch or commit SHA
+}
+
+// CreateBranch creates a new branch in a GitLab project
+func (c *Client) CreateBranch(ctx context.Context, projectID int64, req *CreateBranchRequest) (*Branch, error) {
+	path := fmt.Sprintf("/projects/%d/repository/branches", projectID)
+
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, path, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, err
+	}
+
+	var branch Branch
+	if err := c.parseResponse(resp, &branch); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	return &branch, nil
+}
+
+// DeleteBranch deletes a branch from a GitLab project
+func (c *Client) DeleteBranch(ctx context.Context, projectID int64, branchName string) error {
+	path := fmt.Sprintf("/projects/%d/repository/branches/%s", projectID, url.PathEscape(branchName))
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("delete branch failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// CommitAction represents an action in a commit
+type CommitAction struct {
+	Action          string `json:"action"`                     // create, delete, move, update, chmod
+	FilePath        string `json:"file_path"`                  // Full path to file
+	PreviousPath    string `json:"previous_path,omitempty"`    // For move action
+	Content         string `json:"content,omitempty"`          // File content (base64 for binary)
+	Encoding        string `json:"encoding,omitempty"`         // text or base64
+	LastCommitID    string `json:"last_commit_id,omitempty"`   // For update to detect conflicts
+	ExecuteFilemode bool   `json:"execute_filemode,omitempty"` // For chmod
+}
+
+// CreateCommitRequest contains the data for creating a commit
+type CreateCommitRequest struct {
+	Branch        string         `json:"branch"`
+	CommitMessage string         `json:"commit_message"`
+	StartBranch   string         `json:"start_branch,omitempty"`   // Create branch from this if not exists
+	StartSHA      string         `json:"start_sha,omitempty"`      // Create branch from this SHA
+	StartProject  int64          `json:"start_project,omitempty"`  // Project ID for start_branch
+	Actions       []CommitAction `json:"actions"`
+	AuthorEmail   string         `json:"author_email,omitempty"`
+	AuthorName    string         `json:"author_name,omitempty"`
+	Stats         bool           `json:"stats,omitempty"`
+	Force         bool           `json:"force,omitempty"`
+}
+
+// CommitResponse represents a GitLab commit response (extended from Commit type)
+type CommitResponse struct {
+	ID             string   `json:"id"`
+	ShortID        string   `json:"short_id"`
+	Title          string   `json:"title"`
+	Message        string   `json:"message"`
+	AuthorName     string   `json:"author_name"`
+	AuthorEmail    string   `json:"author_email"`
+	AuthoredDate   string   `json:"authored_date"`
+	CommitterName  string   `json:"committer_name"`
+	CommitterEmail string   `json:"committer_email"`
+	CommittedDate  string   `json:"committed_date"`
+	CreatedAt      string   `json:"created_at"`
+	WebURL         string   `json:"web_url"`
+	ParentIDs      []string `json:"parent_ids"`
+	Stats          *struct {
+		Additions int `json:"additions"`
+		Deletions int `json:"deletions"`
+		Total     int `json:"total"`
+	} `json:"stats,omitempty"`
+}
+
+// CreateCommit creates a commit with file changes
+func (c *Client) CreateCommit(ctx context.Context, projectID int64, req *CreateCommitRequest) (*CommitResponse, error) {
+	path := fmt.Sprintf("/projects/%d/repository/commits", projectID)
+
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, path, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, err
+	}
+
+	var commit CommitResponse
+	if err := c.parseResponse(resp, &commit); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	return &commit, nil
+}
+
+// CreateMergeRequestRequest contains the data for creating a merge request
+type CreateMergeRequestRequest struct {
+	SourceBranch        string   `json:"source_branch"`
+	TargetBranch        string   `json:"target_branch"`
+	Title               string   `json:"title"`
+	Description         string   `json:"description,omitempty"`
+	AssigneeID          int64    `json:"assignee_id,omitempty"`
+	AssigneeIDs         []int64  `json:"assignee_ids,omitempty"`
+	ReviewerIDs         []int64  `json:"reviewer_ids,omitempty"`
+	Labels              string   `json:"labels,omitempty"` // Comma-separated
+	MilestoneID         int64    `json:"milestone_id,omitempty"`
+	RemoveSourceBranch  bool     `json:"remove_source_branch,omitempty"`
+	AllowCollaboration  bool     `json:"allow_collaboration,omitempty"`
+	Squash              bool     `json:"squash,omitempty"`
+	SquashOnMerge       bool     `json:"squash_on_merge,omitempty"`
+	TargetProjectID     int64    `json:"target_project_id,omitempty"`
+}
+
+// CreateMergeRequest creates a new merge request
+func (c *Client) CreateMergeRequest(ctx context.Context, projectID int64, req *CreateMergeRequestRequest) (*MergeRequest, error) {
+	path := fmt.Sprintf("/projects/%d/merge_requests", projectID)
+
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, path, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return nil, err
+	}
+
+	var mr MergeRequest
+	if err := c.parseResponse(resp, &mr); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	return &mr, nil
+}
+
+// CreateMRWithChanges creates a branch, commits changes, and opens a merge request.
+// This is a convenience method that combines CreateBranch, CreateCommit, and CreateMergeRequest.
+//
+// The method performs three steps atomically (with cleanup on failure):
+//  1. Creates a new branch from TargetBranch
+//  2. Creates a commit with the specified file changes
+//  3. Opens a merge request from the new branch to TargetBranch
+//
+// If any step fails, the method attempts to clean up by deleting the created branch.
+// Returns the created MergeRequest on success, or an error with details about which step failed.
+func (c *Client) CreateMRWithChanges(ctx context.Context, projectID int64, opts CreateMRWithChangesOptions) (*MergeRequest, error) {
+	// Validate required options
+	if opts.TargetBranch == "" {
+		return nil, fmt.Errorf("target_branch is required")
+	}
+	if len(opts.Actions) == 0 {
+		return nil, fmt.Errorf("at least one file action is required")
+	}
+	if opts.CommitMessage == "" {
+		return nil, fmt.Errorf("commit_message is required")
+	}
+	if opts.MRTitle == "" {
+		return nil, fmt.Errorf("mr_title is required")
+	}
+
+	// Step 1: Create branch from target
+	branchName := opts.BranchName
+	if branchName == "" {
+		branchName = fmt.Sprintf("aigateway/%s-%d", opts.BranchPrefix, time.Now().Unix())
+	}
+
+	_, err := c.CreateBranch(ctx, projectID, &CreateBranchRequest{
+		Branch: branchName,
+		Ref:    opts.TargetBranch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("step 1/3 create branch '%s' from '%s': %w", branchName, opts.TargetBranch, err)
+	}
+
+	// Step 2: Create commit with file changes
+	_, err = c.CreateCommit(ctx, projectID, &CreateCommitRequest{
+		Branch:        branchName,
+		CommitMessage: opts.CommitMessage,
+		Actions:       opts.Actions,
+		AuthorEmail:   opts.AuthorEmail,
+		AuthorName:    opts.AuthorName,
+	})
+	if err != nil {
+		// Clean up: delete branch on failure
+		if delErr := c.DeleteBranch(ctx, projectID, branchName); delErr != nil {
+			return nil, fmt.Errorf("step 2/3 create commit failed: %w (cleanup also failed: %v)", err, delErr)
+		}
+		return nil, fmt.Errorf("step 2/3 create commit with %d file(s): %w", len(opts.Actions), err)
+	}
+
+	// Step 3: Create merge request
+	mr, err := c.CreateMergeRequest(ctx, projectID, &CreateMergeRequestRequest{
+		SourceBranch:       branchName,
+		TargetBranch:       opts.TargetBranch,
+		Title:              opts.MRTitle,
+		Description:        opts.MRDescription,
+		Labels:             opts.Labels,
+		RemoveSourceBranch: true, // Auto-delete branch after merge
+	})
+	if err != nil {
+		// Clean up: delete branch on failure
+		if delErr := c.DeleteBranch(ctx, projectID, branchName); delErr != nil {
+			return nil, fmt.Errorf("step 3/3 create MR failed: %w (cleanup also failed: %v)", err, delErr)
+		}
+		return nil, fmt.Errorf("step 3/3 create merge request '%s' -> '%s': %w", branchName, opts.TargetBranch, err)
+	}
+
+	return mr, nil
+}
+
+// CreateMRWithChangesOptions holds options for CreateMRWithChanges
+type CreateMRWithChangesOptions struct {
+	BranchName    string         // Optional: specific branch name (auto-generated if empty)
+	BranchPrefix  string         // Prefix for auto-generated branch name (e.g., "autodocs", "tests")
+	TargetBranch  string         // Target branch to merge into (e.g., "main")
+	CommitMessage string         // Commit message
+	Actions       []CommitAction // File changes
+	AuthorName    string         // Optional: commit author name
+	AuthorEmail   string         // Optional: commit author email
+	MRTitle       string         // Merge request title
+	MRDescription string         // Merge request description
+	Labels        string         // Comma-separated labels
+}
+

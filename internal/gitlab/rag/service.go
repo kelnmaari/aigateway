@@ -75,6 +75,75 @@ func (s *RAGService) Initialize(ctx context.Context) error {
 	return nil
 }
 
+// EmbeddingModelChecker is an optional interface that embedding providers can implement
+// to support health checking. This allows the RAG service to verify model availability
+// before starting operations that require embeddings (e.g., repository indexing).
+//
+// Providers that implement this interface (like DynamicEmbeddingProvider) enable
+// the system to wait for model readiness during startup or before batch operations,
+// preventing failures when models are still loading.
+type EmbeddingModelChecker interface {
+	// HealthCheck verifies the embedding model is running and ready to accept requests.
+	// Returns nil if healthy, or an error describing why the model is not ready.
+	HealthCheck(ctx context.Context) error
+}
+
+// IsEmbeddingModelReady checks if the embedding model is ready for use
+// Returns nil if ready, error describing why not ready otherwise
+func (s *RAGService) IsEmbeddingModelReady(ctx context.Context) error {
+	if !s.enabled {
+		return nil // RAG disabled, consider "ready" (will skip embedding anyway)
+	}
+
+	if s.embedder == nil {
+		return fmt.Errorf("embedding provider not configured")
+	}
+
+	// Check if embedder supports health check
+	if checker, ok := s.embedder.(EmbeddingModelChecker); ok {
+		if err := checker.HealthCheck(ctx); err != nil {
+			return fmt.Errorf("embedding model not ready: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// WaitForEmbeddingModel waits for the embedding model to become available
+// Returns nil when ready, error if context cancelled or max retries exceeded
+func (s *RAGService) WaitForEmbeddingModel(ctx context.Context, maxRetries int, retryInterval time.Duration) error {
+	if !s.enabled {
+		return nil
+	}
+
+	for i := 0; i < maxRetries; i++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if err := s.IsEmbeddingModelReady(ctx); err == nil {
+			s.logger.Info("Embedding model is ready")
+			return nil
+		} else {
+			s.logger.WithFields(logrus.Fields{
+				"attempt": i + 1,
+				"max":     maxRetries,
+				"error":   err.Error(),
+			}).Debug("Waiting for embedding model...")
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryInterval):
+		}
+	}
+
+	return fmt.Errorf("embedding model not available after %d retries", maxRetries)
+}
+
 // IndexCodeChunk indexes a code chunk for later retrieval
 func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error {
 	if !s.enabled {

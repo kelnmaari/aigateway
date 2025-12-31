@@ -27,34 +27,42 @@ type GitLabSecretsHandler struct {
 	store       storage.Store
 	vectorStore *vector.QdrantStore
 	scanner     *scanner.Scanner
+	llmBaseURL  string
+	llmAPIKey   string
 	logger      *logrus.Logger
 }
 
 // NewGitLabSecretsHandler creates a new secrets handler
-func NewGitLabSecretsHandler(store storage.Store, vectorStore *vector.QdrantStore, logger *logrus.Logger) *GitLabSecretsHandler {
+func NewGitLabSecretsHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabSecretsHandler {
 	return &GitLabSecretsHandler{
 		store:       store,
 		vectorStore: vectorStore,
 		scanner:     scanner.NewScanner(vectorStore, logger),
+		llmBaseURL:  llmBaseURL,
+		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
 }
 
 // NewGitLabSecretsHandlerWithInterface creates a handler with interface-based vector store
-func NewGitLabSecretsHandlerWithInterface(store storage.Store, vectorStore QdrantStoreForSecrets, logger *logrus.Logger) *GitLabSecretsHandler {
+func NewGitLabSecretsHandlerWithInterface(store storage.Store, vectorStore QdrantStoreForSecrets, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabSecretsHandler {
 	// Type assert to concrete type for scanner
 	qdrantStore, ok := vectorStore.(*vector.QdrantStore)
 	if !ok {
 		logger.Warn("VectorStore is not a QdrantStore, secrets scanning may not work")
 		return &GitLabSecretsHandler{
-			store:  store,
-			logger: logger,
+			store:      store,
+			llmBaseURL: llmBaseURL,
+			llmAPIKey:  llmAPIKey,
+			logger:     logger,
 		}
 	}
 	return &GitLabSecretsHandler{
 		store:       store,
 		vectorStore: qdrantStore,
 		scanner:     scanner.NewScanner(qdrantStore, logger),
+		llmBaseURL:  llmBaseURL,
+		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
 }
@@ -206,15 +214,8 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 		"language":   language,
 	}).Info("Starting deep secrets scan")
 
-	// Create deep scanner
-	// Get LLM configuration from environment or defaults
-	llmBaseURL := "http://localhost:8080" // Self-reference for internal API
-	llmAPIKey := c.GetHeader("Authorization")
-	if llmAPIKey != "" && len(llmAPIKey) > 7 {
-		llmAPIKey = llmAPIKey[7:] // Remove "Bearer "
-	}
-
-	deepScanner := scanner.NewDeepScanner(h.vectorStore, llmBaseURL, llmAPIKey, h.logger)
+	// Create deep scanner using configured LLM credentials
+	deepScanner := scanner.NewDeepScanner(h.vectorStore, h.llmBaseURL, h.llmAPIKey, h.logger)
 
 	// Run deep scan
 	result, err := deepScanner.DeepScan(ctx, scanner.DeepScanRequest{

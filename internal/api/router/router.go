@@ -3716,8 +3716,16 @@ func (r *Router) setupGitLabRoutes() {
 			llmBaseURL := fmt.Sprintf("http://localhost:%d", r.config.Server.Port)
 			llmAPIKey := r.gitlabAPIKey // Use same API key as MR Review workers
 
+			// Validate LLM configuration
+			if llmAPIKey == "" {
+				r.logger.Warn("⚠️ GitLab LLM API key not configured - deep scan and LLM analysis will fail")
+			}
+			if r.config.Server.Port == 0 {
+				r.logger.Warn("⚠️ Server port not configured - LLM requests may fail")
+			}
+
 			// Secrets scanning (handlers use c.Param("id"))
-			secretsHandler := handlers.NewGitLabSecretsHandler(glStore, qdrantStore, r.logger)
+			secretsHandler := handlers.NewGitLabSecretsHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 			adminGitlab.POST("/projects/:id/scan-secrets", secretsHandler.ScanSecrets)
 			adminGitlab.POST("/projects/:id/deep-scan-secrets", secretsHandler.DeepScanSecrets)
 			adminGitlab.POST("/projects/:id/sast-scan", secretsHandler.SASTScan)
@@ -3753,6 +3761,7 @@ func (r *Router) setupGitLabRoutes() {
 			adminGitlab.POST("/projects/:id/scan-tests", testGenHandler.ScanTestable) // Alias for frontend
 			adminGitlab.POST("/projects/:id/generate-tests", testGenHandler.GenerateTests)
 			adminGitlab.POST("/projects/:id/download-tests", testGenHandler.DownloadTests)
+			adminGitlab.POST("/projects/:id/create-tests-mr", testGenHandler.CreateTestsMR)
 			r.logger.Info("✅ GitLab test generation routes registered")
 
 			// Architecture diagrams (handlers use c.Param("id"))

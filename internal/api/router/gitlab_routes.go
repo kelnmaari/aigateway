@@ -188,7 +188,7 @@ type WebhookHandlerInterface interface {
 }
 
 // SetupGitLabSecretsRoutes registers GitLab secrets scanning routes
-func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore interface{}) {
+func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab secrets routes: Store is nil, skipping setup")
 		return
@@ -200,7 +200,7 @@ func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore inter
 		// Try direct type assertion
 		if vs, ok := vectorStore.(handlers.QdrantStoreForSecrets); ok {
 			r.logger.Info("Setting up GitLab secrets scanning routes")
-			secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, vs, r.logger)
+			secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, vs, llmBaseURL, llmAPIKey, r.logger)
 			r.registerSecretsRoutes(secretsHandler)
 			return
 		}
@@ -210,7 +210,7 @@ func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore inter
 
 	r.logger.Info("Setting up GitLab secrets scanning routes")
 	
-	secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, *qdrantStore, r.logger)
+	secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, *qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 	r.registerSecretsRoutes(secretsHandler)
 }
 

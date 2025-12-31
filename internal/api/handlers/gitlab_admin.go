@@ -452,11 +452,18 @@ func (h *GitLabAdminHandler) AddProject(c *gin.Context) {
 		return
 	}
 
+	// Get default branch from GitLab, with fallback
+	defaultBranch := gitlabProject.DefaultBranch
+	if defaultBranch == "" {
+		defaultBranch = "main" // Fallback if GitLab doesn't provide it
+	}
+
 	project := &models.GitLabProject{
 		IntegrationID:     integrationID,
 		GitLabProjectID:   req.GitLabProjectID,
 		Name:              gitlabProject.Name,
 		PathWithNamespace: gitlabProject.PathWithNamespace,
+		DefaultBranch:     defaultBranch,
 		Status:            models.GitLabProjectStatusActive,
 		AutoReview:        req.AutoReview,
 		AnalysisModelID:   req.AnalysisModelID,

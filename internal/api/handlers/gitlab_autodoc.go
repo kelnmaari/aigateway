@@ -293,6 +293,9 @@ func (h *GitLabAutoDocHandler) BulkApplyDocs(c *gin.Context) {
 		if targetBranch == "" {
 			targetBranch = project.DefaultBranch
 		}
+		if targetBranch == "" {
+			targetBranch = "main" // Fallback if not set
+		}
 
 		sourceBranch := fmt.Sprintf("docs/auto-doc-%s", time.Now().Format("20060102-150405"))
 
@@ -389,6 +392,9 @@ func (h *GitLabAutoDocHandler) CreateDocsMR(c *gin.Context) {
 	targetBranch := req.TargetBranch
 	if targetBranch == "" {
 		targetBranch = project.DefaultBranch
+	}
+	if targetBranch == "" {
+		targetBranch = "main" // Fallback if not set
 	}
 
 	sourceBranch := req.SourceBranch

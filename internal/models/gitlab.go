@@ -511,6 +511,7 @@ type CreateGitLabProjectRequest struct {
 type UpdateGitLabProjectRequest struct {
 	AutoReview       *bool                  `json:"auto_review,omitempty"`
 	Status           *GitLabProjectStatus   `json:"status,omitempty"`
+	DefaultBranch    *string                `json:"default_branch,omitempty"`
 	AnalysisModelID  *string                `json:"analysis_model_id,omitempty"`
 	EmbeddingModelID *string                `json:"embedding_model_id,omitempty"`
 	ReviewPrompt     *string                `json:"review_prompt,omitempty"`

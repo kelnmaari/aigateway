@@ -15,12 +15,14 @@ import (
 
 // Vulnerability represents a security vulnerability in a dependency.
 type Vulnerability struct {
-	ID          string   `json:"id"`          // CVE or GHSA ID
-	Summary     string   `json:"summary"`     // Short description
-	Details     string   `json:"details"`     // Full description
-	Severity    string   `json:"severity"`    // "critical", "high", "medium", "low"
-	FixedIn     string   `json:"fixed_in"`    // Version that fixes this
-	References  []string `json:"references"`  // Links to advisories
+	ID          string   `json:"id"`           // GHSA or internal ID
+	CVEID       string   `json:"cve_id"`       // CVE ID (e.g., CVE-2025-12345)
+	Title       string   `json:"title"`        // Human-readable title
+	Summary     string   `json:"summary"`      // Short description
+	Details     string   `json:"details"`      // Full description
+	Severity    string   `json:"severity"`     // "critical", "high", "medium", "low"
+	FixedIn     string   `json:"fixed_in"`     // Version that fixes this
+	References  []string `json:"references"`   // Links to advisories
 	PublishedAt string   `json:"published_at"`
 }
 
@@ -198,6 +200,8 @@ func (c *OSVClient) convertVulnerabilities(osvVulns []OSVVulnerability) []Vulner
 	for _, osv := range osvVulns {
 		vuln := Vulnerability{
 			ID:          c.getPrimaryID(osv),
+			CVEID:       c.getCVEID(osv),
+			Title:       c.getTitle(osv),
 			Summary:     osv.Summary,
 			Details:     osv.Details,
 			Severity:    c.determineSeverity(osv),
@@ -209,6 +213,29 @@ func (c *OSVClient) convertVulnerabilities(osvVulns []OSVVulnerability) []Vulner
 	}
 
 	return vulns
+}
+
+// getCVEID extracts CVE ID from aliases if available.
+func (c *OSVClient) getCVEID(osv OSVVulnerability) string {
+	for _, alias := range osv.Aliases {
+		if len(alias) > 3 && alias[:3] == "CVE" {
+			return alias
+		}
+	}
+	return ""
+}
+
+// getTitle generates a human-readable title for the vulnerability.
+func (c *OSVClient) getTitle(osv OSVVulnerability) string {
+	// Use summary as title, truncate if too long
+	title := osv.Summary
+	if len(title) > 100 {
+		title = title[:97] + "..."
+	}
+	if title == "" {
+		title = osv.ID
+	}
+	return title
 }
 
 // getPrimaryID returns CVE if available, otherwise the OSV ID.

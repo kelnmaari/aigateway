@@ -75,8 +75,16 @@ func (s *RAGService) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// EmbeddingModelChecker interface for checking embedding model availability
+// EmbeddingModelChecker is an optional interface that embedding providers can implement
+// to support health checking. This allows the RAG service to verify model availability
+// before starting operations that require embeddings (e.g., repository indexing).
+//
+// Providers that implement this interface (like DynamicEmbeddingProvider) enable
+// the system to wait for model readiness during startup or before batch operations,
+// preventing failures when models are still loading.
 type EmbeddingModelChecker interface {
+	// HealthCheck verifies the embedding model is running and ready to accept requests.
+	// Returns nil if healthy, or an error describing why the model is not ready.
 	HealthCheck(ctx context.Context) error
 }
 

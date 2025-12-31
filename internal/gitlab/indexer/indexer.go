@@ -26,6 +26,18 @@ const (
 	IndexStatusFailed     IndexStatus = "failed"
 )
 
+// Timeout constants for indexing operations
+const (
+	// ModelWaitTimeout is max time to wait for embedding model to become ready
+	ModelWaitTimeout = 5 * time.Minute
+	// ModelWaitRetries is number of retries when waiting for model
+	ModelWaitRetries = 30
+	// ModelWaitInterval is interval between model readiness checks
+	ModelWaitInterval = 10 * time.Second
+	// DefaultIndexTimeout is default timeout for entire indexing operation
+	DefaultIndexTimeout = 30 * time.Minute
+)
+
 // IndexInfo holds information about an indexed branch
 type IndexInfo struct {
 	ProjectID    string      `json:"project_id"`
@@ -356,10 +368,10 @@ func (i *Indexer) runIndexing(ctx context.Context, gitlabClient *client.Client, 
 	}).Info("Waiting for embedding model to be ready...")
 
 	// Wait for embedding model with timeout (5 minutes, check every 10 seconds)
-	modelWaitCtx, modelWaitCancel := context.WithTimeout(ctx, 5*time.Minute)
+	modelWaitCtx, modelWaitCancel := context.WithTimeout(ctx, ModelWaitTimeout)
 	defer modelWaitCancel()
 
-	if err := i.ragService.WaitForEmbeddingModel(modelWaitCtx, 30, 10*time.Second); err != nil {
+	if err := i.ragService.WaitForEmbeddingModel(modelWaitCtx, ModelWaitRetries, ModelWaitInterval); err != nil {
 		i.logger.WithError(err).Error("Embedding model not available for indexing")
 		result.Status = IndexStatusFailed
 		result.Error = fmt.Sprintf("embedding model not ready: %v", err)

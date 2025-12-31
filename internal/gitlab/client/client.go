@@ -739,9 +739,31 @@ func (c *Client) CreateMergeRequest(ctx context.Context, projectID int64, req *C
 	return &mr, nil
 }
 
-// CreateMRWithChanges creates a branch, commits changes, and opens a merge request
-// This is a convenience method that combines CreateBranch, CreateCommit, and CreateMergeRequest
+// CreateMRWithChanges creates a branch, commits changes, and opens a merge request.
+// This is a convenience method that combines CreateBranch, CreateCommit, and CreateMergeRequest.
+//
+// The method performs three steps atomically (with cleanup on failure):
+//  1. Creates a new branch from TargetBranch
+//  2. Creates a commit with the specified file changes
+//  3. Opens a merge request from the new branch to TargetBranch
+//
+// If any step fails, the method attempts to clean up by deleting the created branch.
+// Returns the created MergeRequest on success, or an error with details about which step failed.
 func (c *Client) CreateMRWithChanges(ctx context.Context, projectID int64, opts CreateMRWithChangesOptions) (*MergeRequest, error) {
+	// Validate required options
+	if opts.TargetBranch == "" {
+		return nil, fmt.Errorf("target_branch is required")
+	}
+	if len(opts.Actions) == 0 {
+		return nil, fmt.Errorf("at least one file action is required")
+	}
+	if opts.CommitMessage == "" {
+		return nil, fmt.Errorf("commit_message is required")
+	}
+	if opts.MRTitle == "" {
+		return nil, fmt.Errorf("mr_title is required")
+	}
+
 	// Step 1: Create branch from target
 	branchName := opts.BranchName
 	if branchName == "" {
@@ -753,7 +775,7 @@ func (c *Client) CreateMRWithChanges(ctx context.Context, projectID int64, opts 
 		Ref:    opts.TargetBranch,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create branch %s: %w", branchName, err)
+		return nil, fmt.Errorf("step 1/3 create branch '%s' from '%s': %w", branchName, opts.TargetBranch, err)
 	}
 
 	// Step 2: Create commit with file changes
@@ -765,9 +787,11 @@ func (c *Client) CreateMRWithChanges(ctx context.Context, projectID int64, opts 
 		AuthorName:    opts.AuthorName,
 	})
 	if err != nil {
-		// Try to clean up branch on failure
-		_ = c.DeleteBranch(ctx, projectID, branchName)
-		return nil, fmt.Errorf("create commit: %w", err)
+		// Clean up: delete branch on failure
+		if delErr := c.DeleteBranch(ctx, projectID, branchName); delErr != nil {
+			return nil, fmt.Errorf("step 2/3 create commit failed: %w (cleanup also failed: %v)", err, delErr)
+		}
+		return nil, fmt.Errorf("step 2/3 create commit with %d file(s): %w", len(opts.Actions), err)
 	}
 
 	// Step 3: Create merge request
@@ -780,9 +804,11 @@ func (c *Client) CreateMRWithChanges(ctx context.Context, projectID int64, opts 
 		RemoveSourceBranch: true, // Auto-delete branch after merge
 	})
 	if err != nil {
-		// Try to clean up branch on failure
-		_ = c.DeleteBranch(ctx, projectID, branchName)
-		return nil, fmt.Errorf("create merge request: %w", err)
+		// Clean up: delete branch on failure
+		if delErr := c.DeleteBranch(ctx, projectID, branchName); delErr != nil {
+			return nil, fmt.Errorf("step 3/3 create MR failed: %w (cleanup also failed: %v)", err, delErr)
+		}
+		return nil, fmt.Errorf("step 3/3 create merge request '%s' -> '%s': %w", branchName, opts.TargetBranch, err)
 	}
 
 	return mr, nil

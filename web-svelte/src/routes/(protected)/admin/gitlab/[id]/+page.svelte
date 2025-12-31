@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import {
@@ -96,6 +96,7 @@
 	let dependenciesScanResult = $state<DependencyScanResult | null>(null);
 	let isCheckingDependencies = $state(false);
 	let checkingDependenciesProjectId = $state<string | null>(null);
+	let isCreatingDependencyIssue = $state(false);
 	
 	// Changelog analysis state
 	let showChangelogModal = $state(false);
@@ -122,6 +123,7 @@
 	let isGeneratingDocs = $state(false);
 	let generatingDocsProjectId = $state<string | null>(null);
 	let autoDocStep = $state<'scan' | 'generate' | 'results'>('scan');
+	let isCreatingDocsMR = $state(false);
 	
 	// Test generation state
 	let showTestGenModal = $state(false);
@@ -130,6 +132,7 @@
 	let isGeneratingTests = $state(false);
 	let generatingTestsProjectId = $state<string | null>(null);
 	let testGenStep = $state<'scan' | 'generate' | 'results'>('scan');
+	let isCreatingTestsMR = $state(false);
 
 	// Add Project form
 	let formGitLabProjectId = $state('');
@@ -190,9 +193,22 @@
 			totalProjects = response.total || projects.length;
 			
 			// Start polling for any projects with in_progress status
+			// Clear old polling for projects no longer in list
+			const currentProjectIds = new Set(projects.map(p => p.id));
+			for (const [projectId, interval] of pollingIntervals.entries()) {
+				if (!currentProjectIds.has(projectId)) {
+					clearInterval(interval);
+					pollingIntervals.delete(projectId);
+					indexingProjects = new Set([...indexingProjects].filter(id => id !== projectId));
+				}
+			}
+			
+			// Start/restart polling for in_progress projects
 			for (const project of projects) {
-				if (project.index_status === 'in_progress' && !indexingProjects.has(project.id)) {
-					indexingProjects = new Set([...indexingProjects, project.id]);
+				if (project.index_status === 'in_progress') {
+					if (!indexingProjects.has(project.id)) {
+						indexingProjects = new Set([...indexingProjects, project.id]);
+					}
 					pollIndexStatus(project.id);
 				}
 			}
@@ -370,7 +386,16 @@
 		}
 	}
 
+	// Store active polling intervals
+	let pollingIntervals = $state<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
 	async function pollIndexStatus(projectId: string) {
+		// Clear existing interval for this project if any
+		if (pollingIntervals.has(projectId)) {
+			clearInterval(pollingIntervals.get(projectId));
+			pollingIntervals.delete(projectId);
+		}
+
 		const maxAttempts = 60; // 5 minutes max
 		let attempts = 0;
 
@@ -378,32 +403,55 @@
 			try {
 				const status = await gitlabApi.getIndexStatus(projectId);
 				
-				// Update project in list
-				projects = projects.map(p => {
-					if (p.id === projectId) {
-						return { 
-							...p, 
-							index_status: status.status as GitLabProject['index_status'],
-							last_indexed_at: status.last_indexed 
-						};
-					}
-					return p;
-				});
+				// Update project in list reactively
+				const projectIndex = projects.findIndex(p => p.id === projectId);
+				if (projectIndex !== -1) {
+					projects[projectIndex] = { 
+						...projects[projectIndex], 
+						index_status: status.status as GitLabProject['index_status'],
+						last_indexed_at: status.last_indexed,
+						index_chunks: status.chunks_total
+					};
+					// Trigger reactivity
+					projects = [...projects];
+				}
 
-				if (status.status === 'in_progress' && attempts < maxAttempts) {
-					attempts++;
-					setTimeout(poll, 5000); // Poll every 5 seconds
-				} else {
-					// Done or failed
+				if (status.status !== 'in_progress' || attempts >= maxAttempts) {
+					// Done or failed - stop polling
+					if (pollingIntervals.has(projectId)) {
+						clearInterval(pollingIntervals.get(projectId));
+						pollingIntervals.delete(projectId);
+					}
 					indexingProjects = new Set([...indexingProjects].filter(id => id !== projectId));
 				}
+				attempts++;
 			} catch {
+				// Error - stop polling
+				if (pollingIntervals.has(projectId)) {
+					clearInterval(pollingIntervals.get(projectId));
+					pollingIntervals.delete(projectId);
+				}
 				indexingProjects = new Set([...indexingProjects].filter(id => id !== projectId));
 			}
 		};
 
-		poll();
+		// Initial poll
+		await poll();
+		
+		// Set up interval for ongoing polling (every 3 seconds for better UX)
+		if (indexingProjects.has(projectId)) {
+			const interval = setInterval(poll, 3000);
+			pollingIntervals.set(projectId, interval);
+		}
 	}
+
+	// Cleanup polling intervals on unmount
+	onDestroy(() => {
+		for (const interval of pollingIntervals.values()) {
+			clearInterval(interval);
+		}
+		pollingIntervals.clear();
+	});
 
 	async function handleRetryReview(review: GitLabReview) {
 		try {
@@ -539,6 +587,58 @@
 		} finally {
 			isCheckingDependencies = false;
 			checkingDependenciesProjectId = null;
+		}
+	}
+
+	async function handleCreateDependencyIssue() {
+		if (!dependenciesScanResult || !selectedProject) return;
+		
+		const vulnerableDeps = dependenciesScanResult.dependencies.filter(d => d.is_vulnerable);
+		const outdatedDeps = dependenciesScanResult.dependencies.filter(d => d.dependency.has_update && !d.is_vulnerable);
+		
+		let description = `## Dependency Security & Update Report\n\n`;
+		description += `**Project:** ${selectedProject.name}\n`;
+		description += `**Scanned:** ${new Date(dependenciesScanResult.scanned_at).toLocaleString()}\n\n`;
+		
+		if (vulnerableDeps.length > 0) {
+			description += `### 🚨 Vulnerable Dependencies (${vulnerableDeps.length})\n\n`;
+			for (const dep of vulnerableDeps) {
+				description += `- **${dep.dependency.name}** ${dep.dependency.current_version} → ${dep.dependency.latest_version}\n`;
+				for (const vuln of dep.vulnerabilities) {
+					description += `  - ${vuln.severity.toUpperCase()}: ${vuln.title} (${vuln.cve_id || 'N/A'})\n`;
+				}
+			}
+			description += `\n`;
+		}
+		
+		if (outdatedDeps.length > 0) {
+			description += `### ⚠️ Outdated Dependencies (${outdatedDeps.length})\n\n`;
+			for (const dep of outdatedDeps.slice(0, 20)) { // Limit to 20 to avoid huge issues
+				description += `- **${dep.dependency.name}** ${dep.dependency.current_version} → ${dep.dependency.latest_version}\n`;
+			}
+			if (outdatedDeps.length > 20) {
+				description += `\n_...and ${outdatedDeps.length - 20} more outdated dependencies_\n`;
+			}
+		}
+		
+		description += `\n---\n_Generated by AI Gateway dependency scanner_`;
+		
+		isCreatingDependencyIssue = true;
+		try {
+			const result = await gitlabApi.createDependencyIssue(dependenciesScanResult.project_id, {
+				title: `[Security] ${vulnerableDeps.length} vulnerable, ${outdatedDeps.length} outdated dependencies`,
+				description,
+				labels: ['dependencies', 'security', 'automated'],
+				critical: vulnerableDeps.length > 0
+			});
+			
+			alert(`Issue created successfully!\n\n${result.url}`);
+			window.open(result.url, '_blank');
+		} catch (error) {
+			console.error('Failed to create issue:', error);
+			alert('Failed to create issue: ' + (error instanceof Error ? error.message : 'Unknown error'));
+		} finally {
+			isCreatingDependencyIssue = false;
 		}
 	}
 	
@@ -777,6 +877,30 @@
 			generatingDocsProjectId = null;
 		}
 	}
+
+	async function handleCreateDocsMR() {
+		if (!docGenResult || !selectedProject || docGenResult.generated.length === 0) return;
+		
+		isCreatingDocsMR = true;
+		try {
+			const result = await gitlabApi.createDocsMR(selectedProject.id, {
+				docs: docGenResult.generated,
+				title: `[Auto-Doc] Add documentation for ${docGenResult.generated.length} symbols`
+			});
+			
+			if (result.mr_url) {
+				alert(`Documentation MR created successfully!\n\n${result.mr_url}`);
+				window.open(result.mr_url, '_blank');
+			} else {
+				alert(result.message);
+			}
+		} catch (error) {
+			console.error('Failed to create docs MR:', error);
+			alert('Failed to create MR: ' + (error instanceof Error ? error.message : 'Unknown error'));
+		} finally {
+			isCreatingDocsMR = false;
+		}
+	}
 	
 	async function handleTestGen(project: GitLabProject) {
 		if (project.index_status !== 'completed' || !project.analysis_model_id) {
@@ -831,6 +955,30 @@
 		} finally {
 			isGeneratingTests = false;
 			generatingTestsProjectId = null;
+		}
+	}
+
+	async function handleCreateTestsMR() {
+		if (!testGenResult || !selectedProject || testGenResult.tests.length === 0) return;
+		
+		isCreatingTestsMR = true;
+		try {
+			const result = await gitlabApi.createTestsMR(selectedProject.id, {
+				tests: testGenResult.tests,
+				title: `[Auto-Test] Add ${testGenResult.tests.length} unit tests`
+			});
+			
+			if (result.mr_url) {
+				alert(`Tests MR created successfully!\n\n${result.mr_url}`);
+				window.open(result.mr_url, '_blank');
+			} else {
+				alert(result.message);
+			}
+		} catch (error) {
+			console.error('Failed to create tests MR:', error);
+			alert('Failed to create MR: ' + (error instanceof Error ? error.message : 'Unknown error'));
+		} finally {
+			isCreatingTestsMR = false;
 		}
 	}
 
@@ -2558,7 +2706,22 @@
 				{/if}
 			{/if}
 
-			<div class="mt-6 flex justify-end">
+			<div class="mt-6 flex justify-end gap-3">
+				{#if dependenciesScanResult && !isCheckingDependencies && (dependenciesScanResult.summary.vulnerable_count > 0 || dependenciesScanResult.summary.outdated_count > 0)}
+					<Button 
+						variant="default" 
+						onclick={handleCreateDependencyIssue}
+						disabled={isCreatingDependencyIssue}
+					>
+						{#if isCreatingDependencyIssue}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							{m.common_creating?.() || 'Creating...'}
+						{:else}
+							<AlertCircle class="mr-2 h-4 w-4" />
+							{m.gitlab_create_issue?.() || 'Create Issue'}
+						{/if}
+					</Button>
+				{/if}
 				<Button variant="outline" onclick={() => (showDependenciesModal = false)}>
 					{m.common_close()}
 				</Button>
@@ -3150,7 +3313,22 @@
 				{/if}
 			{/if}
 
-			<div class="mt-6 flex justify-end">
+			<div class="mt-6 flex justify-end gap-3">
+				{#if docGenResult && docGenResult.generated.length > 0 && !isGeneratingDocs}
+					<Button 
+						variant="default" 
+						onclick={handleCreateDocsMR}
+						disabled={isCreatingDocsMR}
+					>
+						{#if isCreatingDocsMR}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							{m.common_creating?.() || 'Creating...'}
+						{:else}
+							<GitBranch class="mr-2 h-4 w-4" />
+							{m.gitlab_create_mr?.() || 'Create MR'}
+						{/if}
+					</Button>
+				{/if}
 				<Button variant="outline" onclick={() => (showAutoDocModal = false)}>
 					{m.common_close()}
 				</Button>
@@ -3265,7 +3443,22 @@
 				{/if}
 			{/if}
 
-			<div class="mt-6 flex justify-end">
+			<div class="mt-6 flex justify-end gap-3">
+				{#if testGenResult && testGenResult.tests.length > 0 && !isGeneratingTests}
+					<Button 
+						variant="default" 
+						onclick={handleCreateTestsMR}
+						disabled={isCreatingTestsMR}
+					>
+						{#if isCreatingTestsMR}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							{m.common_creating?.() || 'Creating...'}
+						{:else}
+							<GitBranch class="mr-2 h-4 w-4" />
+							{m.gitlab_create_mr?.() || 'Create MR'}
+						{/if}
+					</Button>
+				{/if}
 				<Button variant="outline" onclick={() => (showTestGenModal = false)}>
 					{m.common_close()}
 				</Button>

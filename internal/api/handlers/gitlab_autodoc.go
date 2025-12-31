@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
 	"aigateway/internal/gitlab/autodoc"
+	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/rag/vector"
 
@@ -424,8 +426,75 @@ func (h *GitLabAutoDocHandler) CreateDocsMR(c *gin.Context) {
 		})
 	}
 
-	// Create MR response
+	// Get integration for GitLab API access
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get integration")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get GitLab integration"})
+		return
+	}
+
+	// Create GitLab client
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+		Timeout:     2 * time.Minute,
+	})
+
+	// Group docs by file and get file contents
+	filesDocs := make(map[string][]autodoc.GeneratedDoc)
+	for _, doc := range req.Docs {
+		filesDocs[doc.Symbol.FilePath] = append(filesDocs[doc.Symbol.FilePath], doc)
+	}
+
+	// Prepare commit actions by modifying file contents
+	var actions []client.CommitAction
+	for filePath, docs := range filesDocs {
+		// Get current file content
+		content, err := gitlabClient.GetFileRaw(ctx, project.GitLabProjectID, filePath, targetBranch)
+		if err != nil {
+			h.logger.WithError(err).WithField("file", filePath).Warn("Failed to get file content, skipping")
+			continue
+		}
+
+		// Apply documentation to file
+		modifiedContent := applyDocumentationToFile(string(content), docs)
+		
+		actions = append(actions, client.CommitAction{
+			Action:   "update",
+			FilePath: filePath,
+			Content:  modifiedContent,
+		})
+	}
+
+	if len(actions) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No files could be modified"})
+		return
+	}
+
+	// Create MR with changes
+	mr, err := gitlabClient.CreateMRWithChanges(ctx, project.GitLabProjectID, client.CreateMRWithChangesOptions{
+		BranchPrefix:  "docs/auto-doc",
+		TargetBranch:  targetBranch,
+		CommitMessage: commitMessage,
+		Actions:       actions,
+		AuthorName:    "AIGateway Auto-Doc",
+		AuthorEmail:   "aigateway@localhost",
+		MRTitle:       title,
+		MRDescription: description,
+		Labels:        strings.Join(labels, ","),
+	})
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to create MR")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create merge request: " + err.Error()})
+		return
+	}
+
+	// Build response
 	mrInfo := autodoc.MergeRequestInfo{
+		ID:            mr.ID,
+		IID:           mr.IID,
+		URL:           mr.WebURL,
 		Title:         title,
 		Description:   description,
 		SourceBranch:  sourceBranch,
@@ -433,21 +502,67 @@ func (h *GitLabAutoDocHandler) CreateDocsMR(c *gin.Context) {
 		Labels:        labels,
 		CommitMessage: commitMessage,
 		FileChanges:   fileChanges,
-		Status:        "prepared",
-		Message:       "MR prepared successfully. Use GitLab API to create the actual MR.",
+		Status:        "created",
+		Message:       "Merge request created successfully",
 	}
 
-	// NOTE: Actual GitLab MR creation would require:
-	// 1. Create a new branch from target
-	// 2. Apply file changes (commits)
-	// 3. Create the merge request
-	// This is a simulation - full implementation requires GitLab client integration
+	h.logger.WithFields(logrus.Fields{
+		"project_id": projectID,
+		"mr_iid":     mr.IID,
+		"mr_url":     mr.WebURL,
+	}).Info("Documentation MR created successfully")
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":    "prepared",
-		"message":   "Documentation MR prepared. GitLab API integration required for actual creation.",
-		"mr":        mrInfo,
-		"docs_count": len(req.Docs),
-		"files_affected": len(fileChanges),
+		"status":         "created",
+		"message":        "Merge request created successfully",
+		"mr":             mrInfo,
+		"mr_url":         mr.WebURL,
+		"docs_count":     len(req.Docs),
+		"files_affected": len(actions),
 	})
+}
+
+// applyDocumentationToFile inserts documentation comments into file content
+func applyDocumentationToFile(content string, docs []autodoc.GeneratedDoc) string {
+	lines := strings.Split(content, "\n")
+	
+	// Sort docs by line number in descending order to insert from bottom to top
+	// This prevents line numbers from shifting as we insert
+	sort.Slice(docs, func(i, j int) bool {
+		return docs[i].Symbol.StartLine > docs[j].Symbol.StartLine
+	})
+	
+	for _, doc := range docs {
+		lineNum := doc.Symbol.StartLine - 1 // Convert to 0-indexed
+		if lineNum < 0 || lineNum >= len(lines) {
+			continue
+		}
+		
+		// Get indentation from the target line
+		targetLine := lines[lineNum]
+		indent := ""
+		for _, ch := range targetLine {
+			if ch == ' ' || ch == '\t' {
+				indent += string(ch)
+			} else {
+				break
+			}
+		}
+		
+		// Format documentation with proper indentation
+		docLines := strings.Split(strings.TrimSpace(doc.Documentation), "\n")
+		var formattedDoc []string
+		for _, docLine := range docLines {
+			formattedDoc = append(formattedDoc, indent+docLine)
+		}
+		
+		// Insert documentation before the symbol
+		newLines := make([]string, 0, len(lines)+len(formattedDoc))
+		newLines = append(newLines, lines[:lineNum]...)
+		newLines = append(newLines, formattedDoc...)
+		newLines = append(newLines, lines[lineNum:]...)
+		lines = newLines
+	}
+	
+	return strings.Join(lines, "\n")
 }

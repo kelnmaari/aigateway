@@ -334,6 +334,39 @@ func (i *Indexer) runIndexing(ctx context.Context, gitlabClient *client.Client, 
 	startTime := time.Now()
 	now := startTime
 
+	result := &IndexResult{
+		ProjectID: req.ProjectID,
+		Branch:    req.Branch,
+	}
+
+	// Step 0: Wait for embedding model to be ready
+	// Set status to pending while waiting
+	pendingInfo := &IndexInfo{
+		ProjectID: req.ProjectID,
+		Branch:    req.Branch,
+		Status:    IndexStatusPending,
+		StartedAt: &now,
+	}
+	i.setStatus(req.ProjectID, req.Branch, pendingInfo)
+
+	i.logger.WithFields(logrus.Fields{
+		"project_id":        req.ProjectID,
+		"gitlab_project_id": req.GitLabProjectID,
+		"branch":            req.Branch,
+	}).Info("Waiting for embedding model to be ready...")
+
+	// Wait for embedding model with timeout (5 minutes, check every 10 seconds)
+	modelWaitCtx, modelWaitCancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer modelWaitCancel()
+
+	if err := i.ragService.WaitForEmbeddingModel(modelWaitCtx, 30, 10*time.Second); err != nil {
+		i.logger.WithError(err).Error("Embedding model not available for indexing")
+		result.Status = IndexStatusFailed
+		result.Error = fmt.Sprintf("embedding model not ready: %v", err)
+		i.updateStatusFailed(req.ProjectID, req.Branch, result.Error)
+		return result
+	}
+
 	// Update status to in-progress
 	info := &IndexInfo{
 		ProjectID: req.ProjectID,
@@ -348,11 +381,6 @@ func (i *Indexer) runIndexing(ctx context.Context, gitlabClient *client.Client, 
 		"gitlab_project_id": req.GitLabProjectID,
 		"branch":            req.Branch,
 	}).Info("Starting repository indexing")
-
-	result := &IndexResult{
-		ProjectID: req.ProjectID,
-		Branch:    req.Branch,
-	}
 
 	// Step 1: Delete existing index if force reindex
 	if req.Force {

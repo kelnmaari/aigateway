@@ -660,6 +660,13 @@ export const gitlabApi = {
     return response.blob();
   },
 
+  async createTestsMR(projectId: string, params: CreateTestsMRRequest): Promise<CreateTestsMRResult> {
+    return apiRequest(`/projects/${projectId}/create-tests-mr`, {
+      method: 'POST',
+      body: params,
+    });
+  },
+
   // ============================================================================
   // Architecture Diagrams (v4.2+)
   // ============================================================================
@@ -1315,8 +1322,29 @@ export interface CreateDocsMRResult {
   status: string;
   message: string;
   mr: MergeRequestInfo;
+  mr_url?: string;
   docs_count: number;
   files_affected: number;
+}
+
+export interface CreateTestsMRRequest {
+  tests: GeneratedTest[];
+  title?: string;
+  description?: string;
+  target_branch?: string;
+  labels?: string[];
+  commit_message?: string;
+  test_dir?: string;
+}
+
+export interface CreateTestsMRResult {
+  status: string;
+  message: string;
+  mr_id: number;
+  mr_iid: number;
+  mr_url: string;
+  tests_count: number;
+  files_created: number;
 }
 
 // ============================================================================

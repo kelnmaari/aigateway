@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2024-12-31
+
+### Added
+
+- **Scan History UI**: Human-readable scan results display
+  - Summary cards with severity breakdown (Critical/High/Medium/Low)
+  - Category breakdown visualization
+  - Findings list with file paths and line numbers
+  - Collapsible raw JSON for debugging
+  - Support for all scan types (Secrets, Quality, DeadCode, etc.)
+
+### Fixed
+
+- **AI Code Review Score**: Score no longer shows 0/100 when no issues found
+  - Returns 100 when analysis finds no issues
+  - Smart fallback scoring based on issue count
+  - Model name now displayed in review comments
+
+- **Index Status after Server Restart**: Status properly persisted and restored
+  - `GetStatus` now falls back to database when cache is empty
+  - Interrupted indexing (server restart during process) marked as "Failed"
+  - Proper status synchronization between Redis/memory/DB
+
+- **Data Race in Orchestrator**: Fixed concurrent access to ModelInstance fields
+  - Added `updateInstance()` method for thread-safe field modifications
+  - All status/handle/error updates now protected by mutex
+  - Fixed race between `StartModel` and `ListModels`
+
+- **Data Race in WorkerPool Tests**: Fixed atomic operations in tests
+  - Using `atomic.LoadInt64` for reading shared counters
+
+- **TypeScript Errors in WebUI**: Fixed 28 TypeScript errors
+  - Added `query` parameter support to `apiRequest`
+  - Fixed type definitions for `DependencyVulnerability`
+  - Fixed `DocGenerationResult.docs` property usage
+  - Fixed `integrationId` undefined handling
+  - Fixed event target type casting in settings page
+  - Fixed `HFModel` type compatibility
+
+### Changed
+
+- **CI/CD Pipeline Optimization**: Reduced test execution time from 10+ min to ~1-2 min
+  - Split into `test:fast` (all commits) and `test:race` (MR only)
+  - Removed `resource_group` constraint for parallel execution
+  - Race detector only runs on merge requests to main
+
+### Technical
+
+- `internal/gitlab/indexer/indexer.go`: `GetStatus` returns nil when no cache, handler checks DB
+- `internal/api/handlers/gitlab_indexer.go`: Falls back to project.IndexStatus from DB
+- `internal/inference/orchestrator.go`: Added `updateInstance()` for thread-safe updates
+- `internal/gitlab/processor/processor.go`: Score defaults to 100 when no issues, Model added to stats
+- `internal/gitlab/analyzer/parser.go`: Score defaults in `convertFullResult` and alt format parsing
+- `web-svelte/src/routes/(protected)/admin/gitlab/history/+page.svelte`: Formatted results display
+- `.gitlab-ci.yml`: Optimized test pipeline with fast/race split
+
 ## [4.1.1] - 2024-12-31
 
 ### Fixed

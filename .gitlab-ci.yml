@@ -67,6 +67,8 @@ cache:
   image: golang:${GO_VERSION}
   variables:
     CGO_ENABLED: "1"  # Required for -race flag
+    GOMAXPROCS: "2"   # Limit CPU usage for runner
+  resource_group: tests  # Only 1 test job at a time to reduce runner load
   before_script:
     - apt-get update && apt-get install -y git gcc
     - mkdir -p .go
@@ -86,38 +88,38 @@ cache:
 test:api:
   <<: *test_template
   script:
-    - go test -race ./internal/api/...
+    - go test -race -p 1 ./internal/api/...
 
 # Cache layer tests
 test:cache:
   <<: *test_template
   script:
-    - go test -race ./internal/cache/...
+    - go test -race -p 1 ./internal/cache/...
 
 # Storage layer tests (PostgreSQL, SQLite, DB factory)
 test:storage:
   <<: *test_template
   script:
-    - go test -race ./internal/storage/... ./internal/dbfactory/...
+    - go test -race -p 1 ./internal/storage/... ./internal/dbfactory/...
 
 # GitLab integration tests
 test:gitlab:
   <<: *test_template
   script:
-    - go test -race ./internal/gitlab/...
+    - go test -race -p 1 ./internal/gitlab/...
 
 # Git providers tests (GitHub, BitBucket, etc.)
 test:git:
   <<: *test_template
   script:
-    - go test -race ./internal/git/...
+    - go test -race -p 1 ./internal/git/...
 
 # Services tests (excluding rag)
 test:services:
   <<: *test_template
   script:
     - |
-      go test -race \
+      go test -race -p 1 \
         ./internal/services/agent/... \
         ./internal/services/audit/... \
         ./internal/services/export/... \
@@ -130,7 +132,7 @@ test:core:
   <<: *test_template
   script:
     - |
-      go test -race \
+      go test -race -p 1 \
         ./internal/config/... \
         ./internal/concurrent/... \
         ./internal/errors/... \
@@ -144,7 +146,7 @@ test:infra:
   <<: *test_template
   script:
     - |
-      go test -race \
+      go test -race -p 1 \
         ./internal/health/... \
         ./internal/metrics/... \
         ./internal/observability/... \
@@ -155,7 +157,7 @@ test:models:
   <<: *test_template
   script:
     - |
-      go test -race \
+      go test -race -p 1 \
         ./internal/models/... \
         ./internal/providers/... \
         ./internal/inference/...
@@ -165,7 +167,7 @@ test:other:
   <<: *test_template
   script:
     - |
-      go test -race \
+      go test -race -p 1 \
         ./internal/debug/... \
         ./internal/extractors/... \
         ./internal/filestorage/... \
@@ -185,7 +187,7 @@ test:other:
 test:cmd:
   <<: *test_template
   script:
-    - go test -race ./cmd/server/... ./cmd/tui/...
+    - go test -race -p 1 ./cmd/server/... ./cmd/tui/...
 
 # ==============================================================================
 # BUILD STAGE

@@ -47,7 +47,7 @@ func TestWorkerPoolBasic(t *testing.T) {
 	assert.Equal(t, int64(20), metrics.TotalTasks)
 	assert.Equal(t, int64(20), metrics.CompletedTasks)
 	assert.Equal(t, int64(0), metrics.FailedTasks)
-	assert.Equal(t, int64(20), counter)
+	assert.Equal(t, int64(20), atomic.LoadInt64(&counter))
 	
 	t.Logf("✅ Metrics: %+v", metrics)
 }
@@ -83,7 +83,7 @@ func TestWorkerPoolError(t *testing.T) {
 	
 	metrics := pool.GetMetrics()
 	assert.Equal(t, int64(1), metrics.FailedTasks)
-	assert.Equal(t, int64(1), errorCount)
+	assert.Equal(t, int64(1), atomic.LoadInt64(&errorCount))
 	
 	t.Log("✅ Error handling works")
 }
@@ -147,7 +147,7 @@ func TestBatchProcessor(t *testing.T) {
 	})
 	
 	require.NoError(t, err)
-	assert.Equal(t, int64(50), counter)
+	assert.Equal(t, int64(50), atomic.LoadInt64(&counter))
 	
 	t.Log("✅ Batch processing completed")
 }

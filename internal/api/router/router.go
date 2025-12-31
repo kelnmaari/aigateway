@@ -248,6 +248,7 @@ type Router struct {
 	gitlabScheduleHandler     *handlers.GitLabScheduleHandler     // GitLab scheduled scans handler
 	gitlabScheduler           *schedule.Scheduler                 // GitLab dependency scan scheduler
 	gitlabStore               gitlabStorage.Store                 // GitLab storage (v4.1.0+)
+	gitlabAPIKey              string                              // Internal API key for GitLab LLM calls (v4.1.0+)
 }
 
 // NewOptions содержит опции для создания роутера
@@ -3093,11 +3094,11 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 				}
 
 				// Get or create internal API key for GitLab workers
-				gitlabAPIKey := r.getOrCreateGitLabAPIKey(context.Background(), gitlabLogger)
-				if gitlabAPIKey == "" {
+				r.gitlabAPIKey = r.getOrCreateGitLabAPIKey(context.Background(), gitlabLogger)
+				if r.gitlabAPIKey == "" {
 					gitlabLogger.Error("⚠️ GitLab API key not created - workers will fail with 401. Check migration 093 (system user).")
 				} else {
-					gitlabLogger.WithField("key_prefix", gitlabAPIKey[:20]+"...").Info("✅ GitLab API key ready for workers")
+					gitlabLogger.WithField("key_prefix", r.gitlabAPIKey[:20]+"...").Info("✅ GitLab API key ready for workers")
 				}
 
 				// Initialize RAG service if enabled
@@ -3181,7 +3182,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 				// Create processor and worker pool
 				processorCfg := gitlabProcessor.ProcessorConfig{
 					LLMBaseURL: fmt.Sprintf("http://localhost:%d", cfg.Server.Port), // Use self as LLM endpoint
-					LLMAPIKey:  gitlabAPIKey,                                        // Auto-generated API key
+					LLMAPIKey:  r.gitlabAPIKey,                                      // Auto-generated API key
 					Timeout:    10 * time.Minute,
 				}
 				processor := gitlabProcessor.NewProcessor(glStore, ragService, processorCfg, gitlabLogger)
@@ -3713,7 +3714,7 @@ func (r *Router) setupGitLabRoutes() {
 		if qdrantStore, ok := r.vectorStore.(*vector.QdrantStore); ok && qdrantStore != nil && r.gitlabStore != nil {
 			glStore := r.gitlabStore
 			llmBaseURL := fmt.Sprintf("http://localhost:%d", r.config.Server.Port)
-			llmAPIKey := "" // API key extracted from request headers
+			llmAPIKey := r.gitlabAPIKey // Use same API key as MR Review workers
 
 			// Secrets scanning (handlers use c.Param("id"))
 			secretsHandler := handlers.NewGitLabSecretsHandler(glStore, qdrantStore, r.logger)
@@ -3740,6 +3741,7 @@ func (r *Router) setupGitLabRoutes() {
 			// Auto-documentation (handlers use c.Param("id"))
 			autoDocHandler := handlers.NewGitLabAutoDocHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 			adminGitlab.POST("/projects/:id/scan-undocumented", autoDocHandler.ScanUndocumented)
+			adminGitlab.POST("/projects/:id/scan-docs", autoDocHandler.ScanUndocumented) // Alias for frontend
 			adminGitlab.POST("/projects/:id/generate-docs", autoDocHandler.GenerateDocs)
 			adminGitlab.POST("/projects/:id/bulk-apply-docs", autoDocHandler.BulkApplyDocs)
 			adminGitlab.POST("/projects/:id/create-docs-mr", autoDocHandler.CreateDocsMR)
@@ -3748,6 +3750,7 @@ func (r *Router) setupGitLabRoutes() {
 			// Test generation (handlers use c.Param("id"))
 			testGenHandler := handlers.NewGitLabTestGenHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 			adminGitlab.POST("/projects/:id/scan-testable", testGenHandler.ScanTestable)
+			adminGitlab.POST("/projects/:id/scan-tests", testGenHandler.ScanTestable) // Alias for frontend
 			adminGitlab.POST("/projects/:id/generate-tests", testGenHandler.GenerateTests)
 			adminGitlab.POST("/projects/:id/download-tests", testGenHandler.DownloadTests)
 			r.logger.Info("✅ GitLab test generation routes registered")

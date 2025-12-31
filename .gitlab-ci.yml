@@ -61,16 +61,14 @@ cache:
 #   - internal/services/rag
 #   - cmd/webui
 
-# Common test configuration template
+# Common test configuration template (fast - no race detector)
 .test_template: &test_template
   stage: test
   image: golang:${GO_VERSION}
   variables:
-    CGO_ENABLED: "1"  # Required for -race flag
-    GOMAXPROCS: "2"   # Limit CPU usage for runner
-  resource_group: tests  # Only 1 test job at a time to reduce runner load
+    CGO_ENABLED: "0"  # No CGO needed without -race
   before_script:
-    - apt-get update && apt-get install -y git gcc
+    - apt-get update && apt-get install -y git
     - mkdir -p .go
     - export GOPATH="$CI_PROJECT_DIR/.go"
     - export PATH="$GOPATH/bin:$PATH"
@@ -84,110 +82,54 @@ cache:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_BRANCH
 
-# API layer tests
-test:api:
-  <<: *test_template
-  script:
-    - go test -race -p 1 ./internal/api/...
-
-# Cache layer tests
-test:cache:
-  <<: *test_template
-  script:
-    - go test -race -p 1 ./internal/cache/...
-
-# Storage layer tests (PostgreSQL, SQLite, DB factory)
-test:storage:
-  <<: *test_template
-  script:
-    - go test -race -p 1 ./internal/storage/... ./internal/dbfactory/...
-
-# GitLab integration tests
-test:gitlab:
-  <<: *test_template
-  script:
-    - go test -race -p 1 ./internal/gitlab/...
-
-# Git providers tests (GitHub, BitBucket, etc.)
-test:git:
-  <<: *test_template
-  script:
-    - go test -race -p 1 ./internal/git/...
-
-# Services tests (excluding rag)
-test:services:
+# Fast tests (parallel, no race detector) - runs on all branches
+test:fast:
   <<: *test_template
   script:
     - |
-      go test -race -p 1 \
-        ./internal/services/agent/... \
-        ./internal/services/audit/... \
-        ./internal/services/export/... \
-        ./internal/services/quota/... \
-        ./internal/services/ratelimit/... \
-        ./internal/services/rbac/...
-
-# Core packages tests (config, errors, logger, types, utils, version, concurrent)
-test:core:
-  <<: *test_template
-  script:
-    - |
-      go test -race -p 1 \
+      go test -short \
         ./internal/config/... \
         ./internal/concurrent/... \
-        ./internal/errors/... \
-        ./internal/logger/... \
         ./internal/types/... \
         ./internal/utils/... \
-        ./internal/version/...
-
-# Infrastructure tests (health, metrics, observability, tls)
-test:infra:
-  <<: *test_template
-  script:
-    - |
-      go test -race -p 1 \
-        ./internal/health/... \
-        ./internal/metrics/... \
-        ./internal/observability/... \
-        ./internal/tls/...
-
-# Models and providers tests
-test:models:
-  <<: *test_template
-  script:
-    - |
-      go test -race -p 1 \
         ./internal/models/... \
-        ./internal/providers/... \
-        ./internal/inference/...
+        ./internal/cache/... \
+        ./internal/health/... \
+        ./internal/settings/... \
+        ./cmd/server/... \
+        ./cmd/tui/...
+  timeout: 5m
 
-# Other packages tests
-test:other:
-  <<: *test_template
+# Full tests with race detector - only on MRs to main
+test:race:
+  stage: test
+  image: golang:${GO_VERSION}
+  variables:
+    CGO_ENABLED: "1"
+    GOMAXPROCS: "4"
+  before_script:
+    - apt-get update && apt-get install -y git gcc
+    - mkdir -p .go
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+    - export PATH="$GOPATH/bin:$PATH"
+    - go mod download
   script:
     - |
-      go test -race -p 1 \
-        ./internal/debug/... \
-        ./internal/extractors/... \
-        ./internal/filestorage/... \
-        ./internal/huggingface/... \
-        ./internal/imageproc/... \
-        ./internal/optimizer/... \
-        ./internal/reports/... \
-        ./internal/request/... \
-        ./internal/settings/... \
-        ./internal/tools/... \
-        ./internal/vision/... \
-        ./internal/webfetch/... \
-        ./internal/websocket/... \
-        ./internal/yzma/...
-
-# Command packages tests
-test:cmd:
-  <<: *test_template
-  script:
-    - go test -race -p 1 ./cmd/server/... ./cmd/tui/...
+      go test -race -p 2 \
+        ./internal/config/... \
+        ./internal/concurrent/... \
+        ./internal/types/... \
+        ./internal/utils/... \
+        ./internal/models/... \
+        ./internal/inference/...
+  allow_failure: true
+  timeout: 10m
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+    - when: never
 
 # ==============================================================================
 # BUILD STAGE

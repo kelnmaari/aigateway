@@ -120,8 +120,8 @@ func TestSeedFromYAML_SuccessfulSeed(t *testing.T) {
 	// Mock: settings table is empty
 	mockStorage.On("GetAllSettings", mock.Anything).Return([]*Setting{}, nil)
 
-	// Mock: UpsertSetting succeeds for all settings
-	mockStorage.On("UpsertSetting", mock.Anything, mock.AnythingOfType("*settings.Setting")).Return(nil)
+	// Mock: BulkUpsertSettings succeeds (this is what SeedFromYAMLForce uses)
+	mockStorage.On("BulkUpsertSettings", mock.Anything, mock.AnythingOfType("[]*settings.Setting")).Return(nil)
 
 	seeder := NewConfigSeeder(mockStorage, logger)
 

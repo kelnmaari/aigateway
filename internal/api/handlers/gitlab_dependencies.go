@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"aigateway/internal/gitlab/dependencies"
 	"aigateway/internal/gitlab/dependencies/changelog"
 	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/models"
 	"aigateway/internal/rag/vector"
 
 	"github.com/gin-gonic/gin"
@@ -70,15 +72,46 @@ func (h *GitLabDependenciesHandler) CheckDependencies(c *gin.Context) {
 		"collection": collectionName,
 	}).Info("Starting dependency check")
 
+	// Create scan history record
+	startTime := time.Now()
+	scanResult := &models.GitLabScanResult{
+		ProjectID:     projectID,
+		IntegrationID: project.IntegrationID,
+		ScanType:      models.ScanTypeDependencies,
+		Status:        models.ScanStatusRunning,
+		StartedAt:     startTime,
+	}
+
 	// Run scan
 	result, err := h.scanner.ScanProject(ctx, dependencies.ScanRequest{
 		ProjectID:      projectID,
 		CollectionName: collectionName,
 	})
+
+	// Update scan result
+	completedAt := time.Now()
+	scanResult.CompletedAt = &completedAt
+	scanResult.DurationMs = completedAt.Sub(startTime).Milliseconds()
+
 	if err != nil {
 		h.logger.WithError(err).WithField("project_id", projectID).Error("Dependency scan failed")
+		scanResult.Status = models.ScanStatusFailed
+		scanResult.Error = err.Error()
+		if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+			h.logger.WithError(saveErr).Warn("Failed to save scan result")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dependency scan failed: " + err.Error()})
 		return
+	}
+
+	// Save successful result
+	scanResult.Status = models.ScanStatusCompleted
+	scanResult.FindingsCount = len(result.Dependencies)
+	if resultJSON, jsonErr := json.Marshal(result); jsonErr == nil {
+		scanResult.ResultsJSON = string(resultJSON)
+	}
+	if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+		h.logger.WithError(saveErr).Warn("Failed to save scan result")
 	}
 
 	c.JSON(http.StatusOK, result)

@@ -14,16 +14,28 @@ import (
 )
 
 // HybridAuth creates middleware that accepts EITHER JWT tokens OR API Keys
-// Priority: JWT token (Bearer) → API Key (x-api-key or Bearer with API key format)
+// Priority: API Key (if looks like sk-*) → JWT token → API Key fallback
 // Version 1.3.0+: Uses database-backed API keys + bootstrap admin key from config
+// Version 4.1.2+: API key checked first to avoid noisy JWT validation logs
 func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try JWT first (Bearer token in Authorization header)
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-			// Try to validate as JWT first
+			// Check if token looks like an API key (sk-* prefix) - try API key first
+			if strings.HasPrefix(tokenString, "sk-") {
+				apiKeyDBAuth := APIKeyDBAuth(cfg, db, logger)
+				apiKeyDBAuth(c)
+				if !c.IsAborted() {
+					c.Next()
+					return
+				}
+				// API key auth failed, don't try JWT for sk-* tokens
+				return
+			}
+
+			// Token doesn't look like API key - try JWT first
 			claims, err := jwtManager.ValidateAccessToken(tokenString)
 			if err == nil {
 				// JWT is valid - set user context
@@ -43,7 +55,7 @@ func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database
 				return
 			}
 
-			// JWT validation failed - token might be an API key
+			// JWT validation failed - token might be a non-standard API key
 			logger.WithError(err).Debug("JWT validation failed, trying as API key")
 
 			// Try to authenticate as API key from database

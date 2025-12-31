@@ -545,3 +545,31 @@ func (r *Router) SetupGitLabAnalyticsRoutes(store storage.Store, analyticsStore 
 	r.logger.Info("GitLab analytics routes configured: /api/admin/gitlab/analytics/*")
 }
 
+// SetupGitLabScanHistoryRoutes registers GitLab scan history routes (v4.1.2+)
+func (r *Router) SetupGitLabScanHistoryRoutes(store storage.Store) {
+	if store == nil {
+		r.logger.Warn("GitLab scan history routes: Store is nil, skipping setup")
+		return
+	}
+
+	r.logger.Info("Setting up GitLab scan history routes")
+
+	gitlab := r.engine.Group("/api/admin/gitlab")
+
+	// Apply authentication
+	if r.jwtManager != nil && r.db != nil {
+		gitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		gitlab.Use(middleware.RequireAdmin(r.db, r.logger))
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		gitlab.Use(r.authenticator.AuthenticationMiddleware())
+		gitlab.Use(r.authenticator.PermissionMiddleware("admin"))
+	}
+
+	scanHistoryHandler := handlers.NewGitLabScanHistoryHandler(store, r.logger)
+	gitlab.GET("/scan-history", scanHistoryHandler.ListScanResults)
+	gitlab.GET("/scan-history/types", scanHistoryHandler.GetScanTypes)
+	gitlab.GET("/scan-history/:id", scanHistoryHandler.GetScanResult)
+
+	r.logger.Info("GitLab scan history routes configured: /api/admin/gitlab/scan-history/*")
+}
+

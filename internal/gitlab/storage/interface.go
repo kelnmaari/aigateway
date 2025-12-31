@@ -17,6 +17,7 @@ type Store interface {
 	ModelUsageStore
 	FeedbackStore
 	AnalyticsStore
+	ScanHistoryStore
 }
 
 // IntegrationStore manages GitLab integrations
@@ -191,5 +192,20 @@ type FeedbackStore interface {
 type AnalyticsStore interface {
 	// GetAnalytics retrieves aggregated analytics for the specified number of days
 	GetAnalytics(ctx context.Context, days int) (*models.GitLabAnalytics, error)
+}
+
+// ScanHistoryStore manages scan results history (v4.1.2+)
+type ScanHistoryStore interface {
+	// SaveScanResult saves a scan result to history
+	SaveScanResult(ctx context.Context, result *models.GitLabScanResult) error
+
+	// GetScanResult retrieves a scan result by ID
+	GetScanResult(ctx context.Context, id string) (*models.GitLabScanResult, error)
+
+	// ListScanResults lists scan results with filtering
+	ListScanResults(ctx context.Context, req *models.GitLabScanResultsRequest) ([]models.GitLabScanResult, int, error)
+
+	// DeleteOldScanResults deletes scan results older than specified days
+	DeleteOldScanResults(ctx context.Context, olderThanDays int) (int64, error)
 }
 

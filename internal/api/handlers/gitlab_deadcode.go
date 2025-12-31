@@ -3,12 +3,14 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"aigateway/internal/gitlab/deadcode"
 	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/models"
 	"aigateway/internal/rag/vector"
 
 	"github.com/gin-gonic/gin"
@@ -84,6 +86,17 @@ func (h *GitLabDeadCodeHandler) DetectDeadCode(c *gin.Context) {
 		"model":      project.AnalysisModelID,
 	}).Info("Starting dead code detection")
 
+	// Create scan history record
+	startTime := time.Now()
+	scanResult := &models.GitLabScanResult{
+		ProjectID:     projectID,
+		IntegrationID: project.IntegrationID,
+		ScanType:      models.ScanTypeDeadCode,
+		Status:        models.ScanStatusRunning,
+		ModelID:       project.AnalysisModelID,
+		StartedAt:     startTime,
+	}
+
 	// Create scanner and run detection
 	scanner := deadcode.NewScanner(h.vectorStore, h.llmBaseURL, h.llmAPIKey, h.logger)
 	result, err := scanner.Scan(ctx, deadcode.ScanRequest{
@@ -93,10 +106,33 @@ func (h *GitLabDeadCodeHandler) DetectDeadCode(c *gin.Context) {
 		MaxChunks:      req.MaxChunks,
 		Language:       req.Language,
 	})
+
+	// Update scan result
+	completedAt := time.Now()
+	scanResult.CompletedAt = &completedAt
+	scanResult.DurationMs = completedAt.Sub(startTime).Milliseconds()
+
 	if err != nil {
 		h.logger.WithError(err).WithField("project_id", projectID).Error("Dead code detection failed")
+		scanResult.Status = models.ScanStatusFailed
+		scanResult.Error = err.Error()
+		if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+			h.logger.WithError(saveErr).Warn("Failed to save scan result")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dead code detection failed: " + err.Error()})
 		return
+	}
+
+	// Save successful result
+	scanResult.Status = models.ScanStatusCompleted
+	scanResult.FindingsCount = len(result.DeadSymbols)
+	scanResult.FilesAffected = len(result.Summary.TopAffectedFiles)
+	scanResult.TokensUsed = result.TokensUsed
+	if resultJSON, jsonErr := json.Marshal(result); jsonErr == nil {
+		scanResult.ResultsJSON = string(resultJSON)
+	}
+	if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+		h.logger.WithError(saveErr).Warn("Failed to save scan result")
 	}
 
 	c.JSON(http.StatusOK, result)

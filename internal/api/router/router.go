@@ -3232,11 +3232,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 					// Initialize dependencies handler with vector store for changelog analysis
 					if qdrantStore, ok := r.vectorStore.(*vector.QdrantStore); ok && qdrantStore != nil {
+						llmURL := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
 						r.gitlabDependenciesHandler = handlers.NewGitLabDependenciesHandler(
 							glStore,
 							qdrantStore,
-							"http://localhost:8080", // Self-reference to internal API
-							"",                      // API key will be extracted from request headers
+							llmURL,         // Self-reference to internal API
+							r.gitlabAPIKey, // Use same API key as MR Review workers
 							gitlabLogger,
 						)
 						gitlabLogger.Info("✅ GitLab dependencies handler initialized")
@@ -3244,13 +3245,12 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 						// Initialize scheduled scans handler and scheduler
 						// PostgresStore implements schedule.ScheduleStore interface
 						var scheduleStore schedule.ScheduleStore = glStore
-						llmURL := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
 						r.gitlabScheduler = schedule.NewScheduler(
 							glStore,
 							scheduleStore,
 							qdrantStore,
-							llmURL, // Self-reference to internal API
-							"",     // API key will be extracted from request headers
+							llmURL,         // Self-reference to internal API (reuse from dependencies handler)
+							r.gitlabAPIKey, // Use same API key as MR Review workers
 							gitlabLogger,
 						)
 						if r.gitlabScheduler != nil {
@@ -3730,12 +3730,14 @@ func (r *Router) setupGitLabRoutes() {
 			adminGitlab.POST("/projects/:id/deep-scan-secrets", secretsHandler.DeepScanSecrets)
 			adminGitlab.POST("/projects/:id/sast-scan", secretsHandler.SASTScan)
 			adminGitlab.GET("/secrets/patterns", secretsHandler.GetPatterns)
+			adminGitlab.POST("/projects/:id/secrets/create-issue", secretsHandler.CreateSecretsIssue)
 			r.logger.Info("✅ GitLab secrets scanning routes registered")
 
 			// Code quality analysis (handlers use c.Param("id"))
 			qualityHandler := handlers.NewGitLabQualityHandler(glStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 			adminGitlab.POST("/projects/:id/quality-score", qualityHandler.AnalyzeQuality)
 			adminGitlab.POST("/projects/:id/detect-duplication", qualityHandler.DetectDuplication)
+			adminGitlab.POST("/projects/:id/quality/create-issue", qualityHandler.CreateQualityIssue)
 			r.logger.Info("✅ GitLab quality analysis routes registered")
 
 			// Dead code detection (handlers use c.Param("id"))

@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] - 2024-12-31
+
+### Added
+
+- **Create Issue Button for All Scanners**: Added Create Issue button to all scan modals
+  - Secrets Scan: Creates issue with findings summary
+  - Deep Scan (LLM): Creates issue with LLM-detected secrets
+  - Code Quality: Creates issue with recommendations
+  - Dead Code: Creates issue with dead symbols summary
+  - All buttons generate detailed markdown descriptions
+
+### Fixed
+
+- **Create Issue Button in Dependencies Check**: Button was silently failing
+  - Added `selectedProject = project` in all scan handlers
+  - Function was returning early due to null `selectedProject` check
+
+- **Changelog Analysis LLM Integration**: Fixed "connection refused" for Analyze button
+  - Dependencies handler now uses correct internal API key (`r.gitlabAPIKey`)
+  - Scheduled scans also use correct API key
+  - All GitLab LLM-dependent features now share same authentication
+
+### Technical
+
+- `internal/api/handlers/gitlab_secrets.go`: Added CreateSecretsIssue handler
+- `internal/api/handlers/gitlab_quality.go`: Added CreateQualityIssue handler
+- `internal/api/handlers/gitlab_deadcode.go`: Updated CreateDeadCodeIssue to actually create issues
+- `internal/api/router/router.go`: Added routes for create-issue endpoints
+- `web-svelte/src/lib/api/gitlab.ts`: Added API methods for create issue
+- `web-svelte/src/routes/(protected)/admin/gitlab/[id]/+page.svelte`: Added Create Issue buttons and handlers
+
 ## [4.2.0] - 2024-12-31
 
 ### Added

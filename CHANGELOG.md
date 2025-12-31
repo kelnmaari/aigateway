@@ -32,7 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Router struct: added `gitlabAPIKey string` field for storing internal API key
 - GetAnalytics handler: converted response format to match frontend expectations
-- ListFeedback handler: added aggregate statistics calculation
+- **GetFeedbackStats SQL aggregation**: O(1) complexity on Go side instead of O(n) loop
+  - New `GetFeedbackStats()` method in storage layer with `GROUP BY feedback_type`
+  - Handler uses SQL aggregation for accurate stats on any dataset size
 
 ## [4.1.0] - 2024-12-30
 

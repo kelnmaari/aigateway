@@ -26,7 +26,7 @@ INSERT INTO changelogs (version, release_date, content) VALUES
 
 - Router struct: added `gitlabAPIKey string` field for storing internal API key
 - GetAnalytics handler: converted response format to match frontend expectations
-- ListFeedback handler: added aggregate statistics calculation')
+- **GetFeedbackStats SQL aggregation**: O(1) complexity on Go side instead of O(n) loop')
 ON CONFLICT (version) DO UPDATE SET
   release_date = EXCLUDED.release_date,
   content = EXCLUDED.content;

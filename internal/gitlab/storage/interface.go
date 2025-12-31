@@ -182,6 +182,9 @@ type FeedbackStore interface {
 	
 	// ListFeedback lists feedback with filtering
 	ListFeedback(ctx context.Context, req *models.GitLabFeedbackListRequest) ([]models.GitLabReviewFeedback, int, error)
+	
+	// GetFeedbackStats returns aggregated feedback statistics using SQL (v4.1.1+)
+	GetFeedbackStats(ctx context.Context) (*models.GitLabFeedbackStats, error)
 }
 
 // AnalyticsStore provides analytics queries

@@ -1328,6 +1328,78 @@ func (s *PostgresStore) ListFeedback(ctx context.Context, req *models.GitLabFeed
 	return feedback, total, nil
 }
 
+// GetFeedbackStats returns aggregated feedback statistics using SQL (v4.1.1+)
+// This is O(1) complexity on Go side - all aggregation happens in database
+func (s *PostgresStore) GetFeedbackStats(ctx context.Context) (*models.GitLabFeedbackStats, error) {
+	stats := &models.GitLabFeedbackStats{
+		ByCategory: make([]models.GitLabFeedbackCategoryStat, 0),
+	}
+
+	// Aggregate counts by feedback type
+	query := `
+		SELECT 
+			COALESCE(feedback_type, 'general') as feedback_type,
+			COUNT(*) as count
+		FROM gitlab_review_feedback
+		GROUP BY feedback_type
+	`
+
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query feedback stats: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var feedbackType string
+		var count int
+		if err := rows.Scan(&feedbackType, &count); err != nil {
+			return nil, fmt.Errorf("scan feedback stats: %w", err)
+		}
+
+		stats.TotalFeedback += count
+
+		switch feedbackType {
+		case "approve", "general":
+			stats.ApprovedCount += count
+		case "reject", "false_positive":
+			stats.RejectedCount += count
+		case "edit", "accuracy":
+			stats.EditedCount += count
+		case "ignore":
+			stats.IgnoredCount += count
+		default:
+			stats.ApprovedCount += count // Default to approved
+		}
+
+		// Add to category stats
+		catStat := models.GitLabFeedbackCategoryStat{
+			Category:    feedbackType,
+			TotalIssues: count,
+		}
+		if feedbackType == "approve" || feedbackType == "general" {
+			catStat.ApprovedCount = count
+		} else if feedbackType == "reject" || feedbackType == "false_positive" {
+			catStat.RejectedCount = count
+		}
+		if catStat.ApprovedCount+catStat.RejectedCount > 0 {
+			catStat.AccuracyRate = float64(catStat.ApprovedCount) / float64(catStat.ApprovedCount+catStat.RejectedCount)
+		}
+		stats.ByCategory = append(stats.ByCategory, catStat)
+	}
+
+	// Calculate rates
+	if stats.TotalFeedback > 0 {
+		stats.ApprovalRate = float64(stats.ApprovedCount) / float64(stats.TotalFeedback)
+	}
+	reviewedCount := stats.ApprovedCount + stats.RejectedCount
+	if reviewedCount > 0 {
+		stats.AccuracyRate = float64(stats.ApprovedCount) / float64(reviewedCount)
+	}
+
+	return stats, nil
+}
+
 // ============================================================================
 // Analytics Store Implementation
 // ============================================================================

@@ -641,6 +641,27 @@ type GitLabFeedbackListRequest struct {
 	Offset       int     `json:"offset"`
 }
 
+// GitLabFeedbackStats represents aggregated feedback statistics (v4.1.1+)
+type GitLabFeedbackStats struct {
+	TotalFeedback  int                       `json:"total_feedback"`
+	ApprovedCount  int                       `json:"approved_count"`
+	RejectedCount  int                       `json:"rejected_count"`
+	EditedCount    int                       `json:"edited_count"`
+	IgnoredCount   int                       `json:"ignored_count"`
+	ApprovalRate   float64                   `json:"approval_rate"`
+	AccuracyRate   float64                   `json:"accuracy_rate"`
+	ByCategory     []GitLabFeedbackCategoryStat `json:"by_category"`
+}
+
+// GitLabFeedbackCategoryStat represents feedback stats per category
+type GitLabFeedbackCategoryStat struct {
+	Category      string  `json:"category"`
+	TotalIssues   int     `json:"total_issues"`
+	ApprovedCount int     `json:"approved_count"`
+	RejectedCount int     `json:"rejected_count"`
+	AccuracyRate  float64 `json:"accuracy_rate"`
+}
+
 // ============================================================================
 // Analytics Models
 // ============================================================================

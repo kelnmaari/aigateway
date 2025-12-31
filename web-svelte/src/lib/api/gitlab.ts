@@ -210,9 +210,25 @@ export interface TestConnectionResult {
 
 async function apiRequest<T>(
   path: string,
-  options: { method?: string; body?: unknown } = {}
+  options: { method?: string; body?: unknown; query?: Record<string, unknown> } = {}
 ): Promise<T> {
-  return api.request<T>(`${API_BASE}${path}`, {
+  let url = `${API_BASE}${path}`;
+  
+  // Add query parameters if provided
+  if (options.query) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(options.query)) {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value));
+      }
+    }
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+  }
+  
+  return api.request<T>(url, {
     method: (options.method || 'GET') as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     body: options.body,
   });
@@ -1013,6 +1029,8 @@ export interface DependencyInfo {
 
 export interface DependencyVulnerability {
   id: string;
+  cve_id?: string;
+  title?: string;
   summary: string;
   details: string;
   severity: 'critical' | 'high' | 'medium' | 'low';

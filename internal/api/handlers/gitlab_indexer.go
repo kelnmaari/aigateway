@@ -138,22 +138,48 @@ func (h *GitLabIndexerHandler) GetIndexStatus(c *gin.Context) {
 		return
 	}
 
+	ctx := c.Request.Context()
+	
+	// Always get project from DB for branch info and fallback status
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+		return
+	}
+
 	branch := c.Query("branch")
 	if branch == "" {
-		// Get project to determine default branch
-		ctx := c.Request.Context()
-		project, err := h.store.GetProject(ctx, projectID)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
-			return
-		}
 		branch = project.DefaultBranch
 		if branch == "" {
 			branch = "main"
 		}
 	}
 
+	// Try to get status from indexer (Redis/in-memory cache)
 	status := h.indexer.GetStatus(projectID, branch)
+	
+	// If indexer has no cached status, use DB as source of truth
+	if status == nil {
+		status = &indexer.IndexInfo{
+			ProjectID:   projectID,
+			Branch:      branch,
+			Status:      indexer.IndexStatus(project.IndexStatus),
+			LastIndexed: project.LastIndexedAt,
+		}
+		
+		// Handle edge case: if DB has "in_progress" after server restart, 
+		// the indexing was interrupted - report as failed
+		if status.Status == indexer.IndexStatusInProgress {
+			status.Status = indexer.IndexStatusFailed
+			status.Error = "Indexing was interrupted by server restart"
+		}
+		
+		// If status is empty string or unknown, treat as pending
+		if status.Status == "" {
+			status.Status = indexer.IndexStatusPending
+		}
+	}
+	
 	c.JSON(http.StatusOK, status)
 }
 

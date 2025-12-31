@@ -9,6 +9,7 @@
 		CheckCircle,
 		XCircle,
 		AlertCircle,
+		AlertTriangle,
 		Clock,
 		Filter,
 		ChevronLeft,
@@ -19,7 +20,8 @@
 		BookOpen,
 		TestTube,
 		LayoutGrid,
-		Package
+		Package,
+		Activity
 	} from 'lucide-svelte';
 	import { gitlabApi, type ScanHistoryItem, type ScanTypeInfo } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime } from '$lib/utils';
@@ -423,12 +425,170 @@
 						</div>
 					{/if}
 
-					<!-- Results JSON -->
+					<!-- Formatted Results -->
 					{#if selectedResult.results_json}
-						<div>
-							<h3 class="font-medium mb-2">Full Results</h3>
-							<pre class="bg-muted/50 rounded-lg p-4 text-sm overflow-auto max-h-96 whitespace-pre-wrap">{JSON.stringify(JSON.parse(selectedResult.results_json), null, 2)}</pre>
-						</div>
+						{@const parsedResults = JSON.parse(selectedResult.results_json)}
+						
+						<!-- Summary Section -->
+						{#if parsedResults.summary}
+							<div class="mb-6">
+								<h3 class="font-medium mb-3 flex items-center gap-2">
+									<Activity class="h-4 w-4" />
+									Summary
+								</h3>
+								<div class="grid grid-cols-2 gap-4">
+									<!-- By Severity -->
+									{#if parsedResults.summary.by_severity}
+										<div class="bg-muted/30 rounded-lg p-4">
+											<div class="text-sm text-muted-foreground mb-2">By Severity</div>
+											<div class="space-y-2">
+												{#if parsedResults.summary.by_severity.critical > 0}
+													<div class="flex items-center justify-between">
+														<span class="text-sm flex items-center gap-2">
+															<span class="w-2 h-2 rounded-full bg-red-500"></span>
+															Critical
+														</span>
+														<span class="font-semibold text-red-500">{parsedResults.summary.by_severity.critical}</span>
+													</div>
+												{/if}
+												{#if parsedResults.summary.by_severity.high > 0}
+													<div class="flex items-center justify-between">
+														<span class="text-sm flex items-center gap-2">
+															<span class="w-2 h-2 rounded-full bg-orange-500"></span>
+															High
+														</span>
+														<span class="font-semibold text-orange-500">{parsedResults.summary.by_severity.high}</span>
+													</div>
+												{/if}
+												{#if parsedResults.summary.by_severity.medium > 0}
+													<div class="flex items-center justify-between">
+														<span class="text-sm flex items-center gap-2">
+															<span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+															Medium
+														</span>
+														<span class="font-semibold text-yellow-500">{parsedResults.summary.by_severity.medium}</span>
+													</div>
+												{/if}
+												{#if parsedResults.summary.by_severity.low > 0}
+													<div class="flex items-center justify-between">
+														<span class="text-sm flex items-center gap-2">
+															<span class="w-2 h-2 rounded-full bg-blue-500"></span>
+															Low
+														</span>
+														<span class="font-semibold text-blue-500">{parsedResults.summary.by_severity.low}</span>
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/if}
+									
+									<!-- By Category -->
+									{#if parsedResults.summary.by_category}
+										<div class="bg-muted/30 rounded-lg p-4">
+											<div class="text-sm text-muted-foreground mb-2">By Category</div>
+											<div class="space-y-2">
+												{#each Object.entries(parsedResults.summary.by_category) as [category, count]}
+													<div class="flex items-center justify-between">
+														<span class="text-sm capitalize">{category}</span>
+														<span class="font-semibold">{count}</span>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/if}
+						
+						<!-- Findings List -->
+						{#if parsedResults.findings && parsedResults.findings.length > 0}
+							<div class="mb-6">
+								<h3 class="font-medium mb-3 flex items-center gap-2">
+									<AlertTriangle class="h-4 w-4" />
+									Findings ({parsedResults.findings.length})
+								</h3>
+								<div class="space-y-2 max-h-72 overflow-auto">
+									{#each parsedResults.findings.slice(0, 50) as finding}
+										<div class="bg-muted/30 rounded p-3 text-sm">
+											<div class="flex items-center gap-2 mb-1">
+												<span class={cn(
+													"px-2 py-0.5 rounded text-xs font-medium",
+													finding.severity === 'critical' && "bg-red-500/20 text-red-500",
+													finding.severity === 'high' && "bg-orange-500/20 text-orange-500",
+													finding.severity === 'medium' && "bg-yellow-500/20 text-yellow-500",
+													finding.severity === 'low' && "bg-blue-500/20 text-blue-500"
+												)}>
+													{finding.severity}
+												</span>
+												<span class="text-muted-foreground capitalize">{finding.category || finding.type}</span>
+											</div>
+											<div class="font-mono text-xs text-muted-foreground mb-1">
+												{finding.file}:{finding.line}
+											</div>
+											{#if finding.match || finding.description}
+												<div class="text-xs text-muted-foreground">
+													{finding.description || finding.match}
+												</div>
+											{/if}
+										</div>
+									{/each}
+									{#if parsedResults.findings.length > 50}
+										<div class="text-sm text-muted-foreground text-center py-2">
+											...and {parsedResults.findings.length - 50} more findings
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/if}
+						
+						<!-- Issues List (for Quality/DeadCode scans) -->
+						{#if parsedResults.issues && parsedResults.issues.length > 0}
+							<div class="mb-6">
+								<h3 class="font-medium mb-3 flex items-center gap-2">
+									<AlertTriangle class="h-4 w-4" />
+									Issues ({parsedResults.issues.length})
+								</h3>
+								<div class="space-y-2 max-h-72 overflow-auto">
+									{#each parsedResults.issues.slice(0, 50) as issue}
+										<div class="bg-muted/30 rounded p-3 text-sm">
+											<div class="flex items-center gap-2 mb-1">
+												<span class={cn(
+													"px-2 py-0.5 rounded text-xs font-medium",
+													issue.severity === 'critical' && "bg-red-500/20 text-red-500",
+													issue.severity === 'high' && "bg-orange-500/20 text-orange-500",
+													issue.severity === 'medium' && "bg-yellow-500/20 text-yellow-500",
+													issue.severity === 'low' && "bg-blue-500/20 text-blue-500",
+													!issue.severity && "bg-gray-500/20 text-gray-500"
+												)}>
+													{issue.severity || 'info'}
+												</span>
+												<span class="text-muted-foreground">{issue.category || issue.type}</span>
+											</div>
+											<div class="font-medium mb-1">{issue.message || issue.title || issue.name}</div>
+											{#if issue.file || issue.file_path}
+												<div class="font-mono text-xs text-muted-foreground">
+													{issue.file || issue.file_path}{issue.line ? `:${issue.line}` : ''}
+												</div>
+											{/if}
+											{#if issue.suggestion}
+												<div class="text-xs text-green-500 mt-1">
+													💡 {issue.suggestion}
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						
+						<!-- Raw JSON (collapsible) -->
+						<details class="group">
+							<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
+								<ChevronRight class="h-4 w-4 transition-transform group-open:rotate-90" />
+								View Raw JSON
+							</summary>
+							<pre class="bg-muted/50 rounded-lg p-4 text-xs overflow-auto max-h-64 mt-2 whitespace-pre-wrap">{JSON.stringify(parsedResults, null, 2)}</pre>
+						</details>
 					{/if}
 				{/if}
 			</div>

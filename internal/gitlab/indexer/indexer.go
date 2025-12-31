@@ -180,11 +180,8 @@ func (i *Indexer) GetStatus(projectID, branch string) *IndexInfo {
 		return info
 	}
 
-	return &IndexInfo{
-		ProjectID: projectID,
-		Branch:    branch,
-		Status:    IndexStatusPending,
-	}
+	// Return nil to indicate no cached status - caller should check DB
+	return nil
 }
 
 // setStatus updates indexing status in memory, Redis, and DB

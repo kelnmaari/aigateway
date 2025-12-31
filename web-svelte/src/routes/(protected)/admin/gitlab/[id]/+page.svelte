@@ -155,7 +155,7 @@
 	let isAdding = $state(false);
 	let addError = $state('');
 
-	const integrationId = $derived($page.params.id);
+	const integrationId = $derived($page.params.id ?? '');
 
 	onMount(async () => {
 		await loadIntegration();
@@ -879,13 +879,13 @@
 	}
 
 	async function handleCreateDocsMR() {
-		if (!docGenResult || !selectedProject || docGenResult.generated.length === 0) return;
+		if (!docGenResult || !selectedProject || docGenResult.docs.length === 0) return;
 		
 		isCreatingDocsMR = true;
 		try {
 			const result = await gitlabApi.createDocsMR(selectedProject.id, {
-				docs: docGenResult.generated,
-				title: `[Auto-Doc] Add documentation for ${docGenResult.generated.length} symbols`
+				docs: docGenResult.docs,
+				title: `[Auto-Doc] Add documentation for ${docGenResult.docs.length} symbols`
 			});
 			
 			if (result.mr_url) {
@@ -1884,7 +1884,7 @@
 				<Button variant="outline" onclick={() => (showProjectDetailModal = false)}>
 					{m.common_close()}
 				</Button>
-				<Button onclick={() => { showProjectDetailModal = false; openEditProject(selectedProject); }}>
+				<Button onclick={() => { showProjectDetailModal = false; if (selectedProject) openEditProject(selectedProject); }}>
 					<Settings class="mr-2 h-4 w-4" />
 					{m.common_edit()}
 				</Button>
@@ -3314,7 +3314,7 @@
 			{/if}
 
 			<div class="mt-6 flex justify-end gap-3">
-				{#if docGenResult && docGenResult.generated.length > 0 && !isGeneratingDocs}
+				{#if docGenResult && docGenResult.docs.length > 0 && !isGeneratingDocs}
 					<Button 
 						variant="default" 
 						onclick={handleCreateDocsMR}

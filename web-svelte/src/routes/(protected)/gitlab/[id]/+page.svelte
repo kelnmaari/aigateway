@@ -18,7 +18,7 @@
   } from '$lib/api/gitlab-user';
   import * as m from '$lib/paraglide/messages';
 
-  const integrationId = $page.params.id;
+  const integrationId = $page.params.id ?? '';
   
   let integration: GitLabIntegration | null = null;
   let projects: GitLabProject[] = [];

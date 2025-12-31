@@ -3,11 +3,13 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
 	"aigateway/internal/gitlab/scanner"
 	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/models"
 	"aigateway/internal/rag/vector"
 
 	"github.com/gin-gonic/gin"
@@ -111,6 +113,16 @@ func (h *GitLabSecretsHandler) ScanSecrets(c *gin.Context) {
 		"collection": collectionName,
 	}).Info("Starting secrets scan")
 
+	// Create scan history record
+	startTime := time.Now()
+	scanResult := &models.GitLabScanResult{
+		ProjectID:     projectID,
+		IntegrationID: project.IntegrationID,
+		ScanType:      models.ScanTypeSecrets,
+		Status:        models.ScanStatusRunning,
+		StartedAt:     startTime,
+	}
+
 	// Run scan
 	result, err := h.scanner.Scan(ctx, scanner.ScanRequest{
 		ProjectID:      projectID,
@@ -118,10 +130,32 @@ func (h *GitLabSecretsHandler) ScanSecrets(c *gin.Context) {
 		Categories:     req.Categories,
 		MinSeverity:    req.MinSeverity,
 	})
+
+	// Update scan result
+	completedAt := time.Now()
+	scanResult.CompletedAt = &completedAt
+	scanResult.DurationMs = completedAt.Sub(startTime).Milliseconds()
+
 	if err != nil {
 		h.logger.WithError(err).WithField("project_id", projectID).Error("Secrets scan failed")
+		scanResult.Status = models.ScanStatusFailed
+		scanResult.Error = err.Error()
+		if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+			h.logger.WithError(saveErr).Warn("Failed to save scan result to history")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Scan failed: " + err.Error()})
 		return
+	}
+
+	// Save successful result
+	scanResult.Status = models.ScanStatusCompleted
+	scanResult.FindingsCount = len(result.Findings)
+	scanResult.FilesAffected = result.Summary.FilesAffected
+	if resultJSON, jsonErr := json.Marshal(result); jsonErr == nil {
+		scanResult.ResultsJSON = string(resultJSON)
+	}
+	if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+		h.logger.WithError(saveErr).Warn("Failed to save scan result to history")
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -217,6 +251,17 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 	// Create deep scanner using configured LLM credentials
 	deepScanner := scanner.NewDeepScanner(h.vectorStore, h.llmBaseURL, h.llmAPIKey, h.logger)
 
+	// Create scan history record (pending)
+	startTime := time.Now()
+	scanResult := &models.GitLabScanResult{
+		ProjectID:     projectID,
+		IntegrationID: project.IntegrationID,
+		ScanType:      models.ScanTypeSecretsDeep,
+		Status:        models.ScanStatusRunning,
+		ModelID:       modelID,
+		StartedAt:     startTime,
+	}
+
 	// Run deep scan
 	result, err := deepScanner.DeepScan(ctx, scanner.DeepScanRequest{
 		ProjectID:      projectID,
@@ -225,10 +270,39 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 		MaxChunks:      req.MaxChunks,
 		Language:       language,
 	})
+
+	// Update scan result with outcome
+	completedAt := time.Now()
+	scanResult.CompletedAt = &completedAt
+	scanResult.DurationMs = completedAt.Sub(startTime).Milliseconds()
+
 	if err != nil {
 		h.logger.WithError(err).WithField("project_id", projectID).Error("Deep secrets scan failed")
+		scanResult.Status = models.ScanStatusFailed
+		scanResult.Error = err.Error()
+		// Save failed result
+		if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+			h.logger.WithError(saveErr).Warn("Failed to save scan result to history")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Deep scan failed: " + err.Error()})
 		return
+	}
+
+	// Save successful result
+	scanResult.Status = models.ScanStatusCompleted
+	scanResult.FindingsCount = len(result.Findings)
+	scanResult.FilesAffected = result.Summary.FilesAffected
+	scanResult.TokensUsed = result.TokensUsed
+
+	// Serialize results JSON
+	if resultJSON, jsonErr := json.Marshal(result); jsonErr == nil {
+		scanResult.ResultsJSON = string(resultJSON)
+	}
+
+	if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+		h.logger.WithError(saveErr).Warn("Failed to save scan result to history")
+	} else {
+		h.logger.WithField("scan_id", scanResult.ID).Info("Deep scan result saved to history")
 	}
 
 	c.JSON(http.StatusOK, result)

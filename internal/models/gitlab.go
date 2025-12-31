@@ -702,3 +702,69 @@ type ProjectStats struct {
 	IssuesFound      int    `json:"issues_found"`
 }
 
+// ============================================================================
+// Scan History Models (v4.1.2+)
+// ============================================================================
+
+// GitLabScanType represents the type of scan
+type GitLabScanType string
+
+const (
+	ScanTypeSecrets      GitLabScanType = "secrets"
+	ScanTypeSecretsDeep  GitLabScanType = "secrets_deep"
+	ScanTypeDependencies GitLabScanType = "dependencies"
+	ScanTypeQuality      GitLabScanType = "quality"
+	ScanTypeDeadCode     GitLabScanType = "deadcode"
+	ScanTypeAutoDocs     GitLabScanType = "autodocs"
+	ScanTypeTestGen      GitLabScanType = "testgen"
+	ScanTypeArchitecture GitLabScanType = "architecture"
+)
+
+// GitLabScanStatus represents the status of a scan
+type GitLabScanStatus string
+
+const (
+	ScanStatusPending   GitLabScanStatus = "pending"
+	ScanStatusRunning   GitLabScanStatus = "running"
+	ScanStatusCompleted GitLabScanStatus = "completed"
+	ScanStatusFailed    GitLabScanStatus = "failed"
+	ScanStatusCancelled GitLabScanStatus = "cancelled"
+)
+
+// GitLabScanResult represents a stored scan result
+type GitLabScanResult struct {
+	ID            string           `json:"id" db:"id"`
+	ProjectID     string           `json:"project_id" db:"project_id"`
+	IntegrationID string           `json:"integration_id" db:"integration_id"`
+	ScanType      GitLabScanType   `json:"scan_type" db:"scan_type"`
+	Status        GitLabScanStatus `json:"status" db:"status"`
+	ModelID       string           `json:"model_id,omitempty" db:"model_id"`
+
+	// Timing
+	StartedAt   time.Time  `json:"started_at" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	DurationMs  int64      `json:"duration_ms" db:"duration_ms"`
+
+	// Results summary
+	FindingsCount int    `json:"findings_count" db:"findings_count"`
+	FilesAffected int    `json:"files_affected" db:"files_affected"`
+	TokensUsed    int    `json:"tokens_used" db:"tokens_used"`
+	Error         string `json:"error,omitempty" db:"error"`
+
+	// Full results as JSON
+	ResultsJSON string `json:"results_json,omitempty" db:"results_json"`
+
+	// For display
+	ProjectName string `json:"project_name,omitempty" db:"-"`
+}
+
+// GitLabScanResultsRequest for listing scan results
+type GitLabScanResultsRequest struct {
+	ProjectID     string           `json:"project_id,omitempty"`
+	IntegrationID string           `json:"integration_id,omitempty"`
+	ScanType      *GitLabScanType  `json:"scan_type,omitempty"`
+	Status        *GitLabScanStatus `json:"status,omitempty"`
+	Limit         int              `json:"limit,omitempty"`
+	Offset        int              `json:"offset,omitempty"`
+}
+

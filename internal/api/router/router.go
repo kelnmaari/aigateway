@@ -3795,6 +3795,13 @@ func (r *Router) setupGitLabRoutes() {
 		adminGitlab.GET("/feedback", r.gitlabHandler.ListFeedback)
 		adminGitlab.POST("/feedback", r.gitlabHandler.SubmitFeedback)
 
+		// Scan History (v4.1.2+) - view all scan results with historical data
+		scanHistoryHandler := handlers.NewGitLabScanHistoryHandler(r.gitlabStore, r.logger)
+		adminGitlab.GET("/scan-history", scanHistoryHandler.ListScanResults)
+		adminGitlab.GET("/scan-history/types", scanHistoryHandler.GetScanTypes)
+		adminGitlab.GET("/scan-history/:id", scanHistoryHandler.GetScanResult)
+		r.logger.Info("✅ GitLab scan history routes registered")
+
 		// Available GitLab projects for selection (GITLAB-AUTO)
 		adminGitlab.GET("/integrations/:id/available-projects", r.gitlabHandler.ListAvailableProjects)
 

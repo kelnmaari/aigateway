@@ -835,6 +835,35 @@ export const gitlabApi = {
       body: params || {},
     });
   },
+
+  // ============================================================================
+  // Scan History API (v4.1.2+)
+  // ============================================================================
+
+  async listScanHistory(params?: {
+    project_id?: string;
+    scan_type?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ results: ScanHistoryItem[]; total: number; limit: number; offset: number }> {
+    const query = new URLSearchParams();
+    if (params?.project_id) query.set('project_id', params.project_id);
+    if (params?.scan_type) query.set('scan_type', params.scan_type);
+    if (params?.status) query.set('status', params.status);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const queryStr = query.toString();
+    return apiRequest(`/scan-history${queryStr ? '?' + queryStr : ''}`);
+  },
+
+  async getScanHistoryItem(id: string): Promise<ScanHistoryItem> {
+    return apiRequest(`/scan-history/${id}`);
+  },
+
+  async getScanTypes(): Promise<{ types: ScanTypeInfo[] }> {
+    return apiRequest('/scan-history/types');
+  },
 };
 
 // Model types
@@ -1637,6 +1666,46 @@ export interface ScanHistory {
   issue_created: boolean;
   issue_url?: string;
   results_json?: string;
+}
+
+// ============================================================================
+// Scan History Types (v4.1.2+) - unified scan results storage
+// ============================================================================
+
+export type ScanHistoryScanType = 
+  | 'secrets'
+  | 'secrets_deep'
+  | 'dependencies'
+  | 'quality'
+  | 'deadcode'
+  | 'autodocs'
+  | 'testgen'
+  | 'architecture';
+
+export type ScanHistoryStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface ScanHistoryItem {
+  id: string;
+  project_id: string;
+  integration_id?: string;
+  scan_type: ScanHistoryScanType;
+  status: ScanHistoryStatus;
+  model_id?: string;
+  started_at: string;
+  completed_at?: string;
+  duration_ms: number;
+  findings_count: number;
+  files_affected: number;
+  tokens_used: number;
+  error?: string;
+  results_json?: string;
+  project_name?: string;
+}
+
+export interface ScanTypeInfo {
+  value: string;
+  label: string;
+  description: string;
 }
 
 export interface CreateScheduledScanRequest {

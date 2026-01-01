@@ -529,7 +529,7 @@ export const gitlabApi = {
   // Dependency Scanning (v4.1+)
   // ============================================================================
 
-  async checkDependencies(projectId: string): Promise<DependencyScanResult> {
+  async checkDependencies(projectId: string): Promise<MultiEcosystemDependencyScanResult> {
     return apiRequest(`/projects/${projectId}/check-dependencies`, {
       method: 'POST',
     });
@@ -1099,6 +1099,18 @@ export interface DependencyScanResult {
   duration: string;
   dependencies: DependencyWithVulns[];
   summary: DependencyScanSummary;
+  status: 'completed' | 'failed';
+  error?: string;
+}
+
+// Multi-ecosystem scan result (monorepo support)
+export interface MultiEcosystemDependencyScanResult {
+  project_id: string;
+  scan_id: string;
+  scanned_at: string;
+  duration: string;
+  ecosystems: DependencyScanResult[]; // Results per ecosystem (Go, Node.js, Python)
+  total_summary: DependencyScanSummary;
   status: 'completed' | 'failed';
   error?: string;
 }

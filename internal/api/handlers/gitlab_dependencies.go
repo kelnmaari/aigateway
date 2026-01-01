@@ -82,8 +82,8 @@ func (h *GitLabDependenciesHandler) CheckDependencies(c *gin.Context) {
 		StartedAt:     startTime,
 	}
 
-	// Run scan
-	result, err := h.scanner.ScanProject(ctx, dependencies.ScanRequest{
+	// Run multi-ecosystem scan (supports monorepos with go.mod + package.json + requirements.txt)
+	result, err := h.scanner.ScanProjectAllEcosystems(ctx, dependencies.ScanRequest{
 		ProjectID:      projectID,
 		CollectionName: collectionName,
 	})
@@ -106,7 +106,7 @@ func (h *GitLabDependenciesHandler) CheckDependencies(c *gin.Context) {
 
 	// Save successful result
 	scanResult.Status = models.ScanStatusCompleted
-	scanResult.FindingsCount = len(result.Dependencies)
+	scanResult.FindingsCount = result.TotalSummary.TotalDependencies
 	if resultJSON, jsonErr := json.Marshal(result); jsonErr == nil {
 		scanResult.ResultsJSON = string(resultJSON)
 	}

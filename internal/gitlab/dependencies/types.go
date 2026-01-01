@@ -27,30 +27,42 @@ type DependencyWithVulns struct {
 	IsVulnerable    bool            `json:"is_vulnerable"`
 }
 
-// ScanResult contains the full result of a dependency scan.
+// ScanResult contains the full result of a dependency scan for a single ecosystem.
 type ScanResult struct {
-	ProjectID       string                `json:"project_id"`
-	ScanID          string                `json:"scan_id"`
-	Language        string                `json:"language"` // "go", "nodejs", "python", etc.
-	FilePath        string                `json:"file_path"` // e.g., "go.mod"
-	ScannedAt       time.Time             `json:"scanned_at"`
-	Duration        string                `json:"duration"`
-	Dependencies    []DependencyWithVulns `json:"dependencies"`
-	Summary         ScanSummary           `json:"summary"`
-	Status          string                `json:"status"` // "completed", "failed"
-	Error           string                `json:"error,omitempty"`
+	ProjectID    string                `json:"project_id"`
+	ScanID       string                `json:"scan_id"`
+	Language     string                `json:"language"`  // "go", "nodejs", "python", etc.
+	FilePath     string                `json:"file_path"` // e.g., "go.mod"
+	ScannedAt    time.Time             `json:"scanned_at"`
+	Duration     string                `json:"duration"`
+	Dependencies []DependencyWithVulns `json:"dependencies"`
+	Summary      ScanSummary           `json:"summary"`
+	Status       string                `json:"status"` // "completed", "failed"
+	Error        string                `json:"error,omitempty"`
+}
+
+// MultiEcosystemScanResult contains results from all ecosystems in a project.
+type MultiEcosystemScanResult struct {
+	ProjectID    string       `json:"project_id"`
+	ScanID       string       `json:"scan_id"`
+	ScannedAt    time.Time    `json:"scanned_at"`
+	Duration     string       `json:"duration"`
+	Ecosystems   []ScanResult `json:"ecosystems"`    // Results per ecosystem
+	TotalSummary ScanSummary  `json:"total_summary"` // Aggregated summary
+	Status       string       `json:"status"`
+	Error        string       `json:"error,omitempty"`
 }
 
 // ScanSummary provides overview statistics.
 type ScanSummary struct {
-	TotalDependencies   int            `json:"total_dependencies"`
-	DirectDependencies  int            `json:"direct_dependencies"`
-	OutdatedCount       int            `json:"outdated_count"`
-	VulnerableCount     int            `json:"vulnerable_count"`
-	UpToDateCount       int            `json:"up_to_date_count"`
-	ByUpdateType        map[string]int `json:"by_update_type"`        // major/minor/patch counts
-	BySeverity          map[string]int `json:"by_severity"`           // critical/high/medium/low counts
-	CriticalVulns       int            `json:"critical_vulns"`
+	TotalDependencies  int            `json:"total_dependencies"`
+	DirectDependencies int            `json:"direct_dependencies"`
+	OutdatedCount      int            `json:"outdated_count"`
+	VulnerableCount    int            `json:"vulnerable_count"`
+	UpToDateCount      int            `json:"up_to_date_count"`
+	ByUpdateType       map[string]int `json:"by_update_type"` // major/minor/patch counts
+	BySeverity         map[string]int `json:"by_severity"`    // critical/high/medium/low counts
+	CriticalVulns      int            `json:"critical_vulns"`
 }
 
 // VersionInfo contains version metadata from a registry.
@@ -69,4 +81,3 @@ type PackageInfo struct {
 	Versions    []VersionInfo `json:"versions"`
 	Latest      string        `json:"latest"`
 }
-

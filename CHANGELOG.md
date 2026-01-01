@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.7] - 2025-01-01
+
+### Added
+
+- **Multi-Ecosystem Dependency Scanning**: Full monorepo support
+  - Scans ALL dependency files (go.mod, package.json, requirements.txt)
+  - UI tabs for switching between ecosystems (Go | Node.js | Python)
+  - Aggregated total summary across all ecosystems
+  - Per-ecosystem breakdown with individual file paths and durations
+  - Combined issue creation with dependencies from all ecosystems
+
+### Technical
+
+- `internal/gitlab/dependencies/types.go`: Added `MultiEcosystemScanResult` type
+- `internal/gitlab/dependencies/scanner.go`: New `ScanProjectAllEcosystems()` method
+- `internal/api/handlers/gitlab_dependencies.go`: Uses multi-ecosystem scanner
+- `web-svelte/src/lib/api/gitlab.ts`: Added `MultiEcosystemDependencyScanResult` interface
+- `web-svelte/src/routes/(protected)/admin/gitlab/[id]/+page.svelte`: Ecosystem tabs UI
+
 ## [4.2.6] - 2025-01-01
 
 ### Changed

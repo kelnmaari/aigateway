@@ -150,6 +150,8 @@ build:webui:
     # Clean Paraglide cache and regenerate messages
     - rm -rf src/lib/paraglide project.inlang/cache
     - npx @inlang/paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide
+    # Generate SvelteKit types before build
+    - npx svelte-kit sync
     - npm run build
     - ls -la build/
   artifacts:

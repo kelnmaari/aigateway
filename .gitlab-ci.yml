@@ -598,22 +598,45 @@ release:
   script:
     - TAG_VERSION="${CI_COMMIT_TAG#v}"
     - echo "Creating release for version ${TAG_VERSION}"
-  release:
-    tag_name: $CI_COMMIT_TAG
-    name: 'AIGateway $CI_COMMIT_TAG'
-    description: |
+    
+    # Extract changelog for this version from CHANGELOG.md
+    # Finds content between "## [X.Y.Z]" and the next "## [" header
+    - |
+      CHANGELOG_CONTENT=$(awk -v ver="${TAG_VERSION}" '
+        BEGIN { found=0; content="" }
+        /^## \[/ {
+          if (found) exit
+          if (index($0, "[" ver "]") > 0) found=1
+        }
+        found { content = content $0 "\n" }
+        END { print content }
+      ' CHANGELOG.md)
+      
+      if [ -z "$CHANGELOG_CONTENT" ]; then
+        echo "Warning: No changelog found for version ${TAG_VERSION}"
+        CHANGELOG_CONTENT="No changelog available for this version."
+      fi
+      
+      echo "Extracted changelog:"
+      echo "$CHANGELOG_CONTENT"
+      
+      # Write release description to file
+      cat > release_description.md << EOF
       ## AIGateway $CI_COMMIT_TAG
+      
+      $CHANGELOG_CONTENT
+      
+      ---
       
       ### Quick Install (Rocky Linux 9 / RHEL 9)
       
-      ```bash
-      # Always install latest version
+      \`\`\`bash
       curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/latest/install.sh | sudo bash
-      ```
+      \`\`\`
       
       ### Post-Install
       
-      ```bash
+      \`\`\`bash
       # Configure
       sudo vim /opt/ollama-openai-proxy/configs/dev.yaml
       
@@ -623,19 +646,26 @@ release:
       
       # View logs
       journalctl -u oop -f
-      ```
+      \`\`\`
       
       ### Upgrade
       
-      ```bash
-      # Same command - will install latest
+      \`\`\`bash
       curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/latest/install.sh | sudo bash
       sudo systemctl restart oop
-      ```
+      \`\`\`
       
       ### Package Registry
       
       Browse all packages: ${CI_PROJECT_URL}/-/packages
+      EOF
+      
+      echo "Release description generated:"
+      cat release_description.md
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: 'AIGateway $CI_COMMIT_TAG'
+    description: './release_description.md'
     assets:
       links:
         - name: 'Package Registry'

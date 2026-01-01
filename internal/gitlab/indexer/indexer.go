@@ -77,6 +77,7 @@ func DefaultConfig() IndexerConfig {
 			".vue", ".svelte", ".html", ".css", ".scss",
 			".sql", ".sh", ".bash", ".yaml", ".yml", ".json",
 			".md", ".txt", ".dockerfile", ".tf", ".hcl",
+			".toml", ".xml", ".gradle", ".kts", ".lock",
 		},
 		ExcludeDirs: []string{
 			"node_modules", "vendor", ".git", "__pycache__",
@@ -647,10 +648,25 @@ func (i *Indexer) shouldIndexFile(filePath string) bool {
 		}
 	}
 
-	// Also index files without extension that are common (Dockerfile, Makefile, etc.)
+	// Also index files without standard extension that are common
 	baseName := strings.ToLower(filepath.Base(filePath))
-	noExtFiles := []string{"dockerfile", "makefile", "rakefile", "gemfile", "procfile", "brewfile"}
-	for _, name := range noExtFiles {
+	specialFiles := []string{
+		// Build/task files
+		"dockerfile", "makefile", "rakefile", "procfile", "brewfile",
+		// Go
+		"go.mod", "go.sum",
+		// Ruby
+		"gemfile", "gemfile.lock",
+		// Python
+		"requirements.txt", "pipfile", "pipfile.lock", "pyproject.toml", "setup.py",
+		// Rust
+		"cargo.toml", "cargo.lock",
+		// Node.js (already covered by .json but for completeness)
+		"package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
+		// Java/Gradle/Maven
+		"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
+	}
+	for _, name := range specialFiles {
 		if baseName == name {
 			return true
 		}

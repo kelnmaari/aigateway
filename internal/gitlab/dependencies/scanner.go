@@ -423,8 +423,10 @@ type foundDepFile struct {
 }
 
 // findAllDependencyFiles searches for ALL dependency files in the indexed code.
+// It keeps the LONGEST content for each file_path (to handle chunked files).
 func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projectID string, specs []depFileSpec) []foundDepFile {
 	// Use map for deduplication by file_path (files may have multiple chunks)
+	// We keep the longest content for each file
 	foundMap := make(map[string]foundDepFile)
 	var mu sync.Mutex
 
@@ -446,14 +448,6 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 			// Check if this is any of the dependency files we're looking for
 			for filename, spec := range fileSpecMap {
 				if fp == filename || strings.HasSuffix(fp, "/"+filename) {
-					// Skip if already found (deduplication)
-					mu.Lock()
-					if _, exists := foundMap[fp]; exists {
-						mu.Unlock()
-						break
-					}
-					mu.Unlock()
-
 					var content string
 					if c, ok := doc.Metadata["content"].(string); ok && c != "" {
 						content = c
@@ -463,17 +457,22 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 
 					if content != "" {
 						mu.Lock()
-						foundMap[fp] = foundDepFile{
-							spec:     spec,
-							content:  content,
-							filePath: fp,
+						existing, exists := foundMap[fp]
+						// Keep the longest content (most complete chunk)
+						if !exists || len(content) > len(existing.content) {
+							foundMap[fp] = foundDepFile{
+								spec:     spec,
+								content:  content,
+								filePath: fp,
+							}
+							if !exists {
+								s.logger.WithFields(logrus.Fields{
+									"file":     fp,
+									"language": spec.language,
+								}).Debug("Found dependency file")
+							}
 						}
 						mu.Unlock()
-
-						s.logger.WithFields(logrus.Fields{
-							"file":     fp,
-							"language": spec.language,
-						}).Debug("Found dependency file")
 					}
 					break
 				}

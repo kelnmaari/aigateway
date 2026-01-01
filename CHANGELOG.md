@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.9] - 2025-01-01
+
+### Fixed
+
+- **Dependency Files Not Indexed**: `go.mod`, `go.sum`, `requirements.txt` and other manifest files now indexed
+- **Truncated Dependency Content**: Scanner now uses longest chunk content instead of first found
+
+### Technical
+
+- `internal/gitlab/indexer/indexer.go`: Added `specialFiles` list for dependency manifests
+- `internal/gitlab/dependencies/scanner.go`: Deduplication keeps longest content per file_path
+
 ## [4.2.8] - 2025-01-01
 
 ### Fixed

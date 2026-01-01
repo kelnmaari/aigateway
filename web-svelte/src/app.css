@@ -1,61 +1,90 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Tailwind 4: Define custom theme */
+@theme {
+	/* Colors - semantic tokens */
+	--color-background: rgb(var(--tw-background));
+	--color-foreground: rgb(var(--tw-foreground));
+	--color-card: rgb(var(--tw-card));
+	--color-card-foreground: rgb(var(--tw-card-foreground));
+	--color-primary: rgb(var(--tw-primary));
+	--color-primary-foreground: rgb(var(--tw-primary-foreground));
+	--color-secondary: rgb(var(--tw-secondary));
+	--color-secondary-foreground: rgb(var(--tw-secondary-foreground));
+	--color-muted: rgb(var(--tw-muted));
+	--color-muted-foreground: rgb(var(--tw-muted-foreground));
+	--color-accent: rgb(var(--tw-accent));
+	--color-accent-foreground: rgb(var(--tw-accent-foreground));
+	--color-destructive: rgb(var(--tw-destructive));
+	--color-destructive-foreground: rgb(var(--tw-destructive-foreground));
+	--color-border: rgb(var(--tw-border));
+	--color-input: rgb(var(--tw-input));
+	--color-ring: rgb(var(--tw-ring));
+
+	/* Border radius */
+	--radius-lg: var(--radius);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-sm: calc(var(--radius) - 4px);
+
+	/* Font family */
+	--font-sans: 'Inter', system-ui, sans-serif;
+}
 
 :root {
 	/* Light theme (default) */
-	--color-background: 255 255 255;
-	--color-foreground: 15 23 42;
-	--color-card: 255 255 255;
-	--color-card-foreground: 15 23 42;
-	--color-primary: 16 163 127;
-	--color-primary-foreground: 255 255 255;
-	--color-secondary: 241 245 249;
-	--color-secondary-foreground: 15 23 42;
-	--color-muted: 241 245 249;
-	--color-muted-foreground: 100 116 139;
-	--color-accent: 241 245 249;
-	--color-accent-foreground: 15 23 42;
-	--color-destructive: 239 68 68;
-	--color-destructive-foreground: 255 255 255;
-	--color-border: 226 232 240;
-	--color-input: 226 232 240;
-	--color-ring: 16 163 127;
+	--tw-background: 255 255 255;
+	--tw-foreground: 15 23 42;
+	--tw-card: 255 255 255;
+	--tw-card-foreground: 15 23 42;
+	--tw-primary: 16 163 127;
+	--tw-primary-foreground: 255 255 255;
+	--tw-secondary: 241 245 249;
+	--tw-secondary-foreground: 15 23 42;
+	--tw-muted: 241 245 249;
+	--tw-muted-foreground: 100 116 139;
+	--tw-accent: 241 245 249;
+	--tw-accent-foreground: 15 23 42;
+	--tw-destructive: 239 68 68;
+	--tw-destructive-foreground: 255 255 255;
+	--tw-border: 226 232 240;
+	--tw-input: 226 232 240;
+	--tw-ring: 16 163 127;
 
 	--radius: 0.5rem;
 }
 
 .dark {
 	/* Dark theme */
-	--color-background: 15 23 42;
-	--color-foreground: 248 250 252;
-	--color-card: 30 41 59;
-	--color-card-foreground: 248 250 252;
-	--color-primary: 16 163 127;
-	--color-primary-foreground: 255 255 255;
-	--color-secondary: 51 65 85;
-	--color-secondary-foreground: 248 250 252;
-	--color-muted: 51 65 85;
-	--color-muted-foreground: 148 163 184;
-	--color-accent: 51 65 85;
-	--color-accent-foreground: 248 250 252;
-	--color-destructive: 239 68 68;
-	--color-destructive-foreground: 255 255 255;
-	--color-border: 51 65 85;
-	--color-input: 51 65 85;
-	--color-ring: 16 163 127;
+	--tw-background: 15 23 42;
+	--tw-foreground: 248 250 252;
+	--tw-card: 30 41 59;
+	--tw-card-foreground: 248 250 252;
+	--tw-primary: 16 163 127;
+	--tw-primary-foreground: 255 255 255;
+	--tw-secondary: 51 65 85;
+	--tw-secondary-foreground: 248 250 252;
+	--tw-muted: 51 65 85;
+	--tw-muted-foreground: 148 163 184;
+	--tw-accent: 51 65 85;
+	--tw-accent-foreground: 248 250 252;
+	--tw-destructive: 239 68 68;
+	--tw-destructive-foreground: 255 255 255;
+	--tw-border: 51 65 85;
+	--tw-input: 51 65 85;
+	--tw-ring: 16 163 127;
 }
 
 /* Base styles */
-* {
-	@apply border-border;
-}
+@layer base {
+	* {
+		border-color: var(--color-border);
+	}
 
-body {
-	@apply bg-background text-foreground;
-	font-feature-settings:
-		'rlig' 1,
-		'calt' 1;
+	body {
+		background-color: var(--color-background);
+		color: var(--color-foreground);
+		font-feature-settings: 'rlig' 1, 'calt' 1;
+	}
 }
 
 /* Smooth transitions for theme change */
@@ -75,19 +104,21 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-	@apply bg-muted;
+	background-color: var(--color-muted);
 }
 
 ::-webkit-scrollbar-thumb {
-	@apply bg-muted-foreground/30 rounded-full;
+	background-color: rgb(var(--tw-muted-foreground) / 0.3);
+	border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	@apply bg-muted-foreground/50;
+	background-color: rgb(var(--tw-muted-foreground) / 0.5);
 }
 
 /* Focus styles */
 :focus-visible {
-	@apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+	outline: none;
+	box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
 }
 

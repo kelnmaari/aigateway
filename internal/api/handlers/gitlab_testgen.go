@@ -528,6 +528,15 @@ func (h *GitLabTestGenHandler) CreateTestsMR(c *gin.Context) {
 	// Create commit actions for each test file
 	var actions []client.CommitAction
 	for testFilePath, codes := range fileContents {
+		// Check if file already exists in the target branch
+		action := "create"
+		_, err := gitlabClient.GetFile(ctx, project.GitLabProjectID, testFilePath, targetBranch)
+		if err == nil {
+			// File exists, use update action
+			action = "update"
+			h.logger.WithField("file", testFilePath).Debug("Test file exists, will update")
+		}
+
 		// Get language from first test for this file
 		var lang string
 		for _, t := range req.Tests {
@@ -553,7 +562,7 @@ func (h *GitLabTestGenHandler) CreateTestsMR(c *gin.Context) {
 		}
 
 		actions = append(actions, client.CommitAction{
-			Action:   "create",
+			Action:   action,
 			FilePath: testFilePath,
 			Content:  content.String(),
 		})

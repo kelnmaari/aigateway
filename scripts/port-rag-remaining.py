@@ -31,11 +31,6 @@ def convert_bool_calls(code):
     code = re.sub(r'var (\w+)Int int', r'var \1Bool bool', code)
     return code
 
-def convert_json_strings(code):
-    """Заменяет string(jsonData) на jsonData для JSONB"""
-    code = re.sub(r'string\((\w+JSON)\)', r'\1', code)
-    return code
-
 def main():
     print("Скрипт готов для портирования RAG методов")
     print("Используйте этот шаблон для конвертации:")

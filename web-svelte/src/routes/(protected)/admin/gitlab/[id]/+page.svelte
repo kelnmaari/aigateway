@@ -3012,7 +3012,7 @@
 				</div>
 
 				<!-- Breaking Changes -->
-				{#if changelogResult.breaking_changes.length > 0}
+				{#if changelogResult.breaking_changes?.length > 0}
 					<div class="mb-6">
 						<h4 class="font-semibold mb-2 text-red-600 flex items-center gap-2">
 							<AlertCircle class="h-5 w-5" />
@@ -3044,7 +3044,7 @@
 				{/if}
 
 				<!-- New Features -->
-				{#if changelogResult.new_features.length > 0}
+				{#if changelogResult.new_features?.length > 0}
 					<div class="mb-4">
 						<h4 class="font-semibold mb-2 text-green-600">{m.gitlab_new_features?.() || 'New Features'}</h4>
 						<ul class="list-disc list-inside text-sm space-y-1">
@@ -3056,7 +3056,7 @@
 				{/if}
 
 				<!-- Bug Fixes -->
-				{#if changelogResult.bug_fixes.length > 0}
+				{#if changelogResult.bug_fixes?.length > 0}
 					<div class="mb-4">
 						<h4 class="font-semibold mb-2 text-blue-600">{m.gitlab_bug_fixes?.() || 'Bug Fixes'}</h4>
 						<ul class="list-disc list-inside text-sm space-y-1">
@@ -3068,7 +3068,7 @@
 				{/if}
 
 				<!-- Security Fixes -->
-				{#if changelogResult.security_fixes.length > 0}
+				{#if changelogResult.security_fixes?.length > 0}
 					<div class="mb-4">
 						<h4 class="font-semibold mb-2 text-orange-600">{m.gitlab_security_fixes?.() || 'Security Fixes'}</h4>
 						<ul class="list-disc list-inside text-sm space-y-1">
@@ -3080,7 +3080,7 @@
 				{/if}
 
 				<!-- Deprecated Features -->
-				{#if changelogResult.deprecated_features.length > 0}
+				{#if changelogResult.deprecated_features?.length > 0}
 					<div class="mb-4">
 						<h4 class="font-semibold mb-2 text-yellow-600">{m.gitlab_deprecated?.() || 'Deprecated Features'}</h4>
 						<ul class="list-disc list-inside text-sm space-y-1">

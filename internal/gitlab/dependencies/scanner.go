@@ -424,7 +424,8 @@ type foundDepFile struct {
 
 // findAllDependencyFiles searches for ALL dependency files in the indexed code.
 func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projectID string, specs []depFileSpec) []foundDepFile {
-	var found []foundDepFile
+	// Use map for deduplication by file_path (files may have multiple chunks)
+	foundMap := make(map[string]foundDepFile)
 	var mu sync.Mutex
 
 	// Build a map of filenames we're looking for
@@ -445,6 +446,14 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 			// Check if this is any of the dependency files we're looking for
 			for filename, spec := range fileSpecMap {
 				if fp == filename || strings.HasSuffix(fp, "/"+filename) {
+					// Skip if already found (deduplication)
+					mu.Lock()
+					if _, exists := foundMap[fp]; exists {
+						mu.Unlock()
+						break
+					}
+					mu.Unlock()
+
 					var content string
 					if c, ok := doc.Metadata["content"].(string); ok && c != "" {
 						content = c
@@ -454,11 +463,11 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 
 					if content != "" {
 						mu.Lock()
-						found = append(found, foundDepFile{
+						foundMap[fp] = foundDepFile{
 							spec:     spec,
 							content:  content,
 							filePath: fp,
-						})
+						}
 						mu.Unlock()
 
 						s.logger.WithFields(logrus.Fields{
@@ -475,6 +484,12 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to search for dependency files")
+	}
+
+	// Convert map to slice
+	var found []foundDepFile
+	for _, f := range foundMap {
+		found = append(found, f)
 	}
 
 	return found

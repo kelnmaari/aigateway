@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.8] - 2025-01-01
+
+### Fixed
+
+- **Dependency Scanner Deduplication**: Files with multiple chunks no longer scanned multiple times
+- **Changelog Analysis Null Error**: Fixed "Cannot read properties of null" when arrays are null
+
+### Technical
+
+- `internal/gitlab/dependencies/scanner.go`: Deduplication by file_path in `findAllDependencyFiles()`
+- `web-svelte`: Added null checks (`?.`) for changelog result arrays
+
 ## [4.2.7] - 2025-01-01
 
 ### Added

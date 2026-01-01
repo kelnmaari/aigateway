@@ -24,7 +24,7 @@
 		Clock,
 		BarChart3
 	} from 'lucide-svelte';
-	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview, type SecretsScanResult, type SecretFinding, type DeepScanResult, type DeepFinding, type DependencyScanResult, type DependencyWithVulns, type QualityScore, type QualityCategory, type DeadCodeResult, type DocScanResult, type DocGenerationResult, type TestScanResult, type TestGenerationResult, type ChangelogAnalysis, type BreakingChange } from '$lib/api/gitlab';
+	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview, type SecretsScanResult, type SecretFinding, type DeepScanResult, type DeepFinding, type DependencyScanResult, type MultiEcosystemDependencyScanResult, type DependencyWithVulns, type QualityScore, type QualityCategory, type DeadCodeResult, type DocScanResult, type DocGenerationResult, type TestScanResult, type TestGenerationResult, type ChangelogAnalysis, type BreakingChange } from '$lib/api/gitlab';
 	import { Shield, Brain, Package, Trash2 as TrashIcon, FileEdit, TestTube } from 'lucide-svelte';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -94,10 +94,11 @@
 	
 	// Dependency scan state
 	let showDependenciesModal = $state(false);
-	let dependenciesScanResult = $state<DependencyScanResult | null>(null);
+	let dependenciesScanResult = $state<MultiEcosystemDependencyScanResult | null>(null);
 	let isCheckingDependencies = $state(false);
 	let checkingDependenciesProjectId = $state<string | null>(null);
 	let isCreatingDependencyIssue = $state(false);
+	let selectedEcosystemIndex = $state(0); // For multi-ecosystem tab selection
 	
 	// Create Issue state for all scanners
 	let isCreatingSecretsIssue = $state(false);
@@ -565,6 +566,7 @@
 		checkingDependenciesProjectId = project.id;
 		isCheckingDependencies = true;
 		dependenciesScanResult = null;
+		selectedEcosystemIndex = 0; // Reset to first ecosystem
 		showDependenciesModal = true;
 
 		try {
@@ -575,12 +577,10 @@
 			dependenciesScanResult = {
 				project_id: project.id,
 				scan_id: '',
-				language: '',
-				file_path: '',
 				scanned_at: new Date().toISOString(),
 				duration: '0s',
-				dependencies: [],
-				summary: { 
+				ecosystems: [],
+				total_summary: { 
 					total_dependencies: 0, 
 					direct_dependencies: 0,
 					outdated_count: 0,
@@ -602,17 +602,23 @@
 	async function handleCreateDependencyIssue() {
 		if (!dependenciesScanResult || !selectedProject) return;
 		
-		const vulnerableDeps = dependenciesScanResult.dependencies.filter(d => d.is_vulnerable);
-		const outdatedDeps = dependenciesScanResult.dependencies.filter(d => d.dependency.has_update && !d.is_vulnerable);
+		// Aggregate dependencies from all ecosystems
+		const allDeps = dependenciesScanResult.ecosystems.flatMap(eco => 
+			eco.dependencies.map(d => ({ ...d, ecosystem: eco.language }))
+		);
+		
+		const vulnerableDeps = allDeps.filter(d => d.is_vulnerable);
+		const outdatedDeps = allDeps.filter(d => d.dependency.has_update && !d.is_vulnerable);
 		
 		let description = `## Dependency Security & Update Report\n\n`;
 		description += `**Project:** ${selectedProject.name}\n`;
-		description += `**Scanned:** ${new Date(dependenciesScanResult.scanned_at).toLocaleString()}\n\n`;
+		description += `**Scanned:** ${new Date(dependenciesScanResult.scanned_at).toLocaleString()}\n`;
+		description += `**Ecosystems:** ${dependenciesScanResult.ecosystems.map(e => e.language).join(', ')}\n\n`;
 		
 		if (vulnerableDeps.length > 0) {
 			description += `### 🚨 Vulnerable Dependencies (${vulnerableDeps.length})\n\n`;
 			for (const dep of vulnerableDeps) {
-				description += `- **${dep.dependency.name}** ${dep.dependency.current_version} → ${dep.dependency.latest_version}\n`;
+				description += `- **${dep.dependency.name}** (${dep.ecosystem}) ${dep.dependency.current_version} → ${dep.dependency.latest_version}\n`;
 				for (const vuln of dep.vulnerabilities) {
 					description += `  - ${vuln.severity.toUpperCase()}: ${vuln.title} (${vuln.cve_id || 'N/A'})\n`;
 				}
@@ -623,7 +629,7 @@
 		if (outdatedDeps.length > 0) {
 			description += `### ⚠️ Outdated Dependencies (${outdatedDeps.length})\n\n`;
 			for (const dep of outdatedDeps.slice(0, 20)) { // Limit to 20 to avoid huge issues
-				description += `- **${dep.dependency.name}** ${dep.dependency.current_version} → ${dep.dependency.latest_version}\n`;
+				description += `- **${dep.dependency.name}** (${dep.ecosystem}) ${dep.dependency.current_version} → ${dep.dependency.latest_version}\n`;
 			}
 			if (outdatedDeps.length > 20) {
 				description += `\n_...and ${outdatedDeps.length - 20} more outdated dependencies_\n`;
@@ -2751,44 +2757,53 @@
 						<p class="font-medium">{m.gitlab_scan_failed?.() || 'Check Failed'}</p>
 						<p class="text-sm">{dependenciesScanResult.error}</p>
 					</div>
+				{:else if dependenciesScanResult.ecosystems.length === 0}
+					<div class="flex flex-col items-center justify-center py-12 text-center">
+						<Package class="h-16 w-16 text-muted-foreground/50" />
+						<p class="mt-4 text-lg font-medium text-muted-foreground">
+							{m.gitlab_no_dependencies?.() || 'No dependencies found'}
+						</p>
+						<p class="text-sm text-muted-foreground">
+							{m.gitlab_deps_file_not_found?.() || 'Could not find dependency file in indexed code.'}
+						</p>
+					</div>
 				{:else}
-					<!-- File info -->
+					<!-- Total Summary (all ecosystems) -->
 					<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
-						<FileCode class="h-4 w-4" />
-						<span>{dependenciesScanResult.file_path} ({dependenciesScanResult.language})</span>
-						<span class="mx-2">•</span>
 						<Clock class="h-4 w-4" />
 						<span>{dependenciesScanResult.duration}</span>
+						<span class="mx-2">•</span>
+						<span>{dependenciesScanResult.ecosystems.length} ecosystem(s) scanned</span>
 					</div>
 
-					<!-- Summary stats -->
+					<!-- Total Summary stats -->
 					<div class="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
 						<div class="rounded-lg bg-muted p-4">
-							<div class="text-2xl font-bold">{dependenciesScanResult.summary.total_dependencies}</div>
+							<div class="text-2xl font-bold">{dependenciesScanResult.total_summary.total_dependencies}</div>
 							<div class="text-sm text-muted-foreground">{m.gitlab_deps_total?.() || 'Total'}</div>
 						</div>
 						<div class="rounded-lg bg-muted p-4">
-							<div class="text-2xl font-bold">{dependenciesScanResult.summary.direct_dependencies}</div>
+							<div class="text-2xl font-bold">{dependenciesScanResult.total_summary.direct_dependencies}</div>
 							<div class="text-sm text-muted-foreground">{m.gitlab_deps_direct?.() || 'Direct'}</div>
 						</div>
 						<div class="rounded-lg bg-muted p-4">
-							<div class="text-2xl font-bold text-yellow-600">{dependenciesScanResult.summary.outdated_count}</div>
+							<div class="text-2xl font-bold text-yellow-600">{dependenciesScanResult.total_summary.outdated_count}</div>
 							<div class="text-sm text-muted-foreground">{m.gitlab_deps_outdated?.() || 'Outdated'}</div>
 						</div>
 						<div class="rounded-lg bg-muted p-4">
-							<div class="text-2xl font-bold text-red-600">{dependenciesScanResult.summary.vulnerable_count}</div>
+							<div class="text-2xl font-bold text-red-600">{dependenciesScanResult.total_summary.vulnerable_count}</div>
 							<div class="text-sm text-muted-foreground">{m.gitlab_deps_vulnerable?.() || 'Vulnerable'}</div>
 						</div>
 						<div class="rounded-lg bg-muted p-4">
-							<div class="text-2xl font-bold text-green-600">{dependenciesScanResult.summary.up_to_date_count}</div>
+							<div class="text-2xl font-bold text-green-600">{dependenciesScanResult.total_summary.up_to_date_count}</div>
 							<div class="text-sm text-muted-foreground">{m.gitlab_deps_uptodate?.() || 'Up to Date'}</div>
 						</div>
 					</div>
 
 					<!-- Update type breakdown -->
-					{#if Object.keys(dependenciesScanResult.summary.by_update_type).length > 0}
+					{#if Object.keys(dependenciesScanResult.total_summary.by_update_type).length > 0}
 						<div class="mb-4 flex flex-wrap gap-2">
-							{#each Object.entries(dependenciesScanResult.summary.by_update_type) as [updateType, count]}
+							{#each Object.entries(dependenciesScanResult.total_summary.by_update_type) as [updateType, count]}
 								<span class={cn('px-3 py-1 rounded-full text-sm font-medium', getUpdateTypeColor(updateType))}>
 									{updateType}: {count}
 								</span>
@@ -2796,103 +2811,131 @@
 						</div>
 					{/if}
 
-					<!-- Dependencies list -->
-					{#if dependenciesScanResult.dependencies.length > 0}
-						<div class="space-y-2 max-h-[50vh] overflow-auto">
-							<!-- Header -->
-							<div class="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground border-b">
-								<div class="col-span-4">{m.gitlab_deps_package?.() || 'Package'}</div>
-								<div class="col-span-2">{m.gitlab_deps_current?.() || 'Current'}</div>
-								<div class="col-span-2">{m.gitlab_deps_latest?.() || 'Latest'}</div>
-								<div class="col-span-1">{m.gitlab_deps_update?.() || 'Update'}</div>
-								<div class="col-span-1">{m.gitlab_deps_status?.() || 'Status'}</div>
-								<div class="col-span-2">{m.gitlab_deps_actions?.() || 'Actions'}</div>
-							</div>
-							
-							{#each dependenciesScanResult.dependencies as depWithVulns}
-								<div class={cn(
-									'grid grid-cols-12 gap-2 px-3 py-2 rounded-lg text-sm',
-									depWithVulns.is_vulnerable ? 'bg-red-50 dark:bg-red-900/20' : 
-									depWithVulns.dependency.has_update ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-muted/50'
-								)}>
-									<div class="col-span-4 font-mono text-xs truncate" title={depWithVulns.dependency.name}>
-										{depWithVulns.dependency.name}
-										{#if depWithVulns.dependency.indirect}
-											<span class="text-muted-foreground ml-1">(indirect)</span>
-										{/if}
-									</div>
-									<div class="col-span-2 font-mono text-xs">{depWithVulns.dependency.current_version}</div>
-									<div class="col-span-2 font-mono text-xs">{depWithVulns.dependency.latest_version}</div>
-									<div class="col-span-1">
-										{#if depWithVulns.dependency.update_type !== 'none'}
-											<span class={cn('px-2 py-0.5 rounded text-xs font-medium', getUpdateTypeColor(depWithVulns.dependency.update_type))}>
-												{depWithVulns.dependency.update_type}
-											</span>
-										{:else}
-											<span class="text-green-600 text-xs">✓</span>
-										{/if}
-									</div>
-									<div class="col-span-1">
-										{#if depWithVulns.is_vulnerable}
-											<span class="text-red-600" title={`${depWithVulns.vulnerabilities.length} vulnerabilities`}>
-												⚠️ {depWithVulns.vulnerabilities.length}
-											</span>
-										{:else}
-											<span class="text-green-600">✓</span>
-										{/if}
-									</div>
-									<div class="col-span-2">
-										{#if depWithVulns.dependency.has_update}
-											<button
-												onclick={() => handleAnalyzeChangelog(depWithVulns, dependenciesScanResult!.project_id, dependenciesScanResult!.language)}
-												class="px-2 py-1 text-xs rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300"
-												title={m.gitlab_analyze_changelog?.() || 'Analyze Changelog'}
-											>
-												{m.gitlab_analyze_changelog_short?.() || 'Analyze'}
-											</button>
-										{/if}
-									</div>
-								</div>
-								
-								<!-- Vulnerabilities expandable -->
-								{#if depWithVulns.is_vulnerable}
-									<div class="ml-4 mb-2 space-y-1">
-										{#each depWithVulns.vulnerabilities as vuln}
-											<div class="text-xs p-2 rounded bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500">
-												<div class="flex items-center gap-2">
-													<span class={cn('px-1.5 py-0.5 rounded text-xs font-bold', getSeverityColor(vuln.severity))}>
-														{vuln.severity.toUpperCase()}
-													</span>
-													<a href={vuln.references?.[0]} target="_blank" class="text-blue-600 hover:underline font-medium">
-														{vuln.id}
-													</a>
-												</div>
-												<p class="mt-1 text-muted-foreground">{vuln.summary}</p>
-												{#if vuln.fixed_in}
-													<p class="mt-1"><strong>Fix:</strong> Upgrade to {vuln.fixed_in}</p>
-												{/if}
-											</div>
-										{/each}
-									</div>
-								{/if}
+					<!-- Ecosystem tabs -->
+					<div class="mb-4 border-b">
+						<div class="flex gap-1">
+							{#each dependenciesScanResult.ecosystems as ecosystem, idx}
+								<button
+									onclick={() => selectedEcosystemIndex = idx}
+									class={cn(
+										'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+										selectedEcosystemIndex === idx
+											? 'border-primary text-primary'
+											: 'border-transparent text-muted-foreground hover:text-foreground'
+									)}
+								>
+									{ecosystem.language === 'go' ? 'Go' : ecosystem.language === 'nodejs' ? 'Node.js' : ecosystem.language === 'python' ? 'Python' : ecosystem.language}
+									<span class="ml-1 text-xs text-muted-foreground">({ecosystem.dependencies.length})</span>
+								</button>
 							{/each}
 						</div>
-					{:else}
-						<div class="flex flex-col items-center justify-center py-12 text-center">
-							<Package class="h-16 w-16 text-muted-foreground/50" />
-							<p class="mt-4 text-lg font-medium text-muted-foreground">
-								{m.gitlab_no_dependencies?.() || 'No dependencies found'}
-							</p>
-							<p class="text-sm text-muted-foreground">
-								{m.gitlab_deps_file_not_found?.() || 'Could not find dependency file in indexed code.'}
-							</p>
+					</div>
+
+					<!-- Selected ecosystem content -->
+					{@const selectedEcosystem = dependenciesScanResult.ecosystems[selectedEcosystemIndex]}
+					{#if selectedEcosystem}
+						<!-- File info -->
+						<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
+							<FileCode class="h-4 w-4" />
+							<span>{selectedEcosystem.file_path}</span>
+							<span class="mx-2">•</span>
+							<Clock class="h-4 w-4" />
+							<span>{selectedEcosystem.duration}</span>
 						</div>
+
+						<!-- Dependencies list -->
+						{#if selectedEcosystem.dependencies.length > 0}
+							<div class="space-y-2 max-h-[50vh] overflow-auto">
+								<!-- Header -->
+								<div class="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground border-b">
+									<div class="col-span-4">{m.gitlab_deps_package?.() || 'Package'}</div>
+									<div class="col-span-2">{m.gitlab_deps_current?.() || 'Current'}</div>
+									<div class="col-span-2">{m.gitlab_deps_latest?.() || 'Latest'}</div>
+									<div class="col-span-1">{m.gitlab_deps_update?.() || 'Update'}</div>
+									<div class="col-span-1">{m.gitlab_deps_status?.() || 'Status'}</div>
+									<div class="col-span-2">{m.gitlab_deps_actions?.() || 'Actions'}</div>
+								</div>
+								
+								{#each selectedEcosystem.dependencies as depWithVulns}
+									<div class={cn(
+										'grid grid-cols-12 gap-2 px-3 py-2 rounded-lg text-sm',
+										depWithVulns.is_vulnerable ? 'bg-red-50 dark:bg-red-900/20' : 
+										depWithVulns.dependency.has_update ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-muted/50'
+									)}>
+										<div class="col-span-4 font-mono text-xs truncate" title={depWithVulns.dependency.name}>
+											{depWithVulns.dependency.name}
+											{#if depWithVulns.dependency.indirect}
+												<span class="text-muted-foreground ml-1">(indirect)</span>
+											{/if}
+										</div>
+										<div class="col-span-2 font-mono text-xs">{depWithVulns.dependency.current_version}</div>
+										<div class="col-span-2 font-mono text-xs">{depWithVulns.dependency.latest_version}</div>
+										<div class="col-span-1">
+											{#if depWithVulns.dependency.update_type !== 'none'}
+												<span class={cn('px-2 py-0.5 rounded text-xs font-medium', getUpdateTypeColor(depWithVulns.dependency.update_type))}>
+													{depWithVulns.dependency.update_type}
+												</span>
+											{:else}
+												<span class="text-green-600 text-xs">✓</span>
+											{/if}
+										</div>
+										<div class="col-span-1">
+											{#if depWithVulns.is_vulnerable}
+												<span class="text-red-600" title={`${depWithVulns.vulnerabilities.length} vulnerabilities`}>
+													⚠️ {depWithVulns.vulnerabilities.length}
+												</span>
+											{:else}
+												<span class="text-green-600">✓</span>
+											{/if}
+										</div>
+										<div class="col-span-2">
+											{#if depWithVulns.dependency.has_update}
+												<button
+													onclick={() => handleAnalyzeChangelog(depWithVulns, dependenciesScanResult!.project_id, selectedEcosystem.language)}
+													class="px-2 py-1 text-xs rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+													title={m.gitlab_analyze_changelog?.() || 'Analyze Changelog'}
+												>
+													{m.gitlab_analyze_changelog_short?.() || 'Analyze'}
+												</button>
+											{/if}
+										</div>
+									</div>
+									
+									<!-- Vulnerabilities expandable -->
+									{#if depWithVulns.is_vulnerable}
+										<div class="ml-4 mb-2 space-y-1">
+											{#each depWithVulns.vulnerabilities as vuln}
+												<div class="text-xs p-2 rounded bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500">
+													<div class="flex items-center gap-2">
+														<span class={cn('px-1.5 py-0.5 rounded text-xs font-bold', getSeverityColor(vuln.severity))}>
+															{vuln.severity.toUpperCase()}
+														</span>
+														<a href={vuln.references?.[0]} target="_blank" class="text-blue-600 hover:underline font-medium">
+															{vuln.id}
+														</a>
+													</div>
+													<p class="mt-1 text-muted-foreground">{vuln.summary}</p>
+													{#if vuln.fixed_in}
+														<p class="mt-1"><strong>Fix:</strong> Upgrade to {vuln.fixed_in}</p>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{:else}
+							<div class="flex flex-col items-center justify-center py-8 text-center">
+								<Package class="h-12 w-12 text-muted-foreground/50" />
+								<p class="mt-2 text-muted-foreground">No dependencies in this ecosystem</p>
+							</div>
+						{/if}
 					{/if}
 				{/if}
 			{/if}
 
 			<div class="mt-6 flex justify-end gap-3">
-				{#if dependenciesScanResult && !isCheckingDependencies && (dependenciesScanResult.summary.vulnerable_count > 0 || dependenciesScanResult.summary.outdated_count > 0)}
+				{#if dependenciesScanResult && !isCheckingDependencies && (dependenciesScanResult.total_summary.vulnerable_count > 0 || dependenciesScanResult.total_summary.outdated_count > 0)}
 					<Button 
 						variant="default" 
 						onclick={handleCreateDependencyIssue}

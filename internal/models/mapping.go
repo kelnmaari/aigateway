@@ -123,33 +123,6 @@ type ResponseConverter interface {
 	ConvertStreamingResponse(ollamaChunk interface{}, ctx *ConversionContext) (*ConversionResult, error)
 }
 
-// StreamingConverter интерфейс для обработки потоковых ответов
-type StreamingConverter interface {
-	// Конвертация streaming chunk'ов
-	ConvertStreamChunk(ollamaChunk interface{}, ctx *ConversionContext) (*ChatCompletionChunk, error)
-
-	// Обработка завершения потока
-	HandleStreamEnd(ctx *ConversionContext) (*ChatCompletionChunk, error)
-
-	// Обработка ошибок в потоке
-	HandleStreamError(err error, ctx *ConversionContext) (*ChatCompletionChunk, error)
-}
-
-// Вспомогательные функции для маппинга
-
-// NormalizeModelName нормализует имя модели для поиска
-func NormalizeModelName(modelName string) string {
-	// Приводим к нижнему регистру и убираем пробелы
-	normalized := strings.ToLower(strings.TrimSpace(modelName))
-
-	// Заменяем различные разделители на дефис
-	normalized = strings.ReplaceAll(normalized, "_", "-")
-	normalized = strings.ReplaceAll(normalized, ".", "-")
-	normalized = strings.ReplaceAll(normalized, " ", "-")
-
-	return normalized
-}
-
 // ExtractModelFamily извлекает семейство модели из полного имени
 func ExtractModelFamily(modelName string) string {
 	// Убираем размер модели и другие суффиксы

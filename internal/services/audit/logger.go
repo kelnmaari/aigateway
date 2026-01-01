@@ -294,29 +294,6 @@ func (a *AuditLogger) LogAPIKeyDeleted(ctx context.Context, actorID, keyID, ipAd
 	return a.LogEvent(ctx, event)
 }
 
-// LogAPIKeyRevoked logs API key revocation
-func (a *AuditLogger) LogAPIKeyRevoked(ctx context.Context, actorID, keyID, reason, ipAddress string) error {
-	metadata := map[string]interface{}{
-		"reason": reason,
-	}
-
-	event := &models.AuditEvent{
-		EventType:  models.EventAPIKeyRevoked,
-		Severity:   string(models.AuditSeverityWarning),
-		ActorID:    actorID,
-		ActorType:  models.ActorTypeUser,
-		TargetID:   &keyID,
-		TargetType: utils.Ptr(models.TargetTypeAPIKey),
-		Action:     "revoke",
-		Resource:   "api_key",
-		Status:     models.AuditStatusSuccess,
-		IPAddress:  ipAddress,
-		Metadata:   metadata,
-	}
-
-	return a.LogEvent(ctx, event)
-}
-
 // ========================================
 // Convenience Methods - Tenants
 // ========================================

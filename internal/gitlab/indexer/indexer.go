@@ -290,7 +290,7 @@ type IndexResult struct {
 func (i *Indexer) IndexBranch(ctx context.Context, req IndexRequest) error {
 	// Check if already indexing
 	status := i.GetStatus(req.ProjectID, req.Branch)
-	if status.Status == IndexStatusInProgress {
+	if status != nil && status.Status == IndexStatusInProgress {
 		return fmt.Errorf("indexing already in progress for %s:%s", req.ProjectID, req.Branch)
 	}
 

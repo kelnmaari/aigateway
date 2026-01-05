@@ -461,6 +461,8 @@ Rules:
 - Test happy path and edge cases
 - Use t.Errorf for assertions
 - Optionally use testify/assert if complex assertions needed
+- IMPORTANT: Do NOT use placeholder import paths like "yourapp/..." - use only standard library imports or leave a TODO comment for imports that need the actual module path
+- If you need to import the package being tested, add a comment: // TODO: import "MODULE_PATH/package" - replace MODULE_PATH with actual go.mod module
 
 Example format:
 func TestFunctionName(t *testing.T) {

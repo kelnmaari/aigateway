@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.11] - 2026-01-05
+
+### Fixed
+
+- **Index Panic on New Projects**: Fixed nil pointer dereference when indexing newly added GitLab projects
+  - `GetStatus()` returns nil for projects without prior indexing status
+  - Added nil check before accessing status fields
+
+### Technical
+
+- `internal/gitlab/indexer/indexer.go`: Added nil check in `IndexBranch()` for `GetStatus()` return value
+
+## [4.2.10] - 2025-01-01
+
+### Fixed
+
+- **Chunked Manifest Files**: Dependency scanner now concatenates ALL chunks for manifest files (go.mod, package.json)
+  - Previously only one chunk was used, missing `require` blocks in go.mod
+  - Now collects all chunks and sorts by `chunk_index` before concatenation
+
+### Technical
+
+- `internal/gitlab/dependencies/scanner.go`: `findAllDependencyFiles()` collects all chunks per file and concatenates them
+
 ## [4.2.9] - 2025-01-01
 
 ### Fixed

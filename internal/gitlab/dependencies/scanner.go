@@ -422,12 +422,18 @@ type foundDepFile struct {
 	filePath string
 }
 
+// chunkInfo stores chunk data for concatenation
+type chunkInfo struct {
+	index   int
+	content string
+}
+
 // findAllDependencyFiles searches for ALL dependency files in the indexed code.
-// It keeps the LONGEST content for each file_path (to handle chunked files).
+// It collects ALL chunks for each file and concatenates them (manifest files may be chunked).
 func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projectID string, specs []depFileSpec) []foundDepFile {
-	// Use map for deduplication by file_path (files may have multiple chunks)
-	// We keep the longest content for each file
-	foundMap := make(map[string]foundDepFile)
+	// Map file_path -> list of chunks (to concatenate)
+	fileChunks := make(map[string][]chunkInfo)
+	fileSpecs := make(map[string]depFileSpec)
 	var mu sync.Mutex
 
 	// Build a map of filenames we're looking for
@@ -456,22 +462,24 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 					}
 
 					if content != "" {
-						mu.Lock()
-						existing, exists := foundMap[fp]
-						// Keep the longest content (most complete chunk)
-						if !exists || len(content) > len(existing.content) {
-							foundMap[fp] = foundDepFile{
-								spec:     spec,
-								content:  content,
-								filePath: fp,
-							}
-							if !exists {
-								s.logger.WithFields(logrus.Fields{
-									"file":     fp,
-									"language": spec.language,
-								}).Debug("Found dependency file")
-							}
+						// Get chunk index (default to 0)
+						chunkIdx := 0
+						if idx, ok := doc.Metadata["chunk_index"].(float64); ok {
+							chunkIdx = int(idx)
 						}
+
+						mu.Lock()
+						if _, exists := fileSpecs[fp]; !exists {
+							fileSpecs[fp] = spec
+							s.logger.WithFields(logrus.Fields{
+								"file":     fp,
+								"language": spec.language,
+							}).Debug("Found dependency file")
+						}
+						fileChunks[fp] = append(fileChunks[fp], chunkInfo{
+							index:   chunkIdx,
+							content: content,
+						})
 						mu.Unlock()
 					}
 					break
@@ -485,13 +493,37 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 		s.logger.WithError(err).Error("Failed to search for dependency files")
 	}
 
-	// Convert map to slice
+	// Build result: concatenate chunks in order
 	var found []foundDepFile
-	for _, f := range foundMap {
-		found = append(found, f)
+	for fp, chunks := range fileChunks {
+		spec := fileSpecs[fp]
+
+		// Sort chunks by index
+		sortChunks(chunks)
+
+		// Concatenate content
+		var fullContent strings.Builder
+		for _, chunk := range chunks {
+			fullContent.WriteString(chunk.content)
+		}
+
+		found = append(found, foundDepFile{
+			spec:     spec,
+			content:  fullContent.String(),
+			filePath: fp,
+		})
 	}
 
 	return found
+}
+
+// sortChunks sorts chunks by index (simple insertion sort for small arrays)
+func sortChunks(chunks []chunkInfo) {
+	for i := 1; i < len(chunks); i++ {
+		for j := i; j > 0 && chunks[j].index < chunks[j-1].index; j-- {
+			chunks[j], chunks[j-1] = chunks[j-1], chunks[j]
+		}
+	}
 }
 
 // scanSingleEcosystem scans dependencies for a single ecosystem file.

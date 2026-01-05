@@ -463,7 +463,15 @@ func (h *GitLabTestGenHandler) CreateTestsMR(c *gin.Context) {
 	if description == "" {
 		var sb strings.Builder
 		sb.WriteString("## 🧪 Auto-Generated Unit Tests\n\n")
+		sb.WriteString("⚠️ **REVIEW REQUIRED**: This MR contains AI-generated code that needs manual review.\n\n")
 		sb.WriteString(fmt.Sprintf("This MR adds **%d unit tests** to the codebase.\n\n", len(req.Tests)))
+		
+		sb.WriteString("### ⚠️ Before Merge - Please Check\n\n")
+		sb.WriteString("1. **Import paths** - AI may use placeholder paths like `yourapp/...` that need to be replaced with actual module paths\n")
+		sb.WriteString("2. **Test logic** - Verify assertions and test cases are correct for your business logic\n")
+		sb.WriteString("3. **Dependencies** - Ensure all imported packages are available in go.mod/package.json\n")
+		sb.WriteString("4. **Run tests** - Execute `go test` / `npm test` to verify tests pass\n\n")
+		
 		sb.WriteString("### Tests Added\n\n")
 
 		// Group by source file

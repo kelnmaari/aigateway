@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.12] - 2026-01-05
+
+### Added
+
+- **Test Generation Review Warning**: MR descriptions now include a checklist for mandatory code review
+  - Warning about placeholder import paths (`yourapp/...`)
+  - Checklist: verify imports, test logic, dependencies, run tests
+  - Clear "REVIEW REQUIRED" banner at the top
+
+### Changed
+
+- **Improved Test Generation Prompts**: AI now instructed not to use placeholder paths
+  - Go tests: explicit instruction to avoid `yourapp/...` placeholders
+  - Suggests using TODO comments for module-specific imports
+
+### Technical
+
+- `internal/api/handlers/gitlab_testgen.go`: Added review checklist to MR description
+- `internal/gitlab/testgen/generator.go`: Updated Go test prompt with import path instructions
+
 ## [4.2.11] - 2026-01-05
 
 ### Fixed

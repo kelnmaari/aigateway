@@ -17,6 +17,8 @@ Dependency Scanner анализирует файлы зависимостей в
 | Go | `go.mod` | proxy.golang.org | Go |
 | Node.js | `package.json` | registry.npmjs.org | npm |
 | Python | `requirements.txt` | pypi.org | PyPI |
+| Java (Maven) | `pom.xml` | repo1.maven.org | Maven |
+| Java (Gradle) | `build.gradle`, `build.gradle.kts` | repo1.maven.org | Maven |
 
 ## Использование
 
@@ -141,11 +143,14 @@ internal/gitlab/dependencies/
 ├── parser/
 │   ├── gomod.go           # Go mod parser
 │   ├── npm.go             # package.json parser
-│   └── pip.go             # requirements.txt parser
+│   ├── pip.go             # requirements.txt parser
+│   ├── maven.go           # pom.xml parser
+│   └── gradle.go          # build.gradle / build.gradle.kts parser
 ├── registry/
 │   ├── golang.go          # proxy.golang.org client
 │   ├── npm.go             # registry.npmjs.org client
-│   └── pypi.go            # pypi.org client
+│   ├── pypi.go            # pypi.org client
+│   └── maven.go           # repo1.maven.org client
 └── security/
     └── osv.go             # OSV.dev client (CVE check)
 ```
@@ -155,7 +160,7 @@ internal/gitlab/dependencies/
 ```
 1. Поиск файла зависимостей в Qdrant индексе
    ↓
-2. Парсинг файла (go.mod / package.json / requirements.txt)
+2. Парсинг файла (go.mod / package.json / requirements.txt / pom.xml / build.gradle)
    ↓
 3. Параллельные запросы к registry (10 concurrent)
    ↓
@@ -166,16 +171,20 @@ internal/gitlab/dependencies/
 
 ## Ограничения
 
-- Сканируется **первый найденный** файл зависимостей (приоритет: go.mod → package.json → requirements.txt)
+- Сканируется **первый найденный** файл зависимостей (приоритет: go.mod → package.json → requirements.txt → pom.xml → build.gradle)
 - Для Python поддерживается только `requirements.txt` (не `pyproject.toml`)
-- Lock-файлы (`go.sum`, `package-lock.json`, `Pipfile.lock`) не анализируются
+- Для Gradle: парсинг DSL ограничен стандартными паттернами объявления зависимостей
+- Gradle Version Catalogs (`libs.versions.toml`) не поддерживаются напрямую
+- Lock-файлы (`go.sum`, `package-lock.json`, `Pipfile.lock`, `gradle.lockfile`) не анализируются
 - Приватные реестры не поддерживаются
 
 ## Планы развития
 
 - [ ] Поддержка Rust (Cargo.toml)
-- [ ] Поддержка Java (pom.xml)
+- [x] ~~Поддержка Java (pom.xml)~~ ✅ Добавлено в v4.2.13
+- [x] ~~Поддержка Java (build.gradle)~~ ✅ Добавлено в v4.2.13
 - [ ] Поддержка .NET (*.csproj)
+- [ ] Поддержка Gradle Version Catalogs (libs.versions.toml)
 - [ ] LLM анализ changelog'ов
 - [ ] Breaking changes detection
 - [ ] Scheduled scans (cron)

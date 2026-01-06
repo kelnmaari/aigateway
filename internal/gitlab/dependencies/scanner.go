@@ -21,14 +21,17 @@ type Scanner struct {
 	vectorStore *vector.QdrantStore
 
 	// Parsers
-	goModParser *parser.GoModParser
-	npmParser   *parser.NPMParser
-	pipParser   *parser.PipParser
+	goModParser   *parser.GoModParser
+	npmParser     *parser.NPMParser
+	pipParser     *parser.PipParser
+	mavenParser   *parser.MavenParser
+	gradleParser  *parser.GradleParser
 
 	// Registry clients
 	golangClient *registry.GolangClient
 	npmClient    *registry.NPMClient
 	pypiClient   *registry.PyPIClient
+	mavenClient  *registry.MavenClient
 
 	// Security
 	osvClient *security.OSVClient
@@ -39,15 +42,18 @@ type Scanner struct {
 // NewScanner creates a new dependency scanner.
 func NewScanner(vectorStore *vector.QdrantStore, logger *logrus.Logger) *Scanner {
 	return &Scanner{
-		vectorStore:  vectorStore,
-		goModParser:  parser.NewGoModParser(),
-		npmParser:    parser.NewNPMParser(),
-		pipParser:    parser.NewPipParser(),
-		golangClient: registry.NewGolangClient(logger),
-		npmClient:    registry.NewNPMClient(logger),
-		pypiClient:   registry.NewPyPIClient(logger),
-		osvClient:    security.NewOSVClient(logger),
-		logger:       logger,
+		vectorStore:   vectorStore,
+		goModParser:   parser.NewGoModParser(),
+		npmParser:     parser.NewNPMParser(),
+		pipParser:     parser.NewPipParser(),
+		mavenParser:   parser.NewMavenParser(),
+		gradleParser:  parser.NewGradleParser(),
+		golangClient:  registry.NewGolangClient(logger),
+		npmClient:     registry.NewNPMClient(logger),
+		pypiClient:    registry.NewPyPIClient(logger),
+		mavenClient:   registry.NewMavenClient(logger),
+		osvClient:     security.NewOSVClient(logger),
+		logger:        logger,
 	}
 }
 
@@ -92,6 +98,9 @@ func (s *Scanner) ScanProject(ctx context.Context, req ScanRequest) (*ScanResult
 		{"go.mod", "go", "Go"},
 		{"package.json", "nodejs", "npm"},
 		{"requirements.txt", "python", "PyPI"},
+		{"pom.xml", "java", "Maven"},
+		{"build.gradle", "java", "Maven"},
+		{"build.gradle.kts", "java", "Maven"},
 	}
 
 	var deps []parser.Dependency
@@ -111,7 +120,7 @@ func (s *Scanner) ScanProject(ctx context.Context, req ScanRequest) (*ScanResult
 		result.Language = spec.language
 		result.FilePath = filePath
 
-		// Parse based on language
+		// Parse based on language and file type
 		switch spec.language {
 		case "go":
 			deps, err = s.goModParser.Parse(content)
@@ -119,6 +128,12 @@ func (s *Scanner) ScanProject(ctx context.Context, req ScanRequest) (*ScanResult
 			deps, err = s.npmParser.Parse(content)
 		case "python":
 			deps, err = s.pipParser.Parse(content)
+		case "java":
+			if spec.filename == "pom.xml" {
+				deps, err = s.mavenParser.Parse(content)
+			} else {
+				deps, err = s.gradleParser.Parse(content)
+			}
 		}
 
 		if err != nil {
@@ -132,7 +147,7 @@ func (s *Scanner) ScanProject(ctx context.Context, req ScanRequest) (*ScanResult
 
 	if !foundFile {
 		result.Status = "completed"
-		result.Error = "No dependency files found (go.mod, package.json, requirements.txt)"
+		result.Error = "No dependency files found (go.mod, package.json, requirements.txt, pom.xml, build.gradle)"
 		result.Duration = time.Since(startTime).String()
 		return result, nil
 	}
@@ -256,6 +271,11 @@ func (s *Scanner) checkDependencyForLanguage(ctx context.Context, dep parser.Dep
 		if err == nil {
 			updateType = s.pypiClient.CompareVersions(dep.CurrentVersion, latest)
 		}
+	case "java":
+		latest, err = s.mavenClient.GetLatestVersion(ctx, dep.Name)
+		if err == nil {
+			updateType = s.mavenClient.CompareVersions(dep.CurrentVersion, latest)
+		}
 	default:
 		err = fmt.Errorf("unsupported language: %s", language)
 	}
@@ -294,6 +314,8 @@ func getOSVEcosystem(language string) string {
 		return "npm"
 	case "python":
 		return "PyPI"
+	case "java":
+		return "Maven"
 	default:
 		return language
 	}
@@ -355,6 +377,9 @@ func (s *Scanner) ScanProjectAllEcosystems(ctx context.Context, req ScanRequest)
 		{"go.mod", "go", "Go"},
 		{"package.json", "nodejs", "npm"},
 		{"requirements.txt", "python", "PyPI"},
+		{"pom.xml", "java", "Maven"},
+		{"build.gradle", "java", "Maven"},
+		{"build.gradle.kts", "java", "Maven"},
 	}
 
 	// Find ALL dependency files
@@ -362,7 +387,7 @@ func (s *Scanner) ScanProjectAllEcosystems(ctx context.Context, req ScanRequest)
 
 	if len(allFiles) == 0 {
 		result.Status = "completed"
-		result.Error = "No dependency files found (go.mod, package.json, requirements.txt)"
+		result.Error = "No dependency files found (go.mod, package.json, requirements.txt, pom.xml, build.gradle)"
 		result.Duration = time.Since(startTime).String()
 		return result, nil
 	}
@@ -544,7 +569,7 @@ func (s *Scanner) scanSingleEcosystem(ctx context.Context, projectID, scanID str
 		},
 	}
 
-	// Parse based on language
+	// Parse based on language and file type
 	var deps []parser.Dependency
 	var err error
 
@@ -555,6 +580,12 @@ func (s *Scanner) scanSingleEcosystem(ctx context.Context, projectID, scanID str
 		deps, err = s.npmParser.Parse(fi.content)
 	case "python":
 		deps, err = s.pipParser.Parse(fi.content)
+	case "java":
+		if fi.spec.filename == "pom.xml" {
+			deps, err = s.mavenParser.Parse(fi.content)
+		} else {
+			deps, err = s.gradleParser.Parse(fi.content)
+		}
 	}
 
 	if err != nil {

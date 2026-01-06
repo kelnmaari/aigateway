@@ -353,14 +353,161 @@ POST /api/admin/gitlab/projects/:id/create-issue
 
 ---
 
+## 9. ✨ Validation Refactoring (Zog)
+
+**Приоритет:** Средний  
+**Статус:** ⬜ Planned  
+**Анализ:** [docs/research/ZOG_VALIDATION_ANALYSIS.md](docs/research/ZOG_VALIDATION_ANALYSIS.md)
+
+Переход на декларативную валидацию с [Zog](https://github.com/Oudwins/zog).
+
+### Зачем
+
+- Сокращение boilerplate кода в handlers
+- Единый формат ошибок валидации
+- Built-in coercion и i18n
+- Zod-like API (знакомо TypeScript разработчикам)
+
+### Фазы реализации
+
+#### Phase 1: Инфраструктура (v4.3.x)
+
+- [ ] Добавить `github.com/Oudwins/zog` в go.mod
+- [ ] Создать `internal/api/schemas/` директорию
+- [ ] Написать validation middleware для Gin
+- [ ] Настроить i18n (ru + en)
+
+#### Phase 2: Новые endpoints (v4.3.x)
+
+- [ ] Использовать Zog для всех новых API handlers
+- [ ] Документировать паттерн для команды
+
+#### Phase 3: Миграция существующих handlers (v4.4.x)
+
+- [ ] Chat Completions (`inference_proxy_handler.go`)
+- [ ] API Key CRUD (`admin.go`)
+- [ ] User Auth (`auth.go`)
+- [ ] GitLab Integration (`gitlab_admin.go`)
+- [ ] Model Configuration (`inference_handler.go`)
+
+#### Phase 4: Config & Env validation (v4.5.x)
+
+- [ ] Config file validation
+- [ ] Environment variables validation с zenv
+
+### Пример
+
+**До:**
+```go
+if req.Name == "" {
+    c.JSON(400, gin.H{"error": "name required"})
+    return
+}
+if len(req.Name) > 255 { ... }
+```
+
+**После:**
+```go
+var schema = z.Struct(z.Shape{
+    "name": z.String().Min(1).Max(255).Required(),
+})
+errs := schema.Parse(zhttp.Request(r), &req)
+```
+
+### Файлы
+
+```
+internal/api/
+├── schemas/
+│   ├── apikey.go
+│   ├── auth.go
+│   ├── gitlab.go
+│   ├── inference.go
+│   └── common.go
+└── middleware/
+    └── validation.go
+```
+
+---
+
+## 10. 🧠 Self-Learning Agent (Acontext Integration)
+
+**Приоритет:** Средний  
+**Статус:** ⬜ Planned  
+**Анализ:** [docs/research/ACONTEXT_ANALYSIS.md](docs/research/ACONTEXT_ANALYSIS.md)
+
+Интеграция с [Acontext](https://github.com/memodb-io/Acontext) для self-learning возможностей AI-агентов.
+
+### Концепция
+
+Агент учится на успешных сессиях и накапливает знания:
+- Test Generation → запоминает какие тесты были приняты
+- Code Review → изучает предпочтения команды
+- Auto-doc → адаптирует стиль документации под проект
+
+### Фазы реализации
+
+#### Phase 1: Task Tracking (v4.3.x)
+
+- [ ] Task структура для GitLab операций
+- [ ] Progress tracking для долгих операций
+- [ ] Хранение результатов (success/failed)
+
+#### Phase 2: Pattern Learning (v5.x)
+
+- [ ] Сохранение успешных паттернов
+- [ ] Project-specific промпт customization
+- [ ] SOP (Standard Operating Procedure) структура
+
+#### Phase 3: Full Integration (v6.x)
+
+- [ ] Acontext как external service или форк
+- [ ] Experience search по накопленным навыкам
+- [ ] Multi-project knowledge sharing
+- [ ] Spaces для команд/организаций
+
+### Что можно взять из Acontext
+
+| Компонент | Что взять | Применение |
+|-----------|-----------|------------|
+| Task Extraction | Алгоритм извлечения задач | GitLab операции |
+| SOP Structure | Формат хранения навыков | Test/doc generation |
+| Experience Search | Fast/agentic поиск | Улучшение промптов |
+| Spaces | Организация знаний | Per-project настройки |
+
+### Файлы
+
+```
+internal/learning/
+├── task/
+│   ├── extractor.go    # Task extraction from sessions
+│   └── tracker.go      # Progress tracking
+├── sop/
+│   ├── types.go        # SOP structure
+│   ├── storage.go      # SOP persistence
+│   └── matcher.go      # Experience search
+└── space/
+    ├── types.go        # Space/knowledge base
+    └── manager.go      # Space operations
+```
+
+### Референсы
+
+- [Acontext GitHub](https://github.com/memodb-io/Acontext)
+- [LangMem](https://github.com/langchain-ai/langmem) — memory для LangChain
+- [MemGPT](https://github.com/cpacker/MemGPT) — persistent memory agents
+
+---
+
 ## Ресурсы
 
 - [Renovate](https://github.com/renovatebot/renovate) — референс для Dependency Updater
 - [GitHub Advisory Database](https://github.com/advisories) — CVE данные
 - [OSV](https://osv.dev/) — Open Source Vulnerabilities
 - [Libraries.io](https://libraries.io/) — Package metadata API
+- [Acontext](https://github.com/memodb-io/Acontext) — Context Engineering платформа
 
 ---
 
-*Последнее обновление: 2024-12-30*
+*Последнее обновление: 2026-01-05*
 

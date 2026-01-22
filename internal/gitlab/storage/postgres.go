@@ -32,7 +32,7 @@ func (s *PostgresStore) CreateIntegration(ctx context.Context, integration *mode
 	if integration.ID == "" {
 		integration.ID = uuid.New().String()
 	}
-	
+
 	now := time.Now()
 	integration.CreatedAt = now
 	integration.UpdatedAt = now
@@ -43,12 +43,13 @@ func (s *PostgresStore) CreateIntegration(ctx context.Context, integration *mode
 	}
 
 	query := `
-		INSERT INTO gitlab_integrations (id, name, base_url, access_token, webhook_secret, status, settings, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO gitlab_integrations (id, owner_id, name, base_url, access_token, webhook_secret, status, settings, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err = s.db.ExecContext(ctx, query,
 		integration.ID,
+		integration.OwnerID,
 		integration.Name,
 		integration.BaseURL,
 		integration.AccessToken,
@@ -67,19 +68,21 @@ func (s *PostgresStore) CreateIntegration(ctx context.Context, integration *mode
 
 func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.GitLabIntegration, error) {
 	query := `
-		SELECT id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
+		SELECT id, owner_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
 		       (SELECT COUNT(*) FROM gitlab_projects WHERE integration_id = gitlab_integrations.id) as project_count
 		FROM gitlab_integrations
 		WHERE id = $1
 	`
 
 	var integration models.GitLabIntegration
+	var ownerID sql.NullString
 	var lastSyncAt sql.NullTime
 	var lastError sql.NullString
 	var settingsJSON string
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&integration.ID,
+		&ownerID,
 		&integration.Name,
 		&integration.BaseURL,
 		&integration.AccessToken,
@@ -99,6 +102,9 @@ func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.
 		return nil, fmt.Errorf("query integration: %w", err)
 	}
 
+	if ownerID.Valid {
+		integration.OwnerID = ownerID.String
+	}
 	if lastSyncAt.Valid {
 		integration.LastSyncAt = &lastSyncAt.Time
 	}
@@ -143,7 +149,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 
 	// Fetch items
 	query := fmt.Sprintf(`
-		SELECT id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
+		SELECT id, owner_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
 		       (SELECT COUNT(*) FROM gitlab_projects WHERE integration_id = gitlab_integrations.id) as project_count
 		FROM gitlab_integrations
 		%s
@@ -170,12 +176,14 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 	var integrations []models.GitLabIntegration
 	for rows.Next() {
 		var integration models.GitLabIntegration
+		var ownerID sql.NullString
 		var lastSyncAt sql.NullTime
 		var lastError sql.NullString
 		var settingsJSON string
 
 		if err := rows.Scan(
 			&integration.ID,
+			&ownerID,
 			&integration.Name,
 			&integration.BaseURL,
 			&integration.AccessToken,
@@ -191,6 +199,9 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 			return nil, 0, fmt.Errorf("scan integration: %w", err)
 		}
 
+		if ownerID.Valid {
+			integration.OwnerID = ownerID.String
+		}
 		if lastSyncAt.Valid {
 			integration.LastSyncAt = &lastSyncAt.Time
 		}
@@ -209,7 +220,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 
 func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID string) ([]*models.GitLabIntegration, error) {
 	query := `
-		SELECT id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at
+		SELECT id, owner_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at
 		FROM gitlab_integrations
 		WHERE owner_id = $1
 		ORDER BY created_at DESC
@@ -224,12 +235,14 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 	var integrations []*models.GitLabIntegration
 	for rows.Next() {
 		var integration models.GitLabIntegration
+		var dbOwnerID sql.NullString
 		var lastSyncAt sql.NullTime
 		var lastError sql.NullString
 		var settingsJSON string
 
 		if err := rows.Scan(
 			&integration.ID,
+			&dbOwnerID,
 			&integration.Name,
 			&integration.BaseURL,
 			&integration.AccessToken,
@@ -244,6 +257,9 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 			return nil, fmt.Errorf("scan integration: %w", err)
 		}
 
+		if dbOwnerID.Valid {
+			integration.OwnerID = dbOwnerID.String
+		}
 		if lastSyncAt.Valid {
 			integration.LastSyncAt = &lastSyncAt.Time
 		}
@@ -351,7 +367,7 @@ func (s *PostgresStore) CreateProject(ctx context.Context, project *models.GitLa
 	if project.ID == "" {
 		project.ID = uuid.New().String()
 	}
-	
+
 	now := time.Now()
 	project.CreatedAt = now
 	project.UpdatedAt = now
@@ -869,4 +885,3 @@ func (s *PostgresStore) IsModelUsed(ctx context.Context, modelID string) (bool, 
 	}
 	return count > 0, nil
 }
-

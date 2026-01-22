@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.16] - 2026-01-22
+
+### Fixed
+
+- **GitLab Integration Visibility**: Fixed an issue where new integrations created by regular users were not visible in their personal list
+  - Added `owner_id` to the integration creation process in the database
+  - Ensured `owner_id` is properly retrieved when fetching integration details
+
+### Technical
+
+- `internal/gitlab/storage/postgres.go`: Added `owner_id` field to `CreateIntegration`, `GetIntegration`, and `List` methods
+
 ## [4.2.15] - 2026-01-22
 
 ### Added

@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitLab Integration Visibility**: Fixed an issue where new integrations created by regular users were not visible in their personal list
   - Added `owner_id` to the integration creation process in the database
   - Ensured `owner_id` is properly retrieved when fetching integration details
+- **API Robustness**: Fixed "Cannot read properties of null (reading 'filter')" errors in GitLab UI
+  - Initialized backend storage list results to empty slices `[]` instead of `nil`
+  - Added frontend null checks and default values for project and review lists
 
 ### Technical
 

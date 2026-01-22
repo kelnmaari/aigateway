@@ -173,7 +173,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 	}
 	defer rows.Close()
 
-	var integrations []models.GitLabIntegration
+	integrations := []models.GitLabIntegration{}
 	for rows.Next() {
 		var integration models.GitLabIntegration
 		var ownerID sql.NullString
@@ -232,7 +232,7 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 	}
 	defer rows.Close()
 
-	var integrations []*models.GitLabIntegration
+	integrations := []*models.GitLabIntegration{}
 	for rows.Next() {
 		var integration models.GitLabIntegration
 		var dbOwnerID sql.NullString
@@ -597,7 +597,7 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 	}
 	defer rows.Close()
 
-	var projects []models.GitLabProject
+	projects := []models.GitLabProject{}
 	for rows.Next() {
 		var project models.GitLabProject
 		var webhookID sql.NullInt64
@@ -673,7 +673,7 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 	}
 	defer rows.Close()
 
-	var projects []*models.GitLabProject
+	projects := []*models.GitLabProject{}
 	for rows.Next() {
 		var project models.GitLabProject
 		var webhookID sql.NullInt64

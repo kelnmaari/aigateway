@@ -201,7 +201,7 @@ func (s *PostgresStore) ListReviewsByIntegration(ctx context.Context, integratio
 	}
 	defer rows.Close()
 
-	var reviews []*models.GitLabMRReview
+	reviews := []*models.GitLabMRReview{}
 	for rows.Next() {
 		var review models.GitLabMRReview
 		var resultJSON []byte
@@ -332,7 +332,7 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 	}
 	defer rows.Close()
 
-	var reviews []models.GitLabMRReview
+	reviews := []models.GitLabMRReview{}
 	for rows.Next() {
 		var review models.GitLabMRReview
 		var resultJSON sql.NullString

@@ -11,6 +11,16 @@
 		listMyReviews,
 		startMyProjectIndexing,
 		getMyProjectIndexStatus,
+		scanMySecrets,
+		deepScanMySecrets,
+		analyzeMyQuality,
+		detectMyDuplication,
+		checkMyDependencies,
+		detectMyDeadCode,
+		scanMyUndocumented,
+		generateMyDocs,
+		scanMyTestable,
+		generateMyTests,
 		type GitLabIntegration,
 		type GitLabProject,
 		type GitLabReview,
@@ -40,6 +50,14 @@
 
 	// Indexing state
 	let indexingProjects: Set<string> = new Set();
+
+	// Analysis state
+	let selectedProjectForAnalysis: GitLabProject | null = null;
+	let showAnalysisModal = false;
+	let analysisLoading = false;
+	let analysisType: string = '';
+	let analysisResult: any = null;
+	let analysisError: string = '';
 
 	onMount(async () => {
 		await loadData();
@@ -175,6 +193,57 @@
 			integration = await getMyIntegration(integrationId);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to update integration';
+		}
+	}
+
+	function openAnalysis(project: GitLabProject) {
+		selectedProjectForAnalysis = project;
+		showAnalysisModal = true;
+		analysisResult = null;
+		analysisError = '';
+	}
+
+	async function runAnalysis(type: string) {
+		if (!selectedProjectForAnalysis) return;
+
+		analysisLoading = true;
+		analysisType = type;
+		analysisResult = null;
+		analysisError = '';
+
+		try {
+			let result;
+			switch (type) {
+				case 'secrets':
+					result = await scanMySecrets(selectedProjectForAnalysis.id);
+					break;
+				case 'deep-scan':
+					result = await deepScanMySecrets(selectedProjectForAnalysis.id);
+					break;
+				case 'quality':
+					result = await analyzeMyQuality(selectedProjectForAnalysis.id);
+					break;
+				case 'duplication':
+					result = await detectMyDuplication(selectedProjectForAnalysis.id);
+					break;
+				case 'dependencies':
+					result = await checkMyDependencies(selectedProjectForAnalysis.id);
+					break;
+				case 'dead-code':
+					result = await detectMyDeadCode(selectedProjectForAnalysis.id);
+					break;
+				case 'docs':
+					result = await scanMyUndocumented(selectedProjectForAnalysis.id);
+					break;
+				case 'tests':
+					result = await scanMyTestable(selectedProjectForAnalysis.id);
+					break;
+			}
+			analysisResult = result;
+		} catch (e) {
+			analysisError = e instanceof Error ? e.message : 'Analysis failed';
+		} finally {
+			analysisLoading = false;
 		}
 	}
 
@@ -395,6 +464,20 @@
 										</svg>
 									</button>
 									<button
+										on:click={() => openAnalysis(project)}
+										class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-indigo-900/30 hover:text-indigo-400"
+										title="Analyze project"
+									>
+										<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+											/>
+										</svg>
+									</button>
+									<button
 										on:click={() => handleDeleteProject(project.id, project.name)}
 										class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-900/30 hover:text-red-400"
 										title="Delete project"
@@ -598,6 +681,364 @@
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- Analysis Modal -->
+{#if showAnalysisModal && selectedProjectForAnalysis}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+		<div
+			class="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-y-auto rounded-xl border border-gray-700 bg-gray-800"
+		>
+			<div
+				class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-700 bg-gray-800 p-6"
+			>
+				<div>
+					<h2 class="text-xl font-semibold text-gray-100">
+						Analyze Project: {selectedProjectForAnalysis.name}
+					</h2>
+					<p class="text-sm text-gray-400">{selectedProjectForAnalysis.path_with_namespace}</p>
+				</div>
+				<button
+					on:click={() => (showAnalysisModal = false)}
+					class="text-gray-400 hover:text-gray-200"
+					title={m.common_close()}
+				>
+					<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
+					</svg>
+				</button>
+			</div>
+
+			<div class="p-6">
+				{#if !analysisResult && !analysisLoading}
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+						<!-- Security Section -->
+						<div class="col-span-1 mb-2 border-b border-gray-700 pb-2 md:col-span-2 lg:col-span-3">
+							<h3 class="text-sm font-bold tracking-wider text-gray-400 uppercase">
+								Security & Secrets
+							</h3>
+						</div>
+						<button
+							on:click={() => runAnalysis('secrets')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/20 text-orange-500 transition-colors group-hover:bg-orange-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Secrets Scan</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Search for leaked credentials, tokens and keys</span
+							>
+						</button>
+
+						<button
+							on:click={() => runAnalysis('deep-scan')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-500 transition-colors group-hover:bg-red-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Deep Security Scan</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Deep analysis of vulnerable code patterns</span
+							>
+						</button>
+
+						<!-- Quality Section -->
+						<div
+							class="col-span-1 mt-4 mb-2 border-b border-gray-700 pb-2 md:col-span-2 lg:col-span-3"
+						>
+							<h3 class="text-sm font-bold tracking-wider text-gray-400 uppercase">
+								Quality & Maintenance
+							</h3>
+						</div>
+						<button
+							on:click={() => runAnalysis('quality')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20 text-blue-500 transition-colors group-hover:bg-blue-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Quality Analysis</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Review code readability, complexity and bugs</span
+							>
+						</button>
+
+						<button
+							on:click={() => runAnalysis('duplication')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20 text-purple-500 transition-colors group-hover:bg-purple-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Detect Duplication</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Find similar or identical blocks of code</span
+							>
+						</button>
+
+						<button
+							on:click={() => runAnalysis('dead-code')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-500/20 text-gray-400 transition-colors group-hover:bg-gray-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Dead Code</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Identify unused imports, variables and functions</span
+							>
+						</button>
+
+						<!-- DevOps Section -->
+						<div
+							class="col-span-1 mt-4 mb-2 border-b border-gray-700 pb-2 md:col-span-2 lg:col-span-3"
+						>
+							<h3 class="text-sm font-bold tracking-wider text-gray-400 uppercase">
+								DevOps & Tooling
+							</h3>
+						</div>
+						<button
+							on:click={() => runAnalysis('dependencies')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/20 text-green-500 transition-colors group-hover:bg-green-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Dependencies</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Check for outdated or vulnerable dependencies</span
+							>
+						</button>
+
+						<button
+							on:click={() => runAnalysis('docs')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-500 transition-colors group-hover:bg-emerald-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Documentation</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Scan for undocumented code and generate docs</span
+							>
+						</button>
+
+						<button
+							on:click={() => runAnalysis('tests')}
+							class="group flex flex-col items-start rounded-xl border border-gray-700 bg-gray-900/50 p-4 text-left transition-colors hover:bg-gray-700"
+						>
+							<div
+								class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-500 transition-colors group-hover:bg-indigo-500 group-hover:text-white"
+							>
+								<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+									/>
+								</svg>
+							</div>
+							<span class="font-bold text-gray-100">Test Generation</span>
+							<span class="mt-1 text-xs text-gray-400"
+								>Identify testable code and generate unit tests</span
+							>
+						</button>
+					</div>
+				{:else if analysisLoading}
+					<div class="flex flex-col items-center justify-center py-20">
+						<div
+							class="mb-4 h-16 w-16 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
+						></div>
+						<h3 class="text-xl font-bold text-gray-100">Running {analysisType} scan...</h3>
+						<p class="mt-2 text-gray-400 italic">
+							This may take a few minutes for large repositories
+						</p>
+					</div>
+				{:else if analysisError}
+					<div class="p-8 text-center">
+						<div
+							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-900/30 text-red-500"
+						>
+							<svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+								/>
+							</svg>
+						</div>
+						<h3 class="mb-2 text-xl font-bold text-gray-100">Analysis Failed</h3>
+						<p class="mb-6 text-red-400">{analysisError}</p>
+						<button
+							on:click={() => (analysisResult = null)}
+							class="rounded-lg bg-gray-700 px-6 py-2 text-white transition-colors hover:bg-gray-600"
+						>
+							Back to Scanners
+						</button>
+					</div>
+				{:else if analysisResult}
+					<div class="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-500">
+						<div class="flex items-center justify-between">
+							<h3 class="text-xl font-bold text-gray-100 capitalize">{analysisType} Results</h3>
+							<button
+								on:click={() => (analysisResult = null)}
+								class="text-sm font-medium text-indigo-400 hover:text-indigo-300"
+							>
+								← Back to all scanners
+							</button>
+						</div>
+
+						<!-- Results summary -->
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+							{#if analysisType === 'secrets'}
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Total Secrets</span>
+									<div class="mt-1 text-3xl font-bold text-orange-500">
+										{(analysisResult.secrets || []).length}
+									</div>
+								</div>
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Files Scanned</span>
+									<div class="mt-1 text-3xl font-bold text-blue-400">
+										{analysisResult.files_scanned || 0}
+									</div>
+								</div>
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Severity</span>
+									<div class="mt-1 text-3xl font-bold text-red-500">High</div>
+								</div>
+							{:else if analysisType === 'quality'}
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Overall Score</span>
+									<div class="mt-1 text-3xl font-bold text-green-400">
+										{analysisResult.score || 0}/100
+									</div>
+								</div>
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Issues Found</span>
+									<div class="mt-1 text-3xl font-bold text-yellow-500">
+										{(analysisResult.issues || []).length}
+									</div>
+								</div>
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Files Analyzed</span>
+									<div class="mt-1 text-3xl font-bold text-blue-400">
+										{analysisResult.files_count || 0}
+									</div>
+								</div>
+							{:else}
+								<div class="col-span-3 rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Status</span>
+									<div class="mt-1 text-xl font-bold text-green-400">
+										Scan completed successfully
+									</div>
+								</div>
+							{/if}
+						</div>
+
+						<!-- Results list placeholder -->
+						<div class="overflow-hidden rounded-xl border border-gray-700 bg-gray-900/30">
+							<div class="border-b border-gray-700 bg-gray-900/50 p-4">
+								<h4 class="font-bold text-gray-200">Detailed Findings</h4>
+							</div>
+							<div class="p-6">
+								<pre class="font-mono text-xs whitespace-pre-wrap text-gray-400">
+									{JSON.stringify(analysisResult, null, 2)}
+								</pre>
+							</div>
+						</div>
+
+						<div class="flex justify-end gap-3 border-t border-gray-700 pt-4">
+							<button
+								on:click={() => (showAnalysisModal = false)}
+								class="rounded-lg bg-gray-700 px-6 py-2 text-white transition-colors hover:bg-gray-600"
+							>
+								Dismiss
+							</button>
+							<button
+								class="rounded-lg bg-indigo-600 px-6 py-2 text-white transition-colors hover:bg-indigo-700"
+								on:click={() => alert('Feature coming soon: Create issues from results')}
+							>
+								Create GitLab Issues
+							</button>
+						</div>
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 {/if}

@@ -31,7 +31,7 @@ type GitLabDependenciesHandler struct {
 
 // NewGitLabDependenciesHandler creates a new dependencies handler.
 func NewGitLabDependenciesHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabDependenciesHandler {
-	return &GitLabDependenciesHandler{
+	h := &GitLabDependenciesHandler{
 		store:       store,
 		vectorStore: vectorStore,
 		scanner:     dependencies.NewScanner(vectorStore, logger),
@@ -39,6 +39,58 @@ func NewGitLabDependenciesHandler(store storage.Store, vectorStore *vector.Qdran
 		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
+	h.logger.Debug("GitLabDependenciesHandler initialized")
+	return h
+}
+
+// getUserID extracts user ID from context
+func (h *GitLabDependenciesHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// canAccessProject checks if user can access the project (via integration ownership)
+func (h *GitLabDependenciesHandler) canAccessProject(c *gin.Context, project *models.GitLabProject) bool {
+	userID := h.getUserID(c)
+	if userID == "" {
+		return false
+	}
+
+	// Admins can access everything (if is_admin is set by middleware)
+	if isAdmin, exists := c.Get("is_admin"); exists {
+		if a, ok := isAdmin.(bool); ok && a {
+			return true
+		}
+	}
+
+	// Get integration to check ownership
+	ctx := c.Request.Context()
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil {
+		return false
+	}
+
+	// Check ownership
+	if integration.OwnerID == userID {
+		return true
+	}
+
+	// Check tenant membership
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok {
+			for _, tid := range ids {
+				if integration.TenantID == tid {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // CheckDependencies POST /api/admin/gitlab/projects/:id/check-dependencies
@@ -117,6 +169,25 @@ func (h *GitLabDependenciesHandler) CheckDependencies(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// CheckMyDependencies handles user-level dependency check
+func (h *GitLabDependenciesHandler) CheckMyDependencies(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CheckDependencies(c)
+}
+
 // CreateDependencyIssueRequest is the request body for creating an issue.
 type CreateDependencyIssueRequest struct {
 	Title       string   `json:"title"`
@@ -169,6 +240,25 @@ func (h *GitLabDependenciesHandler) CreateDependencyIssue(c *gin.Context) {
 		"message": "Issue created successfully",
 		"url":     issueURL,
 	})
+}
+
+// CreateMyDependencyIssue handles user-level dependency issue creation
+func (h *GitLabDependenciesHandler) CreateMyDependencyIssue(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CreateDependencyIssue(c)
 }
 
 // createGitLabIssue creates an issue in GitLab.
@@ -288,6 +378,25 @@ func (h *GitLabDependenciesHandler) AnalyzeChangelog(c *gin.Context) {
 	c.JSON(http.StatusOK, analysis)
 }
 
+// AnalyzeMyChangelog handles user-level changelog analysis
+func (h *GitLabDependenciesHandler) AnalyzeMyChangelog(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.AnalyzeChangelog(c)
+}
+
 // AnalyzeDependenciesChangelogsRequest is the request for bulk changelog analysis.
 type AnalyzeDependenciesChangelogsRequest struct {
 	Dependencies []struct {
@@ -384,4 +493,3 @@ func (h *GitLabDependenciesHandler) AnalyzeDependenciesChangelogs(c *gin.Context
 		"total":    len(results),
 	})
 }
-

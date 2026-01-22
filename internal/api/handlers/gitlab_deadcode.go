@@ -29,13 +29,65 @@ type GitLabDeadCodeHandler struct {
 
 // NewGitLabDeadCodeHandler creates a new dead code handler.
 func NewGitLabDeadCodeHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabDeadCodeHandler {
-	return &GitLabDeadCodeHandler{
+	h := &GitLabDeadCodeHandler{
 		store:       store,
 		vectorStore: vectorStore,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
+	h.logger.Debug("GitLabDeadCodeHandler initialized")
+	return h
+}
+
+// getUserID extracts user ID from context
+func (h *GitLabDeadCodeHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// canAccessProject checks if user can access the project (via integration ownership)
+func (h *GitLabDeadCodeHandler) canAccessProject(c *gin.Context, project *models.GitLabProject) bool {
+	userID := h.getUserID(c)
+	if userID == "" {
+		return false
+	}
+
+	// Admins can access everything (if is_admin is set by middleware)
+	if isAdmin, exists := c.Get("is_admin"); exists {
+		if a, ok := isAdmin.(bool); ok && a {
+			return true
+		}
+	}
+
+	// Get integration to check ownership
+	ctx := c.Request.Context()
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil {
+		return false
+	}
+
+	// Check ownership
+	if integration.OwnerID == userID {
+		return true
+	}
+
+	// Check tenant membership
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok {
+			for _, tid := range ids {
+				if integration.TenantID == tid {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // DetectDeadCodeRequest is the request body for dead code detection.
@@ -139,6 +191,24 @@ func (h *GitLabDeadCodeHandler) DetectDeadCode(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// DetectMyDeadCode handles user-level dead code detection
+func (h *GitLabDeadCodeHandler) DetectMyDeadCode(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.DetectDeadCode(c)
+}
 
 // DetectUnreachableRequest is the request body for unreachable code detection.
 type DetectUnreachableRequest struct {
@@ -197,6 +267,25 @@ func (h *GitLabDeadCodeHandler) DetectUnreachable(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// DetectMyUnreachable handles user-level unreachable code detection
+func (h *GitLabDeadCodeHandler) DetectMyUnreachable(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.DetectUnreachable(c)
 }
 
 // DetectCommentedCodeRequest is the request body for commented-out code detection.
@@ -258,6 +347,25 @@ func (h *GitLabDeadCodeHandler) DetectCommentedCode(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// DetectMyCommentedCode handles user-level commented-out code detection
+func (h *GitLabDeadCodeHandler) DetectMyCommentedCode(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.DetectCommentedCode(c)
+}
+
 // CreateDeadCodeIssueRequest for creating GitLab issues with dead code
 type CreateDeadCodeIssueRequest struct {
 	Title       string   `json:"title"`
@@ -309,6 +417,25 @@ func (h *GitLabDeadCodeHandler) CreateDeadCodeIssue(c *gin.Context) {
 		"message": "Issue created successfully",
 		"url":     issueURL,
 	})
+}
+
+// CreateMyDeadCodeIssue handles user-level dead code issue creation
+func (h *GitLabDeadCodeHandler) CreateMyDeadCodeIssue(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CreateDeadCodeIssue(c)
 }
 
 // createGitLabIssue creates an issue in GitLab for dead code.

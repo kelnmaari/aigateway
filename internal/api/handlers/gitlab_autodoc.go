@@ -12,6 +12,7 @@ import (
 	"aigateway/internal/gitlab/autodoc"
 	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/models"
 	"aigateway/internal/rag/vector"
 
 	"github.com/gin-gonic/gin"
@@ -29,13 +30,65 @@ type GitLabAutoDocHandler struct {
 
 // NewGitLabAutoDocHandler creates a new auto-documentation handler.
 func NewGitLabAutoDocHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabAutoDocHandler {
-	return &GitLabAutoDocHandler{
+	h := &GitLabAutoDocHandler{
 		store:       store,
 		vectorStore: vectorStore,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
+	h.logger.Debug("GitLabAutoDocHandler initialized")
+	return h
+}
+
+// getUserID extracts user ID from context
+func (h *GitLabAutoDocHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// canAccessProject checks if user can access the project (via integration ownership)
+func (h *GitLabAutoDocHandler) canAccessProject(c *gin.Context, project *models.GitLabProject) bool {
+	userID := h.getUserID(c)
+	if userID == "" {
+		return false
+	}
+
+	// Admins can access everything (if is_admin is set by middleware)
+	if isAdmin, exists := c.Get("is_admin"); exists {
+		if a, ok := isAdmin.(bool); ok && a {
+			return true
+		}
+	}
+
+	// Get integration to check ownership
+	ctx := c.Request.Context()
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil {
+		return false
+	}
+
+	// Check ownership
+	if integration.OwnerID == userID {
+		return true
+	}
+
+	// Check tenant membership
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok {
+			for _, tid := range ids {
+				if integration.TenantID == tid {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // ScanUndocumentedRequest is the request body for scanning undocumented code.
@@ -106,6 +159,25 @@ func (h *GitLabAutoDocHandler) ScanUndocumented(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ScanMyUndocumented handles user-level documentation scan
+func (h *GitLabAutoDocHandler) ScanMyUndocumented(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.ScanUndocumented(c)
+}
+
 // GenerateDocs POST /api/admin/gitlab/projects/:id/generate-docs
 func (h *GitLabAutoDocHandler) GenerateDocs(c *gin.Context) {
 	projectID := c.Param("id")
@@ -166,10 +238,10 @@ func (h *GitLabAutoDocHandler) GenerateDocs(c *gin.Context) {
 
 	if len(scanResult.Symbols) == 0 {
 		c.JSON(http.StatusOK, gin.H{
-			"message":       "No undocumented symbols found",
-			"status":        "completed",
-			"docs":          []interface{}{},
-			"tokens_used":   0,
+			"message":     "No undocumented symbols found",
+			"status":      "completed",
+			"docs":        []interface{}{},
+			"tokens_used": 0,
 		})
 		return
 	}
@@ -192,6 +264,24 @@ func (h *GitLabAutoDocHandler) GenerateDocs(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GenerateMyDocs handles user-level documentation generation
+func (h *GitLabAutoDocHandler) GenerateMyDocs(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.GenerateDocs(c)
+}
 
 // BulkApplyDocsRequest is the request for bulk applying documentation.
 type BulkApplyDocsRequest struct {
@@ -465,7 +555,7 @@ func (h *GitLabAutoDocHandler) CreateDocsMR(c *gin.Context) {
 
 		// Apply documentation to file
 		modifiedContent := applyDocumentationToFile(string(content), docs)
-		
+
 		actions = append(actions, client.CommitAction{
 			Action:   "update",
 			FilePath: filePath,
@@ -528,22 +618,41 @@ func (h *GitLabAutoDocHandler) CreateDocsMR(c *gin.Context) {
 	})
 }
 
+// CreateMyDocsMR handles user-level MR creation for documentation
+func (h *GitLabAutoDocHandler) CreateMyDocsMR(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CreateDocsMR(c)
+}
+
 // applyDocumentationToFile inserts documentation comments into file content
 func applyDocumentationToFile(content string, docs []autodoc.GeneratedDoc) string {
 	lines := strings.Split(content, "\n")
-	
+
 	// Sort docs by line number in descending order to insert from bottom to top
 	// This prevents line numbers from shifting as we insert
 	sort.Slice(docs, func(i, j int) bool {
 		return docs[i].Symbol.StartLine > docs[j].Symbol.StartLine
 	})
-	
+
 	for _, doc := range docs {
 		lineNum := doc.Symbol.StartLine - 1 // Convert to 0-indexed
 		if lineNum < 0 || lineNum >= len(lines) {
 			continue
 		}
-		
+
 		// Get indentation from the target line
 		targetLine := lines[lineNum]
 		indent := ""
@@ -554,14 +663,14 @@ func applyDocumentationToFile(content string, docs []autodoc.GeneratedDoc) strin
 				break
 			}
 		}
-		
+
 		// Format documentation with proper indentation
 		docLines := strings.Split(strings.TrimSpace(doc.Documentation), "\n")
 		var formattedDoc []string
 		for _, docLine := range docLines {
 			formattedDoc = append(formattedDoc, indent+docLine)
 		}
-		
+
 		// Insert documentation before the symbol
 		newLines := make([]string, 0, len(lines)+len(formattedDoc))
 		newLines = append(newLines, lines[:lineNum]...)
@@ -569,6 +678,6 @@ func applyDocumentationToFile(content string, docs []autodoc.GeneratedDoc) strin
 		newLines = append(newLines, lines[lineNum:]...)
 		lines = newLines
 	}
-	
+
 	return strings.Join(lines, "\n")
 }

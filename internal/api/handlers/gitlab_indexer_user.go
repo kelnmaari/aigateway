@@ -32,19 +32,24 @@ func NewGitLabUserIndexerHandler(idx *indexer.Indexer, store storage.Store, logg
 
 // getUserFromContext extracts user info from JWT context
 func (h *GitLabUserIndexerHandler) getUserFromContext(c *gin.Context) (userID, tenantID string, isAdmin bool) {
-	if claims, exists := c.Get("claims"); exists {
-		if claimsMap, ok := claims.(map[string]interface{}); ok {
-			if uid, ok := claimsMap["user_id"].(string); ok {
-				userID = uid
-			}
-			if tid, ok := claimsMap["tenant_id"].(string); ok {
-				tenantID = tid
-			}
-			if admin, ok := claimsMap["is_admin"].(bool); ok {
-				isAdmin = admin
-			}
+	if uid, exists := c.Get("user_id"); exists {
+		if u, ok := uid.(string); ok {
+			userID = u
 		}
 	}
+	if admin, exists := c.Get("is_admin"); exists {
+		if a, ok := admin.(bool); ok {
+			isAdmin = a
+		}
+	}
+
+	// Middleware also sets 'tenant_ids' directly
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok && len(ids) > 0 {
+			tenantID = ids[0]
+		}
+	}
+
 	return
 }
 
@@ -200,7 +205,7 @@ func (h *GitLabUserIndexerHandler) GetIndexStatus(c *gin.Context) {
 
 	// Try to get status from indexer (Redis/in-memory cache)
 	status := h.indexer.GetStatus(projectID, branch)
-	
+
 	// If indexer has no cached status, use DB as source of truth
 	if status == nil {
 		status = &indexer.IndexInfo{
@@ -209,20 +214,20 @@ func (h *GitLabUserIndexerHandler) GetIndexStatus(c *gin.Context) {
 			Status:      indexer.IndexStatus(project.IndexStatus),
 			LastIndexed: project.LastIndexedAt,
 		}
-		
-		// Handle edge case: if DB has "in_progress" after server restart, 
+
+		// Handle edge case: if DB has "in_progress" after server restart,
 		// the indexing was interrupted - report as failed
 		if status.Status == indexer.IndexStatusInProgress {
 			status.Status = indexer.IndexStatusFailed
 			status.Error = "Indexing was interrupted by server restart"
 		}
-		
+
 		// If status is empty string or unknown, treat as pending
 		if status.Status == "" {
 			status.Status = indexer.IndexStatusPending
 		}
 	}
-	
+
 	c.JSON(http.StatusOK, status)
 }
 
@@ -281,4 +286,3 @@ func (h *GitLabUserIndexerHandler) DeleteIndex(c *gin.Context) {
 func (h *GitLabUserIndexerHandler) SetIndexer(idx *indexer.Indexer) {
 	h.indexer = idx
 }
-

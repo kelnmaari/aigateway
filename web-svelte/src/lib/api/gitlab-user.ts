@@ -201,3 +201,89 @@ export async function deleteMyProjectIndex(
   return api.delete(`/api/gitlab/projects/${projectId}/index${params}`);
 }
 
+// ============================================================================
+// Scanning & Analysis (v4.2+)
+// ============================================================================
+
+// Security Scans
+export async function scanMySecrets(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/scan-secrets`, {});
+}
+
+export async function deepScanMySecrets(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/deep-scan-secrets`, {});
+}
+
+export async function sastScanMySecrets(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/sast-scan`, {});
+}
+
+export async function createMySecretsIssue(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/create-secrets-issue`, data);
+}
+
+// Quality Analysis
+export async function analyzeMyQuality(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/quality-score`, {});
+}
+
+export async function detectMyDuplication(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/detect-duplication`, {});
+}
+
+export async function createMyQualityIssue(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/create-quality-issue`, data);
+}
+
+// Dependency Analysis
+export async function checkMyDependencies(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/check-dependencies`, {});
+}
+
+export async function createMyDependencyIssue(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/create-dependency-issue`, data);
+}
+
+// Dead Code Analysis
+export async function detectMyDeadCode(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/dead-code`, {});
+}
+
+export async function detectMyUnreachable(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/detect-unreachable`, {});
+}
+
+export async function detectMyCommentedCode(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/detect-commented-code`, {});
+}
+
+export async function createMyDeadCodeIssue(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/create-dead-code-issue`, data);
+}
+
+// Documentation
+export async function scanMyUndocumented(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/scan-docs`, {});
+}
+
+export async function generateMyDocs(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/generate-docs`, data);
+}
+
+export async function createMyDocsMR(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/create-docs-mr`, data);
+}
+
+// Test Generation
+export async function scanMyTestable(projectId: string): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/scan-tests`, {});
+}
+
+export async function generateMyTests(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/generate-tests`, data);
+}
+
+export async function createMyTestsMR(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/create-tests-mr`, data);
+}
+

@@ -3,6 +3,7 @@ package router
 
 import (
 	"context"
+	"fmt"
 
 	"aigateway/internal/api/handlers"
 	"aigateway/internal/api/middleware"
@@ -22,7 +23,24 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 
 	r.logger.Info("Setting up GitLab user routes")
 
+	// Get LLM settings (use same logic as in setupGitLabRoutes)
+	llmBaseURL := fmt.Sprintf("http://localhost:%d", r.config.Server.Port)
+	llmAPIKey := r.gitlabAPIKey
+
 	userHandler := handlers.NewGitLabUserHandler(store, r.logger)
+
+	// Create scanner handlers for user-level access
+	var qdrantStore *vector.QdrantStore
+	if vs, ok := r.vectorStore.(*vector.QdrantStore); ok {
+		qdrantStore = vs
+	}
+
+	secretsHandler := handlers.NewGitLabSecretsHandler(store, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+	qualityHandler := handlers.NewGitLabQualityHandler(store, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+	depsHandler := handlers.NewGitLabDependenciesHandler(store, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+	deadCodeHandler := handlers.NewGitLabDeadCodeHandler(store, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+	autoDocHandler := handlers.NewGitLabAutoDocHandler(store, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
+	testGenHandler := handlers.NewGitLabTestGenHandler(store, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 
 	// User-level GitLab Routes (authenticated users, not admin)
 	gitlab := r.engine.Group("/api/gitlab")
@@ -59,7 +77,53 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 	gitlab.GET("/reviews", userHandler.ListMyReviews)
 	gitlab.GET("/reviews/:id", userHandler.GetMyReview)
 
-	r.logger.Info("GitLab user routes configured: /api/gitlab/*")
+	// ============================================================================
+	// User's Project Indexing (RAG)
+	// ============================================================================
+	if r.gitlabUserIndexerHandler != nil {
+		gitlab.POST("/projects/:id/index", r.gitlabUserIndexerHandler.IndexProject)
+		gitlab.GET("/projects/:id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
+		gitlab.DELETE("/projects/:id/index", r.gitlabUserIndexerHandler.DeleteIndex)
+	}
+
+	// ============================================================================
+	// User's Scanning & Analysis (v4.2+)
+	// ============================================================================
+	// All these handlers perform ownership check inside
+
+	// Security
+	gitlab.POST("/projects/:id/scan-secrets", secretsHandler.ScanMySecrets)
+	gitlab.POST("/projects/:id/deep-scan-secrets", secretsHandler.DeepScanMySecrets)
+	gitlab.POST("/projects/:id/sast-scan", secretsHandler.SASTScanMySecrets)
+	gitlab.POST("/projects/:id/create-secrets-issue", secretsHandler.CreateMySecretsIssue)
+
+	// Quality
+	gitlab.POST("/projects/:id/quality-score", qualityHandler.AnalyzeMyQuality)
+	gitlab.POST("/projects/:id/detect-duplication", qualityHandler.DetectMyDuplication)
+	gitlab.POST("/projects/:id/create-quality-issue", qualityHandler.CreateMyQualityIssue)
+
+	// Dependencies
+	gitlab.POST("/projects/:id/check-dependencies", depsHandler.CheckMyDependencies)
+	gitlab.POST("/projects/:id/create-dependency-issue", depsHandler.CreateMyDependencyIssue)
+	gitlab.POST("/projects/:id/analyze-changelog", depsHandler.AnalyzeMyChangelog)
+
+	// Dead Code
+	gitlab.POST("/projects/:id/dead-code", deadCodeHandler.DetectMyDeadCode)
+	gitlab.POST("/projects/:id/detect-unreachable", deadCodeHandler.DetectMyUnreachable)
+	gitlab.POST("/projects/:id/detect-commented-code", deadCodeHandler.DetectMyCommentedCode)
+	gitlab.POST("/projects/:id/create-dead-code-issue", deadCodeHandler.CreateMyDeadCodeIssue)
+
+	// Documentation
+	gitlab.POST("/projects/:id/scan-docs", autoDocHandler.ScanMyUndocumented)
+	gitlab.POST("/projects/:id/generate-docs", autoDocHandler.GenerateMyDocs)
+	gitlab.POST("/projects/:id/create-docs-mr", autoDocHandler.CreateMyDocsMR)
+
+	// Test Generation
+	gitlab.POST("/projects/:id/scan-tests", testGenHandler.ScanMyTestable)
+	gitlab.POST("/projects/:id/generate-tests", testGenHandler.GenerateMyTests)
+	gitlab.POST("/projects/:id/create-tests-mr", testGenHandler.CreateMyTestsMR)
+
+	r.logger.Info("GitLab user routes configured: /api/gitlab/* (including scanning routes)")
 }
 
 // SetupGitLabRoutes registers GitLab admin API routes
@@ -73,7 +137,7 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	r.logger.Info("Setting up GitLab admin routes")
 
 	gitlabHandler := handlers.NewGitLabAdminHandler(store, r.logger)
-	
+
 	// Set main DB for model access
 	if r.db != nil {
 		gitlabHandler.SetMainDB(r.db)
@@ -157,7 +221,7 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 		admin.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
 		admin.Use(middleware.RequireAdmin(r.db, r.logger))
 	}
-	
+
 	admin.GET("/models/:id/gitlab-usage", gitlabHandler.GetModelUsage)
 	r.logger.Info("Model GitLab usage endpoint registered: GET /api/admin/models/:id/gitlab-usage")
 }
@@ -177,7 +241,7 @@ func (r *Router) SetupGitLabWebhookRoute(webhookHandler handlers.WebhookHandler)
 	r.engine.POST("/webhook/gitlab", webhookHandler.HandleWebhook)
 	// New route with integration ID in path (used by frontend)
 	r.engine.POST("/api/gitlab/webhook/:integration_id", webhookHandler.HandleWebhook)
-	
+
 	r.logger.Info("GitLab webhook routes configured: POST /webhook/gitlab, POST /api/gitlab/webhook/:integration_id")
 }
 
@@ -209,7 +273,7 @@ func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore inter
 	}
 
 	r.logger.Info("Setting up GitLab secrets scanning routes")
-	
+
 	secretsHandler := handlers.NewGitLabSecretsHandlerWithInterface(store, *qdrantStore, llmBaseURL, llmAPIKey, r.logger)
 	r.registerSecretsRoutes(secretsHandler)
 }
@@ -483,7 +547,7 @@ func (r *Router) SetupGitLabScheduleRoutes(store storage.Store, vectorStore inte
 
 	// Create scheduler
 	sched := schedule.NewScheduler(store, scheduleStore, qdrantStore, llmBaseURL, llmAPIKey, r.logger)
-	
+
 	// Start scheduler in background (uses background context, lives until process terminates)
 	go func() {
 		ctx := context.Background()
@@ -493,7 +557,7 @@ func (r *Router) SetupGitLabScheduleRoutes(store storage.Store, vectorStore inte
 	}()
 
 	scheduleHandler := handlers.NewGitLabScheduleHandler(sched, scheduleStore, r.logger)
-	
+
 	// Schedule management
 	gitlab.POST("/schedules", scheduleHandler.CreateSchedule)
 	gitlab.GET("/schedules", scheduleHandler.ListSchedules)
@@ -572,4 +636,3 @@ func (r *Router) SetupGitLabScanHistoryRoutes(store storage.Store) {
 
 	r.logger.Info("GitLab scan history routes configured: /api/admin/gitlab/scan-history/*")
 }
-

@@ -14,6 +14,7 @@ import (
 	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/gitlab/testgen"
+	"aigateway/internal/models"
 	"aigateway/internal/rag/vector"
 
 	"github.com/gin-gonic/gin"
@@ -31,13 +32,65 @@ type GitLabTestGenHandler struct {
 
 // NewGitLabTestGenHandler creates a new test generation handler.
 func NewGitLabTestGenHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabTestGenHandler {
-	return &GitLabTestGenHandler{
+	h := &GitLabTestGenHandler{
 		store:       store,
 		vectorStore: vectorStore,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
+	h.logger.Debug("GitLabTestGenHandler initialized")
+	return h
+}
+
+// getUserID extracts user ID from context
+func (h *GitLabTestGenHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// canAccessProject checks if user can access the project (via integration ownership)
+func (h *GitLabTestGenHandler) canAccessProject(c *gin.Context, project *models.GitLabProject) bool {
+	userID := h.getUserID(c)
+	if userID == "" {
+		return false
+	}
+
+	// Admins can access everything (if is_admin is set by middleware)
+	if isAdmin, exists := c.Get("is_admin"); exists {
+		if a, ok := isAdmin.(bool); ok && a {
+			return true
+		}
+	}
+
+	// Get integration to check ownership
+	ctx := c.Request.Context()
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil {
+		return false
+	}
+
+	// Check ownership
+	if integration.OwnerID == userID {
+		return true
+	}
+
+	// Check tenant membership
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok {
+			for _, tid := range ids {
+				if integration.TenantID == tid {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // ScanTestableRequest is the request body for scanning testable functions.
@@ -104,6 +157,25 @@ func (h *GitLabTestGenHandler) ScanTestable(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// ScanMyTestable handles user-level test scan
+func (h *GitLabTestGenHandler) ScanMyTestable(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.ScanTestable(c)
 }
 
 // GenerateTests POST /api/admin/gitlab/projects/:id/generate-tests
@@ -189,6 +261,25 @@ func (h *GitLabTestGenHandler) GenerateTests(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// GenerateMyTests handles user-level test generation
+func (h *GitLabTestGenHandler) GenerateMyTests(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.GenerateTests(c)
 }
 
 // DownloadTestsRequest is the request body for downloading tests.
@@ -465,13 +556,13 @@ func (h *GitLabTestGenHandler) CreateTestsMR(c *gin.Context) {
 		sb.WriteString("## 🧪 Auto-Generated Unit Tests\n\n")
 		sb.WriteString("⚠️ **REVIEW REQUIRED**: This MR contains AI-generated code that needs manual review.\n\n")
 		sb.WriteString(fmt.Sprintf("This MR adds **%d unit tests** to the codebase.\n\n", len(req.Tests)))
-		
+
 		sb.WriteString("### ⚠️ Before Merge - Please Check\n\n")
 		sb.WriteString("1. **Import paths** - AI may use placeholder paths like `yourapp/...` that need to be replaced with actual module paths\n")
 		sb.WriteString("2. **Test logic** - Verify assertions and test cases are correct for your business logic\n")
 		sb.WriteString("3. **Dependencies** - Ensure all imported packages are available in go.mod/package.json\n")
 		sb.WriteString("4. **Run tests** - Execute `go test` / `npm test` to verify tests pass\n\n")
-		
+
 		sb.WriteString("### Tests Added\n\n")
 
 		// Group by source file
@@ -606,14 +697,33 @@ func (h *GitLabTestGenHandler) CreateTestsMR(c *gin.Context) {
 	}).Info("Tests MR created successfully")
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":         "created",
-		"message":        "Merge request with tests created successfully",
-		"mr_id":          mr.ID,
-		"mr_iid":         mr.IID,
-		"mr_url":         mr.WebURL,
-		"tests_count":    len(req.Tests),
-		"files_created":  len(actions),
+		"status":        "created",
+		"message":       "Merge request with tests created successfully",
+		"mr_id":         mr.ID,
+		"mr_iid":        mr.IID,
+		"mr_url":        mr.WebURL,
+		"tests_count":   len(req.Tests),
+		"files_created": len(actions),
 	})
+}
+
+// CreateMyTestsMR handles user-level MR creation for tests
+func (h *GitLabTestGenHandler) CreateMyTestsMR(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CreateTestsMR(c)
 }
 
 // getTestFilePath returns the path for a test file based on source file
@@ -644,4 +754,3 @@ func getTestFilePath(sourceFilePath, language, testDir string) string {
 		return filepath.Join(dir, name+"_test.txt")
 	}
 }
-

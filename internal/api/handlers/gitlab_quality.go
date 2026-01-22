@@ -29,13 +29,65 @@ type GitLabQualityHandler struct {
 
 // NewGitLabQualityHandler creates a new quality handler.
 func NewGitLabQualityHandler(store storage.Store, vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, logger *logrus.Logger) *GitLabQualityHandler {
-	return &GitLabQualityHandler{
+	h := &GitLabQualityHandler{
 		store:       store,
 		vectorStore: vectorStore,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		logger:      logger,
 	}
+	h.logger.Debug("GitLabQualityHandler initialized")
+	return h
+}
+
+// getUserID extracts user ID from context
+func (h *GitLabQualityHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// canAccessProject checks if user can access the project (via integration ownership)
+func (h *GitLabQualityHandler) canAccessProject(c *gin.Context, project *models.GitLabProject) bool {
+	userID := h.getUserID(c)
+	if userID == "" {
+		return false
+	}
+
+	// Admins can access everything (if is_admin is set by middleware)
+	if isAdmin, exists := c.Get("is_admin"); exists {
+		if a, ok := isAdmin.(bool); ok && a {
+			return true
+		}
+	}
+
+	// Get integration to check ownership
+	ctx := c.Request.Context()
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil {
+		return false
+	}
+
+	// Check ownership
+	if integration.OwnerID == userID {
+		return true
+	}
+
+	// Check tenant membership
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok {
+			for _, tid := range ids {
+				if integration.TenantID == tid {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // AnalyzeQualityRequest is the request body for quality analysis.
@@ -140,6 +192,25 @@ func (h *GitLabQualityHandler) AnalyzeQuality(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// AnalyzeMyQuality handles user-level quality analysis
+func (h *GitLabQualityHandler) AnalyzeMyQuality(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.AnalyzeQuality(c)
+}
+
 // DetectDuplicationRequest is the request body for duplication detection.
 type DetectDuplicationRequest struct {
 	MaxFiles int    `json:"max_files,omitempty"`
@@ -205,6 +276,25 @@ func (h *GitLabQualityHandler) DetectDuplication(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// DetectMyDuplication handles user-level duplication detection
+func (h *GitLabQualityHandler) DetectMyDuplication(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.DetectDuplication(c)
+}
+
 // CreateQualityIssueRequest is the request body for creating an issue.
 type CreateQualityIssueRequest struct {
 	Title       string   `json:"title"`
@@ -258,6 +348,25 @@ func (h *GitLabQualityHandler) CreateQualityIssue(c *gin.Context) {
 	})
 }
 
+// CreateMyQualityIssue handles user-level issue creation
+func (h *GitLabQualityHandler) CreateMyQualityIssue(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CreateQualityIssue(c)
+}
+
 // createGitLabIssue creates an issue in GitLab for quality.
 func (h *GitLabQualityHandler) createGitLabIssue(ctx context.Context, gitlabURL, token string, projectID int64, req CreateQualityIssueRequest) (string, error) {
 	h.logger.WithFields(logrus.Fields{
@@ -290,4 +399,3 @@ func (h *GitLabQualityHandler) createGitLabIssue(ctx context.Context, gitlabURL,
 
 	return issue.WebURL, nil
 }
-

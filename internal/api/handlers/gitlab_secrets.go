@@ -71,6 +71,56 @@ func NewGitLabSecretsHandlerWithInterface(store storage.Store, vectorStore Qdran
 	}
 }
 
+// getUserID extracts user ID from context
+func (h *GitLabSecretsHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// canAccessProject checks if user can access the project (via integration ownership)
+func (h *GitLabSecretsHandler) canAccessProject(c *gin.Context, project *models.GitLabProject) bool {
+	userID := h.getUserID(c)
+	if userID == "" {
+		return false
+	}
+
+	// Admins can access everything (if is_admin is set by middleware)
+	if isAdmin, exists := c.Get("is_admin"); exists {
+		if a, ok := isAdmin.(bool); ok && a {
+			return true
+		}
+	}
+
+	// Get integration to check ownership
+	ctx := c.Request.Context()
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil {
+		return false
+	}
+
+	// Check ownership
+	if integration.OwnerID == userID {
+		return true
+	}
+
+	// Check tenant membership
+	if tids, exists := c.Get("tenant_ids"); exists {
+		if ids, ok := tids.([]string); ok {
+			for _, tid := range ids {
+				if integration.TenantID == tid {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // ScanSecretsRequest request body for secrets scanning
 type ScanSecretsRequest struct {
 	Categories  []string         `json:"categories,omitempty"`
@@ -161,6 +211,28 @@ func (h *GitLabSecretsHandler) ScanSecrets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// ScanMySecrets handles user-level secrets scanning (POST /api/gitlab/projects/:id/scan-secrets)
+func (h *GitLabSecretsHandler) ScanMySecrets(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check ownership
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Reuse admin scanner logic
+	h.ScanSecrets(c)
 }
 
 // GetPatterns GET /api/admin/gitlab/secrets/patterns
@@ -310,6 +382,28 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// DeepScanMySecrets handles user-level deep secrets scanning (POST /api/gitlab/projects/:id/deep-scan-secrets)
+func (h *GitLabSecretsHandler) DeepScanMySecrets(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check ownership
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Reuse admin scanner logic
+	h.DeepScanSecrets(c)
+}
+
 // ============================================================================
 // SAST (Static Application Security Testing)
 // ============================================================================
@@ -378,6 +472,25 @@ func (h *GitLabSecretsHandler) SASTScan(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// SASTScanMySecrets handles user-level SAST scanning
+func (h *GitLabSecretsHandler) SASTScanMySecrets(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.SASTScan(c)
+}
+
 // CreateSecretsIssueRequest is the request body for creating an issue.
 type CreateSecretsIssueRequest struct {
 	Title       string   `json:"title"`
@@ -431,6 +544,25 @@ func (h *GitLabSecretsHandler) CreateSecretsIssue(c *gin.Context) {
 	})
 }
 
+// CreateMySecretsIssue handles user-level issue creation
+func (h *GitLabSecretsHandler) CreateMySecretsIssue(c *gin.Context) {
+	projectID := c.Param("id")
+	ctx := c.Request.Context()
+
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if !h.canAccessProject(c, project) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	h.CreateSecretsIssue(c)
+}
+
 // createGitLabIssue creates an issue in GitLab for secrets.
 func (h *GitLabSecretsHandler) createGitLabIssue(ctx context.Context, gitlabURL, token string, projectID int64, req CreateSecretsIssueRequest) (string, error) {
 	h.logger.WithFields(logrus.Fields{
@@ -463,4 +595,3 @@ func (h *GitLabSecretsHandler) createGitLabIssue(ctx context.Context, gitlabURL,
 
 	return issue.WebURL, nil
 }
-

@@ -55,8 +55,12 @@ export interface GitLabProjectSettings {
   skip_bots?: boolean;
   chunk_size?: number;
   chunk_overlap?: number;
+  max_review_tokens?: number;
+  per_file_review?: boolean;
+  review_language?: string;
   target_branches?: string[];
   ignore_branches?: string[];
+  collection_name?: string;
 }
 
 export interface GitLabReview {

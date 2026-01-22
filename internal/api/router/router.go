@@ -3935,64 +3935,82 @@ func (r *Router) setupGitLabRoutes() {
 		r.logger.Info("✅ GitLab Integration stub routes configured (gitlab.enabled=false)")
 	}
 
-	// User-level GitLab routes (always stub for now - user-level not implemented)
+	// User-level GitLab routes
 	userGitlab := r.engine.Group("/api/gitlab")
 	if r.jwtManager != nil && r.db != nil {
 		userGitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
 	}
 
-	userGitlab.GET("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	userGitlab.POST("/integrations", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
-	})
-	userGitlab.GET("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
-	})
-	userGitlab.PUT("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
-	})
-	userGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
-	})
-	userGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	userGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
-	})
-	userGitlab.GET("/projects/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
-	})
-	userGitlab.PUT("/projects/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
-	})
-	userGitlab.DELETE("/projects/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
-	})
+	// If gitlabStore is initialized, use real user handlers
+	if r.gitlabStore != nil {
+		// Create user handler
+		userHandler := handlers.NewGitLabUserHandler(r.gitlabStore, r.logger)
 
-	// User-level Project Indexing (with ownership check)
-	if r.gitlabUserIndexerHandler != nil {
-		userGitlab.POST("/projects/:id/index", r.gitlabUserIndexerHandler.IndexProject)
-		userGitlab.GET("/projects/:id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
-		userGitlab.DELETE("/projects/:id/index", r.gitlabUserIndexerHandler.DeleteIndex)
+		// User's Integrations
+		userGitlab.GET("/integrations", userHandler.ListMyIntegrations)
+		userGitlab.POST("/integrations", userHandler.CreateMyIntegration)
+		userGitlab.GET("/integrations/:id", userHandler.GetMyIntegration)
+		userGitlab.PUT("/integrations/:id", userHandler.UpdateMyIntegration)
+		userGitlab.DELETE("/integrations/:id", userHandler.DeleteMyIntegration)
+
+		// User's Projects
+		userGitlab.GET("/integrations/:id/projects", userHandler.ListMyProjects)
+		userGitlab.POST("/integrations/:id/projects", userHandler.AddMyProject)
+		userGitlab.GET("/projects/:id", userHandler.GetMyProject)
+		userGitlab.PUT("/projects/:id", userHandler.UpdateMyProject)
+		userGitlab.DELETE("/projects/:id", userHandler.DeleteMyProject)
+
+		// User's Reviews
+		userGitlab.GET("/reviews", userHandler.ListMyReviews)
+		userGitlab.GET("/reviews/:id", userHandler.GetMyReview)
+
+		// User-level Project Indexing (with ownership check)
+		if r.gitlabUserIndexerHandler != nil {
+			userGitlab.POST("/projects/:id/index", r.gitlabUserIndexerHandler.IndexProject)
+			userGitlab.GET("/projects/:id/index/status", r.gitlabUserIndexerHandler.GetIndexStatus)
+			userGitlab.DELETE("/projects/:id/index", r.gitlabUserIndexerHandler.DeleteIndex)
+		}
+
+		r.logger.Info("✅ User-level GitLab routes configured with real handlers")
 	} else {
-		userGitlab.POST("/projects/:id/index", func(c *gin.Context) {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		// Stub routes when GitLab not configured
+		userGitlab.GET("/integrations", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
 		})
-		userGitlab.GET("/projects/:id/index/status", func(c *gin.Context) {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		userGitlab.POST("/integrations", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
 		})
-		userGitlab.DELETE("/projects/:id/index", func(c *gin.Context) {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Indexing not available"})
+		userGitlab.GET("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
 		})
-	}
+		userGitlab.PUT("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
+		})
+		userGitlab.DELETE("/integrations/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
+		})
+		userGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		userGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
+		})
+		userGitlab.GET("/projects/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		})
+		userGitlab.PUT("/projects/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
+		})
+		userGitlab.DELETE("/projects/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "User-level GitLab integration not implemented"})
+		})
+		userGitlab.GET("/reviews", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+		})
+		userGitlab.GET("/reviews/:id", func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		})
 
-	userGitlab.GET("/reviews", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
-	})
-	userGitlab.GET("/reviews/:id", func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
-	})
+		r.logger.Info("✅ User-level GitLab stub routes configured (gitlab.enabled=false)")
+	}
 }

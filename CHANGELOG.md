@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.15] - 2026-01-22
+
+### Added
+
+- **User-Level GitLab Integration**: Regular users can now manage their own GitLab integrations
+  - Create, edit, and delete personal GitLab integrations
+  - Add and manage projects within integrations
+  - View code review history for own projects
+  - Full ownership isolation (users can only access their own data)
+  - Edit integration settings including access token updates
+
+### Technical
+
+- `internal/api/handlers/gitlab_user.go`: User-level GitLab handlers with ownership checks
+- `internal/api/router/router.go`: User routes registration in `setupGitLabRoutes()`
+- `web-svelte/src/lib/api/gitlab-user.ts`: Frontend API client for user operations
+- `web-svelte/src/routes/(protected)/gitlab/+page.svelte`: User GitLab management UI
+
 ## [4.2.13] - 2026-01-06
 
 ### Added

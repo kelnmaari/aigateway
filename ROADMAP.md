@@ -25,8 +25,9 @@
 | Go | `go.mod` | proxy.golang.org | ✅ Done |
 | Node.js | `package.json` | registry.npmjs.org | ✅ Done |
 | Python | `requirements.txt` | pypi.org | ✅ Done |
+| Java (Maven) | `pom.xml` | repo1.maven.org | ✅ Done (v4.2.13) |
+| Java (Gradle) | `build.gradle`, `build.gradle.kts` | repo1.maven.org | ✅ Done (v4.2.13) |
 | Rust | `Cargo.toml`, `Cargo.lock` | crates.io | ⬜ |
-| Java | `pom.xml` | maven.org | ⬜ |
 | .NET | `*.csproj`, `packages.config` | nuget.org | ⬜ |
 
 ### Функциональность
@@ -430,7 +431,77 @@ internal/api/
 
 ---
 
-## 10. 🧠 Self-Learning Agent (Acontext Integration)
+## 10. 🛡️ Resilience Patterns (Failsafe-Go)
+
+**Приоритет:** Высокий  
+**Статус:** ⬜ Planned  
+**Анализ:** [docs/research/FAILSAFE_GO_ANALYSIS.md](docs/research/FAILSAFE_GO_ANALYSIS.md)
+
+Интеграция [failsafe-go](https://github.com/failsafe-go/failsafe-go) для отказоустойчивости.
+
+### Зачем
+
+- Circuit Breaker для Ollama (критично — сейчас отсутствует)
+- Composable policies вместо nested if/retry loops
+- Hedge Policy для multi-LLM (параллельные запросы)
+- Production-ready библиотека (2.1k stars)
+
+### Политики
+
+| Policy | Применение |
+|--------|------------|
+| **Retry** | Ollama, GitLab API, Qdrant |
+| **Circuit Breaker** | Ollama (открытие при недоступности) |
+| **Timeout** | Все внешние вызовы |
+| **Fallback** | Default responses при failures |
+| **Hedge** | Multi-LLM latency optimization |
+| **Bulkhead** | Ограничение concurrent requests |
+| **Rate Limiter** | Замена текущего sliding window |
+
+### Фазы реализации
+
+#### Phase 1 (v4.3.x): Ollama Client
+
+- [ ] Обернуть Ollama client в failsafe-go
+- [ ] Circuit Breaker: открытие после 5 failures за 60s
+- [ ] Retry: exponential backoff (1s → 30s)
+- [ ] Timeout: configurable (default 2min)
+- [ ] Logging state changes
+
+#### Phase 2 (v4.4.x): External APIs
+
+- [ ] GitLab API client resilience
+- [ ] Qdrant client resilience
+- [ ] Redis client resilience
+
+#### Phase 3 (v4.5.x): Advanced
+
+- [ ] Hedge policy для multi-LLM
+- [ ] Adaptive limiter для auto-tuning
+- [ ] Metrics integration (Prometheus)
+
+### Пример
+
+**До:**
+```go
+resp, err := ollamaClient.Chat(req)
+if err != nil {
+    // retry manually...
+    time.Sleep(time.Second)
+    resp, err = ollamaClient.Chat(req)
+}
+```
+
+**После:**
+```go
+resp, err := failsafe.Get(func() (*Response, error) {
+    return ollamaClient.Chat(req)
+}, retryPolicy, circuitBreaker, timeoutPolicy)
+```
+
+---
+
+## 11. 🧠 Self-Learning Agent (Acontext Integration)
 
 **Приоритет:** Средний  
 **Статус:** ⬜ Planned  

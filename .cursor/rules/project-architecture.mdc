@@ -2,60 +2,165 @@
 alwaysApply: true
 ---
 
-# Ollama-OpenAI Proxy Project Architecture
+# AIGateway Project Architecture
 
-This is the main **Ollama-OpenAI Proxy** project - a Go 1.25 application that provides OpenAI-compatible API for local Ollama models.
+**AIGateway** — Go 1.25 приложение, предоставляющее OpenAI-совместимый API Gateway с multi-provider backend.
 
 ## 🏗️ Project Structure
 
 ### Entry Points
-- [cmd/server/main.go](mdc:cmd/server/main.go) - HTTP server with OpenAI API endpoints
-- [cmd/tui/main.go](mdc:cmd/tui/main.go) - Terminal UI for monitoring and management
+- `cmd/server/main.go` - HTTP/WebSocket server
+- `cmd/tui/main.go` - Terminal UI для мониторинга
 
-### Core Configuration  
-- [internal/config/config.go](mdc:internal/config/config.go) - Complete configuration system
-- [configs/dev.yaml](mdc:configs/dev.yaml) - Development configuration
-- [configs/production.yaml.example](mdc:configs/production.yaml.example) - Production template
+### Core Directories
 
-### Architecture Layers
 ```
-Client Apps (OpenAI API) → Proxy Server → Ollama Server
-                            ↓
-                    [API Keys & Auth] → [Models & Metrics]
-                            ↓
-                    [Terminal UI (TUI)]
+internal/
+├── api/                    # HTTP handlers & middleware
+│   ├── handlers/           # API endpoints
+│   └── middleware/         # Auth, rate limit, logging
+├── auth/                   # Authentication (JWT, LDAP, OIDC, API Keys)
+├── cache/                  # Redis cache layer
+├── config/                 # Configuration system
+├── inference/              # Docker-based inference (vLLM, SGLang, TGI, llama.cpp)
+├── providers/              # External model providers (Ollama, vLLM endpoints)
+├── storage/postgresql/     # PostgreSQL database layer
+├── gitlab/                 # GitLab integration (RAG, Test Gen, Code Review)
+├── rag/                    # RAG pipeline (embeddings, Qdrant)
+├── services/               # Business logic services
+├── models/                 # Domain models
+├── metrics/                # Prometheus metrics
+└── web/                    # Embedded WebUI
 ```
 
-## 🎯 Key Principles
+### Architecture
 
-### Go 1.25 Features
-- Utilize **enhanced generics** where appropriate
-- Use **improved WaitGroups** with proper error handling  
-- Leverage **new vet analyzers** (`-waitgroup`, `-hostport`)
-- Apply **memory leak detection** capabilities
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Client Applications                       │
+│              (OpenAI SDK, LangChain, custom apps)               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         AIGateway                                │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────────┐ │
+│  │  Auth Layer │  │ Rate Limiter │  │      API Gateway        │ │
+│  │ (JWT/OIDC)  │  │ (per-key)    │  │ (OpenAI-compatible)     │ │
+│  └─────────────┘  └──────────────┘  └─────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │          inference.Service (Docker containers)              ││
+│  │  ┌─────────┐ ┌────────┐ ┌─────┐ ┌─────┐ ┌───────────────┐  ││
+│  │  │  vLLM   │ │ SGLang │ │ TGI │ │ TEI │ │   llama.cpp   │  ││
+│  │  └─────────┘ └────────┘ └─────┘ └─────┘ └───────────────┘  ││
+│  └─────────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │          providers.ProviderManager (external endpoints)     ││
+│  │  ┌──────────────────┐ ┌──────────────────┐                  ││
+│  │  │ Ollama Provider  │ │  vLLM Provider   │ ...              ││
+│  │  └──────────────────┘ └──────────────────┘                  ││
+│  └─────────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    GitLab Integration                       ││
+│  │  (RAG Indexing, Test Generation, Code Review, Analytics)   ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+    ┌───────────┐      ┌───────────┐      ┌───────────┐
+    │PostgreSQL │      │   Redis   │      │  Qdrant   │
+    │ (primary) │      │  (cache)  │      │ (vectors) │
+    └───────────┘      └───────────┘      └───────────┘
+```
 
-### OpenAI Compatibility 
-- **Exact API format** matching for `/v1/chat/completions`, `/v1/models`
-- **Request/Response conversion** between OpenAI ↔ Ollama formats
-- **Streaming support** for real-time responses
-- **Error format consistency** with OpenAI standards
+## 🎯 Inference System
 
-### Security First
-- **API Key Management** with model-based access control
-- **Rate Limiting** per API key with configurable limits
-- **Audit Logging** for all authentication events
-- **Secure storage** with bcrypt/argon2 hashing
+### Docker-based Multi-Provider (`internal/inference/`)
 
-### 100% Test Coverage
-- Every component must have **comprehensive unit tests**
-- **Integration tests** with mock Ollama server
-- **Edge cases coverage** for all error scenarios
-- **Performance benchmarks** for critical paths
+- **Providers:** vLLM, SGLang, TGI, TEI, llama.cpp, TensorRT-LLM
+- Automatic model download from HuggingFace
+- Container lifecycle management
+- Health checks и metrics
 
-## 📋 Development Guidelines
+### Configuration
 
-1. **Follow architecture patterns** defined in [Architecture.MD](mdc:Architecture.MD)
-2. **Reference BACKLOG tasks** for detailed implementation specs
-3. **Update Plan.md** task statuses as work progresses
-4. **Maintain MVP.MD** criteria for release readiness
-5. **Use Makefile commands** for consistent development workflow
+```yaml
+inference:
+  docker:
+    enabled: true
+    hf_cache_dir: "./data/models/hf"
+    gguf_dir: "./data/models/gguf"
+    trt_engines_dir: "./data/engines/trt"
+    max_running_models: 2
+    default_provider: "vllm"  # vllm | sglang | tgi | llama.cpp | tensorrt-llm
+    health_check_timeout: "60s"
+    startup_timeout: "5m"
+```
+
+### Providers from Database
+
+Providers загружаются из PostgreSQL (`model_providers` table):
+
+```go
+// internal/providers/manager.go
+func (pm *ProviderManager) LoadProvidersFromDB(ctx context.Context) error {
+    providerConfigs, err := pm.db.ListModelProviders(ctx, true)
+    
+    for _, config := range providerConfigs {
+        switch config.ProviderType {
+        case models.ProviderTypeOllama:
+            provider = NewOllamaProvider(config.Name, config.BaseURL)
+        case models.ProviderTypeVLLM:
+            provider = NewVLLMProvider(config.Name, config.BaseURL)
+        }
+        pm.RegisterProvider(config.ID, provider)
+    }
+}
+```
+
+## 📦 Database: PostgreSQL Only
+
+Все миграции и запросы в:
+
+```
+internal/storage/postgresql/
+├── postgresql.go        # Connection & migrations
+├── migrations/          # SQL migration files (230+)
+├── apikeys.go
+├── users.go
+├── tenants.go
+├── model_configs.go     # Saved model specs
+├── model_registry.go    # Discovered models
+└── ...
+```
+
+### Синтаксис
+
+- Используй `$1, $2` для параметров
+- `ON CONFLICT ... DO UPDATE` для upsert
+- UUID для primary keys
+
+## ⚠️ Critical Rules
+
+### НЕ запускай сервер автоматически
+
+```bash
+# ✅ Разрешено
+go build -o bin/server.exe cmd/server/main.go
+go test ./...
+
+# ❌ Запрещено
+go run cmd/server/main.go
+./bin/server.exe
+```
+
+### PostgreSQL Only
+
+- Миграции только в `internal/storage/postgresql/migrations/`
+- Используй `$1, $2` placeholders (не `?`)
+
+### Test Coverage
+
+- Все новые handlers должны иметь тесты
+- Используй `go test -race ./...`

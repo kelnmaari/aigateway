@@ -4,315 +4,138 @@ alwaysApply: true
 
 # Changelog Migration Rule
 
-## ВАЖНО: При каждом новом релизе
+## При каждом новом релизе
 
 ### 1. Обновление CHANGELOG.md
 
-- Всегда обновляй `CHANGELOG.md` при добавлении новых изменений
-- Следуй формату [Keep a Changelog](https://keepachangelog.com/):
+- Всегда обновляй `CHANGELOG.md` при добавлении изменений
+- Формат [Keep a Changelog](https://keepachangelog.com/):
   - `## [VERSION] - YYYY-MM-DD`
   - Секции: Added, Changed, Fixed, Security, Technical, Removed
 
-### 2. Обновление SQL миграции
+### 2. SQL миграция (PostgreSQL)
 
-**ОБЯЗАТЕЛЬНО**: После изменения CHANGELOG.md нужно создать SQL миграцию с данными changelog.
+**ОБЯЗАТЕЛЬНО**: После изменения CHANGELOG.md создай SQL миграцию.
 
-#### Где находится
+#### Директория
 
-- **Директория:** `internal/storage/sqlite/migrations/` и `internal/storage/postgresql/migrations/`
-- **Формат файлов:** `{VERSION}_add_changelog_v{X_Y_Z}.up.sql` и `.down.sql`
-
-#### ⚠️ ВАЖНО: Reversible Migrations (v2.4.7+)
-
-Все миграции должны иметь возможность отката (rollback):
-
-- ✅ **ОБЯЗАТЕЛЬНО**: Создавай `.up.sql` (forward) и `.down.sql` (rollback)
-- ✅ **Стремись к reversibility**: Пиши миграции так, чтобы их можно было откатить без потери данных
-- ⚠️ **Если rollback невозможен**: Явно укажи это в `.down.sql` с объяснением причины
-
-#### Что делать
-
-**Шаг 1: Определи номер следующей версии миграции**
-
-Посмотри последний файл в директории `internal/storage/sqlite/migrations/`  и `internal/storage/postgresql/migrations/`:
-
-- Последний файл: `071_add_changelog_v2_4_6.sql`
-- Следующий номер: `072`
-
-**Шаг 2: Создай UP файл (forward migration)**
-
-Имя файла: `072_add_changelog_v2_4_7.up.sql`
-
-**Содержимое:**
-
-```sql
-INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
-('2.4.7', 'YYYY-MM-DD', '## [2.4.7] - YYYY-MM-DD
-
-### Added
-- **Новая функция**: Описание
-  - Детали реализации
-
-### Changed
-- **Изменения**: Что изменилось
-
-### Fixed
-- **Исправления**: Что исправлено
-
-### Technical
-- Технические детали
-- Новые пакеты/зависимости');
+```
+internal/storage/postgresql/migrations/
 ```
 
-**Шаг 3: Создай DOWN файл (rollback migration)**
+#### Формат файлов
 
-Имя файла: `072_add_changelog_v2_4_7.down.sql`
+- `{VERSION}_add_changelog_v{X_Y_Z}.up.sql` (forward)
+- `{VERSION}_add_changelog_v{X_Y_Z}.down.sql` (rollback)
 
-**Содержимое:**
+#### Шаги
 
-```sql
--- Rollback: Remove changelog entry for v2.4.7
-DELETE FROM changelogs WHERE version = '2.4.7';
-```
-
-**Для changelog миграций rollback ВСЕГДА безопасен** ✅ - это просто удаление записи из таблицы.
-
-**ВАЖНО:**
-
-- SQL content должен **точно соответствовать** записи в CHANGELOG.md
-- Escape одинарные кавычки в тексте как `''`
-- Используй INSERT OR REPLACE для idempotency
-- Markdown форматирование должно быть корректным
-- **Файл автоматически загрузится через embed.FS** - не нужно обновлять getMigrations()
-
-### 3. PostgreSQL миграция (опционально)
-
-Если используется PostgreSQL, создай аналогичный файл в:
-
-- `internal/storage/postgresql/migrations/072_add_changelog_v2_4_7.sql`
-
-### 4. Версия приложения
-
-- Обнови файл `VERSION` с новым номером версии
-- Система автоматически внедрит это в билд через `ldflags`
-
-### 5. Проверка
-
-После создания миграции:
+**Шаг 1: Определи номер миграции**
 
 ```bash
-# Пересоздай БД чтобы применилась миграция
-rm data/aigateway.db
-# Запусти сервер - миграция применится автоматически
-go run cmd/server/main.go -config configs/dev.yaml
+ls internal/storage/postgresql/migrations/*.up.sql | tail -1
+# Пример: 113_add_changelog_v4_2_12.up.sql → следующий: 114
 ```
 
-## Workflow последовательность
+**Шаг 2: Создай UP файл**
 
-1. ✅ Добавляешь изменения в `CHANGELOG.md`
-2. ✅ Создаешь новый SQL файл в `migrations/`
-3. ✅ Обновляешь `VERSION` файл
-4. ✅ Коммитишь все 3 файла вместе
-5. ✅ Система автоматически:
-   - Применит миграцию при старте
-   - Данные из CHANGELOG будут доступны через API
-   - WebUI отобразит историю изменений в "О Системе"
-
-## КРИТИЧНО: Не забывай SQL миграцию
-
-Без создания SQL файла:
-
-- ❌ Новая версия не появится в WebUI
-- ❌ API `/api/system/changelogs` вернет старые данные
-- ❌ Пользователи не увидят последние изменения
-
-## 📁 Новая структура миграций (v2.4.7+)
-
-С версии v2.4.7 миграции хранятся в отдельных SQL файлах:
-
-```
-internal/storage/sqlite/migrations/
-  001_initial_schema.sql
-  002_add_mcp_servers.sql
-  003_add_changelogs_with_data.sql
-  ...
-  071_add_changelog_v2_4_6.sql
-  072_add_changelog_v2_4_7.sql  ← твоя новая миграция
-```
-
-**Преимущества:**
-
-- ✅ Легче добавлять (просто создать файл)
-- ✅ Легче ревьюить в Git (один файл = одна миграция)
-- ✅ Можно использовать SQL форматтеры/linters
-- ✅ Автоматическая загрузка через Go embed.FS
-
-## 🎯 Пример полного workflow
-
-**Задача:** Добавлена новая фича в v2.4.7
-
-### Шаг 1: VERSION файл
-
-```
-2.4.7
-```
-
-### Шаг 2: CHANGELOG.md
-
-```markdown
-## [2.4.7] - 2025-10-30
-
-### Added
-- **Migration System Refactoring**: Разбиение sqlite.go на отдельные SQL файлы
-  - 71 миграция в отдельных .sql файлах
-  - Использование Go 1.16+ embed.FS
-
-### Technical
-- internal/storage/sqlite/migrations/ директория
-- Автоматический loader из embedded FS
-```
-
-### Шаг 3: Создать файл миграции
-
-**Файл:** `internal/storage/sqlite/migrations/072_add_changelog_v2_4_7.sql`
+`internal/storage/postgresql/migrations/114_add_changelog_v4_2_13.up.sql`:
 
 ```sql
-INSERT OR REPLACE INTO changelogs (version, release_date, content) VALUES
-('2.4.7', '2025-10-30', '## [2.4.7] - 2025-10-30
+INSERT INTO changelogs (version, release_date, content) VALUES
+('4.2.13', '2026-01-06', '## [4.2.13] - 2026-01-06
 
 ### Added
-- **Migration System Refactoring**: Разбиение sqlite.go на отдельные SQL файлы
-  - 71 миграция в отдельных .sql файлах
-  - Использование Go 1.16+ embed.FS
+- **Feature**: Description
+  - Details
 
 ### Technical
-- internal/storage/sqlite/migrations/ директория
-- Автоматический loader из embedded FS');
+- Technical details')
+ON CONFLICT (version) DO UPDATE SET
+  release_date = EXCLUDED.release_date,
+  content = EXCLUDED.content;
 ```
 
-### Шаг 4: Проверка компиляции
+**Шаг 3: Создай DOWN файл**
+
+`internal/storage/postgresql/migrations/114_add_changelog_v4_2_13.down.sql`:
+
+```sql
+-- Rollback: Remove changelog entry for v4.2.13
+DELETE FROM changelogs WHERE version = '4.2.13';
+```
+
+### 3. Обновление VERSION файла
+
+```bash
+echo "4.2.13" > VERSION
+```
+
+### 4. Проверка компиляции
 
 ```bash
 go build -o bin/server.exe cmd/server/main.go
 ```
 
-### Шаг 5: Проверка результата
+## Workflow
 
-После запуска сервера:
-
-1. Проверь логи: `Migration applied successfully: version=72`
-2. API: `curl http://localhost:8080/api/system/changelogs`
-3. WebUI: Открой "О Системе" - должна быть новая версия
-
-## 📝 Заметки
-
-- Миграции применяются **только один раз** при первом запуске после обновления
-- INSERT OR REPLACE позволяет безопасно перезапускать миграцию
-- Для клиентов и production: **НЕ нужно удалять БД**, миграция применится автоматически
-- Номер миграции должен быть уникальным и последовательным
-- Loader автоматически найдет и применит все новые .sql файлы
-
-## 🔄 Руководство по Reversible Migrations (v2.4.7+)
-
-### ✅ Легко откатить (Safe Rollback)
-
-**Changelog миграции** - ВСЕГДА безопасны:
-
-```sql
--- UP
-INSERT INTO changelogs VALUES (...);
-
--- DOWN
-DELETE FROM changelogs WHERE version = 'X.Y.Z';
+```
+1. ✅ Изменения в CHANGELOG.md
+2. ✅ SQL файлы в postgresql/migrations/
+3. ✅ VERSION файл
+4. ✅ go build (проверка)
+5. ✅ Коммит всех файлов вместе
 ```
 
-**Создание индексов:**
+## PostgreSQL Specific
+
+### Синтаксис
+
+- Используй `$1, $2` для параметров (не `?`)
+- `ON CONFLICT ... DO UPDATE` для upsert
+- `RETURNING` для получения inserted row
+
+### Пример миграции с таблицей
 
 ```sql
 -- UP
-CREATE INDEX idx_users_email ON users(email);
+CREATE TABLE IF NOT EXISTS new_feature (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_new_feature_name ON new_feature(name);
 
 -- DOWN
-DROP INDEX idx_users_email;
+DROP INDEX IF EXISTS idx_new_feature_name;
+DROP TABLE IF EXISTS new_feature;
 ```
 
-**Создание пустых таблиц:**
+## Reversible Migrations
+
+### ✅ Безопасный rollback
+
+- Changelog миграции (DELETE)
+- CREATE INDEX (DROP INDEX)
+- CREATE TABLE (DROP TABLE если пустая)
+
+### ⚠️ С осторожностью
+
+- ADD COLUMN (потеря данных при DROP)
+- ALTER COLUMN TYPE
+
+### ❌ Irreversible
 
 ```sql
--- UP
-CREATE TABLE new_feature (...);
-
--- DOWN
-DROP TABLE new_feature;
--- ✅ Безопасно если таблица пустая или данные не критичны
-```
-
-### ⚠️ Откатить с осторожностью (Careful Rollback)
-
-**Добавление nullable колонок:**
-
-```sql
--- UP
-ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
-
--- DOWN
-ALTER TABLE users DROP COLUMN last_login;
--- ⚠️ Потеря данных! Но допустимо если данные некритичны
-```
-
-**Изменение типов данных:**
-
-```sql
--- UP
-ALTER TABLE users ALTER COLUMN age TEXT;  -- было INTEGER
-
--- DOWN
-ALTER TABLE users ALTER COLUMN age INTEGER;
--- ⚠️ Может не сработать если есть некорректные данные
-```
-
-### ❌ Нельзя откатить (Irreversible - требует пометки)
-
-**Удаление колонок с важными данными:**
-
-```sql
--- UP
-ALTER TABLE users DROP COLUMN important_field;
-
--- DOWN (файл .down.sql должен содержать):
+-- DOWN файл:
 -- IRREVERSIBLE MIGRATION
--- Reason: Column 'important_field' contains critical user data
--- Manual rollback: Restore from backup
--- 
--- Emergency rollback (creates empty column):
--- ALTER TABLE users ADD COLUMN important_field TEXT;
-```
-
-**Data миграции без backup:**
-
-```sql
--- UP
-UPDATE users SET status = 'active' WHERE status = 'enabled';
-DELETE FROM users WHERE old_field IS NULL;
-
--- DOWN (невозможно без backup mapping):
--- IRREVERSIBLE MIGRATION
--- Reason: Original 'status' values and deleted rows cannot be recovered
+-- Reason: Data cannot be recovered
 -- Manual rollback: Restore from backup
 ```
 
-### 📋 Чек-лист перед созданием миграции
+## Запрещено
 
-- [ ] Миграция читает или только пишет данные? (Только запись → легче откатить)
-- [ ] Удаляются ли колонки/таблицы? (Да → может потребоваться пометка IRREVERSIBLE)
-- [ ] Изменяются ли существующие данные? (Да → нужен план отката)
-- [ ] Можно ли восстановить состояние до миграции? (Нет → пометка IRREVERSIBLE)
-- [ ] Создан ли `.down.sql` файл? (Обязательно!)
-
-### 🎯 Best Practices
-
-1. **Предпочитай ADD вместо DROP**: Лучше добавлять новое, чем удалять старое
-2. **Nullable колонки**: При добавлении колонок делай их nullable или с DEFAULT
-3. **Два этапа для DROP**: Сначала помечай deprecated, потом удаляй в следующей версии
-4. **Тестируй rollback**: Проверяй `.down.sql` на тестовой БД
-5. **Документируй риски**: Явно указывай в комментариях что будет потеряно при rollback
+- ❌ НЕ удалять data/*.db файлы
+- ❌ НЕ изменять существующие миграции
+- ❌ НЕ пропускать создание миграции

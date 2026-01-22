@@ -9,10 +9,10 @@ description: General development standards and coding practices
 
 ### Package Documentation
 ```go
-// Package api provides OpenAI-compatible HTTP endpoints for Ollama models.
+// Package api provides OpenAI-compatible HTTP endpoints.
 //
-// This package implements the core HTTP handlers that convert OpenAI API requests
-// to Ollama format and return OpenAI-compatible responses. It supports:
+// This package implements the core HTTP handlers that process OpenAI API requests,
+// route them to appropriate providers, and return OpenAI-compatible responses:
 //   - Chat completions with streaming
 //   - Model listing and management
 //   - Authentication and rate limiting
@@ -22,36 +22,33 @@ package api
 
 ### Function Documentation
 ```go
-// ConvertChatRequest converts an OpenAI chat completion request to Ollama format.
+// RouteRequest routes an OpenAI request to the appropriate LLM provider.
 //
-// It handles model name mapping, message format conversion, and parameter
-// translation between the two APIs. Temperature, top_p, and stop sequences
-// are mapped directly, while other OpenAI-specific parameters are ignored.
+// It handles model name mapping, provider selection, and parameter
+// translation between the OpenAI API and provider-specific formats.
 //
 // Parameters:
+//   - ctx: Context for cancellation and timeouts
 //   - req: OpenAI format chat completion request
-//   - modelMapping: map of OpenAI model names to Ollama model names
 //
 // Returns:
-//   - Ollama format chat request
-//   - error if model mapping fails or request is invalid
-func ConvertChatRequest(req ChatCompletionRequest, modelMapping map[string]string) (OllamaChatRequest, error) {
+//   - Provider response in OpenAI format
+//   - error if routing or provider call fails
+func (r *Router) RouteRequest(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
     // Implementation
 }
 ```
 
 ### Error Handling Standards
 ```go
-import "fmt"
-
 // Use wrapped errors with context
 func (s *Server) processRequest(ctx context.Context, req Request) error {
     if err := s.validateRequest(req); err != nil {
         return fmt.Errorf("request validation failed: %w", err)
     }
     
-    if err := s.forwardToOllama(ctx, req); err != nil {
-        return fmt.Errorf("failed to forward request to Ollama: %w", err)
+    if err := s.routeToProvider(ctx, req); err != nil {
+        return fmt.Errorf("failed to route request to provider: %w", err)
     }
     
     return nil
@@ -78,16 +75,7 @@ func IsValidationError(err error) bool {
 
 ### Logging Standards
 ```go
-import (
-    "github.com/sirupsen/logrus"
-    "context"
-)
-
 // Use structured logging with consistent fields
-type Logger struct {
-    *logrus.Logger
-}
-
 func (l *Logger) LogRequest(ctx context.Context, method, path string, duration time.Duration) {
     l.WithFields(logrus.Fields{
         "method":     method,
@@ -117,9 +105,8 @@ const (
     DefaultReadTimeout        = 30 * time.Second
     DefaultWriteTimeout       = 30 * time.Second
     
-    // Ollama defaults
-    DefaultOllamaURL          = "http://localhost:11434"
-    DefaultOllamaTimeout      = 30 * time.Second
+    // Provider defaults
+    DefaultProviderTimeout    = 120 * time.Second
     DefaultRetryAttempts      = 3
     
     // Rate limiting defaults
@@ -147,7 +134,6 @@ func validateChatRequest(req ChatCompletionRequest) error {
         return ValidationError{Field: "messages", Message: "at least one message required"}
     }
     
-    // Validate message content length
     for i, msg := range req.Messages {
         if len(msg.Content) > MaxMessageLength {
             return ValidationError{
@@ -171,17 +157,13 @@ func (m *APIKeyManager) CreateKey(ctx context.Context, name string, models []str
         Name:     name,
         Models:   models,
         Created:  time.Now(),
-        LastUsed: nil,
-        // Generate secure random key
         KeyHash:  m.hashKey(generateSecureKey(32)),
     }
     
-    // Log creation (without sensitive data)
     m.logger.WithFields(logrus.Fields{
         "event":   "api_key_created",
         "key_id":  key.ID,
         "name":    name,
-        "models":  models,
     }).Info("API key created")
     
     return key, m.storage.SaveKey(key)
@@ -189,10 +171,7 @@ func (m *APIKeyManager) CreateKey(ctx context.Context, name string, models []str
 
 // Always hash keys for storage
 func (m *APIKeyManager) hashKey(plainKey string) string {
-    hash, err := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
-    if err != nil {
-        panic(fmt.Sprintf("failed to hash API key: %v", err)) // This should never happen
-    }
+    hash, _ := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
     return string(hash)
 }
 ```
@@ -202,35 +181,29 @@ func (m *APIKeyManager) hashKey(plainKey string) string {
 ### Context Usage
 ```go
 // Always propagate context for cancellation and timeouts
-func (c *OllamaClient) ChatCompletion(ctx context.Context, req OllamaChatRequest) (*OllamaChatResponse, error) {
-    // Set timeout for this specific operation
-    ctx, cancel := context.WithTimeout(ctx, c.timeout)
+func (p *Provider) ChatCompletion(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+    ctx, cancel := context.WithTimeout(ctx, p.timeout)
     defer cancel()
     
-    // Check if context was cancelled before making request
     select {
     case <-ctx.Done():
         return nil, ctx.Err()
     default:
     }
     
-    return c.makeHTTPRequest(ctx, req)
+    return p.makeHTTPRequest(ctx, req)
 }
 ```
 
 ### Connection Pooling
 ```go
-// Reuse HTTP connections
-func NewOllamaClient(url string) *OllamaClient {
-    return &OllamaClient{
-        url: url,
-        client: &http.Client{
-            Timeout: 30 * time.Second,
-            Transport: &http.Transport{
-                MaxIdleConns:       100,
-                MaxIdleConnsPerHost: 10,
-                IdleConnTimeout:    90 * time.Second,
-            },
+func NewHTTPClient() *http.Client {
+    return &http.Client{
+        Timeout: 120 * time.Second,
+        Transport: &http.Transport{
+            MaxIdleConns:        100,
+            MaxIdleConnsPerHost: 10,
+            IdleConnTimeout:     90 * time.Second,
         },
     }
 }
@@ -239,7 +212,7 @@ func NewOllamaClient(url string) *OllamaClient {
 ### Memory Management
 ```go
 // Use sync.Pool for frequently allocated objects
-var chatResponsePool = sync.Pool{
+var responsePool = sync.Pool{
     New: func() interface{} {
         return &ChatCompletionResponse{
             Choices: make([]ChatCompletionChoice, 0, 1),
@@ -247,29 +220,27 @@ var chatResponsePool = sync.Pool{
     },
 }
 
-func getChatResponse() *ChatCompletionResponse {
-    resp := chatResponsePool.Get().(*ChatCompletionResponse)
-    // Reset the response
+func getResponse() *ChatCompletionResponse {
+    resp := responsePool.Get().(*ChatCompletionResponse)
     resp.ID = ""
     resp.Choices = resp.Choices[:0]
     return resp
 }
 
-func putChatResponse(resp *ChatCompletionResponse) {
-    chatResponsePool.Put(resp)
+func putResponse(resp *ChatCompletionResponse) {
+    responsePool.Put(resp)
 }
 ```
 
 ## 📝 Documentation Standards
 
 ### README Structure
-- **Clear project description** with use cases
-- **Installation instructions** with requirements
-- **Quick start guide** with examples
-- **Configuration documentation** with all options
-- **API documentation** with endpoint examples
-- **Development setup** instructions
-- **Contributing guidelines**
+- Clear project description with use cases
+- Installation instructions with requirements
+- Quick start guide with examples
+- Configuration documentation with all options
+- API documentation with endpoint examples
+- Development setup instructions
 
 ### Code Comments
 ```go
@@ -277,17 +248,16 @@ func putChatResponse(resp *ChatCompletionResponse) {
 // Use complete sentences starting with the name being documented
 
 // ChatHandler handles OpenAI-compatible chat completion requests.
-// It converts the request format, forwards to Ollama, and returns
-// an OpenAI-compatible response with proper error handling.
+// It routes requests to appropriate providers and returns
+// OpenAI-compatible responses with proper error handling.
 type ChatHandler struct {
-    client OllamaClient
-    mapper ModelMapper
+    router *Router
     logger *Logger
 }
 
 // TODO comments should include issue numbers or assignee
-// TODO(username): Implement request caching for better performance (#123)
-// FIXME: Memory leak in streaming responses when client disconnects early
+// TODO(username): Implement request caching (#123)
+// FIXME: Memory leak in streaming responses
 ```
 
 ### Git Commit Standards
@@ -295,9 +265,8 @@ type ChatHandler struct {
 feat(api): add streaming support for chat completions
 
 - Implement server-sent events for streaming responses  
-- Add chunked response conversion from Ollama format
+- Add chunked response handling
 - Include proper error handling for stream interruption
-- Update OpenAI compatibility for streaming format
 
 Closes #45
 ```
@@ -305,25 +274,23 @@ Closes #45
 ## 🧪 Testing Standards
 
 ### Test Coverage Requirements
-- **Critical packages (auth, security)**: 100% coverage
-- **API handlers**: 95%+ coverage  
-- **Core business logic**: 95%+ coverage
-- **Utility functions**: 90%+ coverage
-- **Main functions**: 80%+ coverage
+- **Critical packages (auth, security)**: 100%
+- **API handlers**: 95%+
+- **Core business logic**: 95%+
+- **Utility functions**: 90%+
 
 ### Test Naming Convention
 ```go
 // TestFunctionName_Scenario_ExpectedResult
 func TestChatHandler_ValidRequest_ReturnsSuccess(t *testing.T) {}
 func TestChatHandler_InvalidModel_ReturnsError(t *testing.T) {}
-func TestChatHandler_OllamaDown_ReturnsServiceUnavailable(t *testing.T) {}
+func TestChatHandler_ProviderDown_ReturnsServiceUnavailable(t *testing.T) {}
 ```
 
 ### Continuous Integration
 ```yaml
-# .github/workflows/test.yml
 - name: Run tests with coverage
   run: |
     go test -race -coverprofile=coverage.out ./...
-    go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{if($1<95) exit 1}'
+    go tool cover -func=coverage.out | grep total
 ```

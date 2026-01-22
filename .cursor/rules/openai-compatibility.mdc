@@ -1,165 +1,190 @@
 ---
-globs: ollama-openai-proxy/internal/api/**/*.go,ollama-openai-proxy/internal/converter/*.go
+globs: internal/api/**/*.go,internal/providers/*.go,internal/inference/*.go
 ---
 
 # OpenAI API Compatibility Guidelines
 
-## 🎯 API Endpoint Requirements
+## 🎯 API Endpoints
 
-### Core Endpoints Implementation
-- **`/v1/chat/completions`** - Primary chat endpoint with streaming support
-- **`/v1/models`** - Model listing with proper OpenAI format
-- **`/v1/embeddings`** - Text embeddings (post-MVP)
-- **`/v1/completions`** - Legacy completions (post-MVP)
+### Core Endpoints
+- **`/v1/chat/completions`** - Chat с streaming
+- **`/v1/models`** - Список моделей
+- **`/v1/embeddings`** - Text embeddings
 
-### Request/Response Format Compliance
+### Request Format
 
-#### Chat Completions Request
 ```go
 type ChatCompletionRequest struct {
     Model            string                 `json:"model" binding:"required"`
-    Messages         []ChatMessage         `json:"messages" binding:"required"`
-    MaxTokens        *int                  `json:"max_tokens,omitempty"`
-    Temperature      *float64              `json:"temperature,omitempty"`
-    TopP             *float64              `json:"top_p,omitempty"`
-    N                *int                  `json:"n,omitempty"`
-    Stream           *bool                 `json:"stream,omitempty"`
-    Stop             interface{}           `json:"stop,omitempty"` // string or []string
-    PresencePenalty  *float64              `json:"presence_penalty,omitempty"`
-    FrequencyPenalty *float64              `json:"frequency_penalty,omitempty"`
-    LogitBias        map[string]float64    `json:"logit_bias,omitempty"`
-    User             *string               `json:"user,omitempty"`
+    Messages         []ChatMessage          `json:"messages" binding:"required"`
+    MaxTokens        *int                   `json:"max_tokens,omitempty"`
+    Temperature      *float64               `json:"temperature,omitempty"`
+    TopP             *float64               `json:"top_p,omitempty"`
+    N                *int                   `json:"n,omitempty"`
+    Stream           *bool                  `json:"stream,omitempty"`
+    Stop             interface{}            `json:"stop,omitempty"`
+    PresencePenalty  *float64               `json:"presence_penalty,omitempty"`
+    FrequencyPenalty *float64               `json:"frequency_penalty,omitempty"`
+    Tools            []Tool                 `json:"tools,omitempty"`
+    ToolChoice       interface{}            `json:"tool_choice,omitempty"`
+    User             *string                `json:"user,omitempty"`
 }
 ```
 
-#### Chat Completions Response
+### Response Format
+
 ```go
 type ChatCompletionResponse struct {
-    ID      string                   `json:"id"`
-    Object  string                   `json:"object"`
-    Created int64                    `json:"created"`
-    Model   string                   `json:"model"`
-    Choices []ChatCompletionChoice   `json:"choices"`
-    Usage   ChatCompletionUsage      `json:"usage"`
-}
-
-type ChatCompletionChoice struct {
-    Index        int                `json:"index"`
-    Message      ChatMessage        `json:"message,omitempty"`
-    Delta        *ChatMessage       `json:"delta,omitempty"` // For streaming
-    FinishReason *string            `json:"finish_reason"`
+    ID      string                 `json:"id"`
+    Object  string                 `json:"object"`
+    Created int64                  `json:"created"`
+    Model   string                 `json:"model"`
+    Choices []ChatCompletionChoice `json:"choices"`
+    Usage   ChatCompletionUsage    `json:"usage"`
 }
 ```
 
-#### Model Listing Response
+### Error Format
+
 ```go
-type ModelsResponse struct {
-    Object string  `json:"object"`
-    Data   []Model `json:"data"`
-}
-
-type Model struct {
-    ID         string      `json:"id"`
-    Object     string      `json:"object"`
-    OwnedBy    string      `json:"owned_by"`
-    Permission []ModelPerm `json:"permission"`
-}
-```
-
-### Error Format Compatibility
-```go
-type OpenAIError struct {
-    Error struct {
-        Message string      `json:"message"`
-        Type    string      `json:"type"`
-        Param   interface{} `json:"param,omitempty"`
-        Code    interface{} `json:"code,omitempty"`
-    } `json:"error"`
-}
-
-// Common error types to match OpenAI
 const (
-    ErrorTypeInvalidRequest     = "invalid_request_error"
-    ErrorTypeAuthentication     = "authentication_error"
+    ErrorTypeInvalidRequest    = "invalid_request_error"
+    ErrorTypeAuthentication    = "authentication_error"
     ErrorTypePermission        = "permission_error"
     ErrorTypeNotFound          = "not_found_error"
     ErrorTypeRateLimit         = "rate_limit_exceeded"
-    ErrorTypeQuotaExceeded     = "quota_exceeded"
     ErrorTypeServerError       = "server_error"
-    ErrorTypeEngineOverloaded  = "engine_overloaded"
 )
 ```
 
-## 🔄 Request/Response Conversion
+## 🔄 Provider Architecture
 
-### OpenAI → Ollama Conversion
+### Provider Interface (internal/providers/provider.go)
+
 ```go
-func ConvertChatRequest(openaiReq ChatCompletionRequest) OllamaChatRequest {
-    return OllamaChatRequest{
-        Model:  mapModelName(openaiReq.Model),
-        Messages: convertMessages(openaiReq.Messages),
-        Stream: openaiReq.Stream != nil && *openaiReq.Stream,
-        Options: OllamaOptions{
-            Temperature: openaiReq.Temperature,
-            TopP:       openaiReq.TopP,
-            Stop:       convertStop(openaiReq.Stop),
-        },
-    }
+type Provider interface {
+    GetName() string
+    GetType() models.ModelProviderType
+    HealthCheck(ctx context.Context) error
+    ListModels(ctx context.Context) ([]*ProviderModel, error)
+    GetModelInfo(ctx context.Context, modelID string) (*ProviderModel, error)
+}
+
+type ProviderModel struct {
+    ID             string
+    Name           string
+    Capabilities   []models.ModelCapability
+    Parameters     map[string]interface{}
+    RequiresGPU    bool
+    MinVRAMGB      *int
+    ContextLength  *int
+    Description    string
+    Tags           []string
+    ProviderMeta   map[string]interface{}
 }
 ```
 
-### Ollama → OpenAI Response Conversion
+### Provider Manager (internal/providers/manager.go)
+
 ```go
-func ConvertChatResponse(ollamaResp OllamaChatResponse, model string) ChatCompletionResponse {
-    return ChatCompletionResponse{
-        ID:      generateChatID(),
-        Object:  "chat.completion",
-        Created: time.Now().Unix(),
-        Model:   model,
-        Choices: []ChatCompletionChoice{
-            {
-                Index: 0,
-                Message: ChatMessage{
-                    Role:    "assistant",
-                    Content: ollamaResp.Message.Content,
-                },
-                FinishReason: convertFinishReason(ollamaResp.Done),
-            },
-        },
-        Usage: calculateUsage(ollamaResp),
+type ProviderManager struct {
+    db        storage.Database
+    logger    *logrus.Logger
+    providers map[string]Provider // provider_id -> Provider
+    mu        sync.RWMutex
+}
+
+// Providers загружаются из PostgreSQL при старте
+func (pm *ProviderManager) LoadProvidersFromDB(ctx context.Context) error {
+    providerConfigs, _ := pm.db.ListModelProviders(ctx, true)
+    
+    for _, config := range providerConfigs {
+        switch config.ProviderType {
+        case models.ProviderTypeOllama:
+            provider = NewOllamaProvider(config.Name, config.BaseURL)
+        case models.ProviderTypeVLLM:
+            provider = NewVLLMProvider(config.Name, config.BaseURL)
+        }
+        pm.RegisterProvider(config.ID, provider)
     }
+}
+
+// Периодические health checks
+func (pm *ProviderManager) RunHealthCheckLoop(ctx context.Context, interval time.Duration)
+
+// Автоматическое обнаружение моделей
+func (pm *ProviderManager) DiscoverModels(ctx context.Context) (int, error)
+```
+
+## 🐳 Inference Service (Docker-based)
+
+### Supported Providers (internal/inference/)
+
+| Provider | Docker Image | Use Case |
+|----------|--------------|----------|
+| vLLM | `vllm/vllm-openai` | Production inference |
+| SGLang | `lmsysorg/sglang` | Fast inference |
+| TGI | `ghcr.io/huggingface/text-generation-inference` | HuggingFace models |
+| TEI | `ghcr.io/huggingface/text-embeddings-inference` | Embeddings |
+| llama.cpp | `ghcr.io/ggerganov/llama.cpp` | GGUF models |
+| TensorRT-LLM | Custom | NVIDIA GPUs |
+
+### Model Lifecycle
+
+```go
+// internal/inference/service.go
+type Service struct {
+    orch           *Orchestrator
+    runtime        ContainerRuntime
+    downloader     *ModelDownloader
+    registry       *SpecRegistry
+}
+
+// LoadAndStart downloads model and starts container
+func (s *Service) LoadAndStart(ctx context.Context, spec ModelSpec) (*ModelInstance, error)
+
+// Stop stops container
+func (s *Service) Stop(ctx context.Context, alias string) error
+
+// ListModels returns running models
+func (s *Service) ListModels() []*ModelInstance
+```
+
+### ModelSpec
+
+```go
+type ModelSpec struct {
+    Alias         string           // "my-llama3"
+    Provider      ProviderType     // vllm, sglang, tgi, llama.cpp
+    HFRepo        string           // "meta-llama/Llama-3.2-8B-Instruct"
+    HFFile        string           // For GGUF: specific file name
+    GGUFURL       string           // Direct URL to GGUF
+    LocalPath     string           // Path to local model
+    Format        ModelFormat      // safetensors, gguf
+    Capabilities  []ModelCapability
+    GPULayers     int
+    CtxSize       int
+    FlashAttn     bool
 }
 ```
 
-## 📡 Streaming Implementation
+## 📡 Streaming (SSE)
 
-### Server-Sent Events (SSE) Format
 ```go
-func (h *ChatHandler) streamResponse(w http.ResponseWriter, req ChatCompletionRequest) {
+func (h *Handler) streamResponse(w http.ResponseWriter, req ChatRequest) {
     w.Header().Set("Content-Type", "text/event-stream")
     w.Header().Set("Cache-Control", "no-cache")
     w.Header().Set("Connection", "keep-alive")
     
-    flusher, ok := w.(http.Flusher)
-    if !ok {
-        http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-        return
-    }
+    flusher := w.(http.Flusher)
     
-    for chunk := range streamChannel {
+    for chunk := range stream {
         data := ChatCompletionResponse{
-            ID:      req.ID,
             Object:  "chat.completion.chunk",
-            Created: time.Now().Unix(),
-            Model:   req.Model,
-            Choices: []ChatCompletionChoice{
-                {
-                    Index: 0,
-                    Delta: &ChatMessage{Content: chunk.Content},
-                },
-            },
+            Choices: []ChatCompletionChoice{{
+                Delta: &ChatMessage{Content: chunk.Content},
+            }},
         }
-        
         fmt.Fprintf(w, "data: %s\n\n", toJSON(data))
         flusher.Flush()
     }
@@ -168,32 +193,41 @@ func (h *ChatHandler) streamResponse(w http.ResponseWriter, req ChatCompletionRe
 }
 ```
 
-## 🔑 Authentication Header Handling
+## 🔑 Authentication
+
 ```go
-// Support both Authorization and X-API-Key headers
 func extractAPIKey(r *http.Request) string {
-    // Check Authorization: Bearer <token>
+    // Authorization: Bearer <token>
     auth := r.Header.Get("Authorization")
     if strings.HasPrefix(auth, "Bearer ") {
         return strings.TrimPrefix(auth, "Bearer ")
     }
-    
-    // Check X-API-Key header  
     return r.Header.Get("X-API-Key")
 }
 ```
 
-## 📊 Usage Tracking (OpenAI Compatible)
-```go
-type ChatCompletionUsage struct {
-    PromptTokens     int `json:"prompt_tokens"`
-    CompletionTokens int `json:"completion_tokens"`
-    TotalTokens      int `json:"total_tokens"`
-}
+## ⚙️ Configuration
 
-// Estimate tokens for compatibility (Ollama doesn't provide exact counts)
-func estimateTokenCount(text string) int {
-    // Rough estimation: ~4 characters per token for English
-    return len(text) / 4
-}
+```yaml
+# configs/dev.yaml
+inference:
+  docker:
+    enabled: true
+    hf_cache_dir: "./data/models/hf"
+    gguf_dir: "./data/models/gguf"
+    trt_engines_dir: "./data/engines/trt"
+    max_running_models: 2
+    default_provider: "vllm"  # vllm | sglang | tgi | llama.cpp | tensorrt-llm
+    health_check_timeout: "60s"
+    startup_timeout: "5m"
+    max_concurrent_downloads: 2
+```
+
+### Provider Registration (via API/UI)
+
+Providers создаются через Admin API и хранятся в PostgreSQL:
+
+```sql
+INSERT INTO model_providers (name, provider_type, base_url, enabled)
+VALUES ('local-vllm', 'vllm', 'http://localhost:8000', true);
 ```

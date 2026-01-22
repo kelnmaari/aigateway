@@ -1267,7 +1267,7 @@
 									<span class="text-xs font-bold text-gray-500 uppercase">Updates Available</span>
 									<div class="mt-1 text-3xl font-bold text-yellow-500">
 										{(analysisResult.ecosystems || []).reduce(
-											(acc: number, curr: any) => acc + (curr.outdated_count || 0),
+											(acc: number, curr: any) => acc + (curr.summary?.outdated_count || 0),
 											0
 										)}
 									</div>
@@ -1276,7 +1276,7 @@
 									<span class="text-xs font-bold text-gray-500 uppercase">Vulnerabilities</span>
 									<div class="mt-1 text-3xl font-bold text-red-500">
 										{(analysisResult.ecosystems || []).reduce(
-											(acc: number, curr: any) => acc + (curr.vulnerabilities_count || 0),
+											(acc: number, curr: any) => acc + (curr.summary?.vulnerable_count || 0),
 											0
 										)}
 									</div>
@@ -1314,10 +1314,10 @@
 												}`}
 											>
 												<Package class="h-4 w-4" />
-												{ecosystem.name}
+												{ecosystem.language || ecosystem.name}
 												<span
 													class={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
-														ecosystem.vulnerabilities_count > 0
+														(ecosystem.summary?.vulnerable_count || 0) > 0
 															? 'bg-red-500/20 text-red-500'
 															: 'bg-gray-700 text-gray-400'
 													}`}
@@ -1340,8 +1340,8 @@
 															</div>
 															<div>
 																<h5 class="flex items-center gap-2 font-bold text-gray-200">
-																	{dep.package_name}
-																	{#if dep.is_outdated}
+																	{dep.dependency?.name || 'Unknown'}
+																	{#if dep.dependency?.has_update}
 																		<span
 																			class="rounded bg-yellow-500/10 px-2 py-0.5 text-[10px] text-yellow-500 uppercase"
 																			>Outdated</span
@@ -1349,20 +1349,21 @@
 																	{/if}
 																</h5>
 																<p class="text-xs text-gray-500">
-																	Current: {dep.current_version} • Latest: {dep.latest_version}
+																	Current: {dep.dependency?.current_version || 'N/A'} • Latest: {dep
+																		.dependency?.latest_version || 'N/A'}
 																</p>
 															</div>
 														</div>
 														<div class="flex items-center gap-3">
-															{#if dep.is_outdated}
+															{#if dep.dependency?.has_update}
 																<button
 																	onclick={() => handleAnalyzeChangelog(dep)}
 																	disabled={changelogLoading[
-																		`${dep.package_name}-${dep.latest_version}`
+																		`${dep.dependency.name}-${dep.dependency.latest_version}`
 																	]}
 																	class="flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-bold text-indigo-400 transition-colors hover:bg-gray-700"
 																>
-																	{#if changelogLoading[`${dep.package_name}-${dep.latest_version}`]}
+																	{#if changelogLoading[`${dep.dependency.name}-${dep.dependency.latest_version}`]}
 																		<Loader2 class="h-3 w-3 animate-spin" />
 																	{:else}
 																		<Brain class="h-3 w-3" />
@@ -1383,9 +1384,11 @@
 														</div>
 													</div>
 
-													{#if changelogResults[`${dep.package_name}-${dep.latest_version}`]}
+													{#if changelogResults[`${dep.dependency?.name}-${dep.dependency?.latest_version}`]}
 														{@const ch =
-															changelogResults[`${dep.package_name}-${dep.latest_version}`]}
+															changelogResults[
+																`${dep.dependency.name}-${dep.dependency.latest_version}`
+															]}
 														<div class="animate-in fade-in slide-in-from-top-2 mt-4 duration-300">
 															<div
 																class={`rounded-lg border p-4 ${getRiskLevelClass(ch.risk_level)}`}

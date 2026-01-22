@@ -156,15 +156,15 @@
 	async function handleAnalyzeChangelog(dep: any) {
 		if (!selectedProjectForAnalysis) return;
 
-		const key = `${dep.package_name}-${dep.latest_version}`;
+		const key = `${dep.dependency?.name}-${dep.dependency?.latest_version}`;
 		changelogLoading[key] = true;
 
 		try {
 			const result = await analyzeMyChangelog(selectedProjectForAnalysis.id, {
-				package_name: dep.package_name,
-				current_version: dep.current_version,
-				latest_version: dep.latest_version,
-				ecosystem: (analysisResult.ecosystems || [])[activeEcosystemIndex]?.name
+				package_name: dep.dependency.name,
+				current_version: dep.dependency.current_version,
+				latest_version: dep.dependency.latest_version,
+				language: (analysisResult.ecosystems || [])[activeEcosystemIndex]?.language || 'go'
 			});
 			changelogResults[key] = result;
 		} catch (e) {

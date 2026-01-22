@@ -483,8 +483,9 @@ func (s *PostgresStore) GetProject(ctx context.Context, id string) (*models.GitL
 
 func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID string, gitlabProjectID int64) (*models.GitLabProject, error) {
 	query := `
-		SELECT p.id, p.integration_id, p.gitlab_project_id, p.name, p.path_with_namespace, p.webhook_id,
+		SELECT p.id, p.integration_id, p.gitlab_project_id, p.name, p.path_with_namespace, p.default_branch, p.webhook_id,
 		       p.status, p.auto_review, p.analysis_model_id, p.embedding_model_id, p.review_prompt, p.settings,
+		       p.index_status, p.last_indexed_at,
 		       p.created_at, p.updated_at
 		FROM gitlab_projects p
 		WHERE p.integration_id = $1 AND p.gitlab_project_id = $2
@@ -494,6 +495,8 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 	var webhookID sql.NullInt64
 	var reviewPrompt sql.NullString
 	var settingsJSON string
+	var indexStatus sql.NullString
+	var lastIndexedAt sql.NullTime
 
 	err := s.db.QueryRowContext(ctx, query, integrationID, gitlabProjectID).Scan(
 		&project.ID,
@@ -501,6 +504,7 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 		&project.GitLabProjectID,
 		&project.Name,
 		&project.PathWithNamespace,
+		&project.DefaultBranch,
 		&webhookID,
 		&project.Status,
 		&project.AutoReview,
@@ -508,6 +512,8 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 		&project.EmbeddingModelID,
 		&reviewPrompt,
 		&settingsJSON,
+		&indexStatus,
+		&lastIndexedAt,
 		&project.CreatedAt,
 		&project.UpdatedAt,
 	)
@@ -524,6 +530,12 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 	}
 	if reviewPrompt.Valid {
 		project.ReviewPrompt = reviewPrompt.String
+	}
+	if indexStatus.Valid {
+		project.IndexStatus = indexStatus.String
+	}
+	if lastIndexedAt.Valid {
+		project.LastIndexedAt = &lastIndexedAt.Time
 	}
 	if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
 		// Ignore JSON errors
@@ -659,14 +671,17 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 
 func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrationID string) ([]*models.GitLabProject, error) {
 	query := `
-		SELECT id, integration_id, gitlab_project_id, name, path_with_namespace,
-		       auto_review, webhook_id, status, analysis_model_id, embedding_model_id, review_prompt,
-		       settings, created_at, updated_at
-		FROM gitlab_projects
-		WHERE integration_id = $1
-		ORDER BY name ASC
+		SELECT p.id, p.integration_id, p.gitlab_project_id, p.name, p.path_with_namespace, p.default_branch, p.webhook_id,
+		       p.status, p.auto_review, p.analysis_model_id, p.embedding_model_id, p.review_prompt, p.settings,
+		       p.index_status, p.last_indexed_at,
+		       p.created_at, p.updated_at,
+		       i.name as integration_name,
+		       (SELECT COUNT(*) FROM gitlab_mr_reviews WHERE project_id = p.id) as review_count
+		FROM gitlab_projects p
+		LEFT JOIN gitlab_integrations i ON i.id = p.integration_id
+		WHERE p.integration_id = $1
+		ORDER BY p.name ASC
 	`
-
 	rows, err := s.db.QueryContext(ctx, query, integrationID)
 	if err != nil {
 		return nil, fmt.Errorf("query projects by integration: %w", err)
@@ -680,6 +695,9 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 		var settingsJSON string
 		var analysisModelID, embeddingModelID sql.NullString
 		var reviewPrompt sql.NullString
+		var integrationName sql.NullString
+		var indexStatus sql.NullString
+		var lastIndexedAt sql.NullTime
 
 		if err := rows.Scan(
 			&project.ID,
@@ -687,15 +705,20 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 			&project.GitLabProjectID,
 			&project.Name,
 			&project.PathWithNamespace,
-			&project.AutoReview,
+			&project.DefaultBranch,
 			&webhookID,
 			&project.Status,
+			&project.AutoReview,
 			&analysisModelID,
 			&embeddingModelID,
 			&reviewPrompt,
 			&settingsJSON,
+			&indexStatus,
+			&lastIndexedAt,
 			&project.CreatedAt,
 			&project.UpdatedAt,
+			&integrationName,
+			&project.ReviewCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan project: %w", err)
 		}
@@ -712,6 +735,15 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 		}
 		if reviewPrompt.Valid {
 			project.ReviewPrompt = reviewPrompt.String
+		}
+		if integrationName.Valid {
+			project.IntegrationName = integrationName.String
+		}
+		if indexStatus.Valid {
+			project.IndexStatus = indexStatus.String
+		}
+		if lastIndexedAt.Valid {
+			project.LastIndexedAt = &lastIndexedAt.Time
 		}
 		if settingsJSON != "" {
 			if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
@@ -730,6 +762,11 @@ func (s *PostgresStore) UpdateProject(ctx context.Context, id string, req *model
 	var args []interface{}
 	argNum := 1
 
+	if req.Name != nil {
+		sets = append(sets, fmt.Sprintf("name = $%d", argNum))
+		args = append(args, *req.Name)
+		argNum++
+	}
 	if req.AutoReview != nil {
 		sets = append(sets, fmt.Sprintf("auto_review = $%d", argNum))
 		args = append(args, *req.AutoReview)

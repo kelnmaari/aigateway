@@ -84,7 +84,12 @@
 			chunk_size: 4000,
 			chunk_overlap: 200,
 			max_files_per_mr: 50,
-			max_lines_per_file: 1000
+			max_lines_per_file: 2000,
+			skip_draft_mrs: false,
+			skip_bots: false,
+			per_file_review: false,
+			max_review_tokens: 8192,
+			review_language: 'en'
 		}
 	};
 	let updatingProject = false;
@@ -182,7 +187,12 @@
 				chunk_size: project.settings?.chunk_size || 4000,
 				chunk_overlap: project.settings?.chunk_overlap || 200,
 				max_files_per_mr: project.settings?.max_files_per_mr || 50,
-				max_lines_per_file: project.settings?.max_lines_per_file || 1000
+				max_lines_per_file: project.settings?.max_lines_per_file || 2000,
+				skip_draft_mrs: project.settings?.skip_draft_mrs || false,
+				skip_bots: project.settings?.skip_bots || false,
+				per_file_review: project.settings?.per_file_review || false,
+				max_review_tokens: project.settings?.max_review_tokens || 8192,
+				review_language: project.settings?.review_language || 'en'
 			}
 		};
 		showEditProject = true;
@@ -214,7 +224,12 @@
 					chunk_size: editForm.settings.chunk_size,
 					chunk_overlap: editForm.settings.chunk_overlap,
 					max_files_per_mr: editForm.settings.max_files_per_mr,
-					max_lines_per_file: editForm.settings.max_lines_per_file
+					max_lines_per_file: editForm.settings.max_lines_per_file,
+					skip_draft_mrs: editForm.settings.skip_draft_mrs,
+					skip_bots: editForm.settings.skip_bots,
+					per_file_review: editForm.settings.per_file_review,
+					max_review_tokens: editForm.settings.max_review_tokens,
+					review_language: editForm.settings.review_language
 				}
 			});
 			showEditProject = false;

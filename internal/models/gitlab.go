@@ -14,19 +14,19 @@ import (
 
 // GitLabIntegration represents a connection to a GitLab instance
 type GitLabIntegration struct {
-	ID            string                   `json:"id" db:"id"`
-	OwnerID       string                   `json:"owner_id" db:"owner_id"`     // User who created the integration
-	TenantID      string                   `json:"tenant_id,omitempty" db:"tenant_id"` // Optional: shared within tenant
-	Name          string                   `json:"name" db:"name"`
-	BaseURL       string                   `json:"base_url" db:"base_url"`
-	AccessToken   string                   `json:"-" db:"access_token"`        // Encrypted, never exposed
-	WebhookSecret string                   `json:"-" db:"webhook_secret"`      // For webhook verification
-	Status        GitLabIntegrationStatus  `json:"status" db:"status"`
-	LastSyncAt    *time.Time               `json:"last_sync_at,omitempty" db:"last_sync_at"`
-	LastError     string                   `json:"last_error,omitempty" db:"last_error"`
+	ID            string                    `json:"id" db:"id"`
+	OwnerID       string                    `json:"owner_id" db:"owner_id"`             // User who created the integration
+	TenantID      string                    `json:"tenant_id,omitempty" db:"tenant_id"` // Optional: shared within tenant
+	Name          string                    `json:"name" db:"name"`
+	BaseURL       string                    `json:"base_url" db:"base_url"`
+	AccessToken   string                    `json:"-" db:"access_token"`   // Encrypted, never exposed
+	WebhookSecret string                    `json:"-" db:"webhook_secret"` // For webhook verification
+	Status        GitLabIntegrationStatus   `json:"status" db:"status"`
+	LastSyncAt    *time.Time                `json:"last_sync_at,omitempty" db:"last_sync_at"`
+	LastError     string                    `json:"last_error,omitempty" db:"last_error"`
 	Settings      GitLabIntegrationSettings `json:"settings" db:"settings"`
-	CreatedAt     time.Time                `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time                `json:"updated_at" db:"updated_at"`
+	CreatedAt     time.Time                 `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time                 `json:"updated_at" db:"updated_at"`
 
 	// Computed fields (not stored)
 	ProjectCount int `json:"project_count,omitempty" db:"-"`
@@ -44,12 +44,12 @@ const (
 // GitLabIntegrationSettings contains settings for GitLab integration
 type GitLabIntegrationSettings struct {
 	// Connection settings
-	APIVersion      string `json:"api_version,omitempty"`       // Default: "v4"
-	RequestTimeout  int    `json:"request_timeout,omitempty"`   // In seconds, default: 30
-	MaxRetries      int    `json:"max_retries,omitempty"`       // Default: 3
-	
+	APIVersion     string `json:"api_version,omitempty"`     // Default: "v4"
+	RequestTimeout int    `json:"request_timeout,omitempty"` // In seconds, default: 30
+	MaxRetries     int    `json:"max_retries,omitempty"`     // Default: 3
+
 	// Rate limiting
-	RateLimitPerMin int    `json:"rate_limit_per_min,omitempty"` // Default: 30 (safe for GitLab 2000/min)
+	RateLimitPerMin int `json:"rate_limit_per_min,omitempty"` // Default: 30 (safe for GitLab 2000/min)
 }
 
 // Scan implements sql.Scanner for GitLabIntegrationSettings
@@ -76,38 +76,38 @@ func (s *GitLabIntegrationSettings) Scan(value interface{}) error {
 
 // GitLabProject represents a GitLab project configured for AI review
 type GitLabProject struct {
-	ID                string               `json:"id" db:"id"`
-	IntegrationID     string               `json:"integration_id" db:"integration_id"`
-	GitLabProjectID   int64                `json:"gitlab_project_id" db:"gitlab_project_id"`
-	Name              string               `json:"name" db:"name"`
-	PathWithNamespace string               `json:"path_with_namespace" db:"path_with_namespace"`
-	DefaultBranch     string               `json:"default_branch" db:"default_branch"` // Target branch for indexing
-	WebhookID         *int64               `json:"webhook_id,omitempty" db:"webhook_id"`
-	Status            GitLabProjectStatus  `json:"status" db:"status"`
-	AutoReview        bool                 `json:"auto_review" db:"auto_review"`
-	
+	ID                string              `json:"id" db:"id"`
+	IntegrationID     string              `json:"integration_id" db:"integration_id"`
+	GitLabProjectID   int64               `json:"gitlab_project_id" db:"gitlab_project_id"`
+	Name              string              `json:"name" db:"name"`
+	PathWithNamespace string              `json:"path_with_namespace" db:"path_with_namespace"`
+	DefaultBranch     string              `json:"default_branch" db:"default_branch"` // Target branch for indexing
+	WebhookID         *int64              `json:"webhook_id,omitempty" db:"webhook_id"`
+	Status            GitLabProjectStatus `json:"status" db:"status"`
+	AutoReview        bool                `json:"auto_review" db:"auto_review"`
+
 	// Model Configuration
-	AnalysisModelID   string               `json:"analysis_model_id" db:"analysis_model_id"`   // LLM for review
-	EmbeddingModelID  string               `json:"embedding_model_id" db:"embedding_model_id"` // For code chunking
-	
+	AnalysisModelID  string `json:"analysis_model_id" db:"analysis_model_id"`   // LLM for review
+	EmbeddingModelID string `json:"embedding_model_id" db:"embedding_model_id"` // For code chunking
+
 	// Review Configuration
-	ReviewPrompt      string               `json:"review_prompt,omitempty" db:"review_prompt"`
-	Settings          GitLabProjectSettings `json:"settings" db:"settings"`
-	
+	ReviewPrompt string                `json:"review_prompt,omitempty" db:"review_prompt"`
+	Settings     GitLabProjectSettings `json:"settings" db:"settings"`
+
 	// Indexing status
-	IndexStatus       string               `json:"index_status,omitempty" db:"index_status"` // pending, in_progress, completed, failed
-	LastIndexedAt     *time.Time           `json:"last_indexed_at,omitempty" db:"last_indexed_at"`
-	
-	CreatedAt         time.Time            `json:"created_at" db:"created_at"`
-	UpdatedAt         time.Time            `json:"updated_at" db:"updated_at"`
-	
+	IndexStatus   string     `json:"index_status,omitempty" db:"index_status"` // pending, in_progress, completed, failed
+	LastIndexedAt *time.Time `json:"last_indexed_at,omitempty" db:"last_indexed_at"`
+
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+
 	// Computed fields (not stored)
 	IntegrationName string `json:"integration_name,omitempty" db:"-"`
 	ReviewCount     int    `json:"review_count,omitempty" db:"-"`
-	
+
 	// Index statistics (computed from Qdrant)
-	IndexChunks     int64  `json:"index_chunks,omitempty" db:"-"`
-	IndexVectors    int64  `json:"index_vectors,omitempty" db:"-"`
+	IndexChunks  int64 `json:"index_chunks,omitempty" db:"-"`
+	IndexVectors int64 `json:"index_vectors,omitempty" db:"-"`
 }
 
 // GetCollectionName returns the Qdrant collection name for this project.
@@ -211,66 +211,66 @@ func (s *GitLabProjectSettings) Scan(value interface{}) error {
 
 // GitLabMRReview represents the result of an MR analysis
 type GitLabMRReview struct {
-	ID               string              `json:"id" db:"id"`
-	ProjectID        string              `json:"project_id" db:"project_id"`
-	IntegrationID    string              `json:"integration_id" db:"integration_id"`
-	
+	ID            string `json:"id" db:"id"`
+	ProjectID     string `json:"project_id" db:"project_id"`
+	IntegrationID string `json:"integration_id" db:"integration_id"`
+
 	// MR Information
-	MRIID            int                 `json:"mr_iid" db:"mr_iid"`
-	MRTitle          string              `json:"mr_title" db:"mr_title"`
-	MRAuthor         string              `json:"mr_author" db:"mr_author"`
-	MRAuthorID       int64               `json:"mr_author_id" db:"mr_author_id"`
-	SourceBranch     string              `json:"source_branch" db:"source_branch"`
-	TargetBranch     string              `json:"target_branch" db:"target_branch"`
-	MRURL            string              `json:"mr_url" db:"mr_url"`
-	
+	MRIID        int    `json:"mr_iid" db:"mr_iid"`
+	MRTitle      string `json:"mr_title" db:"mr_title"`
+	MRAuthor     string `json:"mr_author" db:"mr_author"`
+	MRAuthorID   int64  `json:"mr_author_id" db:"mr_author_id"`
+	SourceBranch string `json:"source_branch" db:"source_branch"`
+	TargetBranch string `json:"target_branch" db:"target_branch"`
+	MRURL        string `json:"mr_url" db:"mr_url"`
+
 	// Review Status
-	Status           GitLabReviewStatus  `json:"status" db:"status"`
-	Priority         GitLabReviewPriority `json:"priority" db:"priority"`
-	
+	Status   GitLabReviewStatus   `json:"status" db:"status"`
+	Priority GitLabReviewPriority `json:"priority" db:"priority"`
+
 	// Analysis Results
-	FilesAnalyzed    int                 `json:"files_analyzed" db:"files_analyzed"`
-	LinesChanged     int                 `json:"lines_changed" db:"lines_changed"`
-	IssuesFound      int                 `json:"issues_found" db:"issues_found"`
-	ReviewResult     *GitLabReviewResult `json:"review_result,omitempty" db:"review_result"`
-	
+	FilesAnalyzed int                 `json:"files_analyzed" db:"files_analyzed"`
+	LinesChanged  int                 `json:"lines_changed" db:"lines_changed"`
+	IssuesFound   int                 `json:"issues_found" db:"issues_found"`
+	ReviewResult  *GitLabReviewResult `json:"review_result,omitempty" db:"review_result"`
+
 	// GitLab Note
-	NoteID           *int64              `json:"note_id,omitempty" db:"note_id"`
-	DiscussionID     *string             `json:"discussion_id,omitempty" db:"discussion_id"`
-	
+	NoteID       *int64  `json:"note_id,omitempty" db:"note_id"`
+	DiscussionID *string `json:"discussion_id,omitempty" db:"discussion_id"`
+
 	// Performance Metrics
-	ProcessingTimeMs int64               `json:"processing_time_ms" db:"processing_time_ms"`
-	TokensUsed       int                 `json:"tokens_used" db:"tokens_used"`
-	ModelUsed        string              `json:"model_used" db:"model_used"`
-	
+	ProcessingTimeMs int64  `json:"processing_time_ms" db:"processing_time_ms"`
+	TokensUsed       int    `json:"tokens_used" db:"tokens_used"`
+	ModelUsed        string `json:"model_used" db:"model_used"`
+
 	// Timestamps
-	CreatedAt        time.Time           `json:"created_at" db:"created_at"`
-	StartedAt        *time.Time          `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt      *time.Time          `json:"completed_at,omitempty" db:"completed_at"`
-	
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+
 	// Error handling
-	Error            string              `json:"error,omitempty" db:"error"`
-	RetryCount       int                 `json:"retry_count" db:"retry_count"`
-	MaxRetries       int                 `json:"max_retries" db:"max_retries"`
-	
+	Error      string `json:"error,omitempty" db:"error"`
+	RetryCount int    `json:"retry_count" db:"retry_count"`
+	MaxRetries int    `json:"max_retries" db:"max_retries"`
+
 	// Update tracking
-	UpdatedAt        time.Time           `json:"updated_at" db:"updated_at"`
-	
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+
 	// Computed fields
-	ProjectName      string              `json:"project_name,omitempty" db:"-"`
+	ProjectName string `json:"project_name,omitempty" db:"-"`
 }
 
 // GitLabReviewStatus represents the status of an MR review
 type GitLabReviewStatus string
 
 const (
-	GitLabReviewStatusPending    GitLabReviewStatus = "pending"
-	GitLabReviewStatusQueued     GitLabReviewStatus = "queued"
-	GitLabReviewStatusAnalyzing  GitLabReviewStatus = "analyzing"
-	GitLabReviewStatusCompleted  GitLabReviewStatus = "completed"
-	GitLabReviewStatusFailed     GitLabReviewStatus = "failed"
-	GitLabReviewStatusCancelled  GitLabReviewStatus = "cancelled"
-	GitLabReviewStatusSkipped    GitLabReviewStatus = "skipped"
+	GitLabReviewStatusPending   GitLabReviewStatus = "pending"
+	GitLabReviewStatusQueued    GitLabReviewStatus = "queued"
+	GitLabReviewStatusAnalyzing GitLabReviewStatus = "analyzing"
+	GitLabReviewStatusCompleted GitLabReviewStatus = "completed"
+	GitLabReviewStatusFailed    GitLabReviewStatus = "failed"
+	GitLabReviewStatusCancelled GitLabReviewStatus = "cancelled"
+	GitLabReviewStatusSkipped   GitLabReviewStatus = "skipped"
 )
 
 // GitLabReviewPriority represents the priority of a review job
@@ -285,11 +285,11 @@ const (
 
 // GitLabReviewResult contains structured review results
 type GitLabReviewResult struct {
-	Summary        string                    `json:"summary"`
-	OverallScore   int                       `json:"overall_score"`   // 0-100
-	Categories     []GitLabReviewCategory    `json:"categories"`
-	FileReviews    []GitLabFileReview        `json:"file_reviews,omitempty"`
-	Suggestions    []GitLabSuggestion        `json:"suggestions,omitempty"`
+	Summary      string                 `json:"summary"`
+	OverallScore int                    `json:"overall_score"` // 0-100
+	Categories   []GitLabReviewCategory `json:"categories"`
+	FileReviews  []GitLabFileReview     `json:"file_reviews,omitempty"`
+	Suggestions  []GitLabSuggestion     `json:"suggestions,omitempty"`
 }
 
 // Scan implements sql.Scanner for GitLabReviewResult
@@ -310,20 +310,20 @@ func (r *GitLabReviewResult) Scan(value interface{}) error {
 
 // GitLabReviewCategory represents a review category with score
 type GitLabReviewCategory struct {
-	Name        string `json:"name"`        // "Security", "Performance", "Style", "Bugs"
-	Score       int    `json:"score"`       // 0-100
+	Name        string `json:"name"`  // "Security", "Performance", "Style", "Bugs"
+	Score       int    `json:"score"` // 0-100
 	IssueCount  int    `json:"issue_count"`
 	Description string `json:"description,omitempty"`
 }
 
 // GitLabFileReview contains review for a specific file
 type GitLabFileReview struct {
-	FilePath    string              `json:"file_path"`
-	Language    string              `json:"language,omitempty"`
-	LinesAdded  int                 `json:"lines_added"`
-	LinesRemoved int                `json:"lines_removed"`
-	Issues      []GitLabCodeIssue   `json:"issues,omitempty"`
-	Approved    bool                `json:"approved"`
+	FilePath     string            `json:"file_path"`
+	Language     string            `json:"language,omitempty"`
+	LinesAdded   int               `json:"lines_added"`
+	LinesRemoved int               `json:"lines_removed"`
+	Issues       []GitLabCodeIssue `json:"issues,omitempty"`
+	Approved     bool              `json:"approved"`
 }
 
 // GitLabCodeIssue represents an issue found in code
@@ -331,7 +331,7 @@ type GitLabCodeIssue struct {
 	Line        int                 `json:"line"`
 	EndLine     *int                `json:"end_line,omitempty"`
 	Severity    GitLabIssueSeverity `json:"severity"`
-	Category    string              `json:"category"`    // "security", "bug", "style", "performance"
+	Category    string              `json:"category"` // "security", "bug", "style", "performance"
 	Message     string              `json:"message"`
 	Suggestion  string              `json:"suggestion,omitempty"`
 	CodeSnippet string              `json:"code_snippet,omitempty"`
@@ -364,47 +364,47 @@ type GitLabSuggestion struct {
 
 // GitLabAnalysisJob represents a job in the analysis queue
 type GitLabAnalysisJob struct {
-	ID            string                `json:"id" db:"id"`
-	ReviewID      string                `json:"review_id" db:"review_id"`
-	ProjectID     string                `json:"project_id" db:"project_id"`
-	IntegrationID string                `json:"integration_id" db:"integration_id"`
-	
+	ID            string `json:"id" db:"id"`
+	ReviewID      string `json:"review_id" db:"review_id"`
+	ProjectID     string `json:"project_id" db:"project_id"`
+	IntegrationID string `json:"integration_id" db:"integration_id"`
+
 	// Job Info
-	Status        GitLabJobStatus       `json:"status" db:"status"`
-	Priority      GitLabReviewPriority  `json:"priority" db:"priority"`
-	
+	Status   GitLabJobStatus      `json:"status" db:"status"`
+	Priority GitLabReviewPriority `json:"priority" db:"priority"`
+
 	// MR Info (denormalized for quick access)
-	MRIID         int                   `json:"mr_iid" db:"mr_iid"`
-	MRTitle       string                `json:"mr_title" db:"mr_title"`
-	
+	MRIID   int    `json:"mr_iid" db:"mr_iid"`
+	MRTitle string `json:"mr_title" db:"mr_title"`
+
 	// Worker Info
-	WorkerID      *string               `json:"worker_id,omitempty" db:"worker_id"`
-	
+	WorkerID *string `json:"worker_id,omitempty" db:"worker_id"`
+
 	// Timestamps
-	CreatedAt     time.Time             `json:"created_at" db:"created_at"`
-	StartedAt     *time.Time            `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt   *time.Time            `json:"completed_at,omitempty" db:"completed_at"`
-	
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+
 	// Retry Info
-	RetryCount    int                   `json:"retry_count" db:"retry_count"`
-	MaxRetries    int                   `json:"max_retries" db:"max_retries"`
-	LastError     string                `json:"last_error,omitempty" db:"last_error"`
-	NextRetryAt   *time.Time            `json:"next_retry_at,omitempty" db:"next_retry_at"`
-	
+	RetryCount  int        `json:"retry_count" db:"retry_count"`
+	MaxRetries  int        `json:"max_retries" db:"max_retries"`
+	LastError   string     `json:"last_error,omitempty" db:"last_error"`
+	NextRetryAt *time.Time `json:"next_retry_at,omitempty" db:"next_retry_at"`
+
 	// Update tracking
-	UpdatedAt     time.Time             `json:"updated_at" db:"updated_at"`
-	
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+
 	// Config (JSON)
-	Config        *GitLabJobConfig      `json:"config,omitempty" db:"config"`
-	
+	Config *GitLabJobConfig `json:"config,omitempty" db:"config"`
+
 	// Computed fields from joins (not stored in jobs table)
-	MRAuthor        string `json:"mr_author,omitempty" db:"-"`
-	SourceBranch    string `json:"source_branch,omitempty" db:"-"`
-	TargetBranch    string `json:"target_branch,omitempty" db:"-"`
-	ProjectName     string `json:"project_name,omitempty" db:"-"`
-	AnalysisModelID string `json:"analysis_model_id,omitempty" db:"-"`
+	MRAuthor         string `json:"mr_author,omitempty" db:"-"`
+	SourceBranch     string `json:"source_branch,omitempty" db:"-"`
+	TargetBranch     string `json:"target_branch,omitempty" db:"-"`
+	ProjectName      string `json:"project_name,omitempty" db:"-"`
+	AnalysisModelID  string `json:"analysis_model_id,omitempty" db:"-"`
 	EmbeddingModelID string `json:"embedding_model_id,omitempty" db:"-"`
-	ReviewPrompt    string `json:"review_prompt,omitempty" db:"-"`
+	ReviewPrompt     string `json:"review_prompt,omitempty" db:"-"`
 }
 
 // GitLabJobConfig configuration for analysis job
@@ -452,28 +452,28 @@ const (
 
 // GitLabWebhookEvent represents a received webhook event
 type GitLabWebhookEvent struct {
-	ID            string               `json:"id" db:"id"`
-	IntegrationID string               `json:"integration_id" db:"integration_id"`
-	ProjectID     int64                `json:"project_id" db:"project_id"`
-	MRIID         int                  `json:"mr_iid" db:"mr_iid"`
-	EventType     string               `json:"event_type" db:"event_type"`     // "merge_request"
-	Action        string               `json:"action" db:"action"`             // "open", "update", "reopen"
-	ObjectID      int64                `json:"object_id" db:"object_id"`       // GitLab object_attributes.id
-	Payload       string               `json:"payload,omitempty" db:"payload"` // JSON payload
-	Status        GitLabWebhookStatus  `json:"status" db:"status"`
-	ReceivedAt    time.Time            `json:"received_at" db:"received_at"`
-	ProcessedAt   *time.Time           `json:"processed_at,omitempty" db:"processed_at"`
-	Deduplicated  bool                 `json:"deduplicated" db:"deduplicated"` // Was this a duplicate?
+	ID            string              `json:"id" db:"id"`
+	IntegrationID string              `json:"integration_id" db:"integration_id"`
+	ProjectID     int64               `json:"project_id" db:"project_id"`
+	MRIID         int                 `json:"mr_iid" db:"mr_iid"`
+	EventType     string              `json:"event_type" db:"event_type"`     // "merge_request"
+	Action        string              `json:"action" db:"action"`             // "open", "update", "reopen"
+	ObjectID      int64               `json:"object_id" db:"object_id"`       // GitLab object_attributes.id
+	Payload       string              `json:"payload,omitempty" db:"payload"` // JSON payload
+	Status        GitLabWebhookStatus `json:"status" db:"status"`
+	ReceivedAt    time.Time           `json:"received_at" db:"received_at"`
+	ProcessedAt   *time.Time          `json:"processed_at,omitempty" db:"processed_at"`
+	Deduplicated  bool                `json:"deduplicated" db:"deduplicated"` // Was this a duplicate?
 }
 
 // GitLabWebhookStatus represents the status of a webhook event
 type GitLabWebhookStatus string
 
 const (
-	GitLabWebhookStatusPending     GitLabWebhookStatus = "pending"
-	GitLabWebhookStatusProcessed   GitLabWebhookStatus = "processed"
+	GitLabWebhookStatusPending      GitLabWebhookStatus = "pending"
+	GitLabWebhookStatusProcessed    GitLabWebhookStatus = "processed"
 	GitLabWebhookStatusDeduplicated GitLabWebhookStatus = "deduplicated"
-	GitLabWebhookStatusFailed      GitLabWebhookStatus = "failed"
+	GitLabWebhookStatusFailed       GitLabWebhookStatus = "failed"
 )
 
 // ============================================================================
@@ -482,18 +482,18 @@ const (
 
 // CreateGitLabIntegrationRequest represents request to create a GitLab integration
 type CreateGitLabIntegrationRequest struct {
-	Name        string                    `json:"name" binding:"required"`
-	BaseURL     string                    `json:"base_url" binding:"required"`
-	AccessToken string                    `json:"access_token" binding:"required"`
+	Name        string                     `json:"name" binding:"required"`
+	BaseURL     string                     `json:"base_url" binding:"required"`
+	AccessToken string                     `json:"access_token" binding:"required"`
 	Settings    *GitLabIntegrationSettings `json:"settings,omitempty"`
 }
 
 // UpdateGitLabIntegrationRequest represents request to update a GitLab integration
 type UpdateGitLabIntegrationRequest struct {
-	Name        *string                   `json:"name,omitempty"`
-	BaseURL     *string                   `json:"base_url,omitempty"`
-	AccessToken *string                   `json:"access_token,omitempty"`
-	Status      *GitLabIntegrationStatus  `json:"status,omitempty"`
+	Name        *string                    `json:"name,omitempty"`
+	BaseURL     *string                    `json:"base_url,omitempty"`
+	AccessToken *string                    `json:"access_token,omitempty"`
+	Status      *GitLabIntegrationStatus   `json:"status,omitempty"`
 	Settings    *GitLabIntegrationSettings `json:"settings,omitempty"`
 }
 
@@ -509,6 +509,7 @@ type CreateGitLabProjectRequest struct {
 
 // UpdateGitLabProjectRequest represents request to update project settings
 type UpdateGitLabProjectRequest struct {
+	Name             *string                `json:"name,omitempty"`
 	AutoReview       *bool                  `json:"auto_review,omitempty"`
 	Status           *GitLabProjectStatus   `json:"status,omitempty"`
 	DefaultBranch    *string                `json:"default_branch,omitempty"`
@@ -537,15 +538,15 @@ type GitLabProjectListRequest struct {
 
 // GitLabReviewListRequest represents request for listing reviews
 type GitLabReviewListRequest struct {
-	Limit         int                  `json:"limit" form:"limit"`
-	Offset        int                  `json:"offset" form:"offset"`
-	ProjectID     *string              `json:"project_id,omitempty" form:"project_id"`
-	IntegrationID *string              `json:"integration_id,omitempty" form:"integration_id"`
-	Status        *GitLabReviewStatus  `json:"status,omitempty" form:"status"`
-	MRIID         *int                 `json:"mr_iid,omitempty" form:"mr_iid"`
-	DateFrom      *time.Time           `json:"date_from,omitempty" form:"date_from"`
-	DateTo        *time.Time           `json:"date_to,omitempty" form:"date_to"`
-	Search        *string              `json:"search,omitempty" form:"search"`
+	Limit         int                 `json:"limit" form:"limit"`
+	Offset        int                 `json:"offset" form:"offset"`
+	ProjectID     *string             `json:"project_id,omitempty" form:"project_id"`
+	IntegrationID *string             `json:"integration_id,omitempty" form:"integration_id"`
+	Status        *GitLabReviewStatus `json:"status,omitempty" form:"status"`
+	MRIID         *int                `json:"mr_iid,omitempty" form:"mr_iid"`
+	DateFrom      *time.Time          `json:"date_from,omitempty" form:"date_from"`
+	DateTo        *time.Time          `json:"date_to,omitempty" form:"date_to"`
+	Search        *string             `json:"search,omitempty" form:"search"`
 }
 
 // GitLabListResponse is a generic paginated response
@@ -572,11 +573,11 @@ type ModelOption struct {
 
 // ModelUsageResponse represents model usage check result
 type ModelUsageResponse struct {
-	ModelID        string              `json:"model_id"`
-	IsUsedInGitLab bool                `json:"is_used_in_gitlab"`
-	GitLabProjects []GitLabProjectRef  `json:"gitlab_projects,omitempty"`
-	CanDeactivate  bool                `json:"can_deactivate"`
-	BlockingReason string              `json:"blocking_reason,omitempty"`
+	ModelID        string             `json:"model_id"`
+	IsUsedInGitLab bool               `json:"is_used_in_gitlab"`
+	GitLabProjects []GitLabProjectRef `json:"gitlab_projects,omitempty"`
+	CanDeactivate  bool               `json:"can_deactivate"`
+	BlockingReason string             `json:"blocking_reason,omitempty"`
 }
 
 // GitLabProjectRef represents a reference to a GitLab project
@@ -595,12 +596,12 @@ type GitLabQueueStats struct {
 	Completed  int `json:"completed"`
 	Failed     int `json:"failed"`
 	Cancelled  int `json:"cancelled"`
-	
+
 	// Worker stats
 	ActiveWorkers int `json:"active_workers"`
 	IdleWorkers   int `json:"idle_workers"`
 	TotalWorkers  int `json:"total_workers"`
-	
+
 	// Performance
 	AvgProcessingTimeMs int64 `json:"avg_processing_time_ms"`
 	JobsLastHour        int   `json:"jobs_last_hour"`
@@ -644,14 +645,14 @@ type GitLabFeedbackListRequest struct {
 
 // GitLabFeedbackStats represents aggregated feedback statistics (v4.1.1+)
 type GitLabFeedbackStats struct {
-	TotalFeedback  int                       `json:"total_feedback"`
-	ApprovedCount  int                       `json:"approved_count"`
-	RejectedCount  int                       `json:"rejected_count"`
-	EditedCount    int                       `json:"edited_count"`
-	IgnoredCount   int                       `json:"ignored_count"`
-	ApprovalRate   float64                   `json:"approval_rate"`
-	AccuracyRate   float64                   `json:"accuracy_rate"`
-	ByCategory     []GitLabFeedbackCategoryStat `json:"by_category"`
+	TotalFeedback int                          `json:"total_feedback"`
+	ApprovedCount int                          `json:"approved_count"`
+	RejectedCount int                          `json:"rejected_count"`
+	EditedCount   int                          `json:"edited_count"`
+	IgnoredCount  int                          `json:"ignored_count"`
+	ApprovalRate  float64                      `json:"approval_rate"`
+	AccuracyRate  float64                      `json:"accuracy_rate"`
+	ByCategory    []GitLabFeedbackCategoryStat `json:"by_category"`
 }
 
 // GitLabFeedbackCategoryStat represents feedback stats per category
@@ -669,20 +670,20 @@ type GitLabFeedbackCategoryStat struct {
 
 // GitLabAnalytics represents aggregated analytics data
 type GitLabAnalytics struct {
-	Range             string                   `json:"range"`
-	Days              int                      `json:"days"`
-	TotalReviews      int                      `json:"total_reviews"`
-	CompletedReviews  int                      `json:"completed_reviews"`
-	FailedReviews     int                      `json:"failed_reviews"`
-	PendingReviews    int                      `json:"pending_reviews"`
-	AvgProcessingMs   int64                    `json:"avg_processing_ms"`
-	TotalIssuesFound  int                      `json:"total_issues_found"`
-	TotalTokensUsed   int64                    `json:"total_tokens_used"`
-	ReviewsByDay      []DayStats               `json:"reviews_by_day"`
-	ReviewsByProject  []ProjectStats           `json:"reviews_by_project"`
-	ReviewsByStatus   map[string]int           `json:"reviews_by_status"`
-	AvgRating         float64                  `json:"avg_rating"`
-	FeedbackCount     int                      `json:"feedback_count"`
+	Range            string         `json:"range"`
+	Days             int            `json:"days"`
+	TotalReviews     int            `json:"total_reviews"`
+	CompletedReviews int            `json:"completed_reviews"`
+	FailedReviews    int            `json:"failed_reviews"`
+	PendingReviews   int            `json:"pending_reviews"`
+	AvgProcessingMs  int64          `json:"avg_processing_ms"`
+	TotalIssuesFound int            `json:"total_issues_found"`
+	TotalTokensUsed  int64          `json:"total_tokens_used"`
+	ReviewsByDay     []DayStats     `json:"reviews_by_day"`
+	ReviewsByProject []ProjectStats `json:"reviews_by_project"`
+	ReviewsByStatus  map[string]int `json:"reviews_by_status"`
+	AvgRating        float64        `json:"avg_rating"`
+	FeedbackCount    int            `json:"feedback_count"`
 }
 
 // DayStats represents daily statistics
@@ -761,11 +762,10 @@ type GitLabScanResult struct {
 
 // GitLabScanResultsRequest for listing scan results
 type GitLabScanResultsRequest struct {
-	ProjectID     string           `json:"project_id,omitempty"`
-	IntegrationID string           `json:"integration_id,omitempty"`
-	ScanType      *GitLabScanType  `json:"scan_type,omitempty"`
+	ProjectID     string            `json:"project_id,omitempty"`
+	IntegrationID string            `json:"integration_id,omitempty"`
+	ScanType      *GitLabScanType   `json:"scan_type,omitempty"`
 	Status        *GitLabScanStatus `json:"status,omitempty"`
-	Limit         int              `json:"limit,omitempty"`
-	Offset        int              `json:"offset,omitempty"`
+	Limit         int               `json:"limit,omitempty"`
+	Offset        int               `json:"offset,omitempty"`
 }
-

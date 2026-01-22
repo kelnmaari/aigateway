@@ -12,6 +12,8 @@ INSERT INTO changelogs (version, release_date, content) VALUES
 ### Fixed
 
 - **GitLab Access Control**: Resolved 403 Forbidden errors when regular users attempted to index their projects
+- **GitLab Project Synchronization**: Fixed an issue where the user view showed different values than the admin view (consistent field mapping across all storage methods)
+- **Project Settings Persistence**: Corrected a bug where updated project names and advanced settings were not being saved
 - **Backend Stability**: Fixed compilation error caused by duplicate `AnalyzeProject` function
 - **API Parity**: Ensured all project settings are correctly synchronized between frontend and backend
 

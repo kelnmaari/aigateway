@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-01-22
+
+### Added
+
+- **GitLab Webhook Auto-Registration**: Users can now automatically setup project webhooks directly from the UI.
+- **Enhanced Dependency Analysis UI**: Ported full-featured, multi-ecosystem dependency view from admin panel to regular users.
+  - Ecosystem tabs (Go, Node.js, Python, etc.)
+  - AI-powered changelog analysis for upgrade risks
+- **Default Project Settings**: New projects and the edit form now default to optimal settings (Russian language, specific patterns, high token limits).
+
+### Fixed
+
+- **GitLab Indexing Authorization**: Fixed 403 Forbidden error preventing regular users from indexing their own repositories.
+- **Detect Duplication Rendering**: Resolved issue where duplication analysis results were not displaying correctly.
+- **Backend Stability**: Fixed unused imports and standardized context timeouts in GitLab handlers.
+
 ## [4.4.0] - 2026-01-22
 
 ### Added

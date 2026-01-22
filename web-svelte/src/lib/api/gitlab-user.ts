@@ -291,3 +291,12 @@ export async function createMyTestsMR(projectId: string, data: any): Promise<any
   return api.post(`/api/gitlab/projects/${projectId}/create-tests-mr`, data);
 }
 
+// Webhooks
+export async function setupMyWebhook(projectId: string, url: string): Promise<{ message: string; webhook_id: number }> {
+  return api.post(`/api/gitlab/projects/${projectId}/setup-webhook`, { webhook_url: url });
+}
+
+// Changelog Analysis
+export async function analyzeMyChangelog(projectId: string, data: any): Promise<any> {
+  return api.post(`/api/gitlab/projects/${projectId}/analyze-changelog`, data);
+}

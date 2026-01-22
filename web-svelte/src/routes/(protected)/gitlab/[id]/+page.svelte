@@ -25,7 +25,9 @@
 		type GitLabProject,
 		type GitLabReview,
 		type GitLabIndexStatus,
-		updateMyProject
+		updateMyProject,
+		setupMyWebhook,
+		analyzeMyChangelog
 	} from '$lib/api/gitlab-user';
 	import * as m from '$lib/paraglide/messages';
 	import {
@@ -44,7 +46,8 @@
 		FileCode,
 		FileEdit,
 		TestTube,
-		Trash2
+		Trash2,
+		ExternalLink
 	} from 'lucide-svelte';
 
 	const integrationId = $page.params.id ?? '';
@@ -63,7 +66,21 @@
 		name: '',
 		path_with_namespace: '',
 		analysis_model_id: '',
-		embedding_model_id: ''
+		embedding_model_id: '',
+		auto_review: true,
+		settings: {
+			include_patterns: '*.go, *.ts',
+			exclude_patterns: 'vendor/*, *.pb.go',
+			chunk_size: 4000,
+			chunk_overlap: 200,
+			max_files_per_mr: 50,
+			max_lines_per_file: 1000,
+			skip_draft_mrs: true,
+			skip_bots: true,
+			per_file_review: true,
+			max_review_tokens: 8192,
+			review_language: 'ru'
+		}
 	};
 	let addingProject = false;
 
@@ -79,17 +96,17 @@
 		review_prompt: '',
 		default_branch: '',
 		settings: {
-			include_patterns: '',
-			exclude_patterns: '',
+			include_patterns: '*.go, *.ts',
+			exclude_patterns: 'vendor/*, *.pb.go',
 			chunk_size: 4000,
 			chunk_overlap: 200,
 			max_files_per_mr: 50,
-			max_lines_per_file: 2000,
-			skip_draft_mrs: false,
-			skip_bots: false,
-			per_file_review: false,
+			max_lines_per_file: 1000,
+			skip_draft_mrs: true,
+			skip_bots: true,
+			per_file_review: true,
 			max_review_tokens: 8192,
-			review_language: 'en'
+			review_language: 'ru'
 		}
 	};
 	let updatingProject = false;
@@ -104,6 +121,58 @@
 	let analysisType: string = '';
 	let analysisResult: any = null;
 	let analysisError: string = '';
+
+	// Dependencies scan state
+	let activeEcosystemIndex = 0;
+	let changelogLoading: Record<string, boolean> = {};
+	let changelogResults: Record<string, any> = {};
+
+	function getUpdateTypeColor(type: string) {
+		switch (type?.toLowerCase()) {
+			case 'major':
+				return 'text-red-400';
+			case 'minor':
+				return 'text-yellow-400';
+			case 'patch':
+				return 'text-green-400';
+			default:
+				return 'text-gray-400';
+		}
+	}
+
+	function getRiskLevelClass(level: string) {
+		switch (level?.toLowerCase()) {
+			case 'high':
+				return 'bg-red-500/20 text-red-400 border border-red-500/30';
+			case 'medium':
+				return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
+			case 'low':
+				return 'bg-green-500/20 text-green-400 border border-green-500/30';
+			default:
+				return 'bg-gray-500/20 text-gray-400 border border-gray-500/30';
+		}
+	}
+
+	async function handleAnalyzeChangelog(dep: any) {
+		if (!selectedProjectForAnalysis) return;
+
+		const key = `${dep.package_name}-${dep.latest_version}`;
+		changelogLoading[key] = true;
+
+		try {
+			const result = await analyzeMyChangelog(selectedProjectForAnalysis.id, {
+				package_name: dep.package_name,
+				current_version: dep.current_version,
+				latest_version: dep.latest_version,
+				ecosystem: (analysisResult.ecosystems || [])[activeEcosystemIndex]?.name
+			});
+			changelogResults[key] = result;
+		} catch (e) {
+			console.error('Changelog analysis failed:', e);
+		} finally {
+			changelogLoading[key] = false;
+		}
+	}
 
 	onMount(async () => {
 		await loadData();
@@ -149,7 +218,21 @@
 				name: '',
 				path_with_namespace: '',
 				analysis_model_id: '',
-				embedding_model_id: ''
+				embedding_model_id: '',
+				auto_review: true,
+				settings: {
+					include_patterns: '*.go, *.ts',
+					exclude_patterns: 'vendor/*, *.pb.go',
+					chunk_size: 4000,
+					chunk_overlap: 200,
+					max_files_per_mr: 50,
+					max_lines_per_file: 1000,
+					skip_draft_mrs: true,
+					skip_bots: true,
+					per_file_review: true,
+					max_review_tokens: 8192,
+					review_language: 'ru'
+				}
 			};
 			const response = await listMyProjects(integrationId);
 			projects = response.data || [];
@@ -398,6 +481,22 @@
 				return 'bg-gray-500/20 text-gray-400 border border-gray-500/30';
 		}
 	}
+
+	async function handleSetupWebhook(project: GitLabProject) {
+		const url = prompt(
+			'Enter the Webhook URL for this project (e.g. https://your-domain.com/api/gitlab/webhook/):',
+			window.location.origin + '/api/gitlab/webhook/' + integrationId
+		);
+		if (!url) return;
+
+		try {
+			const res = await setupMyWebhook(project.id, url);
+			alert(res.message);
+			await loadData();
+		} catch (e) {
+			alert(e instanceof Error ? e.message : 'Failed to setup webhook');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -590,6 +689,20 @@
 												stroke-linejoin="round"
 												stroke-width="2"
 												d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+											/>
+										</svg>
+									</button>
+									<button
+										onclick={() => handleSetupWebhook(project)}
+										class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-orange-900/30 hover:text-orange-400"
+										title="Setup Webhook"
+									>
+										<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
 											/>
 										</svg>
 									</button>
@@ -1143,6 +1256,31 @@
 										{analysisResult.files_count || 0}
 									</div>
 								</div>
+							{:else if analysisType === 'dependencies'}
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Ecosystems</span>
+									<div class="mt-1 text-3xl font-bold text-indigo-400">
+										{(analysisResult.ecosystems || []).length}
+									</div>
+								</div>
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Updates Available</span>
+									<div class="mt-1 text-3xl font-bold text-yellow-500">
+										{(analysisResult.ecosystems || []).reduce(
+											(acc: number, curr: any) => acc + (curr.outdated_count || 0),
+											0
+										)}
+									</div>
+								</div>
+								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
+									<span class="text-xs font-bold text-gray-500 uppercase">Vulnerabilities</span>
+									<div class="mt-1 text-3xl font-bold text-red-500">
+										{(analysisResult.ecosystems || []).reduce(
+											(acc: number, curr: any) => acc + (curr.vulnerabilities_count || 0),
+											0
+										)}
+									</div>
+								</div>
 							{:else}
 								<div class="col-span-3 rounded-xl border border-gray-700 bg-gray-900 p-4">
 									<span class="text-xs font-bold text-gray-500 uppercase">Status</span>
@@ -1162,7 +1300,128 @@
 								<div class="h-px flex-1 bg-gray-800"></div>
 							</div>
 
-							{#if (analysisResult.findings || analysisResult.issues || []).length > 0}
+							{#if analysisType === 'dependencies' && (analysisResult.ecosystems || []).length > 0}
+								<!-- Comprehensive Dependencies View -->
+								<div class="space-y-6">
+									<div class="custom-scrollbar flex gap-2 overflow-x-auto pb-2">
+										{#each analysisResult.ecosystems as ecosystem, i}
+											<button
+												onclick={() => (activeEcosystemIndex = i)}
+												class={`flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
+													activeEcosystemIndex === i
+														? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
+														: 'border-gray-700 bg-gray-800/50 text-gray-500 hover:border-gray-600 hover:text-gray-300'
+												}`}
+											>
+												<Package class="h-4 w-4" />
+												{ecosystem.name}
+												<span
+													class={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
+														ecosystem.vulnerabilities_count > 0
+															? 'bg-red-500/20 text-red-500'
+															: 'bg-gray-700 text-gray-400'
+													}`}
+												>
+													{ecosystem.dependencies?.length || 0}
+												</span>
+											</button>
+										{/each}
+									</div>
+
+									{#if analysisResult.ecosystems[activeEcosystemIndex]}
+										{@const eco = analysisResult.ecosystems[activeEcosystemIndex]}
+										<div class="grid grid-cols-1 gap-4">
+											{#each eco.dependencies || [] as dep}
+												<div class="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
+													<div class="flex flex-wrap items-start justify-between gap-4">
+														<div class="flex items-start gap-3">
+															<div class="mt-1 rounded-lg bg-gray-800 p-2 text-gray-400">
+																<Package class="h-5 w-5" />
+															</div>
+															<div>
+																<h5 class="flex items-center gap-2 font-bold text-gray-200">
+																	{dep.package_name}
+																	{#if dep.is_outdated}
+																		<span
+																			class="rounded bg-yellow-500/10 px-2 py-0.5 text-[10px] text-yellow-500 uppercase"
+																			>Outdated</span
+																		>
+																	{/if}
+																</h5>
+																<p class="text-xs text-gray-500">
+																	Current: {dep.current_version} • Latest: {dep.latest_version}
+																</p>
+															</div>
+														</div>
+														<div class="flex items-center gap-3">
+															{#if dep.is_outdated}
+																<button
+																	onclick={() => handleAnalyzeChangelog(dep)}
+																	disabled={changelogLoading[
+																		`${dep.package_name}-${dep.latest_version}`
+																	]}
+																	class="flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-bold text-indigo-400 transition-colors hover:bg-gray-700"
+																>
+																	{#if changelogLoading[`${dep.package_name}-${dep.latest_version}`]}
+																		<Loader2 class="h-3 w-3 animate-spin" />
+																	{:else}
+																		<Brain class="h-3 w-3" />
+																	{/if}
+																	Analyze Changelog
+																</button>
+															{/if}
+															{#if dep.url}
+																<a
+																	href={dep.url}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300"
+																>
+																	<ExternalLink class="h-4 w-4" />
+																</a>
+															{/if}
+														</div>
+													</div>
+
+													{#if changelogResults[`${dep.package_name}-${dep.latest_version}`]}
+														{@const ch =
+															changelogResults[`${dep.package_name}-${dep.latest_version}`]}
+														<div class="animate-in fade-in slide-in-from-top-2 mt-4 duration-300">
+															<div
+																class={`rounded-lg border p-4 ${getRiskLevelClass(ch.risk_level)}`}
+															>
+																<div class="mb-2 flex items-center justify-between">
+																	<span class="text-[10px] font-bold uppercase"
+																		>AI Upgrade risk analysis</span
+																	>
+																	<span class="text-[10px] font-bold uppercase"
+																		>Risk: {ch.risk_level}</span
+																	>
+																</div>
+																<p class="text-sm leading-relaxed">{ch.summary}</p>
+																{#if ch.breaking_changes?.length > 0}
+																	<div class="mt-3 space-y-2">
+																		{#each ch.breaking_changes as bc}
+																			<div
+																				class="flex items-start gap-2 border-t border-red-500/20 pt-2 text-xs"
+																			>
+																				<span class="font-bold text-red-500"
+																					>[{bc.affected_area}]</span
+																				>
+																				<span>{bc.description}</span>
+																			</div>
+																		{/each}
+																	</div>
+																{/if}
+															</div>
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{:else if (analysisResult.findings || analysisResult.issues || []).length > 0}
 								<div class="grid grid-cols-1 gap-4">
 									{#each analysisResult.findings || analysisResult.issues || [] as finding}
 										<div
@@ -1310,7 +1569,7 @@
 										</div>
 									{/each}
 								</div>
-							{:else if analysisType === 'changelog' || analysisResult.summary}
+							{:else if (analysisType === 'changelog' || analysisResult.summary) && analysisType !== 'duplication'}
 								<!-- Changelog analysis specialized view -->
 								<div class="space-y-6">
 									<div class="rounded-xl border border-gray-700 bg-gray-900/40 p-4">

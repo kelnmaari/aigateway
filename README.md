@@ -5,7 +5,7 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.4.0-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-4.5.0-brightgreen.svg)](VERSION)
 
 ---
 

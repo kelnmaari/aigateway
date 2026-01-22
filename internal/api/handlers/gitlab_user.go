@@ -2,8 +2,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"time"
 
+	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/models"
 
@@ -70,10 +73,10 @@ func (h *GitLabUserHandler) CreateMyIntegration(c *gin.Context) {
 	}
 
 	var req struct {
-		Name          string                          `json:"name" binding:"required"`
-		BaseURL       string                          `json:"base_url" binding:"required"`
-		AccessToken   string                          `json:"access_token" binding:"required"`
-		WebhookSecret string                          `json:"webhook_secret"`
+		Name          string                           `json:"name" binding:"required"`
+		BaseURL       string                           `json:"base_url" binding:"required"`
+		AccessToken   string                           `json:"access_token" binding:"required"`
+		WebhookSecret string                           `json:"webhook_secret"`
 		Settings      models.GitLabIntegrationSettings `json:"settings"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -414,3 +417,56 @@ func (h *GitLabUserHandler) GetMyReview(c *gin.Context) {
 	c.JSON(http.StatusOK, review)
 }
 
+// SetupMyWebhook registers a webhook in GitLab for the user's project
+func (h *GitLabUserHandler) SetupMyWebhook(c *gin.Context) {
+	userID := h.getUserID(c)
+	projectID := c.Param("id")
+
+	var req struct {
+		WebhookURL string `json:"webhook_url" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	// Get project
+	project, err := h.store.GetProject(ctx, projectID)
+	if err != nil || project == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check integration ownership
+	integration, err := h.store.GetIntegration(ctx, project.IntegrationID)
+	if err != nil || integration == nil || integration.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Create webhook on GitLab
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+	})
+
+	webhook, err := gitlabClient.CreateProjectWebhook(ctx, project.GitLabProjectID, req.WebhookURL, integration.WebhookSecret)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to create GitLab webhook")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create webhook: " + err.Error()})
+		return
+	}
+
+	// Save webhook ID
+	if err := h.store.UpdateProjectWebhookID(ctx, projectID, webhook.ID); err != nil {
+		h.logger.WithError(err).Error("Failed to save webhook ID")
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Webhook created successfully",
+		"webhook_id": webhook.ID,
+	})
+}

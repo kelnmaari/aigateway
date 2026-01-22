@@ -7,7 +7,7 @@ INSERT INTO changelogs (version, release_date, content) VALUES
   - Added `owner_id` to the integration creation process in the database
   - Ensured `owner_id` is properly retrieved when fetching integration details
   - This ensures that integrations appear correctly in the user-level dashboard while remaining accessible to administrators
-- **API Robustness**: Fixed "Cannot read properties of null (reading 'filter')" errors in GitLab UI
+- **API Robustness**: Fixed "Cannot read properties of null (reading ''filter'')" errors in GitLab UI
   - Initialized backend storage list results to empty slices `[]` instead of `nil`
   - Added frontend null checks and default values for project and review lists
 

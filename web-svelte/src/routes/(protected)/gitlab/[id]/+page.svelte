@@ -340,9 +340,13 @@
 
 		try {
 			// Load models if not already loaded
-			if (availableAnalysisModels.length === 0) {
-				const [modelsRes] = await Promise.all([listMyAvailableModels('analysis')]);
-				availableAnalysisModels = modelsRes.data;
+			if (availableAnalysisModels.length === 0 || availableEmbeddingModels.length === 0) {
+				const [analysisRes, embeddingRes] = await Promise.all([
+					listMyAvailableModels('analysis'),
+					listMyAvailableModels('embedding')
+				]);
+				availableAnalysisModels = analysisRes.data;
+				availableEmbeddingModels = embeddingRes.data;
 			}
 
 			await handleDiscover();
@@ -410,6 +414,7 @@
 				analysis_model_id: newProject.analysis_model_id,
 				embedding_model_id: newProject.embedding_model_id || undefined,
 				auto_review: newProject.auto_review,
+				review_prompt: newProject.review_prompt || undefined,
 				settings: {
 					...newProject.settings,
 					include_patterns: includePatterns.length > 0 ? includePatterns : undefined,
@@ -2840,11 +2845,13 @@
 						</div>
 					</div>
 
-					<div class="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
-						<h4 class="font-bold text-gray-200">Import Configuration</h4>
-						<p class="text-xs text-gray-400">
-							These settings will be applied to all newly selected projects.
-						</p>
+					<div class="space-y-6 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
+						<div class="flex items-center justify-between">
+							<h4 class="font-bold text-gray-200">Import Configuration</h4>
+							<span class="text-[10px] font-medium tracking-wider text-gray-500 uppercase"
+								>Applied to all new projects</span
+							>
+						</div>
 
 						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 							<div>
@@ -2864,6 +2871,25 @@
 								</select>
 							</div>
 							<div>
+								<label
+									for="bulk-embedding-model"
+									class="mb-1 block text-sm font-medium text-gray-400">Embedding Model</label
+								>
+								<select
+									id="bulk-embedding-model"
+									bind:value={newProject.embedding_model_id}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+								>
+									<option value="">None (RAG Disabled)</option>
+									{#each availableEmbeddingModels as model}
+										<option value={model.id}>{model.name} ({model.provider})</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+							<div>
 								<label for="bulk-tenant" class="mb-1 block text-sm font-medium text-gray-400"
 									>Project Tenant</label
 								>
@@ -2878,18 +2904,162 @@
 									{/each}
 								</select>
 							</div>
+							<div>
+								<label
+									for="bulk-review-language"
+									class="mb-1 block text-sm font-medium text-gray-400">Review Language</label
+								>
+								<select
+									id="bulk-review-language"
+									bind:value={newProject.settings.review_language}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+								>
+									<option value="en">English</option>
+									<option value="ru">Russian</option>
+								</select>
+							</div>
 						</div>
 
-						<div class="flex items-center gap-3">
-							<input
-								type="checkbox"
-								id="bulk-auto-review"
-								bind:checked={newProject.auto_review}
-								class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
-							/>
-							<label for="bulk-auto-review" class="text-sm font-bold text-gray-200">
-								Enable Auto-review for imported projects
-							</label>
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+							<div>
+								<label
+									for="bulk-include-patterns"
+									class="mb-1 block text-sm font-medium text-gray-400">Include Patterns</label
+								>
+								<input
+									type="text"
+									id="bulk-include-patterns"
+									bind:value={newProject.settings.include_patterns}
+									placeholder="*.go, *.ts"
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+								/>
+							</div>
+							<div>
+								<label
+									for="bulk-exclude-patterns"
+									class="mb-1 block text-sm font-medium text-gray-400">Exclude Patterns</label
+								>
+								<input
+									type="text"
+									id="bulk-exclude-patterns"
+									bind:value={newProject.settings.exclude_patterns}
+									placeholder="vendor/*, *.pb.go"
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+								/>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+							<div>
+								<label
+									for="bulk-max-files"
+									class="mb-1 block text-xs font-medium text-gray-500 uppercase">Max Files/MR</label
+								>
+								<input
+									type="number"
+									id="bulk-max-files"
+									bind:value={newProject.settings.max_files_per_mr}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+								/>
+							</div>
+							<div>
+								<label
+									for="bulk-max-lines"
+									class="mb-1 block text-xs font-medium text-gray-500 uppercase"
+									>Max Lines/File</label
+								>
+								<input
+									type="number"
+									id="bulk-max-lines"
+									bind:value={newProject.settings.max_lines_per_file}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+								/>
+							</div>
+							<div>
+								<label
+									for="bulk-chunk-size"
+									class="mb-1 block text-xs font-medium text-gray-500 uppercase">Chunk Size</label
+								>
+								<input
+									type="number"
+									id="bulk-chunk-size"
+									bind:value={newProject.settings.chunk_size}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+								/>
+							</div>
+							<div>
+								<label
+									for="bulk-tokens"
+									class="mb-1 block text-xs font-medium text-gray-500 uppercase"
+									>Review Tokens</label
+								>
+								<input
+									type="number"
+									id="bulk-tokens"
+									bind:value={newProject.settings.max_review_tokens}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+								/>
+							</div>
+						</div>
+
+						<div>
+							<label for="bulk-review-prompt" class="mb-1 block text-sm font-medium text-gray-400"
+								>Custom Review Prompt</label
+							>
+							<textarea
+								id="bulk-review-prompt"
+								bind:value={newProject.review_prompt}
+								placeholder="Optional: custom instructions for the AI reviewer..."
+								rows="2"
+								class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
+							></textarea>
+						</div>
+
+						<div class="grid grid-cols-1 gap-y-3 md:grid-cols-2">
+							<div class="flex items-center gap-3">
+								<input
+									type="checkbox"
+									id="bulk-auto-review"
+									bind:checked={newProject.auto_review}
+									class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
+								/>
+								<label for="bulk-auto-review" class="text-sm font-medium text-gray-200">
+									Enable Auto-review
+								</label>
+							</div>
+							<div class="flex items-center gap-3">
+								<input
+									type="checkbox"
+									id="bulk-skip-drafts"
+									bind:checked={newProject.settings.skip_draft_mrs}
+									class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
+								/>
+								<label for="bulk-skip-drafts" class="text-sm font-medium text-gray-200">
+									Skip Draft MRs
+								</label>
+							</div>
+							<div class="flex items-center gap-3">
+								<input
+									type="checkbox"
+									id="bulk-skip-bots"
+									bind:checked={newProject.settings.skip_bots}
+									class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
+								/>
+								<label for="bulk-skip-bots" class="text-sm font-medium text-gray-200">
+									Skip Bot MRs
+								</label>
+							</div>
+							<div class="flex items-center gap-3">
+								<input
+									type="checkbox"
+									id="bulk-per-file"
+									bind:checked={newProject.settings.per_file_review}
+									class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
+								/>
+								<label for="bulk-per-file" class="text-sm font-medium text-gray-200">
+									Per-file review (Experimental)
+								</label>
+							</div>
 						</div>
 					</div>
 				{/if}

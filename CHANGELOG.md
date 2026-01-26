@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.4] - 2026-01-26
+
+### Added
+
+- **GitLab Integration**: Expanded bulk project configuration in Discovery modal. Now you can set Embedding Model, patterns, limits, and custom review prompt for multiple projects at once.
+
 ## [4.7.3] - 2026-01-26
 
 ### Added

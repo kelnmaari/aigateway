@@ -110,7 +110,7 @@ func (h *GitLabQualityHandler) AnalyzeQuality(c *gin.Context) {
 		req = AnalyzeQualityRequest{}
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Minute)
 	defer cancel()
 
 	// Get project

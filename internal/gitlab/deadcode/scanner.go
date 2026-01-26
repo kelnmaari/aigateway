@@ -34,7 +34,7 @@ func NewScanner(vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, l
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Minute,
+			Timeout: 15 * time.Minute,
 		},
 		logger: logger,
 	}
@@ -825,4 +825,3 @@ If no commented-out code found, return: {"commented_code_blocks": []}`, chunk.La
 
 	return result, nil
 }
-

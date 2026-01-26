@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.8.8] - 2026-01-26
+
+### Fixed
+
+- **Analysis Timeouts**: Increased timeouts for all heavy LLM-based analysis components (Quality, Test Generation, Autodoc, Dead Code, Deep Scan) to 15-30 minutes. This prevents "context canceled" errors during long-running tasks.
+- **Inference Proxy**: Increased generation timeout to 15 minutes in the inference proxy.
+
 ## [4.8.7] - 2026-01-26
 
 ### Fixed

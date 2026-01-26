@@ -28,7 +28,7 @@ func NewGenerator(llmBaseURL, llmAPIKey string, logger *logrus.Logger) *Generato
 		llmBaseURL: llmBaseURL,
 		llmAPIKey:  llmAPIKey,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Minute,
+			Timeout: 15 * time.Minute,
 		},
 		logger: logger,
 	}
@@ -256,4 +256,3 @@ func (g *Generator) callLLM(ctx context.Context, modelID, prompt, language strin
 	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
 	return content, llmResponse.Usage.TotalTokens, nil
 }
-

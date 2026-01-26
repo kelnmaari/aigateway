@@ -29,7 +29,7 @@ func NewInferenceProxyHandler(router *inference.Router, logger *logrus.Logger) *
 		router: router,
 		logger: logger,
 		client: &http.Client{
-			Timeout: 5 * time.Minute, // long timeout for generation
+			Timeout: 15 * time.Minute, // long timeout for generation
 		},
 	}
 }

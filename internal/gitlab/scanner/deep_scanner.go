@@ -69,7 +69,7 @@ func NewDeepScanner(vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey strin
 		vectorStore: vectorStore,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
-		httpClient:  &http.Client{Timeout: 3 * time.Minute}, // Increased from 2m
+		httpClient:  &http.Client{Timeout: 15 * time.Minute}, // Increased from 3m
 		logger:      logger,
 	}
 }

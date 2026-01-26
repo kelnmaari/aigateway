@@ -34,7 +34,7 @@ func NewAnalyzer(vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string, 
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Minute,
+			Timeout: 15 * time.Minute,
 		},
 		logger: logger,
 	}
@@ -264,13 +264,13 @@ Respond in JSON format ONLY:
 
 	// Parse response
 	var parsed struct {
-		OverallScore             int                   `json:"overall_score"`
-		Breakdown                map[string]int        `json:"breakdown"`
-		Issues                   []QualityIssue        `json:"issues"`
-		FunctionsCount           int                   `json:"functions_count"`
-		IsTestFile               bool                  `json:"is_test_file"`
-		TestableFunctions        int                   `json:"testable_functions"`
-		TestedFunctionsEstimate  int                   `json:"tested_functions_estimate"`
+		OverallScore            int            `json:"overall_score"`
+		Breakdown               map[string]int `json:"breakdown"`
+		Issues                  []QualityIssue `json:"issues"`
+		FunctionsCount          int            `json:"functions_count"`
+		IsTestFile              bool           `json:"is_test_file"`
+		TestableFunctions       int            `json:"testable_functions"`
+		TestedFunctionsEstimate int            `json:"tested_functions_estimate"`
 	}
 
 	// Extract JSON from response
@@ -755,8 +755,8 @@ If no duplicates found, return {"duplicates": [], "summary": {"total_duplicate_g
 			RefactorType string  `json:"refactor_type"`
 		} `json:"duplicates"`
 		Summary struct {
-			TotalDuplicateGroups   int `json:"total_duplicate_groups"`
-			FilesWithDuplicates    int `json:"files_with_duplicates"`
+			TotalDuplicateGroups    int `json:"total_duplicate_groups"`
+			FilesWithDuplicates     int `json:"files_with_duplicates"`
 			EstimatedDuplicateLines int `json:"estimated_duplicate_lines"`
 		} `json:"summary"`
 	}
@@ -788,7 +788,7 @@ If no duplicates found, return {"duplicates": [], "summary": {"total_duplicate_g
 				filePath = files[occ.FileIndex-1].Path
 			}
 			filesWithDuplicates[filePath] = true
-			
+
 			group.Occurrences = append(group.Occurrences, DuplicateBlock{
 				FilePath:    filePath,
 				StartLine:   occ.StartLine,
@@ -835,4 +835,3 @@ If no duplicates found, return {"duplicates": [], "summary": {"total_duplicate_g
 
 	return result, nil
 }
-

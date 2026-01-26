@@ -34,7 +34,7 @@ func NewGenerator(vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey string,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Minute,
+			Timeout: 15 * time.Minute,
 		},
 		logger: logger,
 	}
@@ -672,4 +672,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-

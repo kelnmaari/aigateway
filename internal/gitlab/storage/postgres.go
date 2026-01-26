@@ -68,7 +68,7 @@ func (s *PostgresStore) CreateIntegration(ctx context.Context, integration *mode
 
 func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.GitLabIntegration, error) {
 	query := `
-		SELECT id, owner_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
+		SELECT id, owner_id, tenant_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
 		       (SELECT COUNT(*) FROM gitlab_projects WHERE integration_id = gitlab_integrations.id) as project_count
 		FROM gitlab_integrations
 		WHERE id = $1
@@ -76,6 +76,7 @@ func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.
 
 	var integration models.GitLabIntegration
 	var ownerID sql.NullString
+	var tenantID sql.NullString
 	var lastSyncAt sql.NullTime
 	var lastError sql.NullString
 	var settingsJSON string
@@ -83,6 +84,7 @@ func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&integration.ID,
 		&ownerID,
+		&tenantID,
 		&integration.Name,
 		&integration.BaseURL,
 		&integration.AccessToken,
@@ -104,6 +106,9 @@ func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.
 
 	if ownerID.Valid {
 		integration.OwnerID = ownerID.String
+	}
+	if tenantID.Valid {
+		integration.TenantID = tenantID.String
 	}
 	if lastSyncAt.Valid {
 		integration.LastSyncAt = &lastSyncAt.Time
@@ -149,7 +154,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 
 	// Fetch items
 	query := fmt.Sprintf(`
-		SELECT id, owner_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
+		SELECT id, owner_id, tenant_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at,
 		       (SELECT COUNT(*) FROM gitlab_projects WHERE integration_id = gitlab_integrations.id) as project_count
 		FROM gitlab_integrations
 		%s
@@ -177,6 +182,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 	for rows.Next() {
 		var integration models.GitLabIntegration
 		var ownerID sql.NullString
+		var tenantID sql.NullString
 		var lastSyncAt sql.NullTime
 		var lastError sql.NullString
 		var settingsJSON string
@@ -184,6 +190,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 		if err := rows.Scan(
 			&integration.ID,
 			&ownerID,
+			&tenantID,
 			&integration.Name,
 			&integration.BaseURL,
 			&integration.AccessToken,
@@ -201,6 +208,9 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 
 		if ownerID.Valid {
 			integration.OwnerID = ownerID.String
+		}
+		if tenantID.Valid {
+			integration.TenantID = tenantID.String
 		}
 		if lastSyncAt.Valid {
 			integration.LastSyncAt = &lastSyncAt.Time
@@ -220,7 +230,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 
 func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID string) ([]*models.GitLabIntegration, error) {
 	query := `
-		SELECT id, owner_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at
+		SELECT id, owner_id, tenant_id, name, base_url, access_token, webhook_secret, status, last_sync_at, last_error, settings, created_at, updated_at
 		FROM gitlab_integrations
 		WHERE owner_id = $1
 		ORDER BY created_at DESC
@@ -236,6 +246,7 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 	for rows.Next() {
 		var integration models.GitLabIntegration
 		var dbOwnerID sql.NullString
+		var tenantID sql.NullString
 		var lastSyncAt sql.NullTime
 		var lastError sql.NullString
 		var settingsJSON string
@@ -243,6 +254,7 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 		if err := rows.Scan(
 			&integration.ID,
 			&dbOwnerID,
+			&tenantID,
 			&integration.Name,
 			&integration.BaseURL,
 			&integration.AccessToken,
@@ -259,6 +271,9 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 
 		if dbOwnerID.Valid {
 			integration.OwnerID = dbOwnerID.String
+		}
+		if tenantID.Valid {
+			integration.TenantID = tenantID.String
 		}
 		if lastSyncAt.Valid {
 			integration.LastSyncAt = &lastSyncAt.Time
@@ -424,6 +439,7 @@ func (s *PostgresStore) GetProject(ctx context.Context, id string) (*models.GitL
 	`
 
 	var project models.GitLabProject
+	var tenantID sql.NullString
 	var webhookID sql.NullInt64
 	var reviewPrompt sql.NullString
 	var settingsJSON string
@@ -434,7 +450,7 @@ func (s *PostgresStore) GetProject(ctx context.Context, id string) (*models.GitL
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&project.ID,
 		&project.IntegrationID,
-		&project.TenantID,
+		&tenantID,
 		&project.GitLabProjectID,
 		&project.Name,
 		&project.PathWithNamespace,
@@ -477,6 +493,9 @@ func (s *PostgresStore) GetProject(ctx context.Context, id string) (*models.GitL
 	if lastIndexedAt.Valid {
 		project.LastIndexedAt = &lastIndexedAt.Time
 	}
+	if tenantID.Valid {
+		project.TenantID = tenantID.String
+	}
 	if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
 		// Ignore JSON errors
 	}
@@ -495,6 +514,7 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 	`
 
 	var project models.GitLabProject
+	var tenantID sql.NullString
 	var webhookID sql.NullInt64
 	var reviewPrompt sql.NullString
 	var settingsJSON string
@@ -504,7 +524,7 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 	err := s.db.QueryRowContext(ctx, query, integrationID, gitlabProjectID).Scan(
 		&project.ID,
 		&project.IntegrationID,
-		&project.TenantID,
+		&tenantID,
 		&project.GitLabProjectID,
 		&project.Name,
 		&project.PathWithNamespace,
@@ -541,6 +561,9 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 	}
 	if lastIndexedAt.Valid {
 		project.LastIndexedAt = &lastIndexedAt.Time
+	}
+	if tenantID.Valid {
+		project.TenantID = tenantID.String
 	}
 	if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
 		// Ignore JSON errors
@@ -617,6 +640,7 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 	projects := []models.GitLabProject{}
 	for rows.Next() {
 		var project models.GitLabProject
+		var tenantID sql.NullString
 		var webhookID sql.NullInt64
 		var reviewPrompt sql.NullString
 		var settingsJSON string
@@ -627,7 +651,7 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 		if err := rows.Scan(
 			&project.ID,
 			&project.IntegrationID,
-			&project.TenantID,
+			&tenantID,
 			&project.GitLabProjectID,
 			&project.Name,
 			&project.PathWithNamespace,
@@ -666,6 +690,9 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 		if lastIndexedAt.Valid {
 			project.LastIndexedAt = &lastIndexedAt.Time
 		}
+		if tenantID.Valid {
+			project.TenantID = tenantID.String
+		}
 		if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {
 			// Ignore JSON errors
 		}
@@ -698,6 +725,7 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 	projects := []*models.GitLabProject{}
 	for rows.Next() {
 		var project models.GitLabProject
+		var tenantID sql.NullString
 		var webhookID sql.NullInt64
 		var settingsJSON string
 		var analysisModelID, embeddingModelID sql.NullString
@@ -709,7 +737,7 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 		if err := rows.Scan(
 			&project.ID,
 			&project.IntegrationID,
-			&project.TenantID,
+			&tenantID,
 			&project.GitLabProjectID,
 			&project.Name,
 			&project.PathWithNamespace,
@@ -753,6 +781,9 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 		}
 		if lastIndexedAt.Valid {
 			project.LastIndexedAt = &lastIndexedAt.Time
+		}
+		if tenantID.Valid {
+			project.TenantID = tenantID.String
 		}
 		if settingsJSON != "" {
 			if err := json.Unmarshal([]byte(settingsJSON), &project.Settings); err != nil {

@@ -52,7 +52,7 @@ type DeepScanResult struct {
 // DeepFinding represents an LLM-detected security issue
 type DeepFinding struct {
 	ID          string   `json:"id"`
-	Type        string   `json:"type"`        // "hardcoded_secret", "sensitive_data", "security_issue"
+	Type        string   `json:"type"` // "hardcoded_secret", "sensitive_data", "security_issue"
 	Severity    Severity `json:"severity"`
 	FilePath    string   `json:"file_path"`
 	StartLine   int      `json:"start_line"`
@@ -210,7 +210,7 @@ func (s *DeepScanner) DeepScan(ctx context.Context, req DeepScanRequest) (*DeepS
 		// Progress log every 10 batches
 		if (i/batchSize)%10 == 0 {
 			s.logger.WithFields(logrus.Fields{
-				"progress":      fmt.Sprintf("%d/%d", chunksScanned, len(allChunks)),
+				"progress":        fmt.Sprintf("%d/%d", chunksScanned, len(allChunks)),
 				"findings_so_far": len(allFindings),
 			}).Debug("Deep scan progress")
 		}
@@ -339,7 +339,9 @@ func (s *DeepScanner) getSystemPrompt(language string) string {
 2. Утечки чувствительных данных
 3. Небезопасных практик
 
-Отвечай ТОЛЬКО в JSON формате:
+⚠️ КРИТИЧЕСКИ ВАЖНО: Отвечай СТРОГО в JSON формате. НЕ добавляй текст до или после JSON!
+
+Формат ответа:
 {
   "findings": [
     {
@@ -354,13 +356,15 @@ func (s *DeepScanner) getSystemPrompt(language string) string {
   ]
 }
 
-Если секретов НЕ найдено, верни: {"findings": []}
+Если секретов НЕ найдено, верни ТОЛЬКО: {"findings": []}
 
-ВАЖНО:
+Правила:
 - Игнорируй примеры, placeholder'ы, тесты с фейковыми данными
 - Ищи РЕАЛЬНЫЕ секреты которые могут быть использованы
 - severity: critical (ключи облаков, БД), high (токены), medium (подозрительное), low (потенциальное)
-- confidence: high (точно секрет), medium (вероятно), low (возможно)`
+- confidence: high (точно секрет), medium (вероятно), low (возможно)
+
+⚠️ Начни ответ с символа '{' и закончи символом '}'. Никакого другого текста!`
 	}
 
 	return `You are a code security expert. Analyze code for:
@@ -368,7 +372,9 @@ func (s *DeepScanner) getSystemPrompt(language string) string {
 2. Sensitive data leaks
 3. Insecure practices
 
-Respond ONLY in JSON format:
+⚠️ CRITICAL: Respond STRICTLY in JSON format. DO NOT add any text before or after JSON!
+
+Response format:
 {
   "findings": [
     {
@@ -383,13 +389,15 @@ Respond ONLY in JSON format:
   ]
 }
 
-If NO secrets found, return: {"findings": []}
+If NO secrets found, return ONLY: {"findings": []}
 
-IMPORTANT:
+Rules:
 - Ignore examples, placeholders, tests with fake data
 - Look for REAL secrets that could be exploited
 - severity: critical (cloud/DB keys), high (tokens), medium (suspicious), low (potential)
-- confidence: high (definitely secret), medium (likely), low (possibly)`
+- confidence: high (definitely secret), medium (likely), low (possibly)
+
+⚠️ Start response with '{' and end with '}'. No other text!`
 }
 
 func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFinding {
@@ -397,19 +405,32 @@ func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFi
 
 	// Try to extract JSON from response
 	content = strings.TrimSpace(content)
-	
+	originalContent := content
+
 	// Handle markdown code blocks
 	if strings.Contains(content, "```json") {
 		start := strings.Index(content, "```json") + 7
 		end := strings.LastIndex(content, "```")
 		if end > start {
-			content = content[start:end]
+			content = strings.TrimSpace(content[start:end])
 		}
 	} else if strings.Contains(content, "```") {
 		start := strings.Index(content, "```") + 3
 		end := strings.LastIndex(content, "```")
 		if end > start {
-			content = content[start:end]
+			content = strings.TrimSpace(content[start:end])
+		}
+	}
+
+	// Try to find JSON object boundaries
+	if !strings.HasPrefix(content, "{") {
+		if idx := strings.Index(content, "{"); idx >= 0 {
+			content = content[idx:]
+		}
+	}
+	if !strings.HasSuffix(content, "}") {
+		if idx := strings.LastIndex(content, "}"); idx >= 0 {
+			content = content[:idx+1]
 		}
 	}
 
@@ -427,7 +448,11 @@ func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFi
 	}
 
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
-		s.logger.WithError(err).WithField("content_preview", truncate(content, 200)).Debug("Failed to parse LLM findings JSON")
+		s.logger.WithError(err).WithFields(logrus.Fields{
+			"content_preview": truncate(content, 200),
+			"original_length": len(originalContent),
+			"cleaned_length":  len(content),
+		}).Warn("Failed to parse LLM findings JSON - model returned invalid format")
 		return findings
 	}
 
@@ -473,4 +498,3 @@ func truncate(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
-

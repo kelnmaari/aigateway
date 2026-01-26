@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.8.0] - 2026-01-26
+
+### Fixed
+
+- **Deep Scan JSON Parsing**: Improved LLM response parsing with automatic JSON extraction from text responses. Added stricter prompts and better error handling for models that don't follow JSON-only instructions.
+- **NPM Dependencies Parser**: Fixed parsing of Vaadin-specific package.json files with custom sections and invalid version references (like `$@package`). Parser now correctly handles `vaadin` section and filters out npm override references.
+
 ## [4.7.5] - 2026-01-26
 
 ### Added

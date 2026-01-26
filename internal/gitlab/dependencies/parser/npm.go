@@ -12,6 +12,13 @@ type PackageJSON struct {
 	Version         string            `json:"version"`
 	Dependencies    map[string]string `json:"dependencies"`
 	DevDependencies map[string]string `json:"devDependencies"`
+	Vaadin          *VaadinSection    `json:"vaadin,omitempty"`
+}
+
+// VaadinSection represents Vaadin-specific package.json section
+type VaadinSection struct {
+	Dependencies    map[string]string `json:"dependencies"`
+	DevDependencies map[string]string `json:"devDependencies"`
 }
 
 // NPMParser parses npm package.json files.
@@ -30,23 +37,51 @@ func (p *NPMParser) Parse(content string) ([]Dependency, error) {
 	}
 
 	var deps []Dependency
+	seen := make(map[string]bool) // Track unique dependencies
+
+	// Helper to add dependency if valid
+	addDep := func(name, version string, indirect bool) {
+		// Skip if already seen
+		if seen[name] {
+			return
+		}
+
+		// Skip invalid version references (like $@vaadin/bundles)
+		if strings.HasPrefix(version, "$") {
+			return
+		}
+
+		cleanedVersion := cleanNPMVersion(version)
+		if cleanedVersion == "" {
+			return
+		}
+
+		deps = append(deps, Dependency{
+			Name:           name,
+			CurrentVersion: cleanedVersion,
+			Indirect:       indirect,
+		})
+		seen[name] = true
+	}
 
 	// Production dependencies
 	for name, version := range pkg.Dependencies {
-		deps = append(deps, Dependency{
-			Name:           name,
-			CurrentVersion: cleanNPMVersion(version),
-			Indirect:       false,
-		})
+		addDep(name, version, false)
 	}
 
 	// Dev dependencies (marked as indirect)
 	for name, version := range pkg.DevDependencies {
-		deps = append(deps, Dependency{
-			Name:           name,
-			CurrentVersion: cleanNPMVersion(version),
-			Indirect:       true, // devDependencies as indirect
-		})
+		addDep(name, version, true)
+	}
+
+	// Vaadin section dependencies (if present and not already added)
+	if pkg.Vaadin != nil {
+		for name, version := range pkg.Vaadin.Dependencies {
+			addDep(name, version, false)
+		}
+		for name, version := range pkg.Vaadin.DevDependencies {
+			addDep(name, version, true)
+		}
 	}
 
 	return deps, nil
@@ -73,12 +108,11 @@ func cleanNPMVersion(version string) string {
 	version = strings.TrimPrefix(version, "<")
 	version = strings.TrimPrefix(version, "=")
 	version = strings.TrimSpace(version)
-	
+
 	// Handle version ranges like "1.0.0 - 2.0.0" - take the first part
 	if idx := strings.Index(version, " "); idx > 0 {
 		version = version[:idx]
 	}
-	
+
 	return version
 }
-

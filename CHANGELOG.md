@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.8.7] - 2026-01-26
+
+### Fixed
+
+- **Deep Scan**: Improved robustness against LLM hallucinations and garbage output. Added garbage detection in output parsing, refined system prompts for better JSON compliance, and set temperature to 0.0 for maximum determinism.
+- **Deep Scan**: Increased HTTP client timeout to 3 minutes to handle complex batch analysis.
+
 ## [4.8.6] - 2026-01-26
 
 ### Fixed

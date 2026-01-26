@@ -69,7 +69,7 @@ func NewDeepScanner(vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey strin
 		vectorStore: vectorStore,
 		llmBaseURL:  llmBaseURL,
 		llmAPIKey:   llmAPIKey,
-		httpClient:  &http.Client{Timeout: 2 * time.Minute},
+		httpClient:  &http.Client{Timeout: 3 * time.Minute}, // Increased from 2m
 		logger:      logger,
 	}
 }
@@ -278,7 +278,7 @@ func (s *DeepScanner) analyzeBatch(ctx context.Context, modelID string, chunks [
 			{"role": "system", "content": systemPrompt},
 			{"role": "user", "content": sb.String()},
 		},
-		"temperature": 0.1,
+		"temperature": 0.0,
 		"max_tokens":  2000,
 	}
 
@@ -356,15 +356,10 @@ func (s *DeepScanner) getSystemPrompt(language string) string {
   ]
 }
 
-Если секретов НЕ найдено, верни ТОЛЬКО: {"findings": []}
+ If secrets are NOT found, return STICTLY: {"findings": []}
 
-Правила:
-- Игнорируй примеры, placeholder'ы, тесты с фейковыми данными
-- Ищи РЕАЛЬНЫЕ секреты которые могут быть использованы
-- severity: critical (ключи облаков, БД), high (токены), medium (подозрительное), low (потенциальное)
-- confidence: high (точно секрет), medium (вероятно), low (возможно)
-
-⚠️ Начни ответ с символа '{' и закончи символом '}'. Никакого другого текста!`
+⚠️ ВАЖНО: Никаких вступлений, пояснений или текста до/после JSON. Только "чистый" JSON объект.
+⚠️ Начни ответ с символа '{' и закончи символом '}'.`
 	}
 
 	return `You are a code security expert. Analyze code for:
@@ -389,15 +384,10 @@ Response format:
   ]
 }
 
-If NO secrets found, return ONLY: {"findings": []}
+ If secrets are NOT found, return STICTLY: {"findings": []}
 
-Rules:
-- Ignore examples, placeholders, tests with fake data
-- Look for REAL secrets that could be exploited
-- severity: critical (cloud/DB keys), high (tokens), medium (suspicious), low (potential)
-- confidence: high (definitely secret), medium (likely), low (possibly)
-
-⚠️ Start response with '{' and end with '}'. No other text!`
+⚠️ IMPORTANT: No introductions, no explanations, no text before or after JSON. Only raw JSON object.
+⚠️ Start response with '{' and end with '}'.`
 }
 
 func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFinding {
@@ -420,6 +410,12 @@ func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFi
 		if end > start {
 			content = strings.TrimSpace(content[start:end])
 		}
+	}
+
+	// Remove possible repetitive trash (hallucinations like "I5 I54...")
+	if len(content) > 100 && strings.Count(content, "I5") > 10 {
+		s.logger.Warn("LLM returned repetitive garbage, skipping batch")
+		return findings
 	}
 
 	// Try to find JSON object boundaries

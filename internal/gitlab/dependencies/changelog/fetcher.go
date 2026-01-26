@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -22,9 +23,24 @@ type Fetcher struct {
 
 // NewFetcher creates a new changelog fetcher.
 func NewFetcher(logger *logrus.Logger) *Fetcher {
+	// Custom transport with aggressive timeouts
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second, // Connection timeout
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ResponseHeaderTimeout: 5 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConns:          10,
+		MaxIdleConnsPerHost:   2,
+		IdleConnTimeout:       30 * time.Second,
+	}
+
 	return &Fetcher{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   15 * time.Second, // Total request timeout
+			Transport: transport,
 		},
 		logger: logger,
 	}

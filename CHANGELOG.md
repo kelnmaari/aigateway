@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [4.8.4] - 2026-01-26
+## [4.8.6] - 2026-01-26
+
+### Fixed
+
+- **Changelog Fetcher**: Configured custom HTTP transport with aggressive timeouts (5s connection, 5s TLS handshake, 5s response headers) to prevent slow DNS or connection issues. Total timeout reduced to 15 seconds.
+
+## [4.8.5] - 2026-01-26
 
 ### Fixed
 

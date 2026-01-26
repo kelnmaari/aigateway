@@ -27,7 +27,7 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 	llmBaseURL := fmt.Sprintf("http://localhost:%d", r.config.Server.Port)
 	llmAPIKey := r.gitlabAPIKey
 
-	userHandler := handlers.NewGitLabUserHandler(store, r.logger)
+	userHandler := handlers.NewGitLabUserHandler(store, r.inferenceRouter, r.inferenceModelStore, r.logger)
 
 	// Create scanner handlers for user-level access
 	var qdrantStore *vector.QdrantStore
@@ -67,10 +67,13 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 	// ============================================================================
 	gitlab.GET("/integrations/:id/projects", userHandler.ListMyProjects)
 	gitlab.POST("/integrations/:id/projects", userHandler.AddMyProject)
+	gitlab.POST("/integrations/:id/projects/bulk", userHandler.BulkAddMyProjects)
+	gitlab.GET("/integrations/:id/discover", userHandler.DiscoverMyProjects)
 	gitlab.GET("/projects/:id", userHandler.GetMyProject)
 	gitlab.PUT("/projects/:id", userHandler.UpdateMyProject)
 	gitlab.DELETE("/projects/:id", userHandler.DeleteMyProject)
 	gitlab.POST("/projects/:id/setup-webhook", userHandler.SetupMyWebhook)
+	gitlab.GET("/models", userHandler.ListMyAvailableModels)
 
 	// ============================================================================
 	// User's Reviews
@@ -149,6 +152,9 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 		gitlabHandler.SetMainDB(r.db)
 	}
 
+	// Set inference components
+	gitlabHandler.SetInference(r.inferenceRouter, r.inferenceModelStore)
+
 	// GitLab Admin Routes
 	gitlab := r.engine.Group("/api/admin/gitlab")
 
@@ -180,6 +186,8 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	// ============================================================================
 	gitlab.GET("/integrations/:id/projects", gitlabHandler.ListProjects)
 	gitlab.POST("/integrations/:id/projects", gitlabHandler.AddProject)
+	gitlab.POST("/integrations/:id/projects/bulk", gitlabHandler.BulkAddProjects)
+	gitlab.GET("/integrations/:id/discover", gitlabHandler.DiscoverProjects)
 
 	// ============================================================================
 	// Project Management (direct)
@@ -215,6 +223,7 @@ func (r *Router) SetupGitLabRoutes(store storage.Store) {
 	gitlab.GET("/models", gitlabHandler.ListActiveModels)
 	gitlab.GET("/models/analysis", gitlabHandler.ListAnalysisModels)
 	gitlab.GET("/models/embedding", gitlabHandler.ListEmbeddingModels)
+	gitlab.GET("/models/available", gitlabHandler.ListAvailableModels)
 
 	r.logger.Info("GitLab admin routes configured successfully")
 

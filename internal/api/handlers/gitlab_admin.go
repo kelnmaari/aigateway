@@ -12,10 +12,12 @@ import (
 	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/rag"
 	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/inference"
 	"aigateway/internal/models"
 	mainStorage "aigateway/internal/storage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,11 +33,13 @@ type QdrantStatsProvider interface {
 }
 
 type GitLabAdminHandler struct {
-	store         storage.Store
-	mainDB        mainStorage.Database   // For accessing model registry
-	workerPool    WorkerPoolStats        // Worker pool for queue stats
-	qdrantStats   QdrantStatsProvider    // For index stats
-	logger        *logrus.Logger
+	store       storage.Store
+	mainDB      mainStorage.Database  // For accessing model registry
+	router      *inference.Router     // For running models
+	modelStore  *inference.ModelStore // For saved configurations
+	workerPool  WorkerPoolStats       // Worker pool for queue stats
+	qdrantStats QdrantStatsProvider   // For index stats
+	logger      *logrus.Logger
 }
 
 // NewGitLabAdminHandler creates a new GitLab admin handler
@@ -59,6 +63,12 @@ func (h *GitLabAdminHandler) SetMainDB(db mainStorage.Database) {
 // SetQdrantStats sets the Qdrant stats provider for index statistics
 func (h *GitLabAdminHandler) SetQdrantStats(qs QdrantStatsProvider) {
 	h.qdrantStats = qs
+}
+
+// SetInference sets the inference components for model selection
+func (h *GitLabAdminHandler) SetInference(router *inference.Router, modelStore *inference.ModelStore) {
+	h.router = router
+	h.modelStore = modelStore
 }
 
 // ============================================================================
@@ -296,10 +306,10 @@ func (h *GitLabAdminHandler) TestIntegration(c *gin.Context) {
 	user, err := gitlabClient.GetCurrentUser(ctx)
 	if err != nil {
 		h.logger.WithError(err).Warn("GitLab connection test failed")
-		
+
 		// Update status to error
 		h.store.UpdateIntegrationStatus(ctx, id, models.GitLabIntegrationStatusError, err.Error())
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -484,6 +494,204 @@ func (h *GitLabAdminHandler) AddProject(c *gin.Context) {
 	}).Info("GitLab project added")
 
 	c.JSON(http.StatusCreated, project)
+}
+
+// BulkAddProjects POST /api/admin/gitlab/integrations/:id/projects/bulk
+func (h *GitLabAdminHandler) BulkAddProjects(c *gin.Context) {
+	integrationID := c.Param("id")
+
+	var req struct {
+		Projects []struct {
+			GitLabProjectID   int64  `json:"gitlab_project_id" binding:"required"`
+			Name              string `json:"name" binding:"required"`
+			PathWithNamespace string `json:"path_with_namespace"`
+			DefaultBranch     string `json:"default_branch"`
+		} `json:"projects" binding:"required"`
+		AnalysisModelID  string                       `json:"analysis_model_id" binding:"required"`
+		EmbeddingModelID string                       `json:"embedding_model_id"`
+		AutoReview       bool                         `json:"auto_review"`
+		ReviewPrompt     string                       `json:"review_prompt,omitempty"`
+		Settings         models.GitLabProjectSettings `json:"settings"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+	defer cancel()
+
+	// Get integration
+	integration, err := h.store.GetIntegration(ctx, integrationID)
+	if err != nil || integration == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		return
+	}
+
+	results := make([]*models.GitLabProject, 0, len(req.Projects))
+	for _, p := range req.Projects {
+		project := &models.GitLabProject{
+			ID:                uuid.New().String(),
+			IntegrationID:     integrationID,
+			GitLabProjectID:   p.GitLabProjectID,
+			Name:              p.Name,
+			PathWithNamespace: p.PathWithNamespace,
+			DefaultBranch:     p.DefaultBranch,
+			Status:            models.GitLabProjectStatusActive,
+			AutoReview:        req.AutoReview,
+			AnalysisModelID:   req.AnalysisModelID,
+			EmbeddingModelID:  req.EmbeddingModelID,
+			ReviewPrompt:      req.ReviewPrompt,
+			Settings:          req.Settings,
+		}
+		if project.DefaultBranch == "" {
+			project.DefaultBranch = "main"
+		}
+
+		if err := h.store.CreateProject(ctx, project); err != nil {
+			h.logger.WithError(err).WithField("gitlab_id", p.GitLabProjectID).Warn("Failed to create project in bulk add")
+			continue
+		}
+		results = append(results, project)
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"data":  results,
+		"count": len(results),
+	})
+}
+
+// DiscoverProjects GET /api/admin/gitlab/integrations/:id/discover
+func (h *GitLabAdminHandler) DiscoverProjects(c *gin.Context) {
+	integrationID := c.Param("id")
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	integration, err := h.store.GetIntegration(ctx, integrationID)
+	if err != nil || integration == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		return
+	}
+
+	search := c.Query("search")
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+	})
+
+	projects, err := gitlabClient.ListProjects(ctx, &client.ListProjectsOptions{
+		Search:         search,
+		PerPage:        perPage,
+		Page:           page,
+		Membership:     true,
+		MinAccessLevel: client.AccessLevelReporter,
+	})
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to discover projects from GitLab")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to discover projects: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": projects,
+	})
+}
+
+// ListAvailableModels GET /api/admin/gitlab/models
+func (h *GitLabAdminHandler) ListAvailableModels(c *gin.Context) {
+	if h.router == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Inference system not initialized"})
+		return
+	}
+
+	analysisOnly := c.Query("type") == "analysis"
+	embeddingOnly := c.Query("type") == "embedding"
+
+	type ModelOption struct {
+		ID           string                 `json:"id"`
+		Name         string                 `json:"name"`
+		Type         string                 `json:"type"` // "running" or "saved"
+		Provider     string                 `json:"provider"`
+		Status       string                 `json:"status"`
+		Capabilities []inference.Capability `json:"capabilities"`
+	}
+
+	seen := make(map[string]bool)
+	options := make([]ModelOption, 0)
+
+	// 1. Add running models
+	for _, inst := range h.router.ListModels() {
+		if inst.Status != inference.StatusRunning {
+			continue
+		}
+
+		isEmbedding := false
+		for _, cap := range inst.Spec.Capabilities {
+			if cap == "embeddings" {
+				isEmbedding = true
+				break
+			}
+		}
+
+		if analysisOnly && isEmbedding {
+			continue
+		}
+		if embeddingOnly && !isEmbedding {
+			continue
+		}
+
+		options = append(options, ModelOption{
+			ID:           inst.Spec.Alias,
+			Name:         inst.Spec.Alias,
+			Type:         "running",
+			Provider:     string(inst.Spec.Provider),
+			Status:       string(inst.Status),
+			Capabilities: inst.Spec.Capabilities,
+		})
+		seen[inst.Spec.Alias] = true
+	}
+
+	// 2. Add saved models (if not already listed as running)
+	if h.modelStore != nil {
+		for _, saved := range h.modelStore.List() {
+			if seen[saved.Alias] {
+				continue
+			}
+
+			isEmbedding := false
+			for _, cap := range saved.Capabilities {
+				if cap == "embeddings" {
+					isEmbedding = true
+					break
+				}
+			}
+
+			if analysisOnly && isEmbedding {
+				continue
+			}
+			if embeddingOnly && !isEmbedding {
+				continue
+			}
+
+			options = append(options, ModelOption{
+				ID:           saved.Alias,
+				Name:         saved.Alias,
+				Type:         "saved",
+				Provider:     string(saved.Provider),
+				Status:       "stopped",
+				Capabilities: saved.Capabilities,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": options,
+	})
 }
 
 // UpdateProject PUT /api/admin/gitlab/projects/:project_id
@@ -854,11 +1062,11 @@ func (h *GitLabAdminHandler) GetModelUsage(c *gin.Context) {
 	isUsed, _ := h.store.IsModelUsed(ctx, modelID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"model_id":           modelID,
-		"is_used_in_gitlab":  isUsed,
-		"gitlab_projects":    projects,
-		"can_deactivate":     !isUsed,
-		"blocking_reason":    getBlockingReason(projects),
+		"model_id":          modelID,
+		"is_used_in_gitlab": isUsed,
+		"gitlab_projects":   projects,
+		"can_deactivate":    !isUsed,
+		"blocking_reason":   getBlockingReason(projects),
 	})
 }
 
@@ -920,12 +1128,12 @@ func (h *GitLabAdminHandler) ListActiveModels(c *gin.Context) {
 
 	// Get capability filter from query param
 	capability := c.Query("capability")
-	
+
 	// Build filter for active models
 	filter := &models.ModelRegistryFilter{
 		Status: models.ModelStatusActive,
 	}
-	
+
 	if capability != "" {
 		filter.Capabilities = []models.ModelCapability{models.ModelCapability(capability)}
 	}
@@ -1153,12 +1361,12 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 	topProjects := make([]gin.H, 0, len(analytics.ReviewsByProject))
 	for _, p := range analytics.ReviewsByProject {
 		topProjects = append(topProjects, gin.H{
-			"project_id":        p.ProjectID,
-			"project_name":      p.ProjectName,
-			"total_reviews":     p.TotalReviews,
-			"completed_reviews": p.CompletedReviews,
+			"project_id":         p.ProjectID,
+			"project_name":       p.ProjectName,
+			"total_reviews":      p.TotalReviews,
+			"completed_reviews":  p.CompletedReviews,
 			"total_issues_found": p.IssuesFound,
-			"avg_score":         0.0, // TODO: Add to analytics query
+			"avg_score":          0.0, // TODO: Add to analytics query
 		})
 	}
 
@@ -1177,11 +1385,11 @@ func (h *GitLabAdminHandler) GetAnalytics(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"overview":            overview,
-		"top_projects":        topProjects,
-		"top_models":          []gin.H{}, // TODO: Add model stats to analytics query
-		"issues_by_category":  issuesByCategory,
-		"reviews_by_day":      analytics.ReviewsByDay,
+		"overview":           overview,
+		"top_projects":       topProjects,
+		"top_models":         []gin.H{}, // TODO: Add model stats to analytics query
+		"issues_by_category": issuesByCategory,
+		"reviews_by_day":     analytics.ReviewsByDay,
 	})
 }
 
@@ -1299,11 +1507,11 @@ func (h *GitLabAdminHandler) ListFeedback(c *gin.Context) {
 // SubmitFeedback POST /api/admin/gitlab/feedback
 func (h *GitLabAdminHandler) SubmitFeedback(c *gin.Context) {
 	var req struct {
-		ReviewID     string  `json:"review_id" binding:"required"`
-		Rating       int     `json:"rating" binding:"required,min=1,max=5"`
-		FeedbackType string  `json:"feedback_type"`
-		Comment      string  `json:"comment"`
-		IssueIndex   *int    `json:"issue_index"`
+		ReviewID     string `json:"review_id" binding:"required"`
+		Rating       int    `json:"rating" binding:"required,min=1,max=5"`
+		FeedbackType string `json:"feedback_type"`
+		Comment      string `json:"comment"`
+		IssueIndex   *int   `json:"issue_index"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

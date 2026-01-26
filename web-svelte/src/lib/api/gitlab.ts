@@ -213,7 +213,7 @@ async function apiRequest<T>(
   options: { method?: string; body?: unknown; query?: Record<string, unknown> } = {}
 ): Promise<T> {
   let url = `${API_BASE}${path}`;
-  
+
   // Add query parameters if provided
   if (options.query) {
     const params = new URLSearchParams();
@@ -227,7 +227,7 @@ async function apiRequest<T>(
       url += `?${queryString}`;
     }
   }
-  
+
   return api.request<T>(url, {
     method: (options.method || 'GET') as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     body: options.body,
@@ -248,7 +248,7 @@ export const gitlabApi = {
     if (params?.offset) searchParams.set('offset', params.offset.toString());
     if (params?.status) searchParams.set('status', params.status);
     if (params?.search) searchParams.set('search', params.search);
-    
+
     return apiRequest(`/integrations?${searchParams}`);
   },
 
@@ -301,7 +301,7 @@ export const gitlabApi = {
     if (params?.offset) searchParams.set('offset', params.offset.toString());
     if (params?.status) searchParams.set('status', params.status);
     if (params?.search) searchParams.set('search', params.search);
-    
+
     return apiRequest(`/integrations/${integrationId}/projects?${searchParams}`);
   },
 
@@ -320,6 +320,35 @@ export const gitlabApi = {
     return apiRequest(`/integrations/${integrationId}/projects`, {
       method: 'POST',
       body: data,
+    });
+  },
+
+  async bulkAddProjects(integrationId: string, data: {
+    projects: Array<{
+      gitlab_project_id: number;
+      name: string;
+      path_with_namespace?: string;
+      default_branch?: string;
+    }>;
+    analysis_model_id: string;
+    embedding_model_id?: string;
+    auto_review?: boolean;
+    review_prompt?: string;
+    settings?: GitLabProjectSettings;
+  }): Promise<{ data: GitLabProject[]; count: number }> {
+    return apiRequest(`/integrations/${integrationId}/projects/bulk`, {
+      method: 'POST',
+      body: data,
+    });
+  },
+
+  async discoverProjects(integrationId: string, params?: {
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<{ data: any[] }> {
+    return apiRequest(`/integrations/${integrationId}/discover`, {
+      query: params,
     });
   },
 
@@ -350,11 +379,11 @@ export const gitlabApi = {
   },
 
   // Indexing
-  async startIndexing(projectId: string, options?: { branch?: string; force?: boolean }): Promise<{ 
-    message: string; 
-    project_id: string; 
-    branch: string; 
-    status: string 
+  async startIndexing(projectId: string, options?: { branch?: string; force?: boolean }): Promise<{
+    message: string;
+    project_id: string;
+    branch: string;
+    status: string
   }> {
     return apiRequest(`/projects/${projectId}/index`, {
       method: 'POST',
@@ -386,7 +415,7 @@ export const gitlabApi = {
     if (params?.project_id) searchParams.set('project_id', params.project_id);
     if (params?.status) searchParams.set('status', params.status);
     if (params?.search) searchParams.set('search', params.search);
-    
+
     return apiRequest(`/reviews?${searchParams}`);
   },
 
@@ -412,7 +441,7 @@ export const gitlabApi = {
     if (params?.limit) searchParams.set('limit', params.limit.toString());
     if (params?.offset) searchParams.set('offset', params.offset.toString());
     if (params?.status) searchParams.set('status', params.status);
-    
+
     return apiRequest(`/queue/jobs?${searchParams}`);
   },
 
@@ -439,9 +468,10 @@ export const gitlabApi = {
     return apiRequest('/models/embedding');
   },
 
-  // Model Usage Check
-  async checkModelUsage(modelId: string): Promise<ModelUsage> {
-    return apiRequest(`/models/${modelId}/gitlab-usage`);
+  async listAvailableModels(type?: 'analysis' | 'embedding'): Promise<{ data: ModelOption[] }> {
+    return apiRequest('/models/available', {
+      query: type ? { type } : {},
+    });
   },
 
   // Settings
@@ -488,7 +518,7 @@ export const gitlabApi = {
   // ============================================================================
   // Secrets Scanning (v4.0+)
   // ============================================================================
-  
+
   async scanSecrets(projectId: string, params?: {
     categories?: string[];
     min_severity?: SecretSeverity;
@@ -695,18 +725,18 @@ export const gitlabApi = {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     const response = await fetch(`/api/admin/gitlab/projects/${projectId}/download-tests`, {
       method: 'POST',
       headers,
       body: JSON.stringify(params),
     });
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Download failed' }));
       throw new Error(error.error || 'Download failed');
     }
-    
+
     return response.blob();
   },
 
@@ -861,14 +891,14 @@ export const gitlabApi = {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     const queryStr = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
     const response = await fetch(`/api/admin/gitlab/analytics/export${queryStr}`, { headers });
-    
+
     if (!response.ok) {
       throw new Error('Export failed');
     }
-    
+
     return response.blob();
   },
 
@@ -1624,7 +1654,7 @@ export interface DeepScanResult {
 // SAST (Static Application Security Testing) Types
 // ============================================================================
 
-export type SASTVulnerabilityType = 
+export type SASTVulnerabilityType =
   | 'sql_injection'
   | 'xss'
   | 'path_traversal'
@@ -1736,7 +1766,7 @@ export interface ScanHistory {
 // Scan History Types (v4.1.2+) - unified scan results storage
 // ============================================================================
 
-export type ScanHistoryScanType = 
+export type ScanHistoryScanType =
   | 'secrets'
   | 'secrets_deep'
   | 'dependencies'

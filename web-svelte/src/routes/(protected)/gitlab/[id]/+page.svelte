@@ -29,7 +29,11 @@
 		setupMyWebhook,
 		analyzeMyChangelog,
 		listMyScanHistory,
-		getMyScanTypes
+		getMyScanTypes,
+		discoverMyProjects,
+		bulkAddMyProjects,
+		listMyAvailableModels,
+		type ModelOption
 	} from '$lib/api/gitlab-user';
 	import { tenantsApi, type Tenant } from '$lib/api/tenants';
 	import * as m from '$lib/paraglide/messages';
@@ -315,6 +319,110 @@
 			error = e instanceof Error ? e.message : 'Failed to add project';
 		} finally {
 			addingProject = false;
+		}
+	}
+
+	// Discovery state
+	let showDiscovery = false;
+	let discoverySearch = '';
+	let discoveredProjects: any[] = [];
+	let selectedDiscoveryProjects: Set<number> = new Set();
+	let discoveryLoading = false;
+	let discoveryAdding = false;
+	let availableAnalysisModels: ModelOption[] = [];
+	let availableEmbeddingModels: ModelOption[] = [];
+
+	async function openDiscovery() {
+		showDiscovery = true;
+		discoveryLoading = true;
+		discoveredProjects = [];
+		selectedDiscoveryProjects = new Set();
+
+		try {
+			// Load models if not already loaded
+			if (availableAnalysisModels.length === 0) {
+				const [modelsRes] = await Promise.all([listMyAvailableModels('analysis')]);
+				availableAnalysisModels = modelsRes.data;
+			}
+
+			await handleDiscover();
+		} catch (e) {
+			console.error('Failed to init discovery:', e);
+		} finally {
+			discoveryLoading = false;
+		}
+	}
+
+	async function handleDiscover() {
+		discoveryLoading = true;
+		try {
+			const res = await discoverMyProjects(integrationId, {
+				search: discoverySearch || undefined,
+				per_page: 50
+			});
+			discoveredProjects = res.data || [];
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Discovery failed';
+		} finally {
+			discoveryLoading = false;
+		}
+	}
+
+	function toggleDiscoveryProject(id: number) {
+		if (selectedDiscoveryProjects.has(id)) {
+			selectedDiscoveryProjects.delete(id);
+		} else {
+			selectedDiscoveryProjects.add(id);
+		}
+		selectedDiscoveryProjects = new Set(selectedDiscoveryProjects);
+	}
+
+	async function handleBulkAdd() {
+		if (selectedDiscoveryProjects.size === 0) return;
+		if (!newProject.analysis_model_id) {
+			alert('Please select an analysis model');
+			return;
+		}
+
+		discoveryAdding = true;
+		try {
+			const projectsToAdd = discoveredProjects
+				.filter((p) => selectedDiscoveryProjects.has(p.id))
+				.map((p) => ({
+					gitlab_project_id: p.id,
+					name: p.name,
+					path_with_namespace: p.path_with_namespace,
+					default_branch: p.default_branch
+				}));
+
+			const includePatterns = newProject.settings.include_patterns
+				.split(',')
+				.map((p) => p.trim())
+				.filter((p) => p);
+			const excludePatterns = newProject.settings.exclude_patterns
+				.split(',')
+				.map((p) => p.trim())
+				.filter((p) => p);
+
+			await bulkAddMyProjects(integrationId, {
+				projects: projectsToAdd,
+				tenant_id: newProject.tenant_id || undefined,
+				analysis_model_id: newProject.analysis_model_id,
+				embedding_model_id: newProject.embedding_model_id || undefined,
+				auto_review: newProject.auto_review,
+				settings: {
+					...newProject.settings,
+					include_patterns: includePatterns.length > 0 ? includePatterns : undefined,
+					exclude_patterns: excludePatterns.length > 0 ? excludePatterns : undefined
+				}
+			});
+
+			showDiscovery = false;
+			await loadData();
+		} catch (e) {
+			alert(e instanceof Error ? e.message : 'Bulk add failed');
+		} finally {
+			discoveryAdding = false;
 		}
 	}
 
@@ -673,7 +781,16 @@
 		<!-- Tab content -->
 		{#if activeTab === 'projects'}
 			<div class="space-y-4">
-				<div class="flex justify-end">
+				<div class="flex justify-end gap-2">
+					<button
+						onclick={openDiscovery}
+						class="flex items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20"
+					>
+						<RefreshCw class="h-4 w-4" />
+						{m.gitlab_discover_repos && m.gitlab_discover_repos()
+							? m.gitlab_discover_repos()
+							: 'Discover & Bulk Add'}
+					</button>
 					<button
 						onclick={() => (showAddProject = true)}
 						class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition-colors hover:bg-indigo-700"
@@ -2459,6 +2576,351 @@
 							)}</pre>
 					</div>
 				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Add Project Modal -->
+{#if showAddProject}
+	<div
+		class="animate-in fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200"
+		onclick={(e) => e.target === e.currentTarget && (showAddProject = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showAddProject = false)}
+		role="button"
+		tabindex="-1"
+	>
+		<div
+			class="animate-in zoom-in-95 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl duration-200"
+		>
+			<div class="mb-6 flex items-center justify-between">
+				<h3 class="text-xl font-bold text-gray-100">{m.modal_add_project()}</h3>
+				<button
+					onclick={() => (showAddProject = false)}
+					class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+				>
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<div class="space-y-4">
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div>
+						<label for="p-id" class="mb-1 block text-sm font-medium text-gray-400"
+							>GitLab Project ID</label
+						>
+						<input
+							id="p-id"
+							type="number"
+							bind:value={newProject.gitlab_project_id}
+							placeholder="123456"
+							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+						/>
+					</div>
+					<div>
+						<label for="p-name" class="mb-1 block text-sm font-medium text-gray-400"
+							>{m.common_name()}</label
+						>
+						<input
+							id="p-name"
+							type="text"
+							bind:value={newProject.name}
+							placeholder="My Awesome App"
+							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+						/>
+					</div>
+				</div>
+
+				<div>
+					<label for="p-path" class="mb-1 block text-sm font-medium text-gray-400"
+						>Path (optional)</label
+					>
+					<input
+						id="p-path"
+						type="text"
+						bind:value={newProject.path_with_namespace}
+						placeholder="group/project"
+						class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+					/>
+				</div>
+
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div>
+						<label for="p-analysis-model" class="mb-1 block text-sm font-medium text-gray-400"
+							>{m.modal_analysis_model()}</label
+						>
+						<select
+							id="p-analysis-model"
+							bind:value={newProject.analysis_model_id}
+							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+						>
+							<option value="" disabled>Select a model</option>
+							{#each availableAnalysisModels as model}
+								<option value={model.id}>{model.name} ({model.provider})</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label for="p-tenant" class="mb-1 block text-sm font-medium text-gray-400"
+							>Project Tenant</label
+						>
+						<select
+							id="p-tenant"
+							bind:value={newProject.tenant_id}
+							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+						>
+							<option value="">None (Personal)</option>
+							{#each userTenants as tenant}
+								<option value={tenant.id}>{tenant.name}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				<div class="flex items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-3">
+					<input
+						type="checkbox"
+						id="p-auto-review"
+						bind:checked={newProject.auto_review}
+						class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
+					/>
+					<label for="p-auto-review" class="text-sm font-bold text-gray-200">
+						{m.modal_auto_review()}
+					</label>
+				</div>
+			</div>
+
+			<div class="mt-8 flex justify-end gap-3 border-t border-gray-700 pt-6">
+				<button
+					onclick={() => (showAddProject = false)}
+					class="rounded-lg bg-gray-800 px-6 py-2 text-white transition-colors hover:bg-gray-700"
+				>
+					{m.common_cancel()}
+				</button>
+				<button
+					onclick={handleAddProject}
+					disabled={addingProject}
+					class="flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-2 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+				>
+					{#if addingProject}
+						<Loader2 class="h-4 w-4 animate-spin" />
+					{/if}
+					{m.common_add()}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if showDiscovery}
+	<div
+		class="animate-in fade-in fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200"
+		onclick={(e) => e.target === e.currentTarget && (showDiscovery = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showDiscovery = false)}
+		role="button"
+		tabindex="-1"
+	>
+		<div
+			class="animate-in zoom-in-95 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl duration-200"
+		>
+			<div class="flex items-center justify-between border-b border-gray-700 p-6">
+				<div>
+					<h3 class="text-xl font-bold text-gray-100">Discover Repositories</h3>
+					<p class="text-sm text-gray-400">Search and bulk add projects from your GitLab</p>
+				</div>
+				<button
+					onclick={() => (showDiscovery = false)}
+					class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+				>
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<div class="flex-1 overflow-y-auto p-6">
+				<div class="mb-6 flex gap-2">
+					<div class="relative flex-1">
+						<svg
+							class="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-gray-500"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+							/>
+						</svg>
+						<input
+							type="text"
+							bind:value={discoverySearch}
+							placeholder="Search repositories..."
+							class="w-full rounded-lg border border-gray-700 bg-gray-800 py-2.5 pr-4 pl-10 text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+							onkeydown={(e) => e.key === 'Enter' && handleDiscover()}
+						/>
+					</div>
+					<button
+						onclick={handleDiscover}
+						disabled={discoveryLoading}
+						class="rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+					>
+						{#if discoveryLoading}
+							<Loader2 class="h-5 w-5 animate-spin" />
+						{:else}
+							Search
+						{/if}
+					</button>
+				</div>
+
+				{#if discoveryLoading && discoveredProjects.length === 0}
+					<div class="flex flex-col items-center justify-center py-12">
+						<Loader2 class="mb-4 h-12 w-12 animate-spin text-indigo-500" />
+						<p class="text-gray-400">Discovering projects...</p>
+					</div>
+				{:else if discoveredProjects.length === 0}
+					<div class="rounded-xl border border-dashed border-gray-700 py-12 text-center">
+						<p class="text-gray-400">No projects found. Try a different search.</p>
+					</div>
+				{:else}
+					<div class="mb-6 rounded-xl border border-gray-700 bg-gray-800/30">
+						<div
+							class="flex items-center justify-between border-b border-gray-700 bg-gray-800/50 px-4 py-2"
+						>
+							<span class="text-xs font-bold text-gray-400 uppercase">
+								{discoveredProjects.length} Projects found
+							</span>
+							<button
+								onclick={() => {
+									if (selectedDiscoveryProjects.size === discoveredProjects.length) {
+										selectedDiscoveryProjects = new Set();
+									} else {
+										selectedDiscoveryProjects = new Set(discoveredProjects.map((p) => p.id));
+									}
+								}}
+								class="text-xs text-indigo-400 hover:text-indigo-300"
+							>
+								{selectedDiscoveryProjects.size === discoveredProjects.length
+									? 'Deselect All'
+									: 'Select All'}
+							</button>
+						</div>
+						<div class="max-h-[300px] divide-y divide-gray-700 overflow-y-auto">
+							{#each discoveredProjects as project}
+								{@const isAdded = projects.some((p) => p.gitlab_project_id === project.id)}
+								<div
+									class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-gray-800/50"
+								>
+									<div class="flex items-center gap-3">
+										<input
+											type="checkbox"
+											checked={selectedDiscoveryProjects.has(project.id)}
+											disabled={isAdded}
+											onchange={() => toggleDiscoveryProject(project.id)}
+											class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600 disabled:opacity-30"
+										/>
+										<div>
+											<div class="flex items-center gap-2">
+												<span class="font-medium text-gray-200">{project.name}</span>
+												{#if isAdded}
+													<span
+														class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] text-green-400"
+														>Added</span
+													>
+												{/if}
+											</div>
+											<div class="text-xs text-gray-500">{project.path_with_namespace}</div>
+										</div>
+									</div>
+									<div class="text-xs text-gray-500 italic">
+										{project.default_branch || 'main'}
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<div class="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
+						<h4 class="font-bold text-gray-200">Import Configuration</h4>
+						<p class="text-xs text-gray-400">
+							These settings will be applied to all newly selected projects.
+						</p>
+
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+							<div>
+								<label
+									for="bulk-analysis-model"
+									class="mb-1 block text-sm font-medium text-gray-400">Analysis Model</label
+								>
+								<select
+									id="bulk-analysis-model"
+									bind:value={newProject.analysis_model_id}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+								>
+									<option value="" disabled>Select a model</option>
+									{#each availableAnalysisModels as model}
+										<option value={model.id}>{model.name} ({model.provider})</option>
+									{/each}
+								</select>
+							</div>
+							<div>
+								<label for="bulk-tenant" class="mb-1 block text-sm font-medium text-gray-400"
+									>Project Tenant</label
+								>
+								<select
+									id="bulk-tenant"
+									bind:value={newProject.tenant_id}
+									class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+								>
+									<option value="">None (Personal)</option>
+									{#each userTenants as tenant}
+										<option value={tenant.id}>{tenant.name}</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+
+						<div class="flex items-center gap-3">
+							<input
+								type="checkbox"
+								id="bulk-auto-review"
+								bind:checked={newProject.auto_review}
+								class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
+							/>
+							<label for="bulk-auto-review" class="text-sm font-bold text-gray-200">
+								Enable Auto-review for imported projects
+							</label>
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex items-center justify-between border-t border-gray-700 bg-gray-800/50 p-6">
+				<div class="text-sm text-gray-400">
+					{selectedDiscoveryProjects.size} projects selected for import
+				</div>
+				<div class="flex gap-3">
+					<button
+						onclick={() => (showDiscovery = false)}
+						class="rounded-lg bg-gray-700 px-6 py-2 font-medium text-white transition-colors hover:bg-gray-600"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleBulkAdd}
+						disabled={discoveryAdding ||
+							selectedDiscoveryProjects.size === 0 ||
+							!newProject.analysis_model_id}
+						class="flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-2 font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+					>
+						{#if discoveryAdding}
+							<Loader2 class="h-5 w-5 animate-spin" />
+							Importing...
+						{:else}
+							Import Projects
+						{/if}
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>

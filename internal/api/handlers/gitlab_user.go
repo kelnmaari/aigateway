@@ -8,7 +8,9 @@ import (
 
 	"aigateway/internal/gitlab/client"
 	"aigateway/internal/gitlab/storage"
+	"aigateway/internal/inference"
 	"aigateway/internal/models"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -17,15 +19,19 @@ import (
 
 // GitLabUserHandler handles user-level GitLab operations
 type GitLabUserHandler struct {
-	store  storage.Store
-	logger *logrus.Logger
+	store      storage.Store
+	router     *inference.Router
+	modelStore *inference.ModelStore
+	logger     *logrus.Logger
 }
 
 // NewGitLabUserHandler creates a new user handler
-func NewGitLabUserHandler(store storage.Store, logger *logrus.Logger) *GitLabUserHandler {
+func NewGitLabUserHandler(store storage.Store, router *inference.Router, modelStore *inference.ModelStore, logger *logrus.Logger) *GitLabUserHandler {
 	return &GitLabUserHandler{
-		store:  store,
-		logger: logger,
+		store:      store,
+		router:     router,
+		modelStore: modelStore,
+		logger:     logger,
 	}
 }
 
@@ -282,6 +288,208 @@ func (h *GitLabUserHandler) AddMyProject(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, project)
+}
+
+// DiscoverMyProjects lists projects available in user's GitLab integration (via GitLab API)
+func (h *GitLabUserHandler) DiscoverMyProjects(c *gin.Context) {
+	userID := h.getUserID(c)
+	integrationID := c.Param("id")
+
+	// Check integration ownership
+	integration, err := h.store.GetIntegration(c.Request.Context(), integrationID)
+	if err != nil || integration == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		return
+	}
+	if integration.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	search := c.Query("search")
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+	})
+
+	projects, err := gitlabClient.ListProjects(c.Request.Context(), &client.ListProjectsOptions{
+		Search:         search,
+		PerPage:        perPage,
+		Page:           page,
+		Membership:     true,
+		MinAccessLevel: client.AccessLevelReporter,
+	})
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to discover projects from GitLab")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to discover projects: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": projects,
+	})
+}
+
+// BulkAddMyProjects adds multiple projects to user's integration at once
+func (h *GitLabUserHandler) BulkAddMyProjects(c *gin.Context) {
+	userID := h.getUserID(c)
+	integrationID := c.Param("id")
+
+	// Check integration ownership
+	integration, err := h.store.GetIntegration(c.Request.Context(), integrationID)
+	if err != nil || integration == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Integration not found"})
+		return
+	}
+	if integration.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	var req struct {
+		Projects []struct {
+			GitLabProjectID   int64  `json:"gitlab_project_id" binding:"required"`
+			Name              string `json:"name" binding:"required"`
+			PathWithNamespace string `json:"path_with_namespace"`
+			DefaultBranch     string `json:"default_branch"`
+		} `json:"projects" binding:"required"`
+		TenantID         string                       `json:"tenant_id"`
+		AnalysisModelID  string                       `json:"analysis_model_id" binding:"required"`
+		EmbeddingModelID string                       `json:"embedding_model_id"`
+		Settings         models.GitLabProjectSettings `json:"settings"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	results := make([]*models.GitLabProject, 0, len(req.Projects))
+	for _, p := range req.Projects {
+		project := &models.GitLabProject{
+			ID:                uuid.New().String(),
+			IntegrationID:     integrationID,
+			TenantID:          req.TenantID,
+			GitLabProjectID:   p.GitLabProjectID,
+			Name:              p.Name,
+			PathWithNamespace: p.PathWithNamespace,
+			DefaultBranch:     p.DefaultBranch,
+			AnalysisModelID:   req.AnalysisModelID,
+			EmbeddingModelID:  req.EmbeddingModelID,
+			AutoReview:        true,
+			Status:            models.GitLabProjectStatusActive,
+			Settings:          req.Settings,
+		}
+		if project.DefaultBranch == "" {
+			project.DefaultBranch = "main"
+		}
+
+		if err := h.store.CreateProject(c.Request.Context(), project); err != nil {
+			h.logger.WithError(err).WithField("gitlab_id", p.GitLabProjectID).Warn("Failed to create project in bulk add")
+			continue
+		}
+		results = append(results, project)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  results,
+		"count": len(results),
+	})
+}
+
+// ListMyAvailableModels returns a unified list of models (running + saved)
+func (h *GitLabUserHandler) ListMyAvailableModels(c *gin.Context) {
+	if h.router == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Inference system not initialized"})
+		return
+	}
+
+	analysisOnly := c.Query("type") == "analysis"
+	embeddingOnly := c.Query("type") == "embedding"
+
+	type ModelOption struct {
+		ID           string                 `json:"id"`
+		Name         string                 `json:"name"`
+		Type         string                 `json:"type"` // "running" or "saved"
+		Provider     string                 `json:"provider"`
+		Status       string                 `json:"status"`
+		Capabilities []inference.Capability `json:"capabilities"`
+	}
+
+	seen := make(map[string]bool)
+	options := make([]ModelOption, 0)
+
+	// 1. Add running models
+	for _, inst := range h.router.ListModels() {
+		if inst.Status != inference.StatusRunning {
+			continue
+		}
+
+		isEmbedding := false
+		for _, cap := range inst.Spec.Capabilities {
+			if cap == "embeddings" {
+				isEmbedding = true
+				break
+			}
+		}
+
+		if analysisOnly && isEmbedding {
+			continue
+		}
+		if embeddingOnly && !isEmbedding {
+			continue
+		}
+
+		options = append(options, ModelOption{
+			ID:           inst.Spec.Alias,
+			Name:         inst.Spec.Alias,
+			Type:         "running",
+			Provider:     string(inst.Spec.Provider),
+			Status:       string(inst.Status),
+			Capabilities: inst.Spec.Capabilities,
+		})
+		seen[inst.Spec.Alias] = true
+	}
+
+	// 2. Add saved models (if not already listed as running)
+	if h.modelStore != nil {
+		for _, saved := range h.modelStore.List() {
+			if seen[saved.Alias] {
+				continue
+			}
+
+			isEmbedding := false
+			for _, cap := range saved.Capabilities {
+				if cap == "embeddings" {
+					isEmbedding = true
+					break
+				}
+			}
+
+			if analysisOnly && isEmbedding {
+				continue
+			}
+			if embeddingOnly && !isEmbedding {
+				continue
+			}
+
+			options = append(options, ModelOption{
+				ID:           saved.Alias,
+				Name:         saved.Alias,
+				Type:         "saved",
+				Provider:     string(saved.Provider),
+				Status:       "stopped",
+				Capabilities: saved.Capabilities,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": options,
+	})
 }
 
 // GetMyProject gets a specific project owned by user

@@ -157,6 +157,49 @@ export async function deleteMyProject(projectId: string): Promise<void> {
   return api.delete(`/api/gitlab/projects/${projectId}`);
 }
 
+export async function discoverMyProjects(integrationId: string, params?: {
+  search?: string;
+  page?: number;
+  per_page?: number;
+}): Promise<{ data: any[] }> {
+  const query = new URLSearchParams();
+  if (params?.search) query.append('search', params.search);
+  if (params?.page) query.append('page', params.page.toString());
+  if (params?.per_page) query.append('per_page', params.per_page.toString());
+  return api.get(`/api/gitlab/integrations/${integrationId}/discover?${query.toString()}`);
+}
+
+export async function bulkAddMyProjects(integrationId: string, data: {
+  projects: Array<{
+    gitlab_project_id: number;
+    name: string;
+    path_with_namespace?: string;
+    default_branch?: string;
+  }>;
+  tenant_id?: string;
+  analysis_model_id: string;
+  embedding_model_id?: string;
+  auto_review?: boolean;
+  review_prompt?: string;
+  settings?: GitLabProjectSettings;
+}): Promise<{ data: GitLabProject[]; count: number }> {
+  return api.post(`/api/gitlab/integrations/${integrationId}/projects/bulk`, data);
+}
+
+export interface ModelOption {
+  id: string;
+  name: string;
+  type: 'running' | 'saved';
+  provider: string;
+  status: string;
+  capabilities: string[];
+}
+
+export async function listMyAvailableModels(type?: 'analysis' | 'embedding'): Promise<{ data: ModelOption[] }> {
+  const query = type ? `?type=${type}` : '';
+  return api.get(`/api/gitlab/models${query}`);
+}
+
 // ============================================================================
 // Review History
 // ============================================================================

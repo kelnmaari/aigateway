@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-01-26
+
+### Added
+
+- **GitLab Project Discovery**: Users can now search their entire GitLab instance for repositories directly from the UI.
+- **Bulk Project Import**: Support for selecting multiple discovered repositories and importing them with a shared configuration in one click.
+- **Enhanced Analysis Selection**: Discovery and Add Project modals now feature a dynamic model selector with provider information.
+
+### Changed
+
+- **Standardized GitLab User API**: Improved consistency between admin and user-level API methods for project discovery and management.
+- **Improved API Client Robustness**: Fixed various formatting and parameter mapping issues in the GitLab TypeScript clients.
+
 ## [4.6.0] - 2026-01-26
 
 ### Added

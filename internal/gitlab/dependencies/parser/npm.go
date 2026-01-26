@@ -31,6 +31,17 @@ func NewNPMParser() *NPMParser {
 
 // Parse parses package.json content and returns dependencies.
 func (p *NPMParser) Parse(content string) ([]Dependency, error) {
+	// Clean content: remove BOM and trim whitespace
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "\ufeff") // Remove UTF-8 BOM
+
+	// Find JSON boundaries to handle trailing garbage
+	start := strings.Index(content, "{")
+	end := strings.LastIndex(content, "}")
+	if start >= 0 && end > start {
+		content = content[start : end+1]
+	}
+
 	var pkg PackageJSON
 	if err := json.Unmarshal([]byte(content), &pkg); err != nil {
 		return nil, err

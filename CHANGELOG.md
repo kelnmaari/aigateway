@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.8.1] - 2026-01-26
+
+### Fixed
+
+- **NPM Parser**: Fixed JSON parsing error "invalid character after top-level value" by adding content cleaning to remove BOM markers, trim whitespace, and extract JSON boundaries. Parser now handles files with encoding issues and trailing garbage.
+
 ## [4.8.0] - 2026-01-26
 
 ### Fixed

@@ -318,7 +318,7 @@ func (h *GitLabDependenciesHandler) AnalyzeChangelog(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
 
 	// Get project for model ID if not specified
@@ -362,6 +362,9 @@ func (h *GitLabDependenciesHandler) AnalyzeChangelog(c *gin.Context) {
 	}).Info("Analyzing changelog")
 
 	analyzer := changelog.NewAnalyzer(llmBaseURL, llmAPIKey, h.logger)
+
+	h.logger.WithField("model_id", modelID).Debug("Starting changelog analysis")
+
 	analysis, err := analyzer.AnalyzeChangelog(ctx, changelog.AnalyzeRequest{
 		PackageName:    req.PackageName,
 		CurrentVersion: req.CurrentVersion,
@@ -374,6 +377,12 @@ func (h *GitLabDependenciesHandler) AnalyzeChangelog(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Changelog analysis failed: " + err.Error()})
 		return
 	}
+
+	h.logger.WithFields(logrus.Fields{
+		"risk_level":  analysis.RiskLevel,
+		"confidence":  analysis.Confidence,
+		"summary_len": len(analysis.Summary),
+	}).Debug("Changelog analysis completed, sending response")
 
 	c.JSON(http.StatusOK, analysis)
 }

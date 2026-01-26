@@ -78,7 +78,9 @@ export const tenantsApi = {
 		api.delete(`/api/tenants/${tenantId}/members/${memberId}`),
 
 	// User search for adding members
-	searchUsers: (query: string) =>
-		api.get<{ users: UserSearchResult[] }>(`/api/users/search?q=${encodeURIComponent(query)}`)
+	searchUsers: (tenantId: string, query: string) =>
+		api.get<{ user: UserSearchResult; already_member: boolean }>(
+			`/api/tenants/${tenantId}/search-users?query=${encodeURIComponent(query)}`
+		)
 };
 

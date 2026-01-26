@@ -258,10 +258,14 @@ func (s *Scanner) findDependencyFile(ctx context.Context, collection, projectID,
 	fileChunks := chunks[finalFilePath]
 	sortChunks(fileChunks)
 
-	// Concatenate content
+	// Concatenate content with newlines between chunks
 	var fullContent strings.Builder
-	for _, chunk := range fileChunks {
+	for i, chunk := range fileChunks {
 		fullContent.WriteString(chunk.content)
+		// Add newline between chunks (except after last chunk)
+		if i < len(fileChunks)-1 {
+			fullContent.WriteString("\n")
+		}
 	}
 
 	return fullContent.String(), finalFilePath, nil

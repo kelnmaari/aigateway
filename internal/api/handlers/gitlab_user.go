@@ -251,6 +251,7 @@ func (h *GitLabUserHandler) AddMyProject(c *gin.Context) {
 		GitLabProjectID   int64                        `json:"gitlab_project_id" binding:"required"`
 		Name              string                       `json:"name" binding:"required"`
 		PathWithNamespace string                       `json:"path_with_namespace"`
+		TenantID          string                       `json:"tenant_id"`
 		AnalysisModelID   string                       `json:"analysis_model_id" binding:"required"`
 		EmbeddingModelID  string                       `json:"embedding_model_id"`
 		Settings          models.GitLabProjectSettings `json:"settings"`
@@ -263,6 +264,7 @@ func (h *GitLabUserHandler) AddMyProject(c *gin.Context) {
 	project := &models.GitLabProject{
 		ID:                uuid.New().String(),
 		IntegrationID:     integrationID,
+		TenantID:          req.TenantID,
 		GitLabProjectID:   req.GitLabProjectID,
 		Name:              req.Name,
 		PathWithNamespace: req.PathWithNamespace,
@@ -469,4 +471,96 @@ func (h *GitLabUserHandler) SetupMyWebhook(c *gin.Context) {
 		"message":    "Webhook created successfully",
 		"webhook_id": webhook.ID,
 	})
+}
+
+// ============================================================================
+// Scan History (User's scans)
+// ============================================================================
+
+// ListMyScanHistory lists scan results for user's projects
+func (h *GitLabUserHandler) ListMyScanHistory(c *gin.Context) {
+	userID := h.getUserID(c)
+	projectID := c.Query("project_id") // Optional filter
+
+	req := &models.GitLabScanResultsRequest{
+		ProjectID: projectID,
+		Limit:     50,
+		Offset:    0,
+	}
+
+	// If no project_id specified, we must filter by user's integrations
+	if projectID == "" {
+		integrations, err := h.store.ListIntegrationsByOwner(c.Request.Context(), userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list integrations"})
+			return
+		}
+
+		var integrationIDs []string
+		for _, integration := range integrations {
+			integrationIDs = append(integrationIDs, integration.ID)
+		}
+		req.IntegrationIDs = integrationIDs
+	} else {
+		// Verify project ownership if projectID is provided
+		project, err := h.store.GetProject(c.Request.Context(), projectID)
+		if err != nil || project == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+			return
+		}
+		integration, err := h.store.GetIntegration(c.Request.Context(), project.IntegrationID)
+		if err != nil || integration == nil || integration.OwnerID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+	}
+
+	results, total, err := h.store.ListScanResults(c.Request.Context(), req)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list scan history")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list scan history"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  results,
+		"total": total,
+	})
+}
+
+// GetMyScanResult gets a specific scan result
+func (h *GitLabUserHandler) GetMyScanResult(c *gin.Context) {
+	userID := h.getUserID(c)
+	scanID := c.Param("id")
+
+	result, err := h.store.GetScanResult(c.Request.Context(), scanID)
+	if err != nil || result == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Scan result not found"})
+		return
+	}
+
+	// Check ownership through integration
+	integration, err := h.store.GetIntegration(c.Request.Context(), result.IntegrationID)
+	if err != nil || integration == nil || integration.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// GetMyScanTypes GET /api/gitlab/scan-history/types
+func (h *GitLabUserHandler) GetMyScanTypes(c *gin.Context) {
+	types := []gin.H{
+		{"value": "secrets", "label": "Secrets Scan", "description": "Regex-based secrets detection"},
+		{"value": "secrets_deep", "label": "Deep Secrets Scan", "description": "LLM-powered semantic secrets detection"},
+		{"value": "dependencies", "label": "Dependencies Check", "description": "Outdated and vulnerable dependencies"},
+		{"value": "quality", "label": "Code Quality", "description": "Code quality analysis"},
+		{"value": "deadcode", "label": "Dead Code", "description": "Unused code detection"},
+		{"value": "autodocs", "label": "Auto-Documentation", "description": "Undocumented code detection"},
+		{"value": "testgen", "label": "Test Generation", "description": "Testable code detection"},
+		{"value": "architecture", "label": "Architecture", "description": "Architecture analysis"},
+	}
+
+	c.JSON(http.StatusOK, gin.H{"types": types})
 }

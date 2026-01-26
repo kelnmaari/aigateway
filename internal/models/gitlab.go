@@ -78,6 +78,7 @@ func (s *GitLabIntegrationSettings) Scan(value interface{}) error {
 type GitLabProject struct {
 	ID                string              `json:"id" db:"id"`
 	IntegrationID     string              `json:"integration_id" db:"integration_id"`
+	TenantID          string              `json:"tenant_id,omitempty" db:"tenant_id"`
 	GitLabProjectID   int64               `json:"gitlab_project_id" db:"gitlab_project_id"`
 	Name              string              `json:"name" db:"name"`
 	PathWithNamespace string              `json:"path_with_namespace" db:"path_with_namespace"`
@@ -105,8 +106,8 @@ type GitLabProject struct {
 	IntegrationName string `json:"integration_name,omitempty" db:"-"`
 	ReviewCount     int    `json:"review_count,omitempty" db:"-"`
 
-	// Index statistics (computed from Qdrant)
-	IndexChunks  int64 `json:"index_chunks,omitempty" db:"-"`
+	// Index statistics
+	IndexChunks  int64 `json:"index_chunks,omitempty" db:"index_chunks_count"`
 	IndexVectors int64 `json:"index_vectors,omitempty" db:"-"`
 }
 
@@ -510,6 +511,7 @@ type CreateGitLabProjectRequest struct {
 // UpdateGitLabProjectRequest represents request to update project settings
 type UpdateGitLabProjectRequest struct {
 	Name             *string                `json:"name,omitempty"`
+	TenantID         *string                `json:"tenant_id,omitempty"`
 	AutoReview       *bool                  `json:"auto_review,omitempty"`
 	Status           *GitLabProjectStatus   `json:"status,omitempty"`
 	DefaultBranch    *string                `json:"default_branch,omitempty"`
@@ -762,10 +764,11 @@ type GitLabScanResult struct {
 
 // GitLabScanResultsRequest for listing scan results
 type GitLabScanResultsRequest struct {
-	ProjectID     string            `json:"project_id,omitempty"`
-	IntegrationID string            `json:"integration_id,omitempty"`
-	ScanType      *GitLabScanType   `json:"scan_type,omitempty"`
-	Status        *GitLabScanStatus `json:"status,omitempty"`
-	Limit         int               `json:"limit,omitempty"`
-	Offset        int               `json:"offset,omitempty"`
+	ProjectID      string            `json:"project_id,omitempty"`
+	IntegrationID  string            `json:"integration_id,omitempty"`
+	IntegrationIDs []string          `json:"integration_ids,omitempty"`
+	ScanType       *GitLabScanType   `json:"scan_type,omitempty"`
+	Status         *GitLabScanStatus `json:"status,omitempty"`
+	Limit          int               `json:"limit,omitempty"`
+	Offset         int               `json:"offset,omitempty"`
 }

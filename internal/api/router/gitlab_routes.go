@@ -124,6 +124,11 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 	gitlab.POST("/projects/:id/generate-tests", testGenHandler.GenerateMyTests)
 	gitlab.POST("/projects/:id/create-tests-mr", testGenHandler.CreateMyTestsMR)
 
+	// Scan History
+	gitlab.GET("/scan-history", userHandler.ListMyScanHistory)
+	gitlab.GET("/scan-history/types", userHandler.GetMyScanTypes)
+	gitlab.GET("/scan-history/:id", userHandler.GetMyScanResult)
+
 	r.logger.Info("GitLab user routes configured: /api/gitlab/* (including scanning routes)")
 }
 

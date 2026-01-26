@@ -48,6 +48,8 @@ func (f *Fetcher) FetchChangelog(ctx context.Context, packageName, currentVersio
 		err = f.fetchNPMChangelog(ctx, info)
 	case "python":
 		err = f.fetchPyPIChangelog(ctx, info)
+	case "java":
+		err = f.fetchJavaChangelog(ctx, info)
 	default:
 		return info, fmt.Errorf("unsupported language: %s", language)
 	}
@@ -396,3 +398,99 @@ func (f *Fetcher) extractVersionSection(changelog, currentVersion, latestVersion
 	return result.String()
 }
 
+// fetchJavaChangelog fetches changelog for a Java (Maven) package.
+func (f *Fetcher) fetchJavaChangelog(ctx context.Context, info *ChangelogInfo) error {
+	// Parse group:artifact
+	parts := strings.Split(info.PackageName, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid Maven package name: %s", info.PackageName)
+	}
+	group, artifact := parts[0], parts[1]
+
+	// Get info from Maven Central
+	url := fmt.Sprintf("https://search.maven.org/solrsearch/select?q=g:%s+AND+a:%s&rows=1&wt=json", group, artifact)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := f.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("maven central returned %d", resp.StatusCode)
+	}
+
+	var mavenResult struct {
+		Response struct {
+			Docs []struct {
+				V string `json:"v"`
+			} `json:"docs"`
+		} `json:"response"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&mavenResult); err != nil {
+		return err
+	}
+
+	// Maven Central doesn't always provide repository URL in the search API.
+	// We might need to fetch the POM file.
+	pomURL := fmt.Sprintf("https://search.maven.org/remotecontent?filepath=%s/%s/%s/%s-%s.pom",
+		strings.ReplaceAll(group, ".", "/"), artifact, info.LatestVersion, artifact, info.LatestVersion)
+
+	pomReq, err := http.NewRequestWithContext(ctx, "GET", pomURL, nil)
+	if err != nil {
+		return err
+	}
+
+	pomResp, err := f.httpClient.Do(pomReq)
+	if err != nil {
+		return err
+	}
+	defer pomResp.Body.Close()
+
+	if pomResp.StatusCode == http.StatusOK {
+		pomBody, _ := io.ReadAll(pomResp.Body)
+		// Basic regex to find SCM URL in POM
+		scmRe := regexp.MustCompile(`(?s)<scm>.*?<url>(.*?)</url>.*? </scm>`)
+		matches := scmRe.FindStringSubmatch(string(pomBody))
+		var githubURL string
+		if len(matches) > 1 {
+			githubURL = strings.TrimSpace(matches[1])
+		}
+
+		if strings.Contains(githubURL, "github.com") {
+			owner, repo := f.extractGitHubRepoFromURL(githubURL)
+			if owner != "" && repo != "" {
+				// Try release notes
+				releaseNotes, err := f.fetchGitHubReleaseNotes(ctx, owner, repo, info.LatestVersion)
+				if err == nil && releaseNotes != "" {
+					info.ReleaseNotes = releaseNotes
+					info.ChangelogURL = fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", owner, repo, info.LatestVersion)
+					return nil
+				}
+
+				// Try with 'v' prefix
+				releaseNotes, err = f.fetchGitHubReleaseNotes(ctx, owner, repo, "v"+info.LatestVersion)
+				if err == nil && releaseNotes != "" {
+					info.ReleaseNotes = releaseNotes
+					info.ChangelogURL = fmt.Sprintf("https://github.com/%s/%s/releases/tag/v%s", owner, repo, info.LatestVersion)
+					return nil
+				}
+
+				// Try CHANGELOG.md
+				changelogText, err := f.fetchGitHubFile(ctx, owner, repo, "CHANGELOG.md")
+				if err == nil && changelogText != "" {
+					info.ChangelogText = f.extractVersionSection(changelogText, info.CurrentVersion, info.LatestVersion)
+					info.ChangelogURL = fmt.Sprintf("https://github.com/%s/%s/blob/main/CHANGELOG.md", owner, repo)
+					return nil
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("no changelog found for %s", info.PackageName)
+}

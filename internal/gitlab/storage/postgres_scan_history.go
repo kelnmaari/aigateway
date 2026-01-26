@@ -143,6 +143,16 @@ func (s *PostgresStore) ListScanResults(ctx context.Context, req *models.GitLabS
 		argNum++
 	}
 
+	if len(req.IntegrationIDs) > 0 {
+		placeholders := make([]string, len(req.IntegrationIDs))
+		for i := range req.IntegrationIDs {
+			placeholders[i] = fmt.Sprintf("$%d", argNum)
+			args = append(args, req.IntegrationIDs[i])
+			argNum++
+		}
+		conditions = append(conditions, fmt.Sprintf("sh.integration_id IN (%s)", strings.Join(placeholders, ", ")))
+	}
+
 	whereClause := ""
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
@@ -243,4 +253,3 @@ func MarshalScanResults(v interface{}) (string, error) {
 	}
 	return string(data), nil
 }
-

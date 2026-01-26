@@ -29,6 +29,7 @@ export interface GitLabIntegrationSettings {
 export interface GitLabProject {
   id: string;
   integration_id: string;
+  tenant_id?: string;
   gitlab_project_id: number;
   name: string;
   path_with_namespace: string;
@@ -128,6 +129,7 @@ export async function addMyProject(integrationId: string, data: {
   gitlab_project_id: number;
   name: string;
   path_with_namespace?: string;
+  tenant_id?: string;
   analysis_model_id: string;
   embedding_model_id?: string;
   settings?: GitLabProjectSettings;
@@ -141,6 +143,7 @@ export async function getMyProject(projectId: string): Promise<GitLabProject> {
 
 export async function updateMyProject(projectId: string, data: {
   name?: string;
+  tenant_id?: string;
   analysis_model_id?: string;
   embedding_model_id?: string;
   auto_review?: boolean;
@@ -299,4 +302,53 @@ export async function setupMyWebhook(projectId: string, url: string): Promise<{ 
 // Changelog Analysis
 export async function analyzeMyChangelog(projectId: string, data: any): Promise<any> {
   return api.post(`/api/gitlab/projects/${projectId}/analyze-changelog`, data);
+}
+
+// ============================================================================
+// Scan History (v4.6.0+)
+// ============================================================================
+
+export interface GitLabScanResult {
+  id: string;
+  project_id: string;
+  integration_id: string;
+  scan_type: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  model_id?: string;
+  started_at: string;
+  completed_at?: string;
+  duration_ms: number;
+  findings_count: number;
+  files_affected: number;
+  tokens_used: number;
+  error?: string;
+  results_json?: string;
+  project_name?: string;
+}
+
+export async function listMyScanHistory(params?: {
+  project_id?: string;
+  scan_type?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: GitLabScanResult[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.project_id) query.append('project_id', params.project_id);
+  if (params?.scan_type) query.append('scan_type', params.scan_type);
+  if (params?.status) query.append('status', params.status);
+  if (params?.limit) query.append('limit', params.limit.toString());
+  if (params?.offset) query.append('offset', params.offset.toString());
+
+  // Note: Backend returns { results: [], total: ... } for admin API but I made user API consistent with listMyProjects { data: [], total: ... }
+  // Wait, I implemented userHandler.ListMyScanHistory returning { data: [], total: ... } in step 2156
+  return api.get(`/api/gitlab/scan-history?${query.toString()}`);
+}
+
+export async function getMyScanResult(id: string): Promise<GitLabScanResult> {
+  return api.get(`/api/gitlab/scan-history/${id}`);
+}
+
+export async function getMyScanTypes(): Promise<{ types: { value: string; label: string; description: string }[] }> {
+  return api.get('/api/gitlab/scan-history/types');
 }

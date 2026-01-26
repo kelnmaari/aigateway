@@ -27,8 +27,11 @@
 		type GitLabIndexStatus,
 		updateMyProject,
 		setupMyWebhook,
-		analyzeMyChangelog
+		analyzeMyChangelog,
+		listMyScanHistory,
+		getMyScanTypes
 	} from '$lib/api/gitlab-user';
+	import { tenantsApi, type Tenant } from '$lib/api/tenants';
 	import * as m from '$lib/paraglide/messages';
 	import {
 		Settings,
@@ -55,9 +58,10 @@
 	let integration: GitLabIntegration | null = null;
 	let projects: GitLabProject[] = [];
 	let reviews: GitLabReview[] = [];
+	let userTenants: Tenant[] = [];
 	let loading = true;
 	let error = '';
-	let activeTab: 'projects' | 'reviews' | 'settings' = 'projects';
+	let activeTab: 'projects' | 'reviews' | 'settings' | 'history' = 'projects';
 
 	// Add project modal
 	let showAddProject = false;
@@ -65,6 +69,7 @@
 		gitlab_project_id: 0,
 		name: '',
 		path_with_namespace: '',
+		tenant_id: '',
 		analysis_model_id: '',
 		embedding_model_id: '',
 		auto_review: true,
@@ -89,6 +94,7 @@
 	let editingProject: GitLabProject | null = null;
 	let editForm = {
 		name: '',
+		tenant_id: '',
 		analysis_model_id: '',
 		embedding_model_id: '',
 		auto_review: true,
@@ -126,6 +132,16 @@
 	let activeEcosystemIndex = 0;
 	let changelogLoading: Record<string, boolean> = {};
 	let changelogResults: Record<string, any> = {};
+
+	// Scan History state
+	let scanHistory: any[] = [];
+	let scanTypes: any[] = [];
+	let scanHistoryLoading = false;
+	let scanHistoryPage = 0;
+	let scanHistoryTotal = 0;
+	let scanHistoryLimit = 20;
+	let selectedScan: any = null;
+	let showScanResultModal = false;
 
 	function getUpdateTypeColor(type: string) {
 		switch (type?.toLowerCase()) {
@@ -174,6 +190,45 @@
 		}
 	}
 
+	async function loadScanHistory() {
+		scanHistoryLoading = true;
+		try {
+			if (scanTypes.length === 0) {
+				const typesRes = await getMyScanTypes();
+				scanTypes = typesRes.types;
+			}
+
+			// Find project IDs for this integration to filter if needed,
+			// checking ownership is handled by backend but good for clarity
+			const result = await listMyScanHistory({
+				limit: scanHistoryLimit,
+				offset: scanHistoryPage * scanHistoryLimit
+			});
+
+			// Backend returns generic structure, map to local state
+			// We need to filter client-side for this integration if backend returns all user's scans
+			// But wait, userHandler.ListMyScanHistory in step 2156 filters for user's integrations.
+			// We want to show scans ONLY for THIS integration here.
+			// But ListMyScanHistory doesn't accept integration_id filter in request model yet!
+			// Ah, I updated GitLabScanResultsRequest to accept IntegrationIDs []string in step 2185.
+			// Let's filter on client side for now as listMyScanHistory (client) doesn't expose IntegrationIDs param widely yet
+			// Wait, I can pass integration_id in params if I update the client function signature slightly or just rely on backend filter?
+			// The backend implementation of ListMyScanHistory:
+			// "If no project_id specified, we must filter by user's integrations"
+			// It returns scans for ALL integrations owned by user.
+			// So I should client-side filter here OR update listMyScanHistory to allow filtering by specific integration I own.
+			// Given I am on the integration page, I probably want to see scans for THIS integration.
+
+			const allScans = result.data || [];
+			scanHistory = allScans.filter((s) => s.integration_id === integrationId);
+			scanHistoryTotal = scanHistory.length; // Approximate total since we client-side filter
+		} catch (e) {
+			console.error('Failed to load scan history:', e);
+		} finally {
+			scanHistoryLoading = false;
+		}
+	}
+
 	onMount(async () => {
 		await loadData();
 	});
@@ -182,13 +237,15 @@
 		loading = true;
 		error = '';
 		try {
-			const [intResponse, projResponse, revResponse] = await Promise.all([
+			const [intResponse, projResponse, revResponse, tenantRes] = await Promise.all([
 				getMyIntegration(integrationId),
 				listMyProjects(integrationId),
-				listMyReviews()
+				listMyReviews(),
+				tenantsApi.getUserTenants()
 			]);
 			integration = intResponse;
 			projects = projResponse.data || [];
+			userTenants = tenantRes.tenants || [];
 			const allReviews = revResponse.data || [];
 			// Filter reviews for this integration
 			reviews = allReviews.filter((r) => r.integration_id === integrationId);
@@ -211,12 +268,30 @@
 
 		addingProject = true;
 		try {
-			await addMyProject(integrationId, newProject);
+			const includePatterns = newProject.settings.include_patterns
+				.split(',')
+				.map((p) => p.trim())
+				.filter((p) => p);
+			const excludePatterns = newProject.settings.exclude_patterns
+				.split(',')
+				.map((p) => p.trim())
+				.filter((p) => p);
+
+			await addMyProject(integrationId, {
+				...newProject,
+				tenant_id: newProject.tenant_id || undefined,
+				settings: {
+					...newProject.settings,
+					include_patterns: includePatterns.length > 0 ? includePatterns : undefined,
+					exclude_patterns: excludePatterns.length > 0 ? excludePatterns : undefined
+				}
+			});
 			showAddProject = false;
 			newProject = {
 				gitlab_project_id: 0,
 				name: '',
 				path_with_namespace: '',
+				tenant_id: '',
 				analysis_model_id: '',
 				embedding_model_id: '',
 				auto_review: true,
@@ -258,6 +333,7 @@
 		editingProject = project;
 		editForm = {
 			name: project.name,
+			tenant_id: project.tenant_id || '',
 			analysis_model_id: project.analysis_model_id,
 			embedding_model_id: project.embedding_model_id || '',
 			auto_review: project.auto_review,
@@ -296,6 +372,7 @@
 
 			await updateMyProject(editingProject.id, {
 				name: editForm.name,
+				tenant_id: editForm.tenant_id || undefined,
 				analysis_model_id: editForm.analysis_model_id,
 				embedding_model_id: editForm.embedding_model_id || undefined,
 				auto_review: editForm.auto_review,
@@ -638,7 +715,55 @@
 										{:else}
 											<span class="text-gray-500">Auto-review OFF</span>
 										{/if}
+										{#if project.webhook_id}
+											<span class="flex items-center gap-1 text-orange-400">
+												<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+													/>
+												</svg>
+												Webhook Active
+											</span>
+										{:else}
+											<span class="flex items-center gap-1 text-gray-500">
+												<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+													/>
+												</svg>
+												Webhook Inactive
+											</span>
+										{/if}
+										{#if project.tenant_id}
+											{@const projectTenant = userTenants.find((t) => t.id === project.tenant_id)}
+											<span class="flex items-center gap-1 text-purple-400">
+												<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+													/>
+												</svg>
+												{projectTenant?.name || 'Shared Tenant'}
+											</span>
+										{/if}
 									</div>
+									{#if project.last_indexed_at}
+										<div class="mt-1 flex items-center gap-3 text-[10px] text-gray-500 uppercase">
+											<span>Last indexed: {new Date(project.last_indexed_at).toLocaleString()}</span
+											>
+											{#if project.index_chunks}
+												<span>Chunks: {project.index_chunks}</span>
+											{/if}
+										</div>
+									{/if}
 								</div>
 								<div class="flex items-center gap-2">
 									<!-- Index Status & Button -->
@@ -871,6 +996,25 @@
 						class="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-gray-100"
 						required
 					/>
+				</div>
+
+				<div>
+					<label for="user-project-tenant" class="mb-2 block text-sm font-medium text-gray-300"
+						>Assign to Tenant</label
+					>
+					<select
+						id="user-project-tenant"
+						bind:value={newProject.tenant_id}
+						class="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+					>
+						<option value="">None (Personal)</option>
+						{#each userTenants as tenant}
+							<option value={tenant.id}>{tenant.name}</option>
+						{/each}
+					</select>
+					<p class="mt-1 text-xs text-gray-500">
+						Grant access to this project to all members of selected tenant
+					</p>
 				</div>
 
 				<div>
@@ -1424,9 +1568,178 @@
 										</div>
 									{/if}
 								</div>
-							{:else if (analysisResult.findings || analysisResult.issues || []).length > 0}
+							{:else if (analysisType === 'quality' || analysisType === 'quality-score') && analysisResult.issues}
 								<div class="grid grid-cols-1 gap-4">
-									{#each analysisResult.findings || analysisResult.issues || [] as finding}
+									{#each analysisResult.issues as issue}
+										<div
+											class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600"
+										>
+											<div class="mb-3 flex items-start justify-between">
+												<div class="flex flex-wrap items-center gap-2">
+													<span
+														class={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getSeverityClass(issue.severity)}`}
+													>
+														{issue.severity || 'info'}
+													</span>
+													<h5 class="font-bold text-gray-200">
+														{issue.category} Issue
+													</h5>
+												</div>
+												<div
+													class="flex items-center gap-1.5 rounded bg-gray-800/50 px-2 py-1 font-mono text-xs text-gray-500"
+												>
+													<svg
+														class="h-3 w-3"
+														fill="none"
+														stroke="currentColor"
+														viewBox="0 0 24 24"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+														/>
+													</svg>
+													{issue.file_path}:{issue.line}
+												</div>
+											</div>
+											<p class="mb-4 text-sm leading-relaxed text-gray-300">{issue.message}</p>
+											{#if issue.suggestion}
+												<div class="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
+													<div class="mb-1.5 flex items-center gap-2">
+														<svg
+															class="h-4 w-4 text-indigo-400"
+															fill="none"
+															stroke="currentColor"
+															viewBox="0 0 24 24"
+														>
+															<path
+																stroke-linecap="round"
+																stroke-linejoin="round"
+																stroke-width="2"
+																d="M13 10V3L4 14h7v7l9-11h-7z"
+															/>
+														</svg>
+														<span class="text-xs font-bold tracking-tight text-indigo-400 uppercase"
+															>Recommendation</span
+														>
+													</div>
+													<p class="text-xs leading-normal text-indigo-200/70 italic">
+														{issue.suggestion}
+													</p>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{:else if (analysisType === 'dead-code' || analysisType === 'detect-dead-code') && analysisResult.dead_symbols}
+								<div class="grid grid-cols-1 gap-4">
+									{#each analysisResult.dead_symbols as symbol}
+										<div
+											class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600"
+										>
+											<div class="mb-2 flex items-start justify-between">
+												<div class="flex items-center gap-3">
+													<span
+														class="rounded border border-gray-700 bg-gray-800 px-2 py-0.5 text-[10px] font-bold text-gray-400 uppercase"
+													>
+														{symbol.type}
+													</span>
+													<h5 class="font-mono text-sm font-bold text-gray-200">{symbol.name}</h5>
+												</div>
+												<span
+													class={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${symbol.confidence === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}
+												>
+													{symbol.confidence} Confidence
+												</span>
+											</div>
+											<div class="mb-3 flex items-center gap-2 font-mono text-xs text-gray-500">
+												<span>{symbol.file_path}:{symbol.start_line}-{symbol.end_line}</span>
+											</div>
+											<p
+												class="border-l-2 border-gray-700 pl-3 text-sm leading-relaxed text-gray-400 italic"
+											>
+												{symbol.reason}
+											</p>
+										</div>
+									{/each}
+								</div>
+							{:else if (analysisType === 'docs' || analysisType === 'scan-docs') && analysisResult.symbols}
+								<div class="grid grid-cols-1 gap-4">
+									{#each analysisResult.symbols as symbol}
+										<div
+											class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600"
+										>
+											<div class="mb-2 flex items-center justify-between">
+												<div class="flex items-center gap-2">
+													<FileEdit class="h-4 w-4 text-emerald-500" />
+													<span class="font-mono text-sm font-bold text-gray-200"
+														>{symbol.name}</span
+													>
+													{#if symbol.is_exported}
+														<span
+															class="rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400"
+															>Exported</span
+														>
+													{/if}
+												</div>
+												<span class="font-mono text-xs text-gray-500">{symbol.type}</span>
+											</div>
+											<p class="mb-3 font-mono text-xs text-gray-500">
+												{symbol.file_path}:{symbol.start_line}
+											</p>
+											{#if symbol.code}
+												<div class="rounded-lg border border-gray-800 bg-black/30 p-3">
+													<pre
+														class="overflow-x-auto font-mono text-[10px] whitespace-pre text-gray-400">{symbol.code}</pre>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{:else if (analysisType === 'tests' || analysisType === 'scan-tests') && analysisResult.functions}
+								<div class="grid grid-cols-1 gap-4">
+									{#each analysisResult.functions as func}
+										<div
+											class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600"
+										>
+											<div class="mb-2 flex items-center justify-between">
+												<div class="flex items-center gap-2">
+													<TestTube class="h-4 w-4 text-indigo-400" />
+													<span class="font-mono text-sm font-bold text-gray-200">{func.name}</span>
+												</div>
+												<div class="flex items-center gap-2">
+													<span
+														class={`rounded px-2 py-0.5 text-[10px] ${func.complexity === 'high' ? 'bg-red-400/10 text-red-400' : 'bg-gray-800 text-gray-400'}`}
+													>
+														{func.complexity} complexity
+													</span>
+													{#if func.has_tests}
+														<span
+															class="rounded border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[10px] text-green-400"
+															>Has Tests</span
+														>
+													{:else}
+														<span
+															class="rounded border border-orange-500/20 bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-400"
+															>Untested</span
+														>
+													{/if}
+												</div>
+											</div>
+											<p class="mb-2 font-mono text-xs text-gray-500">
+												{func.file_path}:{func.start_line}
+											</p>
+											<div class="flex items-center gap-2 text-[10px] text-gray-500">
+												<span>Signature: {func.signature}</span>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{:else if (analysisResult.findings || []).length > 0}
+								<div class="grid grid-cols-1 gap-4">
+									{#each analysisResult.findings as finding}
 										<div
 											class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600"
 										>
@@ -1438,7 +1751,7 @@
 														{finding.severity || 'info'}
 													</span>
 													<h5 class="font-bold text-gray-200">
-														{finding.pattern_name || finding.type || 'Finding'}
+														{finding.pattern_name || finding.type || finding.name || 'Finding'}
 													</h5>
 												</div>
 												<div
@@ -1464,6 +1777,7 @@
 											<p class="mb-4 text-sm leading-relaxed text-gray-300">
 												{finding.description ||
 													finding.match ||
+													finding.signature ||
 													'Analysis detected a potential issue in this location.'}
 											</p>
 
@@ -1472,7 +1786,7 @@
 													class="mb-4 overflow-hidden rounded-lg border border-gray-800 bg-black/40"
 												>
 													<div
-														class="flex items-center justify-between bg-gray-800/40 px-3 py-1 text-[10px] font-bold text-gray-500 uppercase"
+														class="flex items-center justify-between bg-gray-800/40 px-3 py-1 text-[10px] font-bold text-gray-400 uppercase"
 													>
 														<span>Evidence</span>
 														{#if finding.confidence}
@@ -1483,11 +1797,11 @@
 														class="custom-scrollbar overflow-x-auto p-3 font-mono text-xs whitespace-pre"
 													>
 														{#if finding.context}
-															<div class="text-gray-500 opacity-30 select-none">
+															<div class="text-gray-400 opacity-50 select-none">
 																{finding.context}
 															</div>
 														{/if}
-														<div class="text-orange-300/90">
+														<div class="text-orange-200">
 															{finding.match || finding.code_snippet}
 														</div>
 													</div>
@@ -1522,57 +1836,7 @@
 										</div>
 									{/each}
 								</div>
-							{:else if analysisResult.files && analysisResult.files.length > 0}
-								<!-- Docs & Tests specific view -->
-								<div class="space-y-4">
-									{#each analysisResult.files as file}
-										<div class="overflow-hidden rounded-xl border border-gray-700 bg-gray-900/40">
-											<div
-												class="flex items-center gap-2 border-b border-gray-700 bg-gray-800/40 p-3"
-											>
-												<svg
-													class="h-4 w-4 text-gray-400"
-													fill="none"
-													stroke="currentColor"
-													viewBox="0 0 24 24"
-												>
-													<path
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														stroke-width="2"
-														d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-													/>
-												</svg>
-												<span class="font-mono text-sm text-gray-300">{file.file_path}</span>
-											</div>
-											<div class="p-4">
-												{#if file.missing_docs}
-													<p class="mb-3 text-sm text-gray-400">Undocumented entities found:</p>
-													<div class="flex flex-wrap gap-2">
-														{#each file.missing_docs as doc}
-															<span
-																class="rounded border border-orange-500/20 bg-orange-500/10 px-2 py-1 font-mono text-xs text-orange-400"
-															>
-																{doc}
-															</span>
-														{/each}
-													</div>
-												{:else if file.logic_description}
-													<p class="mb-3 text-sm text-gray-300">{file.logic_description}</p>
-													<div class="space-y-2">
-														{#each file.suggested_tests || [] as test}
-															<div class="flex items-start gap-2 text-xs text-gray-400">
-																<span class="mt-0.5 text-green-500">●</span>
-																<span>{test}</span>
-															</div>
-														{/each}
-													</div>
-												{/if}
-											</div>
-										</div>
-									{/each}
-								</div>
-							{:else if (analysisType === 'changelog' || analysisResult.summary) && analysisType !== 'duplication'}
+							{:else if analysisType === 'changelog' || analysisType === 'analyze-changelog'}
 								<!-- Changelog analysis specialized view -->
 								<div class="space-y-6">
 									<div class="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
@@ -1650,58 +1914,30 @@
 														d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
 													/>
 												</svg>
-												<h5 class="text-xs font-bold tracking-widest text-indigo-400 uppercase">
-													Migration Guide
-												</h5>
+												<span class="text-xs font-bold tracking-tight text-indigo-400 uppercase"
+													>Migration Guide</span
+												>
 											</div>
-											<div
-												class="font-sans text-sm leading-relaxed whitespace-pre-wrap text-gray-300"
-											>
+											<div class="prose prose-invert max-w-none text-sm text-gray-300">
 												{analysisResult.migration_guide}
 											</div>
 										</div>
 									{/if}
-
-									<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-										{#if (analysisResult.new_features || []).length > 0}
-											<div class="space-y-3">
-												<h5
-													class="text-xs font-bold tracking-widest text-green-500 uppercase opacity-70"
-												>
-													New Features
-												</h5>
-												<ul class="space-y-2">
-													{#each analysisResult.new_features as feat}
-														<li
-															class="flex items-start gap-3 rounded border border-green-500/10 bg-green-500/5 p-2 text-xs text-gray-400"
-														>
-															<span class="font-bold text-green-500">✓</span>
-															{feat}
-														</li>
-													{/each}
-												</ul>
-											</div>
-										{/if}
-										{#if (analysisResult.bug_fixes || []).length > 0}
-											<div class="space-y-3">
-												<h5
-													class="text-xs font-bold tracking-widest text-blue-500 uppercase opacity-70"
-												>
-													Bug Fixes
-												</h5>
-												<ul class="space-y-2">
-													{#each analysisResult.bug_fixes as fix}
-														<li
-															class="flex items-start gap-3 rounded border border-blue-500/10 bg-blue-500/5 p-2 text-xs text-gray-400"
-														>
-															<span class="font-bold text-blue-500">✓</span>
-															{fix}
-														</li>
-													{/each}
-												</ul>
-											</div>
-										{/if}
-									</div>
+								</div>
+							{:else if analysisResult.summary || analysisResult.status === 'completed'}
+								<div
+									class="rounded-xl border border-gray-700 bg-gray-900/40 p-8 text-center text-gray-400"
+								>
+									<CheckCircle class="mx-auto mb-3 h-12 w-12 text-green-500/50" />
+									<p class="font-medium text-gray-200">Scan completed successfully</p>
+									<p class="mt-1 text-sm">No findings were reported for this analysis.</p>
+									{#if analysisResult.summary}
+										<div class="mt-4 rounded-lg bg-black/30 p-4 text-left font-mono text-xs">
+											{typeof analysisResult.summary === 'string'
+												? analysisResult.summary
+												: JSON.stringify(analysisResult.summary, null, 2)}
+										</div>
+									{/if}
 								</div>
 							{:else if analysisResult.vulnerabilities && analysisResult.vulnerabilities.length > 0}
 								<!-- Security/SAST specific view -->
@@ -1780,6 +2016,98 @@
 				{/if}
 			</div>
 		</div>
+
+		{#if activeTab === 'history'}
+			{#if scanHistoryLoading}
+				<div class="flex justify-center py-12">
+					<Loader2 class="h-10 w-10 animate-spin text-indigo-500" />
+				</div>
+			{:else if scanHistory.length === 0}
+				<div class="rounded-xl border border-gray-700 bg-gray-800 p-12 text-center">
+					<Clock class="mx-auto mb-4 h-12 w-12 text-gray-600" />
+					<h3 class="text-xl font-semibold text-gray-300">No scan history</h3>
+					<p class="mt-2 text-gray-500">
+						You haven't run any scans for projects in this integration yet.
+					</p>
+				</div>
+			{:else}
+				<div class="overflow-hidden rounded-xl border border-gray-700 bg-gray-800">
+					<table class="w-full text-left text-sm">
+						<thead class="bg-gray-900/50 text-xs font-bold text-gray-400 uppercase">
+							<tr>
+								<th class="px-6 py-4">Status</th>
+								<th class="px-6 py-4">Type</th>
+								<th class="px-6 py-4">Project</th>
+								<th class="px-6 py-4">Date</th>
+								<th class="px-6 py-4">Duration</th>
+								<th class="px-6 py-4 text-right">Findings</th>
+								<th class="px-6 py-4"></th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-700">
+							{#each scanHistory as scan}
+								<tr class="transition-colors hover:bg-gray-700/50">
+									<td class="px-6 py-4">
+										<div class="flex items-center gap-2">
+											<span class={`h-2.5 w-2.5 rounded-full ${getStatusColor(scan.status)}`}
+											></span>
+											<span class="text-gray-200 capitalize">{scan.status}</span>
+										</div>
+									</td>
+									<td class="px-6 py-4">
+										<div class="flex items-center gap-2">
+											{#if scan.scan_type === 'secrets' || scan.scan_type === 'secrets_deep'}
+												<Shield class="h-4 w-4 text-orange-400" />
+											{:else if scan.scan_type === 'dependencies'}
+												<Package class="h-4 w-4 text-blue-400" />
+											{:else if scan.scan_type === 'quality'}
+												<Brain class="h-4 w-4 text-indigo-400" />
+											{:else}
+												<FileCode class="h-4 w-4 text-gray-400" />
+											{/if}
+											<span class="text-gray-300">
+												{scanTypes.find((t) => t.value === scan.scan_type)?.label || scan.scan_type}
+											</span>
+										</div>
+									</td>
+									<td class="px-6 py-4 text-gray-300">
+										{scan.project_name || 'Unknown Project'}
+									</td>
+									<td class="px-6 py-4 text-gray-400">
+										{new Date(scan.started_at).toLocaleString()}
+									</td>
+									<td class="px-6 py-4 font-mono text-xs text-gray-400">
+										{(scan.duration_ms / 1000).toFixed(1)}s
+									</td>
+									<td class="px-6 py-4 text-right font-medium text-gray-200">
+										{scan.findings_count}
+									</td>
+									<td class="px-6 py-4 text-right">
+										<button
+											onclick={() => {
+												selectedScan = scan;
+												if (scan.results_json) {
+													try {
+														analysisResult = JSON.parse(scan.results_json);
+														analysisType = scan.scan_type;
+														showScanResultModal = true;
+													} catch (e) {
+														console.error('Failed to parse scan results', e);
+													}
+												}
+											}}
+											class="rounded border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20 hover:text-indigo-300"
+										>
+											View Details
+										</button>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+		{/if}
 	</div>
 {/if}
 
@@ -1847,6 +2175,24 @@
 							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
 						/>
 					</div>
+					<div>
+						<label for="edit-tenant" class="mb-1 block text-sm font-medium text-gray-400"
+							>Project Tenant</label
+						>
+						<select
+							id="edit-tenant"
+							bind:value={editForm.tenant_id}
+							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+						>
+							<option value="">None (Personal)</option>
+							{#each userTenants as tenant}
+								<option value={tenant.id}>{tenant.name}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 					<div>
 						<label for="edit-embedding-model" class="mb-1 block text-sm font-medium text-gray-400"
 							>{m.modal_embedding_model()}</label
@@ -2024,6 +2370,95 @@
 					{/if}
 					{m.common_save()}
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Scan Result Modal -->
+{#if showScanResultModal && selectedScan}
+	<div
+		class="animate-in fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200"
+		onclick={(e) => e.target === e.currentTarget && (showScanResultModal = false)}
+		onkeydown={(e) => e.key === 'Escape' && (showScanResultModal = false)}
+		role="button"
+		tabindex="-1"
+	>
+		<div
+			class="animate-in zoom-in-95 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl duration-200"
+		>
+			<div class="mb-6 flex items-center justify-between">
+				<div>
+					<h3 class="flex items-center gap-2 text-xl font-bold text-gray-100">
+						{#if selectedScan.scan_type === 'secrets' || selectedScan.scan_type === 'secrets_deep'}
+							<Shield class="h-6 w-6 text-orange-400" />
+						{:else if selectedScan.scan_type === 'dependencies'}
+							<Package class="h-6 w-6 text-blue-400" />
+						{:else if selectedScan.scan_type === 'quality'}
+							<Brain class="h-6 w-6 text-indigo-400" />
+						{:else}
+							<FileCode class="h-6 w-6 text-gray-400" />
+						{/if}
+						Scan Results
+					</h3>
+					<p class="text-sm text-gray-400">
+						{selectedScan.project_name} • {new Date(selectedScan.started_at).toLocaleString()}
+					</p>
+				</div>
+				<button
+					onclick={() => (showScanResultModal = false)}
+					class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+				>
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<div class="space-y-6">
+				{#if !analysisResult}
+					<div class="p-8 text-center text-gray-500">Failed to load results.</div>
+				{:else}
+					<!-- Results Summary -->
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+						<div class="rounded-xl border border-gray-700 bg-gray-800 p-4">
+							<span class="text-xs font-bold text-gray-500 uppercase">Findings</span>
+							<div class="mt-1 text-3xl font-bold text-gray-200">
+								{selectedScan.findings_count}
+							</div>
+						</div>
+						<div class="rounded-xl border border-gray-700 bg-gray-800 p-4">
+							<span class="text-xs font-bold text-gray-500 uppercase">Files Affected</span>
+							<div class="mt-1 text-3xl font-bold text-gray-200">
+								{selectedScan.files_affected}
+							</div>
+						</div>
+						<div class="rounded-xl border border-gray-700 bg-gray-800 p-4">
+							<span class="text-xs font-bold text-gray-500 uppercase">Duration</span>
+							<div class="mt-1 text-3xl font-bold text-gray-200">
+								{(selectedScan.duration_ms / 1000).toFixed(1)}s
+							</div>
+						</div>
+					</div>
+
+					<!-- JSON formatted raw results for now as a fallback/quick implementation -->
+					<div class="rounded-xl border border-gray-700 bg-black/30 p-4">
+						<div class="mb-2 flex items-center justify-between">
+							<span class="text-xs font-bold text-gray-500 uppercase">Raw Results</span>
+							<button
+								class="text-xs text-indigo-400 hover:text-indigo-300"
+								onclick={() =>
+									navigator.clipboard.writeText(JSON.stringify(analysisResult, null, 2))}
+							>
+								Copy JSON
+							</button>
+						</div>
+						<pre
+							class="custom-scrollbar max-h-[500px] overflow-auto rounded-lg bg-black/50 p-4 font-mono text-xs text-gray-300">{JSON.stringify(
+								analysisResult,
+								null,
+								2
+							)}</pre>
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>

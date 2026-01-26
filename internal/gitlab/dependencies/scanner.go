@@ -21,11 +21,11 @@ type Scanner struct {
 	vectorStore *vector.QdrantStore
 
 	// Parsers
-	goModParser   *parser.GoModParser
-	npmParser     *parser.NPMParser
-	pipParser     *parser.PipParser
-	mavenParser   *parser.MavenParser
-	gradleParser  *parser.GradleParser
+	goModParser  *parser.GoModParser
+	npmParser    *parser.NPMParser
+	pipParser    *parser.PipParser
+	mavenParser  *parser.MavenParser
+	gradleParser *parser.GradleParser
 
 	// Registry clients
 	golangClient *registry.GolangClient
@@ -42,18 +42,18 @@ type Scanner struct {
 // NewScanner creates a new dependency scanner.
 func NewScanner(vectorStore *vector.QdrantStore, logger *logrus.Logger) *Scanner {
 	return &Scanner{
-		vectorStore:   vectorStore,
-		goModParser:   parser.NewGoModParser(),
-		npmParser:     parser.NewNPMParser(),
-		pipParser:     parser.NewPipParser(),
-		mavenParser:   parser.NewMavenParser(),
-		gradleParser:  parser.NewGradleParser(),
-		golangClient:  registry.NewGolangClient(logger),
-		npmClient:     registry.NewNPMClient(logger),
-		pypiClient:    registry.NewPyPIClient(logger),
-		mavenClient:   registry.NewMavenClient(logger),
-		osvClient:     security.NewOSVClient(logger),
-		logger:        logger,
+		vectorStore:  vectorStore,
+		goModParser:  parser.NewGoModParser(),
+		npmParser:    parser.NewNPMParser(),
+		pipParser:    parser.NewPipParser(),
+		mavenParser:  parser.NewMavenParser(),
+		gradleParser: parser.NewGradleParser(),
+		golangClient: registry.NewGolangClient(logger),
+		npmClient:    registry.NewNPMClient(logger),
+		pypiClient:   registry.NewPyPIClient(logger),
+		mavenClient:  registry.NewMavenClient(logger),
+		osvClient:    security.NewOSVClient(logger),
+		logger:       logger,
 	}
 }
 
@@ -183,22 +183,23 @@ func (s *Scanner) ScanProject(ctx context.Context, req ScanRequest) (*ScanResult
 	result.Duration = time.Since(startTime).String()
 
 	s.logger.WithFields(logrus.Fields{
-		"project_id":   req.ProjectID,
-		"scan_id":      scanID,
-		"total_deps":   result.Summary.TotalDependencies,
-		"outdated":     result.Summary.OutdatedCount,
-		"vulnerable":   result.Summary.VulnerableCount,
-		"duration":     result.Duration,
+		"project_id": req.ProjectID,
+		"scan_id":    scanID,
+		"total_deps": result.Summary.TotalDependencies,
+		"outdated":   result.Summary.OutdatedCount,
+		"vulnerable": result.Summary.VulnerableCount,
+		"duration":   result.Duration,
 	}).Info("Dependency scan completed")
 
 	return result, nil
 }
 
 // findDependencyFile searches for a dependency file in the indexed code.
+// It collects all chunks for the found file and concatenates them.
 func (s *Scanner) findDependencyFile(ctx context.Context, collection, projectID, filename string) (string, string, error) {
 	// Search for the file in Qdrant
-	var content string
-	var filePath string
+	chunks := make(map[string][]chunkInfo)
+	var finalFilePath string
 
 	err := s.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
 		"project_id": projectID,
@@ -208,19 +209,37 @@ func (s *Scanner) findDependencyFile(ctx context.Context, collection, projectID,
 			if !ok {
 				continue
 			}
-			
+
 			// Check if this is the file we're looking for
 			if fp == filename || strings.HasSuffix(fp, "/"+filename) {
-				// Get content
-				if c, ok := doc.Metadata["content"].(string); ok && c != "" {
-					content = c
-					filePath = fp
-					return nil // Found, stop scrolling
+				// If we haven't picked a file yet, or this is a better match (shorter path usually means closer to root)
+				if finalFilePath == "" || len(fp) < len(finalFilePath) {
+					// If we found a NEW file path that is better, clear old chunks
+					if finalFilePath != "" && fp != finalFilePath {
+						delete(chunks, finalFilePath)
+					}
+					finalFilePath = fp
 				}
-				if doc.Text != "" {
-					content = doc.Text
-					filePath = fp
-					return nil
+
+				// Only collect chunks for the chosen file path
+				if fp == finalFilePath {
+					var content string
+					if c, ok := doc.Metadata["content"].(string); ok && c != "" {
+						content = c
+					} else if doc.Text != "" {
+						content = doc.Text
+					}
+
+					if content != "" {
+						chunkIdx := 0
+						if idx, ok := doc.Metadata["chunk_index"].(float64); ok {
+							chunkIdx = int(idx)
+						}
+						chunks[fp] = append(chunks[fp], chunkInfo{
+							index:   chunkIdx,
+							content: content,
+						})
+					}
 				}
 			}
 		}
@@ -231,11 +250,21 @@ func (s *Scanner) findDependencyFile(ctx context.Context, collection, projectID,
 		return "", "", err
 	}
 
-	if content == "" {
+	if finalFilePath == "" || len(chunks[finalFilePath]) == 0 {
 		return "", "", fmt.Errorf("file %s not found in index", filename)
 	}
 
-	return content, filePath, nil
+	// Sort chunks by index
+	fileChunks := chunks[finalFilePath]
+	sortChunks(fileChunks)
+
+	// Concatenate content
+	var fullContent strings.Builder
+	for _, chunk := range fileChunks {
+		fullContent.WriteString(chunk.content)
+	}
+
+	return fullContent.String(), finalFilePath, nil
 }
 
 // checkDependencyForLanguage checks a single dependency for updates and vulnerabilities.
@@ -293,7 +322,7 @@ func (s *Scanner) checkDependencyForLanguage(ctx context.Context, dep parser.Dep
 	// Check for vulnerabilities using OSV
 	ecosystem := getOSVEcosystem(language)
 	version := strings.TrimPrefix(dep.CurrentVersion, "v")
-	
+
 	vulns, err := s.osvClient.QueryVulnerabilities(ctx, ecosystem, dep.Name, version)
 	if err != nil {
 		s.logger.WithError(err).WithField("package", dep.Name).Debug("Failed to check vulnerabilities")
@@ -428,13 +457,13 @@ func (s *Scanner) ScanProjectAllEcosystems(ctx context.Context, req ScanRequest)
 	result.Duration = time.Since(startTime).String()
 
 	s.logger.WithFields(logrus.Fields{
-		"project_id":   req.ProjectID,
-		"scan_id":      scanID,
-		"ecosystems":   len(result.Ecosystems),
-		"total_deps":   result.TotalSummary.TotalDependencies,
-		"outdated":     result.TotalSummary.OutdatedCount,
-		"vulnerable":   result.TotalSummary.VulnerableCount,
-		"duration":     result.Duration,
+		"project_id": req.ProjectID,
+		"scan_id":    scanID,
+		"ecosystems": len(result.Ecosystems),
+		"total_deps": result.TotalSummary.TotalDependencies,
+		"outdated":   result.TotalSummary.OutdatedCount,
+		"vulnerable": result.TotalSummary.VulnerableCount,
+		"duration":   result.Duration,
 	}).Info("Multi-ecosystem dependency scan completed")
 
 	return result, nil
@@ -651,4 +680,3 @@ func (s *Scanner) buildTotalSummary(result *MultiEcosystemScanResult) {
 		}
 	}
 }
-

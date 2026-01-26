@@ -26,11 +26,11 @@ type Client struct {
 
 // ClientConfig holds configuration for the GitLab client
 type ClientConfig struct {
-	BaseURL        string
-	AccessToken    string
-	Timeout        time.Duration
+	BaseURL         string
+	AccessToken     string
+	Timeout         time.Duration
 	RateLimitPerSec float64 // Default: 30 (safe for GitLab 2000/min limit)
-	APIVersion     string   // Default: "v4"
+	APIVersion      string  // Default: "v4"
 }
 
 // NewClient creates a new GitLab API client
@@ -343,6 +343,22 @@ func (c *Client) GetFileRaw(ctx context.Context, projectID int64, filePath, ref 
 	return io.ReadAll(resp.Body)
 }
 
+// ListBranches lists all branches of a project
+func (c *Client) ListBranches(ctx context.Context, projectID int64) ([]Branch, error) {
+	path := fmt.Sprintf("/projects/%d/repository/branches", projectID)
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var branches []Branch
+	if err := c.parseResponse(resp, &branches); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	return branches, nil
+}
+
 // ============================================================================
 // Notes (Comments) API
 // ============================================================================
@@ -645,9 +661,9 @@ type CommitAction struct {
 type CreateCommitRequest struct {
 	Branch        string         `json:"branch"`
 	CommitMessage string         `json:"commit_message"`
-	StartBranch   string         `json:"start_branch,omitempty"`   // Create branch from this if not exists
-	StartSHA      string         `json:"start_sha,omitempty"`      // Create branch from this SHA
-	StartProject  int64          `json:"start_project,omitempty"`  // Project ID for start_branch
+	StartBranch   string         `json:"start_branch,omitempty"`  // Create branch from this if not exists
+	StartSHA      string         `json:"start_sha,omitempty"`     // Create branch from this SHA
+	StartProject  int64          `json:"start_project,omitempty"` // Project ID for start_branch
 	Actions       []CommitAction `json:"actions"`
 	AuthorEmail   string         `json:"author_email,omitempty"`
 	AuthorName    string         `json:"author_name,omitempty"`
@@ -701,20 +717,20 @@ func (c *Client) CreateCommit(ctx context.Context, projectID int64, req *CreateC
 
 // CreateMergeRequestRequest contains the data for creating a merge request
 type CreateMergeRequestRequest struct {
-	SourceBranch        string   `json:"source_branch"`
-	TargetBranch        string   `json:"target_branch"`
-	Title               string   `json:"title"`
-	Description         string   `json:"description,omitempty"`
-	AssigneeID          int64    `json:"assignee_id,omitempty"`
-	AssigneeIDs         []int64  `json:"assignee_ids,omitempty"`
-	ReviewerIDs         []int64  `json:"reviewer_ids,omitempty"`
-	Labels              string   `json:"labels,omitempty"` // Comma-separated
-	MilestoneID         int64    `json:"milestone_id,omitempty"`
-	RemoveSourceBranch  bool     `json:"remove_source_branch,omitempty"`
-	AllowCollaboration  bool     `json:"allow_collaboration,omitempty"`
-	Squash              bool     `json:"squash,omitempty"`
-	SquashOnMerge       bool     `json:"squash_on_merge,omitempty"`
-	TargetProjectID     int64    `json:"target_project_id,omitempty"`
+	SourceBranch       string  `json:"source_branch"`
+	TargetBranch       string  `json:"target_branch"`
+	Title              string  `json:"title"`
+	Description        string  `json:"description,omitempty"`
+	AssigneeID         int64   `json:"assignee_id,omitempty"`
+	AssigneeIDs        []int64 `json:"assignee_ids,omitempty"`
+	ReviewerIDs        []int64 `json:"reviewer_ids,omitempty"`
+	Labels             string  `json:"labels,omitempty"` // Comma-separated
+	MilestoneID        int64   `json:"milestone_id,omitempty"`
+	RemoveSourceBranch bool    `json:"remove_source_branch,omitempty"`
+	AllowCollaboration bool    `json:"allow_collaboration,omitempty"`
+	Squash             bool    `json:"squash,omitempty"`
+	SquashOnMerge      bool    `json:"squash_on_merge,omitempty"`
+	TargetProjectID    int64   `json:"target_project_id,omitempty"`
 }
 
 // CreateMergeRequest creates a new merge request
@@ -827,4 +843,3 @@ type CreateMRWithChangesOptions struct {
 	MRDescription string         // Merge request description
 	Labels        string         // Comma-separated labels
 }
-

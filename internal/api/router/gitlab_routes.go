@@ -72,6 +72,7 @@ func (r *Router) SetupGitLabUserRoutes(store storage.Store) {
 	gitlab.GET("/projects/:id", userHandler.GetMyProject)
 	gitlab.PUT("/projects/:id", userHandler.UpdateMyProject)
 	gitlab.DELETE("/projects/:id", userHandler.DeleteMyProject)
+	gitlab.GET("/projects/:id/branches", userHandler.ListMyProjectBranches)
 	gitlab.POST("/projects/:id/setup-webhook", userHandler.SetupMyWebhook)
 	gitlab.GET("/models", userHandler.ListMyAvailableModels)
 

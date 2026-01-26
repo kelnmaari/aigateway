@@ -33,6 +33,7 @@
 		discoverMyProjects,
 		bulkAddMyProjects,
 		listMyAvailableModels,
+		listMyProjectBranches,
 		type ModelOption
 	} from '$lib/api/gitlab-user';
 	import { tenantsApi, type Tenant } from '$lib/api/tenants';
@@ -120,6 +121,8 @@
 		}
 	};
 	let updatingProject = false;
+	let projectBranches: any[] = [];
+	let loadingBranches = false;
 
 	// Indexing state
 	let indexingProjects: Set<string> = new Set();
@@ -468,6 +471,20 @@
 			}
 		};
 		showEditProject = true;
+
+		// Fetch branches
+		loadingBranches = true;
+		projectBranches = [];
+		listMyProjectBranches(project.id)
+			.then((res) => {
+				projectBranches = res.data || [];
+			})
+			.catch((e) => {
+				console.error('Failed to fetch branches:', e);
+			})
+			.finally(() => {
+				loadingBranches = false;
+			});
 	}
 
 	async function handleUpdateProject() {
@@ -488,6 +505,7 @@
 				tenant_id: editForm.tenant_id || undefined,
 				analysis_model_id: editForm.analysis_model_id,
 				embedding_model_id: editForm.embedding_model_id || undefined,
+				default_branch: editForm.default_branch,
 				auto_review: editForm.auto_review,
 				status: editForm.status,
 				settings: {
@@ -2325,6 +2343,37 @@
 							bind:value={editForm.embedding_model_id}
 							class="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
 						/>
+					</div>
+					<div>
+						<label for="edit-branch" class="mb-1 block text-sm font-medium text-gray-400"
+							>Branch to Index</label
+						>
+						<div class="relative">
+							<select
+								id="edit-branch"
+								bind:value={editForm.default_branch}
+								disabled={loadingBranches}
+								class="w-full appearance-none rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none disabled:opacity-50"
+							>
+								{#if loadingBranches}
+									<option disabled>Loading branches...</option>
+								{:else if projectBranches.length === 0}
+									<option value={editForm.default_branch}>{editForm.default_branch}</option>
+									<option disabled>No other branches found</option>
+								{:else}
+									{#each projectBranches as branch}
+										<option value={branch.name}
+											>{branch.name} {branch.default ? '(default)' : ''}</option
+										>
+									{/each}
+								{/if}
+							</select>
+							{#if loadingBranches}
+								<div class="absolute top-1/2 right-3 -translate-y-1/2">
+									<Loader2 class="h-4 w-4 animate-spin text-gray-500" />
+								</div>
+							{/if}
+						</div>
 					</div>
 				</div>
 

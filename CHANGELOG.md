@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.7.5] - 2026-01-26
+
+### Added
+
+- **GitLab Project Configuration**: Added ability to select specific branches for repository indexing in the project settings. This allows users to create search indexes for feature branches in addition to the default branch.
+- **GitLab User API**: New endpoint to fetch project branches via integrated GitLab credentials.
+
 ## [4.7.4] - 2026-01-26
 
 ### Added

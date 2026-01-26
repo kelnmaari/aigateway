@@ -513,6 +513,41 @@ func (h *GitLabUserHandler) GetMyProject(c *gin.Context) {
 	c.JSON(http.StatusOK, project)
 }
 
+// ListMyProjectBranches lists branches of a project from GitLab
+func (h *GitLabUserHandler) ListMyProjectBranches(c *gin.Context) {
+	userID := h.getUserID(c)
+	projectID := c.Param("id")
+
+	project, err := h.store.GetProject(c.Request.Context(), projectID)
+	if err != nil || project == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check integration ownership
+	integration, err := h.store.GetIntegration(c.Request.Context(), project.IntegrationID)
+	if err != nil || integration == nil || integration.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	gitlabClient := client.NewClient(client.ClientConfig{
+		BaseURL:     integration.BaseURL,
+		AccessToken: integration.AccessToken,
+	})
+
+	branches, err := gitlabClient.ListBranches(c.Request.Context(), int64(project.GitLabProjectID))
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to list branches from GitLab")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list branches: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": branches,
+	})
+}
+
 // UpdateMyProject updates user's project
 func (h *GitLabUserHandler) UpdateMyProject(c *gin.Context) {
 	userID := h.getUserID(c)

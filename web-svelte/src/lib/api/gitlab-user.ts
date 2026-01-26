@@ -141,11 +141,16 @@ export async function getMyProject(projectId: string): Promise<GitLabProject> {
   return api.get(`/api/gitlab/projects/${projectId}`);
 }
 
+export async function listMyProjectBranches(projectId: string): Promise<{ data: any[] }> {
+  return api.get(`/api/gitlab/projects/${projectId}/branches`);
+}
+
 export async function updateMyProject(projectId: string, data: {
   name?: string;
   tenant_id?: string;
   analysis_model_id?: string;
   embedding_model_id?: string;
+  default_branch?: string;
   auto_review?: boolean;
   status?: 'active' | 'disabled';
   settings?: GitLabProjectSettings;

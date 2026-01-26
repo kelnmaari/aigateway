@@ -1,12 +1,20 @@
 -- Add changelog entry for v4.7.0
-INSERT INTO changelog (version, title, description, changes, created_at)
+INSERT INTO changelogs (version, release_date, content)
 VALUES (
     '4.7.0',
-    'GitLab Project Discovery & Bulk Import',
-    'This release introduces a powerful way to discover and bulk-add projects from GitLab, alongside API client improvements for better stability.',
-    '{"added": ["GitLab Project Discovery (scan your whole instance)", "Bulk Project Import with shared configuration", "Dynamic model selector in discovery modals"], "changed": ["Standardized GitLab User API methods", "Improved TypeScript API client robustness and type safety"]}',
-    CURRENT_TIMESTAMP
+    '2026-01-26',
+    '## [4.7.0] - 2026-01-26
+
+### Added
+
+- **GitLab Project Discovery**: Users can now search their entire GitLab instance for repositories directly from the UI.
+- **Bulk Project Import**: Support for selecting multiple discovered repositories and importing them with a shared configuration in one click.
+- **Enhanced Analysis Selection**: Discovery and Add Project modals now feature a dynamic model selector with provider information.
+
+### Changed
+
+- **Standardized GitLab User API**: Improved consistency between admin and user-level API methods for project discovery and management.
+- **Improved API Client Robustness**: Fixed various formatting and parameter mapping issues in the GitLab TypeScript clients.'
 ) ON CONFLICT (version) DO UPDATE SET
-    title = EXCLUDED.title,
-    description = EXCLUDED.description,
-    changes = EXCLUDED.changes;
+    release_date = EXCLUDED.release_date,
+    content = EXCLUDED.content;

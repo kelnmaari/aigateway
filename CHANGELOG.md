@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.9.3] - 2026-02-02
+
+### Fixed
+
+- **Jobs API UUID Parsing**: Fixed critical bug where user_id was passed with `user_` prefix but PostgreSQL expected raw UUID. Now strips prefix in `getUserID()` for both `GitLabJobsHandler` and `GitLabJobSubmitHandler`.
+
+---
+
 ## [4.9.2] - 2026-02-02
 
 ### Added

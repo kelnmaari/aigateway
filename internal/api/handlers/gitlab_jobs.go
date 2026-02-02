@@ -32,9 +32,14 @@ func NewGitLabJobsHandler(store storage.Store, jobService *jobs.Service, logger 
 }
 
 // getUserID extracts user ID from context (set by auth middleware)
+// Strips "user_" prefix if present since JWT claims include it but DB stores raw UUID
 func (h *GitLabJobsHandler) getUserID(c *gin.Context) string {
 	if userID, exists := c.Get("user_id"); exists {
 		if id, ok := userID.(string); ok {
+			// JWT claims store user_id with "user_" prefix, but DB expects raw UUID
+			if len(id) > 5 && id[:5] == "user_" {
+				return id[5:]
+			}
 			return id
 		}
 	}

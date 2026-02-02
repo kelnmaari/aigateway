@@ -3278,7 +3278,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 						gitlabLogger.Info("Initializing GitLab background jobs service...")
 						r.gitlabJobService = gitlabJobs.NewService(glStore, gitlabLogger, gitlabJobs.DefaultConfig())
 
-						// Register executors
+						// Register executors for all scan types
 						r.gitlabJobService.RegisterExecutor(
 							models.JobTypeDeepSecretsScan,
 							gitlabJobs.NewDeepScanExecutor(glStore, qdrantStore, llmURL, r.gitlabAPIKey, gitlabLogger),
@@ -3290,6 +3290,18 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 						r.gitlabJobService.RegisterExecutor(
 							models.JobTypeSASTScan,
 							gitlabJobs.NewSASTScanExecutor(glStore, qdrantStore, gitlabLogger),
+						)
+						r.gitlabJobService.RegisterExecutor(
+							models.JobTypeQualityScan,
+							gitlabJobs.NewQualityScanExecutor(glStore, qdrantStore, llmURL, r.gitlabAPIKey, gitlabLogger),
+						)
+						r.gitlabJobService.RegisterExecutor(
+							models.JobTypeDependencyScan,
+							gitlabJobs.NewDependencyScanExecutor(glStore, qdrantStore, gitlabLogger),
+						)
+						r.gitlabJobService.RegisterExecutor(
+							models.JobTypeDeadCodeScan,
+							gitlabJobs.NewDeadCodeScanExecutor(glStore, qdrantStore, llmURL, r.gitlabAPIKey, gitlabLogger),
 						)
 
 						// Start job service in background

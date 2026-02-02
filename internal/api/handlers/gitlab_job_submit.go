@@ -98,6 +98,9 @@ func (h *GitLabJobSubmitHandler) canAccessProject(c *gin.Context, project *model
 	return false
 }
 
+// MaxActiveJobsPerUser is the maximum number of concurrent jobs per user
+const MaxActiveJobsPerUser = 5
+
 // submitJob is a helper that creates and submits a job
 func (h *GitLabJobSubmitHandler) submitJob(c *gin.Context, jobType models.UserJobType, req SubmitJobRequest) {
 	userID := h.getUserID(c)
@@ -113,6 +116,20 @@ func (h *GitLabJobSubmitHandler) submitJob(c *gin.Context, jobType models.UserJo
 	}
 
 	ctx := c.Request.Context()
+
+	// Rate limiting: check concurrent jobs limit
+	activeJobs, err := h.store.GetActiveUserJobs(ctx, userID)
+	if err != nil {
+		h.logger.WithError(err).Warn("Failed to check active jobs count")
+		// Continue anyway - don't block on rate limit check failure
+	} else if len(activeJobs) >= MaxActiveJobsPerUser {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":       "Too many active jobs. Please wait for existing jobs to complete.",
+			"active_jobs": len(activeJobs),
+			"max_allowed": MaxActiveJobsPerUser,
+		})
+		return
+	}
 
 	// Get project
 	project, err := h.store.GetProject(ctx, projectID)

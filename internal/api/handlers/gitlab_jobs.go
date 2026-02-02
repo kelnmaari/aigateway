@@ -270,6 +270,10 @@ func (h *GitLabJobsHandler) StreamJobUpdates(c *gin.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	// Heartbeat to keep connection alive (prevents proxy timeouts)
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
 	ctx := c.Request.Context()
 	lastProgress := job.Progress
 	lastStatus := job.Status
@@ -280,6 +284,11 @@ func (h *GitLabJobsHandler) StreamJobUpdates(c *gin.Context) {
 			// Client disconnected
 			h.logger.WithField("job_id", jobID).Debug("SSE client disconnected")
 			return
+
+		case <-heartbeat.C:
+			// Send heartbeat comment to keep connection alive
+			fmt.Fprintf(c.Writer, ": heartbeat\n\n")
+			flusher.Flush()
 
 		case <-ticker.C:
 			// Fetch latest job state

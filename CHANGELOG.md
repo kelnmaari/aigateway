@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.9.2] - 2026-02-02
+
+### Added
+
+- **Quality Scan Executor**: Background job executor for code quality analysis
+- **Dependency Scan Executor**: Background job executor for vulnerability checking across all ecosystems (Go, npm, pip, Maven, Gradle)
+- **Dead Code Scan Executor**: Background job executor for detecting unused code
+
+### Fixed
+
+- **JobService nil check**: Added null check for jobService in SetupGitLabUserJobsRoutes to prevent panic
+- **Rate limiting**: Added limit of 5 concurrent jobs per user to prevent abuse
+- **SSE heartbeat**: Added 15-second heartbeat to prevent proxy timeout on idle SSE connections
+
+### Technical
+
+- New executors: `QualityScanExecutor`, `DependencyScanExecutor`, `DeadCodeScanExecutor`
+- All 6 scan types now have working background executors
+- Improved SSE streaming reliability
+
+---
+
 ## [4.9.1] - 2026-02-02
 
 ### Fixed

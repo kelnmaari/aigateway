@@ -661,6 +661,11 @@ func (r *Router) SetupGitLabUserJobsRoutes(store storage.Store, jobService *jobs
 		return
 	}
 
+	if jobService == nil {
+		r.logger.Warn("GitLab user jobs routes: JobService is nil, skipping setup")
+		return
+	}
+
 	r.logger.Info("Setting up GitLab user jobs routes")
 
 	// User routes (authenticated users can see their own jobs)

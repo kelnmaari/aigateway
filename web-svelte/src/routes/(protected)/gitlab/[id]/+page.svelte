@@ -37,6 +37,13 @@
 		type ModelOption
 	} from '$lib/api/gitlab-user';
 	import { tenantsApi, type Tenant } from '$lib/api/tenants';
+	import {
+		listMyJobs,
+		type UserJob,
+		type JobStatus,
+		isJobActive
+	} from '$lib/api/gitlab-jobs';
+	import { JobProgressCard } from '$lib/components/gitlab';
 	import * as m from '$lib/paraglide/messages';
 	import {
 		Settings,
@@ -150,6 +157,14 @@
 	let selectedScan: any = null;
 	let showScanResultModal = false;
 
+	// Jobs state
+	let jobs: UserJob[] = [];
+	let jobsLoading = false;
+	let jobsError = '';
+	let jobsTotal = 0;
+	let jobsPage = 1;
+	let jobsLimit = 20;
+
 	function getUpdateTypeColor(type: string) {
 		switch (type?.toLowerCase()) {
 			case 'major':
@@ -233,6 +248,33 @@
 			console.error('Failed to load scan history:', e);
 		} finally {
 			scanHistoryLoading = false;
+		}
+	}
+
+	async function loadJobs() {
+		jobsLoading = true;
+		jobsError = '';
+		try {
+			const result = await listMyJobs({
+				integration_id: integrationId,
+				limit: jobsLimit,
+				offset: (jobsPage - 1) * jobsLimit
+			});
+			jobs = result.jobs || [];
+			jobsTotal = result.total;
+		} catch (e: any) {
+			jobsError = e.message || 'Failed to load jobs';
+			console.error('Failed to load jobs:', e);
+		} finally {
+			jobsLoading = false;
+		}
+	}
+
+	function handleJobsPageChange(newPage: number) {
+		const totalPages = Math.ceil(jobsTotal / jobsLimit);
+		if (newPage >= 1 && newPage <= totalPages) {
+			jobsPage = newPage;
+			loadJobs();
 		}
 	}
 
@@ -799,9 +841,16 @@
 			>
 				{m.settings_title()}
 			</button>
-			<a
-				href="/gitlab/jobs?integration_id={integrationId}"
-				class="flex items-center gap-2 rounded-md px-4 py-2 font-medium text-gray-400 transition-colors hover:text-gray-200"
+			<button
+				onclick={() => {
+					activeTab = 'jobs';
+					if (jobs.length === 0 && !jobsLoading) {
+						loadJobs();
+					}
+				}}
+				class="flex items-center gap-2 rounded-md px-4 py-2 font-medium transition-colors {activeTab === 'jobs'
+					? 'bg-indigo-600 text-white'
+					: 'text-gray-400 hover:text-gray-200'}"
 			>
 				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
@@ -812,7 +861,7 @@
 					/>
 				</svg>
 				Jobs
-			</a>
+			</button>
 		</div>
 
 		<!-- Tab content -->
@@ -2261,6 +2310,71 @@
 					</table>
 				</div>
 			{/if}
+		{/if}
+
+		{#if activeTab === 'jobs'}
+			<div class="space-y-4">
+				<div class="flex items-center justify-between">
+					<h3 class="text-lg font-semibold text-gray-200">Background Jobs</h3>
+					<button
+						onclick={loadJobs}
+						disabled={jobsLoading}
+						class="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<RefreshCw class="h-4 w-4 {jobsLoading ? 'animate-spin' : ''}" />
+						Refresh
+					</button>
+				</div>
+
+				{#if jobsError}
+					<div class="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+						<span class="font-medium">Error:</span>
+						{jobsError}
+					</div>
+				{/if}
+
+				{#if jobsLoading}
+					<div class="flex justify-center py-12">
+						<Loader2 class="h-10 w-10 animate-spin text-indigo-500" />
+					</div>
+				{:else if jobs.length === 0}
+					<div class="rounded-xl border border-gray-700 bg-gray-800 p-12 text-center">
+						<Clock class="mx-auto mb-4 h-12 w-12 text-gray-600" />
+						<h3 class="text-xl font-semibold text-gray-300">No jobs found</h3>
+						<p class="mt-2 text-gray-500">
+							Start a scan from a project to see background jobs here.
+						</p>
+					</div>
+				{:else}
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+						{#each jobs as job (job.id)}
+							<JobProgressCard {job} showCancel={isJobActive(job.status)} />
+						{/each}
+					</div>
+
+					{#if Math.ceil(jobsTotal / jobsLimit) > 1}
+						<div class="mt-6 flex items-center justify-center gap-4 border-t border-gray-700 pt-6">
+							<button
+								class="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={jobsPage === 1}
+								onclick={() => handleJobsPageChange(jobsPage - 1)}
+							>
+								Previous
+							</button>
+							<span class="text-sm text-gray-400">
+								Page {jobsPage} of {Math.ceil(jobsTotal / jobsLimit)}
+							</span>
+							<button
+								class="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={jobsPage >= Math.ceil(jobsTotal / jobsLimit)}
+								onclick={() => handleJobsPageChange(jobsPage + 1)}
+							>
+								Next
+							</button>
+						</div>
+					{/if}
+				{/if}
+			</div>
 		{/if}
 	</div>
 {/if}

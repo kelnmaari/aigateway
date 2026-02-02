@@ -1078,3 +1078,64 @@ func (h *InferenceHandler) RemoveRepoDownload(c *gin.Context) {
 	downloader.RemoveRepoDownload(req.ModelID)
 	c.JSON(http.StatusOK, gin.H{"status": "removed", "model_id": req.ModelID})
 }
+
+// POST /api/system/inference/refresh-saved
+// Refreshes a saved model by re-downloading missing or outdated files.
+// This is useful when model files are corrupted or incomplete.
+func (h *InferenceHandler) PostRefreshSaved(c *gin.Context) {
+	alias := c.Query("alias")
+	if alias == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "alias parameter required"})
+		return
+	}
+
+	if h.modelStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model store not configured"})
+		return
+	}
+
+	// Get saved model config
+	saved, ok := h.modelStore.Get(alias)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "saved model not found"})
+		return
+	}
+
+	// Check if this is an HF model
+	if saved.HFRepo == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "model has no HuggingFace repository configured, cannot refresh"})
+		return
+	}
+
+	downloader := h.router.GetDownloader()
+	if downloader == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "downloader not configured"})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"alias":   alias,
+		"hf_repo": saved.HFRepo,
+	}).Info("Starting model refresh/re-download")
+
+	// Use DownloadRepository which will check existing files and download missing ones
+	repoDownload, err := downloader.DownloadRepository(c.Request.Context(), saved.HFRepo)
+	if err != nil {
+		h.logger.WithError(err).WithFields(logrus.Fields{
+			"alias":   alias,
+			"hf_repo": saved.HFRepo,
+		}).Error("Failed to start model refresh")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":     "Model refresh started",
+		"alias":       alias,
+		"model_id":    saved.HFRepo,
+		"download_id": repoDownload.ID,
+		"total_files": repoDownload.TotalFiles,
+		"total_size":  repoDownload.TotalSize,
+		"local_path":  repoDownload.LocalPath,
+	})
+}

@@ -628,6 +628,8 @@ func (r *Router) setupInferenceRoutes() {
 		group.POST("/repo-downloads/status", r.inferenceHandler.GetRepoDownloadStatus) // POST because model_id contains /
 		group.POST("/repo-downloads/cancel", r.inferenceHandler.CancelRepoDownload)
 		group.POST("/repo-downloads/remove", r.inferenceHandler.RemoveRepoDownload)
+		// Refresh saved model (re-download missing/corrupted files)
+		group.POST("/refresh-saved", r.inferenceHandler.PostRefreshSaved)
 	}
 	r.logger.Info("Inference v4 routes configured")
 

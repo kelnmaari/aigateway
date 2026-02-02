@@ -54,6 +54,8 @@ func (h *GitLabJobsHandler) ListUserJobs(c *gin.Context) {
 		return
 	}
 
+	h.logger.WithField("user_id", userID).Debug("Listing jobs for user")
+
 	// Parse query params
 	var req models.UserJobsRequest
 	req.UserID = userID
@@ -92,11 +94,27 @@ func (h *GitLabJobsHandler) ListUserJobs(c *gin.Context) {
 		}
 	}
 
+	h.logger.WithFields(logrus.Fields{
+		"user_id":        req.UserID,
+		"integration_id": req.IntegrationID,
+		"project_id":     req.ProjectID,
+	}).Debug("ListUserJobs query params")
+
 	jobs, total, err := h.store.ListUserJobs(c.Request.Context(), &req)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list user jobs")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list jobs"})
 		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"jobs_count": len(jobs),
+		"total":      total,
+	}).Debug("ListUserJobs results")
+
+	// Ensure jobs is never null in JSON response
+	if jobs == nil {
+		jobs = []models.UserJob{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

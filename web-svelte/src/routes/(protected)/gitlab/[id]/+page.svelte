@@ -1569,38 +1569,40 @@
 						<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 							{#if analysisType === 'secrets'}
 								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
-									<span class="text-xs font-bold text-gray-500 uppercase">Total Secrets</span>
+									<span class="text-xs font-bold text-gray-500 uppercase">Total Findings</span>
 									<div class="mt-1 text-3xl font-bold text-orange-500">
-										{(analysisResult.secrets || []).length}
+										{analysisResult.summary?.total_findings || (analysisResult.findings || []).length}
 									</div>
 								</div>
 								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
-									<span class="text-xs font-bold text-gray-500 uppercase">Files Scanned</span>
+									<span class="text-xs font-bold text-gray-500 uppercase">Files Affected</span>
 									<div class="mt-1 text-3xl font-bold text-blue-400">
-										{analysisResult.files_scanned || 0}
+										{analysisResult.summary?.files_affected || 0}
 									</div>
 								</div>
 								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
-									<span class="text-xs font-bold text-gray-500 uppercase">Severity</span>
-									<div class="mt-1 text-3xl font-bold text-red-500">High</div>
+									<span class="text-xs font-bold text-gray-500 uppercase">Chunks Scanned</span>
+									<div class="mt-1 text-3xl font-bold text-gray-400">
+										{analysisResult.chunks_scanned || 0}
+									</div>
 								</div>
 							{:else if analysisType === 'quality'}
 								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
 									<span class="text-xs font-bold text-gray-500 uppercase">Overall Score</span>
-									<div class="mt-1 text-3xl font-bold text-green-400">
-										{analysisResult.score || 0}/100
+									<div class="mt-1 text-3xl font-bold {(analysisResult.overall_score || 0) >= 70 ? 'text-green-400' : (analysisResult.overall_score || 0) >= 50 ? 'text-yellow-400' : 'text-red-400'}">
+										{analysisResult.overall_score || 0}/100
 									</div>
 								</div>
 								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
 									<span class="text-xs font-bold text-gray-500 uppercase">Issues Found</span>
 									<div class="mt-1 text-3xl font-bold text-yellow-500">
-										{(analysisResult.issues || []).length}
+										{analysisResult.summary?.issues_count || 0}
 									</div>
 								</div>
 								<div class="rounded-xl border border-gray-700 bg-gray-900 p-4">
 									<span class="text-xs font-bold text-gray-500 uppercase">Files Analyzed</span>
 									<div class="mt-1 text-3xl font-bold text-blue-400">
-										{analysisResult.files_count || 0}
+										{analysisResult.summary?.total_files || 0}
 									</div>
 								</div>
 							{:else if analysisType === 'dependencies'}
@@ -1771,70 +1773,85 @@
 										</div>
 									{/if}
 								</div>
-							{:else if (analysisType === 'quality' || analysisType === 'quality-score') && analysisResult.issues}
-								<div class="grid grid-cols-1 gap-4">
-									{#each analysisResult.issues as issue}
-										<div
-											class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600"
-										>
-											<div class="mb-3 flex items-start justify-between">
-												<div class="flex flex-wrap items-center gap-2">
-													<span
-														class={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getSeverityClass(issue.severity)}`}
-													>
-														{issue.severity || 'info'}
-													</span>
-													<h5 class="font-bold text-gray-200">
-														{issue.category} Issue
-													</h5>
-												</div>
-												<div
-													class="flex items-center gap-1.5 rounded bg-gray-800/50 px-2 py-1 font-mono text-xs text-gray-500"
-												>
-													<svg
-														class="h-3 w-3"
-														fill="none"
-														stroke="currentColor"
-														viewBox="0 0 24 24"
-													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-														/>
-													</svg>
-													{issue.file_path}:{issue.line}
-												</div>
-											</div>
-											<p class="mb-4 text-sm leading-relaxed text-gray-300">{issue.message}</p>
-											{#if issue.suggestion}
-												<div class="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
-													<div class="mb-1.5 flex items-center gap-2">
-														<svg
-															class="h-4 w-4 text-indigo-400"
-															fill="none"
-															stroke="currentColor"
-															viewBox="0 0 24 24"
-														>
-															<path
-																stroke-linecap="round"
-																stroke-linejoin="round"
-																stroke-width="2"
-																d="M13 10V3L4 14h7v7l9-11h-7z"
-															/>
-														</svg>
-														<span class="text-xs font-bold tracking-tight text-indigo-400 uppercase"
-															>Recommendation</span
-														>
+							{:else if (analysisType === 'quality' || analysisType === 'quality-score') && (analysisResult.recommendations || analysisResult.file_scores)}
+								<div class="space-y-6">
+									<!-- Recommendations -->
+									{#if analysisResult.recommendations && analysisResult.recommendations.length > 0}
+										<div>
+											<h4 class="mb-3 text-sm font-semibold text-gray-300">Recommendations ({analysisResult.recommendations.length})</h4>
+											<div class="grid grid-cols-1 gap-3">
+												{#each analysisResult.recommendations.slice(0, 10) as rec}
+													<div class="rounded-xl border border-gray-700 bg-gray-900/40 p-4 transition-colors hover:border-gray-600 {rec.priority === 'high' ? 'border-l-4 border-l-red-500' : rec.priority === 'medium' ? 'border-l-4 border-l-yellow-500' : 'border-l-4 border-l-blue-500'}">
+														<div class="mb-2 flex items-center gap-2">
+															<span class="rounded px-2 py-0.5 text-[10px] font-bold uppercase {rec.priority === 'high' ? 'bg-red-500/20 text-red-400' : rec.priority === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}">
+																{rec.priority}
+															</span>
+															<span class="rounded bg-gray-800 px-2 py-0.5 text-[10px] font-medium text-gray-400 uppercase">
+																{rec.category}
+															</span>
+														</div>
+														<h5 class="mb-1 font-semibold text-gray-200">{rec.title}</h5>
+														<p class="text-sm text-gray-400">{rec.description}</p>
+														{#if rec.impact}
+															<p class="mt-2 text-xs text-indigo-400">Impact: {rec.impact}</p>
+														{/if}
 													</div>
-													<p class="text-xs leading-normal text-indigo-200/70 italic">
-														{issue.suggestion}
-													</p>
-												</div>
-											{/if}
+												{/each}
+											</div>
 										</div>
-									{/each}
+									{/if}
+
+									<!-- File Issues -->
+									{#if analysisResult.file_scores && analysisResult.file_scores.some((f: any) => f.issues && f.issues.length > 0)}
+										<div>
+											<h4 class="mb-3 text-sm font-semibold text-gray-300">Issues by File</h4>
+											<div class="space-y-4">
+												{#each analysisResult.file_scores.filter((f: any) => f.issues && f.issues.length > 0).slice(0, 5) as file}
+													<div class="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
+														<div class="mb-3 flex items-center justify-between">
+															<span class="font-mono text-sm text-gray-300">{file.file_path}</span>
+															<span class="rounded bg-gray-800 px-2 py-1 text-xs font-medium {file.score >= 70 ? 'text-green-400' : file.score >= 50 ? 'text-yellow-400' : 'text-red-400'}">
+																{file.score}/100
+															</span>
+														</div>
+														<div class="space-y-2">
+															{#each file.issues.slice(0, 3) as issue}
+																<div class="rounded-lg border border-gray-700/50 bg-gray-800/30 p-3">
+																	<div class="mb-1 flex items-center gap-2">
+																		<span class="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase {getSeverityClass(issue.severity)}">
+																			{issue.severity}
+																		</span>
+																		<span class="text-xs text-gray-500">Line {issue.line}</span>
+																	</div>
+																	<p class="text-sm text-gray-300">{issue.message}</p>
+																</div>
+															{/each}
+															{#if file.issues.length > 3}
+																<p class="text-xs text-gray-500">...and {file.issues.length - 3} more issues</p>
+															{/if}
+														</div>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
+
+									<!-- Breakdown by Category -->
+									{#if analysisResult.breakdown}
+										<div>
+											<h4 class="mb-3 text-sm font-semibold text-gray-300">Score Breakdown</h4>
+											<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+												{#each Object.entries(analysisResult.breakdown) as [category, score]}
+													<div class="rounded-lg border border-gray-700 bg-gray-800/50 p-3 text-center">
+														<div class="text-2xl font-bold {Number(score) >= 70 ? 'text-green-400' : Number(score) >= 50 ? 'text-yellow-400' : 'text-red-400'}">
+															{score}
+														</div>
+														<div class="text-xs text-gray-500 capitalize">{String(category).replace('_', ' ')}</div>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
 								</div>
 							{:else if (analysisType === 'dead-code' || analysisType === 'detect-dead-code') && analysisResult.dead_symbols}
 								<div class="grid grid-cols-1 gap-4">

@@ -6,6 +6,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.9.8] - 2026-02-02
+
+### Fixed
+
+- **Secrets Scanner UI**: Fixed field name mismatches in user GitLab integration page
+  - `secrets` → `findings` (consistent with backend `SecretsScanResult.findings`)
+  - `files_scanned` → `summary.files_affected`
+  - Added `chunks_scanned` metric display
+  - Labels updated: "Total Secrets" → "Total Findings", "Files Scanned" → "Files Affected"
+
+### Technical
+
+- Full audit of all scanner types confirmed Quality was the only other mismatch (fixed in 4.9.7)
+- Dead Code, Docs, Tests, Dependencies scanners already using correct field names
+
+---
+
+## [4.9.7] - 2026-02-02
+
+### Fixed
+
+- **Jobs API**: Fixed `jobs: null` response when no jobs exist - now returns empty array `[]`
+- **Quality Analysis UI**: Fixed field name mismatches between user and admin UI
+  - `score` → `overall_score`
+  - `files_count` → `summary.total_files`
+  - `issues[]` → `file_scores[].issues` and `recommendations[]`
+
+### Changed
+
+- **Quality Results Visualization**: Completely redesigned quality analysis results display
+  - Shows recommendations with priority badges (high/medium/low)
+  - Shows issues grouped by file with score per file
+  - Shows score breakdown by category (complexity, documentation, security, etc.)
+  - Dynamic color coding based on score thresholds
+
+---
+
+## [4.9.6] - 2026-02-02
+
+### Added
+
+- **Model Refresh/Update**: Added ability to refresh/re-download saved models in Model Registry
+  - New 🔄 button in Saved Models list for HuggingFace models
+  - Automatically re-downloads missing or corrupted files (like `config.json`)
+  - New API endpoint `POST /api/system/inference/refresh-saved?alias=...`
+
+### Technical
+
+- New `PostRefreshSaved` handler in inference API
+- Uses existing `DownloadRepository` which intelligently skips already-downloaded files
+
+---
+
 ## [4.9.4] - 2026-02-02
 
 ### Fixed

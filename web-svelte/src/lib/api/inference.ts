@@ -308,6 +308,10 @@ export const inferenceApi = {
 	
 	removeRepoDownload: (modelId: string) =>
 		api.post('/api/system/inference/repo-downloads/remove', { model_id: modelId }),
+
+	// Refresh saved model (re-download missing/corrupted files)
+	refreshSaved: (alias: string) =>
+		api.post<RepoDownloadResponse>(`/api/system/inference/refresh-saved?alias=${encodeURIComponent(alias)}`),
 };
 
 // Repository download types

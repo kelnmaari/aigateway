@@ -976,6 +976,19 @@
 		}
 	}
 
+	async function refreshSavedModel(saved: SavedModel) {
+		if (!saved.hf_repo) {
+			showMsg('Модель не имеет HuggingFace репозитория для обновления', 'error');
+			return;
+		}
+		try {
+			const result = await inferenceApi.refreshSaved(saved.alias);
+			showMsg(`Обновление модели ${saved.alias} запущено (${result.total_files} файлов)`, 'success');
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка запуска обновления', 'error');
+		}
+	}
+
 	function openEditSavedModal(saved: SavedModel) {
 		editingSavedModel = saved;
 		editSavedForm = {
@@ -1529,15 +1542,24 @@
 										{#if !isRunning}
 											<button class="px-2 py-1 text-xs rounded border bg-primary/10 text-primary hover:bg-primary/20" onclick={() => loadSavedModelConfig(saved)}>Load</button>
 										{/if}
-										<button 
+										<button
 											class="px-2 py-1 text-xs rounded border hover:bg-muted"
 											onclick={() => openEditSavedModal(saved)}
 											title="Edit parameters"
 										>
 											⚙️
 										</button>
-										<button 
-											class="px-2 py-1 text-xs rounded border hover:bg-muted" 
+										{#if saved.hf_repo}
+											<button
+												class="px-2 py-1 text-xs rounded border hover:bg-muted text-blue-500 hover:bg-blue-500/10"
+												onclick={() => refreshSavedModel(saved)}
+												title="Update/re-download model files"
+											>
+												🔄
+											</button>
+										{/if}
+										<button
+											class="px-2 py-1 text-xs rounded border hover:bg-muted"
 											onclick={() => toggleAutoStart(saved)}
 											title={saved.auto_start ? 'Disable auto-start' : 'Enable auto-start'}
 										>

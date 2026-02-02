@@ -262,6 +262,7 @@ type DeepScanSecretsRequest struct {
 	ModelID   string `json:"model_id,omitempty"`   // Analysis model to use
 	MaxChunks int    `json:"max_chunks,omitempty"` // Limit chunks (default 500)
 	Language  string `json:"language,omitempty"`   // "en" or "ru"
+	Stream    bool   `json:"stream,omitempty"`     // Enable SSE streaming for progress
 }
 
 // DeepScanSecrets POST /api/admin/gitlab/projects/:id/deep-scan-secrets
@@ -320,6 +321,7 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 		"collection": collectionName,
 		"model":      modelID,
 		"language":   language,
+		"stream":     req.Stream,
 	}).Info("Starting deep secrets scan")
 
 	// Create deep scanner using configured LLM credentials
@@ -336,7 +338,13 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 		StartedAt:     startTime,
 	}
 
-	// Run deep scan
+	// Handle streaming mode
+	if req.Stream {
+		h.deepScanWithStreaming(c, ctx, deepScanner, projectID, collectionName, modelID, req, scanResult, startTime)
+		return
+	}
+
+	// Non-streaming mode (original behavior)
 	result, err := deepScanner.DeepScan(ctx, scanner.DeepScanRequest{
 		ProjectID:      projectID,
 		CollectionName: collectionName,
@@ -380,6 +388,108 @@ func (h *GitLabSecretsHandler) DeepScanSecrets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// deepScanWithStreaming handles SSE streaming mode for deep scan
+func (h *GitLabSecretsHandler) deepScanWithStreaming(
+	c *gin.Context,
+	ctx context.Context,
+	deepScanner *scanner.DeepScanner,
+	projectID, collectionName, modelID string,
+	req DeepScanSecretsRequest,
+	scanResult *models.GitLabScanResult,
+	startTime time.Time,
+) {
+	// Set SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	// Get the flusher
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Streaming not supported"})
+		return
+	}
+
+	// Send initial event
+	h.sendSSEEvent(c.Writer, flusher, "start", map[string]interface{}{
+		"project_id": projectID,
+		"model":      modelID,
+		"status":     "starting",
+	})
+
+	// Progress callback for streaming updates
+	progressCallback := func(progress scanner.ScanProgress) {
+		h.sendSSEEvent(c.Writer, flusher, "progress", progress)
+	}
+
+	// Run deep scan with progress
+	language := req.Language
+	if language == "" {
+		language = "en"
+	}
+
+	result, err := deepScanner.DeepScanWithProgress(ctx, scanner.DeepScanRequest{
+		ProjectID:      projectID,
+		CollectionName: collectionName,
+		ModelID:        modelID,
+		MaxChunks:      req.MaxChunks,
+		Language:       language,
+	}, progressCallback)
+
+	// Update scan result with outcome
+	completedAt := time.Now()
+	scanResult.CompletedAt = &completedAt
+	scanResult.DurationMs = completedAt.Sub(startTime).Milliseconds()
+
+	if err != nil {
+		h.logger.WithError(err).WithField("project_id", projectID).Error("Deep secrets scan failed")
+		scanResult.Status = models.ScanStatusFailed
+		scanResult.Error = err.Error()
+		if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+			h.logger.WithError(saveErr).Warn("Failed to save scan result to history")
+		}
+		h.sendSSEEvent(c.Writer, flusher, "error", map[string]string{
+			"error": err.Error(),
+		})
+		h.sendSSEEvent(c.Writer, flusher, "done", nil)
+		return
+	}
+
+	// Save successful result
+	scanResult.Status = models.ScanStatusCompleted
+	scanResult.FindingsCount = len(result.Findings)
+	scanResult.FilesAffected = result.Summary.FilesAffected
+	scanResult.TokensUsed = result.TokensUsed
+
+	if resultJSON, jsonErr := json.Marshal(result); jsonErr == nil {
+		scanResult.ResultsJSON = string(resultJSON)
+	}
+
+	if saveErr := h.store.SaveScanResult(ctx, scanResult); saveErr != nil {
+		h.logger.WithError(saveErr).Warn("Failed to save scan result to history")
+	}
+
+	// Send final result
+	h.sendSSEEvent(c.Writer, flusher, "complete", result)
+	h.sendSSEEvent(c.Writer, flusher, "done", nil)
+}
+
+// sendSSEEvent sends a Server-Sent Event
+func (h *GitLabSecretsHandler) sendSSEEvent(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
+	if data != nil {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			h.logger.WithError(err).Error("Failed to marshal SSE data")
+			return
+		}
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, string(jsonData))
+	} else {
+		fmt.Fprintf(w, "event: %s\ndata: {}\n\n", event)
+	}
+	flusher.Flush()
 }
 
 // DeepScanMySecrets handles user-level deep secrets scanning (POST /api/gitlab/projects/:id/deep-scan-secrets)

@@ -18,6 +18,7 @@ type Store interface {
 	FeedbackStore
 	AnalyticsStore
 	ScanHistoryStore
+	UserJobStore
 }
 
 // IntegrationStore manages GitLab integrations
@@ -207,5 +208,35 @@ type ScanHistoryStore interface {
 
 	// DeleteOldScanResults deletes scan results older than specified days
 	DeleteOldScanResults(ctx context.Context, olderThanDays int) (int64, error)
+}
+
+// UserJobStore manages user-initiated background jobs (v4.8.9+)
+type UserJobStore interface {
+	// CreateUserJob creates a new user job
+	CreateUserJob(ctx context.Context, job *models.UserJob) error
+
+	// GetUserJob retrieves a user job by ID
+	GetUserJob(ctx context.Context, id string) (*models.UserJob, error)
+
+	// ListUserJobs lists user jobs with filtering
+	ListUserJobs(ctx context.Context, req *models.UserJobsRequest) ([]models.UserJob, int, error)
+
+	// UpdateUserJobStatus updates job status
+	UpdateUserJobStatus(ctx context.Context, id string, status models.UserJobStatus, err string) error
+
+	// UpdateUserJobProgress updates job progress
+	UpdateUserJobProgress(ctx context.Context, id string, progress int, progressMsg string) error
+
+	// UpdateUserJobResult updates job result
+	UpdateUserJobResult(ctx context.Context, id string, resultID, resultType, resultURL string) error
+
+	// CancelUserJob cancels a pending or running job
+	CancelUserJob(ctx context.Context, id string) error
+
+	// GetActiveUserJobs retrieves all running jobs for a user
+	GetActiveUserJobs(ctx context.Context, userID string) ([]models.UserJob, error)
+
+	// CleanupOldUserJobs deletes jobs older than specified days
+	CleanupOldUserJobs(ctx context.Context, olderThanDays int) (int64, error)
 }
 

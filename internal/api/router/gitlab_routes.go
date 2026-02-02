@@ -10,6 +10,7 @@ import (
 	authMiddleware "aigateway/internal/auth/middleware"
 	"aigateway/internal/gitlab/analytics"
 	"aigateway/internal/gitlab/dependencies/schedule"
+	"aigateway/internal/gitlab/jobs"
 	"aigateway/internal/gitlab/storage"
 	"aigateway/internal/rag/vector"
 )
@@ -651,4 +652,36 @@ func (r *Router) SetupGitLabScanHistoryRoutes(store storage.Store) {
 	gitlab.GET("/scan-history/:id", scanHistoryHandler.GetScanResult)
 
 	r.logger.Info("GitLab scan history routes configured: /api/admin/gitlab/scan-history/*")
+}
+
+// SetupGitLabUserJobsRoutes registers GitLab user jobs routes (v4.8.9+)
+func (r *Router) SetupGitLabUserJobsRoutes(store storage.Store, jobService *jobs.Service) {
+	if store == nil {
+		r.logger.Warn("GitLab user jobs routes: Store is nil, skipping setup")
+		return
+	}
+
+	r.logger.Info("Setting up GitLab user jobs routes")
+
+	// User routes (authenticated users can see their own jobs)
+	gitlab := r.engine.Group("/api/gitlab")
+
+	// Apply authentication
+	if r.jwtManager != nil && r.db != nil {
+		gitlab.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+	} else if r.config.Auth.Enabled && r.authenticator != nil {
+		gitlab.Use(r.authenticator.AuthenticationMiddleware())
+	}
+
+	jobsHandler := handlers.NewGitLabJobsHandler(store, jobService, r.logger)
+
+	// User job routes
+	gitlab.GET("/jobs", jobsHandler.ListUserJobs)
+	gitlab.GET("/jobs/active", jobsHandler.GetActiveUserJobs)
+	gitlab.GET("/jobs/types", jobsHandler.GetJobTypes)
+	gitlab.GET("/jobs/statuses", jobsHandler.GetJobStatuses)
+	gitlab.GET("/jobs/:id", jobsHandler.GetUserJob)
+	gitlab.POST("/jobs/:id/cancel", jobsHandler.CancelUserJob)
+
+	r.logger.Info("GitLab user jobs routes configured: /api/gitlab/jobs/*")
 }

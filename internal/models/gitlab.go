@@ -772,3 +772,118 @@ type GitLabScanResultsRequest struct {
 	Limit          int               `json:"limit,omitempty"`
 	Offset         int               `json:"offset,omitempty"`
 }
+
+// ============================================================================
+// User Background Jobs (v4.8.9+)
+// ============================================================================
+
+// UserJobType represents the type of background job
+type UserJobType string
+
+const (
+	JobTypeSecretsScn     UserJobType = "secrets_scan"
+	JobTypeDeepSecretsScan UserJobType = "deep_secrets_scan"
+	JobTypeSASTScan        UserJobType = "sast_scan"
+	JobTypeDependencyScan  UserJobType = "dependency_scan"
+	JobTypeQualityScan     UserJobType = "quality_scan"
+	JobTypeDeadCodeScan    UserJobType = "deadcode_scan"
+	JobTypeAutoDocsScan    UserJobType = "autodocs_scan"
+	JobTypeTestGenScan     UserJobType = "testgen_scan"
+	JobTypeProjectIndex    UserJobType = "project_index"
+	JobTypeGenerateDocs    UserJobType = "generate_docs"
+	JobTypeGenerateTests   UserJobType = "generate_tests"
+	JobTypeCreateMR        UserJobType = "create_mr"
+)
+
+// UserJobStatus represents the status of a background job
+type UserJobStatus string
+
+const (
+	UserJobStatusPending    UserJobStatus = "pending"
+	UserJobStatusRunning    UserJobStatus = "running"
+	UserJobStatusCompleted  UserJobStatus = "completed"
+	UserJobStatusFailed     UserJobStatus = "failed"
+	UserJobStatusCancelled  UserJobStatus = "cancelled"
+)
+
+// UserJob represents a user-initiated background job
+type UserJob struct {
+	ID            string        `json:"id" db:"id"`
+	UserID        string        `json:"user_id" db:"user_id"`
+	TenantID      string        `json:"tenant_id,omitempty" db:"tenant_id"`
+	ProjectID     string        `json:"project_id" db:"project_id"`
+	IntegrationID string        `json:"integration_id" db:"integration_id"`
+	JobType       UserJobType   `json:"job_type" db:"job_type"`
+	Status        UserJobStatus `json:"status" db:"status"`
+
+	// Job configuration (JSON)
+	Config string `json:"config,omitempty" db:"config"`
+
+	// Progress tracking
+	Progress    int    `json:"progress" db:"progress"`         // 0-100 percentage
+	ProgressMsg string `json:"progress_msg,omitempty" db:"progress_msg"` // Current step description
+
+	// Timing
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+
+	// Results
+	ResultID    string `json:"result_id,omitempty" db:"result_id"`       // Reference to scan result or MR
+	ResultType  string `json:"result_type,omitempty" db:"result_type"`   // "scan_result", "merge_request", etc.
+	ResultURL   string `json:"result_url,omitempty" db:"result_url"`     // External URL (e.g., MR URL)
+	Error       string `json:"error,omitempty" db:"error"`
+
+	// For display
+	ProjectName string `json:"project_name,omitempty" db:"-"`
+}
+
+// UserJobConfig contains configuration for a background job
+type UserJobConfig struct {
+	// Common
+	ModelID  string `json:"model_id,omitempty"`
+	Language string `json:"language,omitempty"`
+
+	// Scan specific
+	MaxChunks   int      `json:"max_chunks,omitempty"`
+	Categories  []string `json:"categories,omitempty"`
+	MinSeverity string   `json:"min_severity,omitempty"`
+
+	// Generation specific
+	TargetBranch string   `json:"target_branch,omitempty"`
+	FilePaths    []string `json:"file_paths,omitempty"`
+	CreateMR     bool     `json:"create_mr,omitempty"`
+}
+
+// UserJobsRequest for listing user jobs
+type UserJobsRequest struct {
+	UserID        string         `json:"user_id,omitempty"`
+	ProjectID     string         `json:"project_id,omitempty"`
+	IntegrationID string         `json:"integration_id,omitempty"`
+	JobType       *UserJobType   `json:"job_type,omitempty"`
+	Status        *UserJobStatus `json:"status,omitempty"`
+	Limit         int            `json:"limit,omitempty"`
+	Offset        int            `json:"offset,omitempty"`
+}
+
+// ToScanType converts UserJobType to GitLabScanType where applicable
+func (jt UserJobType) ToScanType() (GitLabScanType, bool) {
+	switch jt {
+	case JobTypeSecretsScn:
+		return ScanTypeSecrets, true
+	case JobTypeDeepSecretsScan:
+		return ScanTypeSecretsDeep, true
+	case JobTypeDependencyScan:
+		return ScanTypeDependencies, true
+	case JobTypeQualityScan:
+		return ScanTypeQuality, true
+	case JobTypeDeadCodeScan:
+		return ScanTypeDeadCode, true
+	case JobTypeAutoDocsScan:
+		return ScanTypeAutoDocs, true
+	case JobTypeTestGenScan:
+		return ScanTypeTestGen, true
+	default:
+		return "", false
+	}
+}

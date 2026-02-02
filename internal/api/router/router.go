@@ -40,6 +40,7 @@ import (
 	filestorageBackend "aigateway/internal/filestorage/storage"
 	"aigateway/internal/gitlab/dependencies/schedule"
 	gitlabIndexer "aigateway/internal/gitlab/indexer"
+	gitlabJobs "aigateway/internal/gitlab/jobs"
 	gitlabProcessor "aigateway/internal/gitlab/processor"
 	gitlabRAG "aigateway/internal/gitlab/rag"
 	gitlabStorage "aigateway/internal/gitlab/storage"
@@ -249,6 +250,7 @@ type Router struct {
 	gitlabScheduler           *schedule.Scheduler                 // GitLab dependency scan scheduler
 	gitlabStore               gitlabStorage.Store                 // GitLab storage (v4.1.0+)
 	gitlabAPIKey              string                              // Internal API key for GitLab LLM calls (v4.1.0+)
+	gitlabJobService          *gitlabJobs.Service                 // GitLab background jobs service (v4.8.9+)
 }
 
 // NewOptions содержит опции для создания роутера
@@ -3271,6 +3273,32 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 								}
 							}()
 						}
+
+						// Initialize background jobs service (v4.8.9+)
+						gitlabLogger.Info("Initializing GitLab background jobs service...")
+						r.gitlabJobService = gitlabJobs.NewService(glStore, gitlabLogger, gitlabJobs.DefaultConfig())
+
+						// Register executors
+						r.gitlabJobService.RegisterExecutor(
+							models.JobTypeDeepSecretsScan,
+							gitlabJobs.NewDeepScanExecutor(glStore, qdrantStore, llmURL, r.gitlabAPIKey, gitlabLogger),
+						)
+						r.gitlabJobService.RegisterExecutor(
+							models.JobTypeSecretsScn,
+							gitlabJobs.NewSecretsScanExecutor(glStore, qdrantStore, gitlabLogger),
+						)
+						r.gitlabJobService.RegisterExecutor(
+							models.JobTypeSASTScan,
+							gitlabJobs.NewSASTScanExecutor(glStore, qdrantStore, gitlabLogger),
+						)
+
+						// Start job service in background
+						go func() {
+							r.gitlabJobService.Start()
+							gitlabLogger.Info("✅ GitLab background jobs service started")
+						}()
+
+						gitlabLogger.Info("✅ GitLab background jobs service initialized with executors")
 					}
 				}
 
@@ -3361,6 +3389,12 @@ func (r *Router) Shutdown(ctx context.Context) error {
 	if r.gitlabWorkerPool != nil {
 		r.gitlabWorkerPool.Stop(30 * time.Second)
 		r.logger.Info("GitLab worker pool stopped")
+	}
+
+	// Stop GitLab background jobs service (v4.8.9+)
+	if r.gitlabJobService != nil {
+		r.gitlabJobService.Stop()
+		r.logger.Info("GitLab background jobs service stopped")
 	}
 
 	r.logger.Info("All router components stopped")
@@ -3938,5 +3972,10 @@ func (r *Router) setupGitLabRoutes() {
 	// User-level GitLab routes
 	if r.gitlabStore != nil {
 		r.SetupGitLabUserRoutes(r.gitlabStore)
+
+		// User background jobs routes (v4.8.9+)
+		if r.gitlabJobService != nil {
+			r.SetupGitLabUserJobsRoutes(r.gitlabStore, r.gitlabJobService)
+		}
 	}
 }

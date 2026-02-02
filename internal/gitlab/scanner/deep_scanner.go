@@ -33,6 +33,19 @@ type DeepScanRequest struct {
 	Language       string `json:"language,omitempty"` // "en" or "ru"
 }
 
+// ProgressCallback is called during scan to report progress
+type ProgressCallback func(progress ScanProgress)
+
+// ScanProgress represents current scan progress
+type ScanProgress struct {
+	ChunksScanned int    `json:"chunks_scanned"`
+	TotalChunks   int    `json:"total_chunks"`
+	FindingsCount int    `json:"findings_count"`
+	CurrentBatch  int    `json:"current_batch"`
+	TotalBatches  int    `json:"total_batches"`
+	Status        string `json:"status"`
+}
+
 // DeepScanResult contains deep scan results
 type DeepScanResult struct {
 	ProjectID     string        `json:"project_id"`
@@ -76,6 +89,11 @@ func NewDeepScanner(vectorStore *vector.QdrantStore, llmBaseURL, llmAPIKey strin
 
 // DeepScan performs semantic analysis using LLM
 func (s *DeepScanner) DeepScan(ctx context.Context, req DeepScanRequest) (*DeepScanResult, error) {
+	return s.DeepScanWithProgress(ctx, req, nil)
+}
+
+// DeepScanWithProgress performs semantic analysis with progress callback
+func (s *DeepScanner) DeepScanWithProgress(ctx context.Context, req DeepScanRequest, progressCb ProgressCallback) (*DeepScanResult, error) {
 	startTime := time.Now()
 	scanID := fmt.Sprintf("deep-%s", time.Now().Format("20060102-150405"))
 
@@ -118,7 +136,9 @@ func (s *DeepScanner) DeepScan(ctx context.Context, req DeepScanRequest) (*DeepS
 	)
 
 	// Collect chunks (we'll process them in batches)
+	// Skip test files and documentation to reduce false positives
 	var allChunks []chunkData
+	var skippedTestFiles, skippedDocFiles int
 	err := s.vectorStore.ScrollAll(ctx, req.CollectionName, map[string]interface{}{
 		"project_id": req.ProjectID,
 	}, func(docs []vector.VectorDocument) error {
@@ -136,6 +156,18 @@ func (s *DeepScanner) DeepScan(ctx context.Context, req DeepScanRequest) (*DeepS
 			filePath := ""
 			if fp, ok := doc.Metadata["file_path"].(string); ok {
 				filePath = fp
+			}
+
+			// Skip test files - they often contain fake secrets for testing
+			if isTestFile(filePath) {
+				skippedTestFiles++
+				continue
+			}
+
+			// Skip documentation files - they often contain example secrets
+			if isDocumentationFile(filePath) {
+				skippedDocFiles++
+				continue
 			}
 
 			startLine := 0
@@ -167,10 +199,18 @@ func (s *DeepScanner) DeepScan(ctx context.Context, req DeepScanRequest) (*DeepS
 		return result, err
 	}
 
-	s.logger.WithField("chunks_collected", len(allChunks)).Info("Collected chunks for deep analysis")
+	s.logger.WithFields(logrus.Fields{
+		"chunks_collected":   len(allChunks),
+		"skipped_test_files": skippedTestFiles,
+		"skipped_doc_files":  skippedDocFiles,
+	}).Info("Collected chunks for deep analysis (test/doc files filtered)")
 
-	// Process chunks in batches (5 chunks per LLM call to optimize)
-	batchSize := 5
+	// Process chunks in batches (3 chunks per LLM call for better quality)
+	// Smaller batches = more focused analysis = fewer hallucinations
+	batchSize := 3
+	totalBatches := (len(allChunks) + batchSize - 1) / batchSize
+	currentBatch := 0
+
 	for i := 0; i < len(allChunks); i += batchSize {
 		select {
 		case <-ctx.Done():
@@ -186,6 +226,19 @@ func (s *DeepScanner) DeepScan(ctx context.Context, req DeepScanRequest) (*DeepS
 		}
 		batch := allChunks[i:end]
 		chunksScanned += len(batch)
+		currentBatch++
+
+		// Report progress via callback
+		if progressCb != nil {
+			progressCb(ScanProgress{
+				ChunksScanned: chunksScanned,
+				TotalChunks:   len(allChunks),
+				FindingsCount: len(allFindings),
+				CurrentBatch:  currentBatch,
+				TotalBatches:  totalBatches,
+				Status:        "scanning",
+			})
+		}
 
 		// Analyze batch with LLM
 		findings, tokens, err := s.analyzeBatch(ctx, req.ModelID, batch, language)
@@ -334,12 +387,44 @@ func (s *DeepScanner) analyzeBatch(ctx context.Context, modelID string, chunks [
 
 func (s *DeepScanner) getSystemPrompt(language string) string {
 	if language == "ru" {
-		return `Ты эксперт по безопасности кода. Анализируй код на наличие:
-1. Хардкод секретов (API ключи, пароли, токены)
-2. Утечки чувствительных данных
-3. Небезопасных практик
+		return `Ты эксперт по безопасности кода. Твоя задача — найти ТОЛЬКО РЕАЛЬНЫЕ захардкоженные секреты.
 
-⚠️ КРИТИЧЕСКИ ВАЖНО: Отвечай СТРОГО в JSON формате. НЕ добавляй текст до или после JSON!
+## СТРОГИЕ КРИТЕРИИ — что ЯВЛЯЕТСЯ секретом:
+- Реальные API ключи с валидным форматом (AKIA..., sk_live_..., ghp_..., glpat-...)
+- Реальные пароли в коде (НЕ переменные окружения, НЕ плейсхолдеры)
+- Приватные ключи (-----BEGIN RSA PRIVATE KEY-----)
+- Connection strings с реальными credentials
+
+## КРИТЕРИИ ИСКЛЮЧЕНИЯ — что НЕ является секретом:
+- Переменные окружения: os.Getenv("API_KEY"), process.env.SECRET
+- Плейсхолдеры: "your-api-key", "xxx", "changeme", "<YOUR_TOKEN>", "example"
+- Тестовые данные: "test_key", "mock_token", "fake_password"
+- Шаблоны конфигов: ${API_KEY}, {{.Secret}}, %SECRET%
+- Пустые значения: "", '', nil, null
+- Документация и комментарии с примерами
+- Константы с именами (без значений): const API_KEY = ""
+
+## ПРИМЕРЫ
+
+### ✅ ЭТО СЕКРЕТ (reportuй):
+{"chunk_index": 1, "type": "hardcoded_secret", "severity": "critical", "description": "AWS Access Key ID захардкожен", "code_snippet": "aws_key = \"AKIAIOSFODNN7REAL123\"", "confidence": "high"}
+
+### ❌ НЕ СЕКРЕТ (НЕ reportuй):
+- password = os.Getenv("DB_PASSWORD")  → переменная окружения
+- API_KEY = "your-api-key-here"  → плейсхолдер
+- token = "<INSERT_TOKEN>"  → шаблон
+- secret = ""  → пустое значение
+- // Example: api_key = "sk_test_xxx"  → комментарий/документация
+
+## УРОВНИ CONFIDENCE:
+- "high": 100% уверен что это реальный секрет (валидный формат, не плейсхолдер)
+- "medium": похоже на секрет, но может быть тестовым
+- "low": возможно секрет, требует ручной проверки
+
+⚠️ КРИТИЧЕСКИ ВАЖНО:
+1. Лучше пропустить сомнительный случай, чем создать false positive
+2. Отвечай СТРОГО в JSON формате
+3. Если секретов НЕТ, верни: {"findings": []}
 
 Формат ответа:
 {
@@ -348,26 +433,64 @@ func (s *DeepScanner) getSystemPrompt(language string) string {
       "chunk_index": 1,
       "type": "hardcoded_secret",
       "severity": "critical",
-      "description": "Найден хардкод API ключ AWS",
-      "code_snippet": "aws_key = 'AKIA...'",
-      "suggestion": "Использовать переменные окружения",
+      "description": "Краткое описание",
+      "code_snippet": "строка кода",
+      "suggestion": "Как исправить",
       "confidence": "high"
     }
   ]
-}
-
- If secrets are NOT found, return STICTLY: {"findings": []}
-
-⚠️ ВАЖНО: Никаких вступлений, пояснений или текста до/после JSON. Только "чистый" JSON объект.
-⚠️ Начни ответ с символа '{' и закончи символом '}'.`
+}`
 	}
 
-	return `You are a code security expert. Analyze code for:
-1. Hardcoded secrets (API keys, passwords, tokens)
-2. Sensitive data leaks
-3. Insecure practices
+	return `You are a code security expert. Your task is to find ONLY REAL hardcoded secrets.
 
-⚠️ CRITICAL: Respond STRICTLY in JSON format. DO NOT add any text before or after JSON!
+## STRICT CRITERIA — what IS a secret:
+- Real API keys with valid format (AKIA..., sk_live_..., ghp_..., glpat-...)
+- Real passwords in code (NOT environment variables, NOT placeholders)
+- Private keys (-----BEGIN RSA PRIVATE KEY-----)
+- Connection strings with real credentials
+
+## EXCLUSION CRITERIA — what is NOT a secret:
+- Environment variables: os.Getenv("API_KEY"), process.env.SECRET, ENV["KEY"]
+- Placeholders: "your-api-key", "xxx", "changeme", "<YOUR_TOKEN>", "example"
+- Test data: "test_key", "mock_token", "fake_password", "dummy_secret"
+- Config templates: ${API_KEY}, {{.Secret}}, %SECRET%, $SECRET
+- Empty values: "", '', nil, null, None
+- Documentation and comments with examples
+- Constants with names only (no values): const API_KEY = ""
+- Base64-encoded placeholders or examples
+
+## EXAMPLES
+
+### ✅ THIS IS A SECRET (report it):
+{"chunk_index": 1, "type": "hardcoded_secret", "severity": "critical", "description": "AWS Access Key ID hardcoded", "code_snippet": "aws_key = \"AKIAIOSFODNN7REAL123\"", "confidence": "high"}
+
+### ❌ NOT A SECRET (do NOT report):
+- password = os.Getenv("DB_PASSWORD")  → environment variable
+- API_KEY = "your-api-key-here"  → placeholder
+- token = "<INSERT_TOKEN>"  → template
+- secret = ""  → empty value
+- // Example: api_key = "sk_test_xxx"  → comment/documentation
+- const ApiKey = config.Get("api_key")  → config lookup
+- key := viper.GetString("secret")  → config library
+
+## CONFIDENCE LEVELS:
+- "high": 100% certain this is a real secret (valid format, not a placeholder)
+- "medium": looks like a secret but could be test data
+- "low": possibly a secret, requires manual review
+
+## SEVERITY LEVELS:
+- "critical": Production API keys, private keys, database passwords
+- "high": OAuth tokens, service credentials
+- "medium": Generic secrets that may or may not be sensitive
+- "low": Internal IPs, non-sensitive configuration
+
+⚠️ CRITICAL RULES:
+1. When in doubt, DO NOT report — false negatives are better than false positives
+2. Respond STRICTLY in JSON format
+3. If NO secrets found, return: {"findings": []}
+4. DO NOT report environment variable lookups as secrets
+5. DO NOT report placeholder values as secrets
 
 Response format:
 {
@@ -376,18 +499,13 @@ Response format:
       "chunk_index": 1,
       "type": "hardcoded_secret",
       "severity": "critical",
-      "description": "Found hardcoded AWS API key",
-      "code_snippet": "aws_key = 'AKIA...'",
-      "suggestion": "Use environment variables",
+      "description": "Brief description",
+      "code_snippet": "the code line",
+      "suggestion": "How to fix",
       "confidence": "high"
     }
   ]
-}
-
- If secrets are NOT found, return STICTLY: {"findings": []}
-
-⚠️ IMPORTANT: No introductions, no explanations, no text before or after JSON. Only raw JSON object.
-⚠️ Start response with '{' and end with '}'.`
+}`
 }
 
 func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFinding {
@@ -412,9 +530,9 @@ func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFi
 		}
 	}
 
-	// Remove possible repetitive trash (hallucinations like "I5 I54...")
-	if len(content) > 100 && strings.Count(content, "I5") > 10 {
-		s.logger.Warn("LLM returned repetitive garbage, skipping batch")
+	// Detect hallucinations - repetitive garbage patterns
+	if s.isHallucination(content) {
+		s.logger.WithField("content_preview", truncate(content, 100)).Warn("LLM returned hallucinated garbage, skipping batch")
 		return findings
 	}
 
@@ -461,6 +579,16 @@ func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFi
 
 		chunk := chunks[chunkIdx]
 
+		// Additional validation: skip findings that look like false positives
+		if s.isLikelyFalsePositive(f.CodeSnippet, f.Description, f.Confidence) {
+			s.logger.WithFields(logrus.Fields{
+				"code_snippet": truncate(f.CodeSnippet, 100),
+				"confidence":   f.Confidence,
+				"file_path":    chunk.filePath,
+			}).Debug("Skipping likely false positive finding")
+			continue
+		}
+
 		finding := DeepFinding{
 			ID:          fmt.Sprintf("deep-%d", time.Now().UnixNano()),
 			Type:        f.Type,
@@ -482,10 +610,202 @@ func (s *DeepScanner) parseFindings(content string, chunks []chunkData) []DeepFi
 			finding.Severity = SeverityMedium
 		}
 
+		// Validate confidence - only accept high/medium confidence findings
+		switch finding.Confidence {
+		case "high", "medium":
+			// OK
+		case "low":
+			// Skip low confidence findings to reduce false positives
+			s.logger.WithFields(logrus.Fields{
+				"code_snippet": truncate(f.CodeSnippet, 100),
+				"file_path":    chunk.filePath,
+			}).Debug("Skipping low confidence finding")
+			continue
+		default:
+			finding.Confidence = "medium"
+		}
+
 		findings = append(findings, finding)
 	}
 
 	return findings
+}
+
+// isHallucination detects if LLM output is garbage/hallucinated
+func (s *DeepScanner) isHallucination(content string) bool {
+	if len(content) < 50 {
+		return false
+	}
+
+	// Pattern 1: Repetitive number sequences (e.g., "444446644444646444461284...")
+	digitCount := 0
+	for _, r := range content {
+		if r >= '0' && r <= '9' {
+			digitCount++
+		}
+	}
+	// If more than 60% of content is digits, it's likely garbage
+	if float64(digitCount)/float64(len(content)) > 0.6 {
+		return true
+	}
+
+	// Pattern 2: Repetitive "I" + number patterns (e.g., "I5 I54 I6 I128...")
+	iPatterns := []string{"I4", "I5", "I6", "I12", "I28", "I64", "I128"}
+	iCount := 0
+	for _, p := range iPatterns {
+		iCount += strings.Count(content, p)
+	}
+	if iCount > 10 {
+		return true
+	}
+
+	// Pattern 3: Very long strings without spaces (likely binary/encoded garbage)
+	words := strings.Fields(content)
+	for _, word := range words {
+		if len(word) > 200 && !strings.HasPrefix(word, "{") && !strings.HasPrefix(word, "\"") {
+			return true
+		}
+	}
+
+	// Pattern 4: Repetitive character sequences
+	if len(content) > 100 {
+		// Check for any character repeated more than 20 times in a row
+		for i := 0; i < len(content)-20; i++ {
+			allSame := true
+			char := content[i]
+			for j := 1; j < 20; j++ {
+				if content[i+j] != char {
+					allSame = false
+					break
+				}
+			}
+			if allSame && char != ' ' && char != '\n' {
+				return true
+			}
+		}
+	}
+
+	// Pattern 5: No valid JSON structure at all
+	if !strings.Contains(content, "{") && !strings.Contains(content, "findings") {
+		return true
+	}
+
+	return false
+}
+
+// isLikelyFalsePositive checks if a finding looks like a false positive
+func (s *DeepScanner) isLikelyFalsePositive(codeSnippet, description, confidence string) bool {
+	snippetLower := strings.ToLower(codeSnippet)
+	descLower := strings.ToLower(description)
+
+	// Placeholder patterns - these are NOT real secrets
+	placeholderPatterns := []string{
+		"your-api-key",
+		"your_api_key",
+		"your-secret",
+		"your_secret",
+		"your-token",
+		"your_token",
+		"insert-here",
+		"insert_here",
+		"changeme",
+		"change-me",
+		"change_me",
+		"xxxxxxxx",
+		"xxx-xxx",
+		"example",
+		"sample",
+		"placeholder",
+		"<your",
+		"<insert",
+		"<api",
+		"<token",
+		"<secret",
+		"<password",
+		"${",
+		"{{",
+		"%s",
+		"todo:",
+		"fixme:",
+		"replace_with",
+		"replace-with",
+		"dummy",
+		"fake",
+		"mock",
+		"test_key",
+		"test_token",
+		"test_secret",
+		"test_password",
+		"demo_",
+		"dev_key",
+		"dev_token",
+	}
+
+	for _, pattern := range placeholderPatterns {
+		if strings.Contains(snippetLower, pattern) {
+			return true
+		}
+	}
+
+	// Environment variable patterns - these are SAFE
+	envPatterns := []string{
+		"os.getenv",
+		"os.environ",
+		"process.env",
+		"env[",
+		"env.get",
+		"getenv(",
+		"viper.get",
+		"config.get",
+		"settings.",
+		"${env:",
+		"${env.",
+	}
+
+	for _, pattern := range envPatterns {
+		if strings.Contains(snippetLower, pattern) {
+			return true
+		}
+	}
+
+	// Empty or trivial values
+	trivialPatterns := []string{
+		`= ""`,
+		`= ''`,
+		`= nil`,
+		`= null`,
+		`= none`,
+		`= ""`,
+		`: ""`,
+		`: ''`,
+	}
+
+	for _, pattern := range trivialPatterns {
+		if strings.Contains(snippetLower, pattern) {
+			return true
+		}
+	}
+
+	// Description suggests it's not a real secret
+	falsePositiveDescriptions := []string{
+		"placeholder",
+		"example",
+		"template",
+		"sample",
+		"mock",
+		"test",
+		"dummy",
+		"default value",
+		"empty",
+	}
+
+	for _, pattern := range falsePositiveDescriptions {
+		if strings.Contains(descLower, pattern) && confidence != "high" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func truncate(s string, maxLen int) string {
@@ -493,4 +813,104 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// isTestFile checks if the file path indicates a test/mock/fixture file
+func isTestFile(filePath string) bool {
+	if filePath == "" {
+		return false
+	}
+
+	lowerPath := strings.ToLower(filePath)
+
+	// Test file patterns
+	testPatterns := []string{
+		"_test.go",
+		"_test.py",
+		"_test.js",
+		"_test.ts",
+		"_test.rb",
+		"_spec.go",
+		"_spec.py",
+		"_spec.js",
+		"_spec.ts",
+		"_spec.rb",
+		".test.go",
+		".test.js",
+		".test.ts",
+		".spec.js",
+		".spec.ts",
+		"test_",
+		"mock_",
+		"fake_",
+		"stub_",
+	}
+
+	for _, pattern := range testPatterns {
+		if strings.Contains(lowerPath, pattern) {
+			return true
+		}
+	}
+
+	// Test directories
+	testDirs := []string{
+		"/test/",
+		"/tests/",
+		"/testing/",
+		"/__tests__/",
+		"/spec/",
+		"/specs/",
+		"/fixtures/",
+		"/testdata/",
+		"/test_data/",
+		"/mocks/",
+		"/mock/",
+		"/fakes/",
+		"/stubs/",
+		"/__mocks__/",
+		"/examples/",
+		"/example/",
+		"/samples/",
+		"/sample/",
+		"/demo/",
+		"/demos/",
+	}
+
+	for _, dir := range testDirs {
+		if strings.Contains(lowerPath, dir) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isDocumentationFile checks if the file is documentation
+func isDocumentationFile(filePath string) bool {
+	if filePath == "" {
+		return false
+	}
+
+	lowerPath := strings.ToLower(filePath)
+
+	docPatterns := []string{
+		".md",
+		".rst",
+		".txt",
+		"readme",
+		"changelog",
+		"contributing",
+		"license",
+		"/docs/",
+		"/doc/",
+		"/documentation/",
+	}
+
+	for _, pattern := range docPatterns {
+		if strings.Contains(lowerPath, pattern) {
+			return true
+		}
+	}
+
+	return false
 }

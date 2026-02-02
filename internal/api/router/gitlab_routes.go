@@ -674,8 +674,9 @@ func (r *Router) SetupGitLabUserJobsRoutes(store storage.Store, jobService *jobs
 	}
 
 	jobsHandler := handlers.NewGitLabJobsHandler(store, jobService, r.logger)
+	jobSubmitHandler := handlers.NewGitLabJobSubmitHandler(store, jobService, r.logger)
 
-	// User job routes
+	// User job routes - list, get, cancel
 	gitlab.GET("/jobs", jobsHandler.ListUserJobs)
 	gitlab.GET("/jobs/active", jobsHandler.GetActiveUserJobs)
 	gitlab.GET("/jobs/types", jobsHandler.GetJobTypes)
@@ -683,5 +684,17 @@ func (r *Router) SetupGitLabUserJobsRoutes(store storage.Store, jobService *jobs
 	gitlab.GET("/jobs/:id", jobsHandler.GetUserJob)
 	gitlab.POST("/jobs/:id/cancel", jobsHandler.CancelUserJob)
 
-	r.logger.Info("GitLab user jobs routes configured: /api/gitlab/jobs/*")
+	// SSE streaming for real-time job progress (v4.9.0+)
+	gitlab.GET("/jobs/:id/stream", jobsHandler.StreamJobUpdates)
+
+	// Background job submission routes (v4.9.0+)
+	// These submit jobs to the job service for async processing
+	gitlab.POST("/projects/:id/jobs/deep-scan", jobSubmitHandler.SubmitDeepScanJob)
+	gitlab.POST("/projects/:id/jobs/secrets-scan", jobSubmitHandler.SubmitSecretsScanJob)
+	gitlab.POST("/projects/:id/jobs/sast-scan", jobSubmitHandler.SubmitSASTJob)
+	gitlab.POST("/projects/:id/jobs/quality-scan", jobSubmitHandler.SubmitQualityScanJob)
+	gitlab.POST("/projects/:id/jobs/dependency-scan", jobSubmitHandler.SubmitDependencyScanJob)
+	gitlab.POST("/projects/:id/jobs/deadcode-scan", jobSubmitHandler.SubmitDeadCodeScanJob)
+
+	r.logger.Info("GitLab user jobs routes configured: /api/gitlab/jobs/* + /api/gitlab/projects/:id/jobs/*")
 }

@@ -24,6 +24,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET /api/gitlab/jobs/types` - List available job types
   - `GET /api/gitlab/jobs/statuses` - List job statuses
 
+- **Job Submission Endpoints**: Submit background jobs for async processing:
+  - `POST /api/gitlab/projects/:id/jobs/deep-scan` - Deep secrets scan
+  - `POST /api/gitlab/projects/:id/jobs/secrets-scan` - Secrets scan
+  - `POST /api/gitlab/projects/:id/jobs/sast-scan` - SAST scan
+  - `POST /api/gitlab/projects/:id/jobs/quality-scan` - Quality scan
+  - `POST /api/gitlab/projects/:id/jobs/dependency-scan` - Dependency scan
+  - `POST /api/gitlab/projects/:id/jobs/deadcode-scan` - Dead code scan
+
+- **SSE Streaming**: Real-time job progress updates via Server-Sent Events:
+  - `GET /api/gitlab/jobs/:id/stream` - SSE endpoint for live progress
+  - Events: `init`, `progress`, `complete`, `done`, `error`
+
+- **Jobs Monitoring UI** (Svelte):
+  - New `/gitlab/jobs` page with tabs (All/Active/Completed), filters, and pagination
+  - `JobProgressCard` component with real-time SSE streaming and cancel support
+  - `ActiveJobsIndicator` navbar widget showing active jobs count with dropdown
+  - API client `gitlab-jobs.ts` with SSE streaming support
+
 - **Deep Scan Improvements**:
   - Enhanced hallucination detection for numeric garbage patterns (I4, I5, I6, I12, I28, I64, I128)
   - Added SSE streaming mode with real-time progress updates (`stream: true` parameter)
@@ -37,7 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New packages: `internal/gitlab/jobs` (service, executors)
 - New storage: `internal/gitlab/storage/postgres_user_jobs.go`
-- New handlers: `internal/api/handlers/gitlab_jobs.go`
+- New handlers: `internal/api/handlers/gitlab_jobs.go`, `internal/api/handlers/gitlab_job_submit.go`
+- New Svelte components: `JobProgressCard.svelte`, `ActiveJobsIndicator.svelte`
 - Migration 139: `user_jobs` table with indexes for efficient querying
 
 ## [4.8.8] - 2026-01-26

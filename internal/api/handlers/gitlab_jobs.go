@@ -2,8 +2,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"aigateway/internal/gitlab/jobs"
 	"aigateway/internal/gitlab/storage"
@@ -208,6 +210,114 @@ func (h *GitLabJobsHandler) GetJobStatuses(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"statuses": statuses})
+}
+
+// StreamJobUpdates GET /api/gitlab/jobs/:id/stream
+// Server-Sent Events endpoint for real-time job progress updates
+func (h *GitLabJobsHandler) StreamJobUpdates(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	jobID := c.Param("id")
+	if jobID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Job ID is required"})
+		return
+	}
+
+	// Get initial job to check ownership
+	job, err := h.store.GetUserJob(c.Request.Context(), jobID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Job not found"})
+		return
+	}
+
+	// Check ownership
+	if job.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Set SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no") // Disable nginx buffering
+
+	// Get flusher
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Streaming not supported"})
+		return
+	}
+
+	// Send initial state
+	h.sendJobSSEEvent(c.Writer, flusher, "init", job)
+
+	// Poll for updates until job completes or client disconnects
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	ctx := c.Request.Context()
+	lastProgress := job.Progress
+	lastStatus := job.Status
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected
+			h.logger.WithField("job_id", jobID).Debug("SSE client disconnected")
+			return
+
+		case <-ticker.C:
+			// Fetch latest job state
+			job, err = h.store.GetUserJob(ctx, jobID)
+			if err != nil {
+				h.sendJobSSEEvent(c.Writer, flusher, "error", map[string]string{"error": "Job not found"})
+				return
+			}
+
+			// Send update if changed
+			if job.Progress != lastProgress || job.Status != lastStatus {
+				h.sendJobSSEEvent(c.Writer, flusher, "progress", map[string]interface{}{
+					"job_id":       job.ID,
+					"status":       job.Status,
+					"progress":     job.Progress,
+					"progress_msg": job.ProgressMsg,
+					"result_id":    job.ResultID,
+					"error":        job.Error,
+				})
+				lastProgress = job.Progress
+				lastStatus = job.Status
+			}
+
+			// Check if job completed
+			if job.Status == models.UserJobStatusCompleted ||
+				job.Status == models.UserJobStatusFailed ||
+				job.Status == models.UserJobStatusCancelled {
+				h.sendJobSSEEvent(c.Writer, flusher, "complete", job)
+				h.sendJobSSEEvent(c.Writer, flusher, "done", nil)
+				return
+			}
+		}
+	}
+}
+
+// sendJobSSEEvent sends a Server-Sent Event
+func (h *GitLabJobsHandler) sendJobSSEEvent(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
+	if data != nil {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			h.logger.WithError(err).Error("Failed to marshal SSE data")
+			return
+		}
+		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, string(jsonData))
+	} else {
+		fmt.Fprintf(w, "event: %s\ndata: {}\n\n", event)
+	}
+	flusher.Flush()
 }
 
 // Helper to parse int from query param

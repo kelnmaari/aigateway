@@ -73,9 +73,13 @@
 				statusFilter = 'completed';
 			}
 
+			// Get integration_id from URL if present
+			const integrationId = $page.url.searchParams.get('integration_id') || undefined;
+
 			const result = await listMyJobs({
 				status: statusFilter,
 				job_type: filterType || undefined,
+				integration_id: integrationId,
 				limit,
 				offset
 			});

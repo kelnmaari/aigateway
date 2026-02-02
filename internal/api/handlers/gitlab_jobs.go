@@ -31,9 +31,19 @@ func NewGitLabJobsHandler(store storage.Store, jobService *jobs.Service, logger 
 	}
 }
 
+// getUserID extracts user ID from context (set by auth middleware)
+func (h *GitLabJobsHandler) getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if id, ok := userID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
 // ListUserJobs GET /api/gitlab/jobs
 func (h *GitLabJobsHandler) ListUserJobs(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := h.getUserID(c)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -94,7 +104,7 @@ func (h *GitLabJobsHandler) ListUserJobs(c *gin.Context) {
 
 // GetUserJob GET /api/gitlab/jobs/:id
 func (h *GitLabJobsHandler) GetUserJob(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := h.getUserID(c)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -123,7 +133,7 @@ func (h *GitLabJobsHandler) GetUserJob(c *gin.Context) {
 
 // GetActiveUserJobs GET /api/gitlab/jobs/active
 func (h *GitLabJobsHandler) GetActiveUserJobs(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := h.getUserID(c)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -144,7 +154,7 @@ func (h *GitLabJobsHandler) GetActiveUserJobs(c *gin.Context) {
 
 // CancelUserJob POST /api/gitlab/jobs/:id/cancel
 func (h *GitLabJobsHandler) CancelUserJob(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := h.getUserID(c)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -215,7 +225,7 @@ func (h *GitLabJobsHandler) GetJobStatuses(c *gin.Context) {
 // StreamJobUpdates GET /api/gitlab/jobs/:id/stream
 // Server-Sent Events endpoint for real-time job progress updates
 func (h *GitLabJobsHandler) StreamJobUpdates(c *gin.Context) {
-	userID := c.GetString("user_id")
+	userID := h.getUserID(c)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return

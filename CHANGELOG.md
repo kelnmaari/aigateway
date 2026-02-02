@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.9.1] - 2026-02-02
+
+### Fixed
+
+- **Jobs API**: Fixed UUID parsing error in GitLabJobsHandler - user_id was incorrectly extracted with `user_` prefix causing "invalid input syntax for type uuid" errors
+
+---
+
 ## [4.9.0] - 2026-02-02
 
 ### Added

@@ -33,16 +33,16 @@ type Capability = models.ModelCapability
 
 // ModelSpec describes how a model should be prepared and started.
 type ModelSpec struct {
-	Alias        string             // user-friendly alias
-	Provider     ProviderKind       // target provider
-	Format       ModelFormat        // model artifact format
-	Capabilities []Capability       // chat, embeddings, vision
-	HFRepo       string             // e.g. meta-llama/Llama-3-8B
-	HFRevision   string             // optional revision/commit
-	HFFile       string             // filename inside repo
-	GGUFURL      string             // direct URL for GGUF if not HF
-	ExpectedSHA  string             // optional sha256 for validation
-	LocalPath    string             // resolved local path after download
+	Alias        string       // user-friendly alias
+	Provider     ProviderKind // target provider
+	Format       ModelFormat  // model artifact format
+	Capabilities []Capability // chat, embeddings, vision
+	HFRepo       string       // e.g. meta-llama/Llama-3-8B
+	HFRevision   string       // optional revision/commit
+	HFFile       string       // filename inside repo
+	GGUFURL      string       // direct URL for GGUF if not HF
+	ExpectedSHA  string       // optional sha256 for validation
+	LocalPath    string       // resolved local path after download
 
 	// GPU selection (e.g., "0", "1", "0,1" for specific GPU(s), empty = all)
 	GPUDevice string
@@ -59,31 +59,32 @@ type ModelSpec struct {
 	LlamaCtxSize     int    // --ctx-size (context window size)
 	LlamaNParallel   int    // --parallel (concurrent request slots)
 	LlamaFlashAttn   bool   // --flash-attn (enable flash attention)
+	LlamaJinja       bool   // --jinja (enable Jinja template processing)
 
 	// SGLang-specific
-	SGLangTensorParallel int    // --tp (tensor parallel)
-	SGLangDataParallel   int    // --dp (data parallel)
+	SGLangTensorParallel int     // --tp (tensor parallel)
+	SGLangDataParallel   int     // --dp (data parallel)
 	SGLangMemFraction    float64 // --mem-fraction-static (0..1)
-	SGLangContextLen     int    // --context-length
-	SGLangChunkedPrefill bool   // --chunked-prefill-size (enable chunked prefill)
+	SGLangContextLen     int     // --context-length
+	SGLangChunkedPrefill bool    // --chunked-prefill-size (enable chunked prefill)
 
 	// TGI-specific
-	TGINumShard           int // --num-shard
-	TGIMaxConcurrentReqs  int // --max-concurrent-requests
-	TGIMaxInputLen        int // --max-input-length
-	TGIMaxTotalTokens     int // --max-total-tokens
+	TGINumShard          int // --num-shard
+	TGIMaxConcurrentReqs int // --max-concurrent-requests
+	TGIMaxInputLen       int // --max-input-length
+	TGIMaxTotalTokens    int // --max-total-tokens
 }
 
 // ModelStatus represents container+artifact state.
 type ModelStatus string
 
 const (
-	StatusPending   ModelStatus = "pending"
+	StatusPending     ModelStatus = "pending"
 	StatusDownloading ModelStatus = "downloading"
-	StatusReady     ModelStatus = "ready"
-	StatusStarting  ModelStatus = "starting"
-	StatusRunning   ModelStatus = "running"
-	StatusFailed    ModelStatus = "failed"
+	StatusReady       ModelStatus = "ready"
+	StatusStarting    ModelStatus = "starting"
+	StatusRunning     ModelStatus = "running"
+	StatusFailed      ModelStatus = "failed"
 )
 
 // ContainerHandle is a minimal runtime handle.
@@ -120,4 +121,3 @@ type VolumeMount struct {
 	ContainerPath string
 	ReadOnly      bool
 }
-

@@ -55,9 +55,10 @@ type LoadRequest struct {
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
 	LlamaTensorSplit string `json:"llama_tensor_split"`
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers"`
-	LlamaCtxSize     int    `json:"llama_ctx_size"`     // Context size (default: 2048)
-	LlamaNParallel   int    `json:"llama_n_parallel"`   // Parallel slots (concurrent requests)
-	LlamaFlashAttn   bool   `json:"llama_flash_attn"`   // Enable Flash Attention
+	LlamaCtxSize     int    `json:"llama_ctx_size"`   // Context size (default: 2048)
+	LlamaNParallel   int    `json:"llama_n_parallel"` // Parallel slots (concurrent requests)
+	LlamaFlashAttn   bool   `json:"llama_flash_attn"` // Enable Flash Attention
+	LlamaJinja       bool   `json:"llama_jinja"`      // Enable Jinja template processing
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel"`
@@ -102,6 +103,7 @@ type ModelsResponse struct {
 	LlamaCtxSize         int     `json:"llama_ctx_size,omitempty"`
 	LlamaNParallel       int     `json:"llama_n_parallel,omitempty"`
 	LlamaFlashAttn       bool    `json:"llama_flash_attn,omitempty"`
+	LlamaJinja           bool    `json:"llama_jinja,omitempty"`
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64 `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
@@ -148,6 +150,7 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		LlamaCtxSize:       req.LlamaCtxSize,
 		LlamaNParallel:     req.LlamaNParallel,
 		LlamaFlashAttn:     req.LlamaFlashAttn,
+		LlamaJinja:         req.LlamaJinja,
 		// SGLang
 		SGLangTensorParallel: req.SGLangTensorParallel,
 		SGLangDataParallel:   req.SGLangDataParallel,
@@ -370,6 +373,7 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 			LlamaCtxSize:         m.Spec.LlamaCtxSize,
 			LlamaNParallel:       m.Spec.LlamaNParallel,
 			LlamaFlashAttn:       m.Spec.LlamaFlashAttn,
+			LlamaJinja:           m.Spec.LlamaJinja,
 			SGLangTensorParallel: m.Spec.SGLangTensorParallel,
 			SGLangMemFraction:    m.Spec.SGLangMemFraction,
 			TGINumShard:          m.Spec.TGINumShard,
@@ -538,6 +542,7 @@ type SavedModelResponse struct {
 	LlamaCtxSize         int                    `json:"llama_ctx_size,omitempty"`
 	LlamaNParallel       int                    `json:"llama_n_parallel,omitempty"`
 	LlamaFlashAttn       bool                   `json:"llama_flash_attn,omitempty"`
+	LlamaJinja           bool                   `json:"llama_jinja,omitempty"`
 	LlamaTensorSplit     string                 `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel int                    `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64                `json:"sglang_mem_fraction,omitempty"`
@@ -574,6 +579,7 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 			LlamaCtxSize:         m.LlamaCtxSize,
 			LlamaNParallel:       m.LlamaNParallel,
 			LlamaFlashAttn:       m.LlamaFlashAttn,
+			LlamaJinja:           m.LlamaJinja,
 			LlamaTensorSplit:     m.LlamaTensorSplit,
 			SGLangTensorParallel: m.SGLangTensorParallel,
 			SGLangMemFraction:    m.SGLangMemFraction,
@@ -679,6 +685,7 @@ type UpdateSavedRequest struct {
 	LlamaCtxSize         *int     `json:"llama_ctx_size,omitempty"`
 	LlamaNParallel       *int     `json:"llama_n_parallel,omitempty"`
 	LlamaFlashAttn       *bool    `json:"llama_flash_attn,omitempty"`
+	LlamaJinja           *bool    `json:"llama_jinja,omitempty"`
 	LlamaTensorSplit     *string  `json:"llama_tensor_split,omitempty"`
 	SGLangTensorParallel *int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
@@ -732,6 +739,9 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.LlamaFlashAttn != nil {
 			m.LlamaFlashAttn = *req.LlamaFlashAttn
 		}
+		if req.LlamaJinja != nil {
+			m.LlamaJinja = *req.LlamaJinja
+		}
 		if req.LlamaTensorSplit != nil {
 			m.LlamaTensorSplit = *req.LlamaTensorSplit
 		}
@@ -770,28 +780,29 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 
 // CreateSavedRequest represents a request to create a saved model configuration directly.
 type CreateSavedRequest struct {
-	Alias              string   `json:"alias" binding:"required"`
-	Provider           string   `json:"provider" binding:"required"`
-	Format             string   `json:"format"`
-	HFRepo             string   `json:"hf_repo"`
-	HFFile             string   `json:"hf_file"`
-	HFRevision         string   `json:"hf_revision"`
-	GGUFURL            string   `json:"gguf_url"`
-	Capabilities       []string `json:"capabilities"`
-	GPUDevice          string   `json:"gpu_device"`
-	AutoStart          bool     `json:"auto_start"`
-	VLLMTensorParallel int      `json:"vllm_tensor_parallel"`
-	VLLMMaxModelLen    int      `json:"vllm_max_model_len"`
-	VLLMGPUUtilization float64  `json:"vllm_gpu_utilization"`
-	LlamaMainGPU       int      `json:"llama_main_gpu"`
-	LlamaTensorSplit   string   `json:"llama_tensor_split"`
-	LlamaNGPULayers    int      `json:"llama_n_gpu_layers"`
-	LlamaCtxSize       int      `json:"llama_ctx_size"`
-	LlamaNParallel     int      `json:"llama_n_parallel"`
-	LlamaFlashAttn     bool     `json:"llama_flash_attn"`
-	SGLangTensorParallel int    `json:"sglang_tensor_parallel"`
-	SGLangMemFraction  float64  `json:"sglang_mem_fraction"`
-	TGINumShard        int      `json:"tgi_num_shard"`
+	Alias                string   `json:"alias" binding:"required"`
+	Provider             string   `json:"provider" binding:"required"`
+	Format               string   `json:"format"`
+	HFRepo               string   `json:"hf_repo"`
+	HFFile               string   `json:"hf_file"`
+	HFRevision           string   `json:"hf_revision"`
+	GGUFURL              string   `json:"gguf_url"`
+	Capabilities         []string `json:"capabilities"`
+	GPUDevice            string   `json:"gpu_device"`
+	AutoStart            bool     `json:"auto_start"`
+	VLLMTensorParallel   int      `json:"vllm_tensor_parallel"`
+	VLLMMaxModelLen      int      `json:"vllm_max_model_len"`
+	VLLMGPUUtilization   float64  `json:"vllm_gpu_utilization"`
+	LlamaMainGPU         int      `json:"llama_main_gpu"`
+	LlamaTensorSplit     string   `json:"llama_tensor_split"`
+	LlamaNGPULayers      int      `json:"llama_n_gpu_layers"`
+	LlamaCtxSize         int      `json:"llama_ctx_size"`
+	LlamaNParallel       int      `json:"llama_n_parallel"`
+	LlamaFlashAttn       bool     `json:"llama_flash_attn"`
+	LlamaJinja           bool     `json:"llama_jinja"`
+	SGLangTensorParallel int      `json:"sglang_tensor_parallel"`
+	SGLangMemFraction    float64  `json:"sglang_mem_fraction"`
+	TGINumShard          int      `json:"tgi_num_shard"`
 }
 
 // PostCreateSaved creates a new saved model configuration directly from form data.
@@ -816,28 +827,29 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 
 	// Create saved model directly
 	saved := inference.SavedModel{
-		Alias:              req.Alias,
-		Provider:           inference.ProviderKind(req.Provider),
-		Format:             inference.ModelFormat(req.Format),
-		HFRepo:             req.HFRepo,
-		HFFile:             req.HFFile,
-		HFRevision:         req.HFRevision,
-		GGUFURL:            req.GGUFURL,
-		Capabilities:       caps,
-		GPUDevice:          req.GPUDevice,
-		AutoStart:          req.AutoStart,
-		VLLMTensorParallel: req.VLLMTensorParallel,
-		VLLMMaxModelLen:    req.VLLMMaxModelLen,
-		VLLMGPUUtilization: req.VLLMGPUUtilization,
-		LlamaMainGPU:       req.LlamaMainGPU,
-		LlamaTensorSplit:   req.LlamaTensorSplit,
-		LlamaNGPULayers:    req.LlamaNGPULayers,
-		LlamaCtxSize:       req.LlamaCtxSize,
-		LlamaNParallel:     req.LlamaNParallel,
-		LlamaFlashAttn:     req.LlamaFlashAttn,
+		Alias:                req.Alias,
+		Provider:             inference.ProviderKind(req.Provider),
+		Format:               inference.ModelFormat(req.Format),
+		HFRepo:               req.HFRepo,
+		HFFile:               req.HFFile,
+		HFRevision:           req.HFRevision,
+		GGUFURL:              req.GGUFURL,
+		Capabilities:         caps,
+		GPUDevice:            req.GPUDevice,
+		AutoStart:            req.AutoStart,
+		VLLMTensorParallel:   req.VLLMTensorParallel,
+		VLLMMaxModelLen:      req.VLLMMaxModelLen,
+		VLLMGPUUtilization:   req.VLLMGPUUtilization,
+		LlamaMainGPU:         req.LlamaMainGPU,
+		LlamaTensorSplit:     req.LlamaTensorSplit,
+		LlamaNGPULayers:      req.LlamaNGPULayers,
+		LlamaCtxSize:         req.LlamaCtxSize,
+		LlamaNParallel:       req.LlamaNParallel,
+		LlamaFlashAttn:       req.LlamaFlashAttn,
+		LlamaJinja:           req.LlamaJinja,
 		SGLangTensorParallel: req.SGLangTensorParallel,
-		SGLangMemFraction:  req.SGLangMemFraction,
-		TGINumShard:        req.TGINumShard,
+		SGLangMemFraction:    req.SGLangMemFraction,
+		TGINumShard:          req.TGINumShard,
 	}
 
 	if err := h.modelStore.Save(saved); err != nil {
@@ -1043,7 +1055,7 @@ func (h *InferenceHandler) CancelRepoDownload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "model_id is required"})
 		return
 	}
-	
+
 	downloader := h.router.GetDownloader()
 	if downloader == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "downloader not configured"})
@@ -1068,7 +1080,7 @@ func (h *InferenceHandler) RemoveRepoDownload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "model_id is required"})
 		return
 	}
-	
+
 	downloader := h.router.GetDownloader()
 	if downloader == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "downloader not configured"})

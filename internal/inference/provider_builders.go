@@ -353,6 +353,9 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	if spec.LlamaTensorSplit != "" {
 		cmd = append(cmd, "--tensor-split", spec.LlamaTensorSplit)
 	}
+	if spec.LlamaJinja {
+		cmd = append(cmd, "--jinja")
+	}
 
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,

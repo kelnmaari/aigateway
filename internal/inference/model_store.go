@@ -13,15 +13,15 @@ import (
 
 // SavedModel represents a model configuration that can be restored after restart.
 type SavedModel struct {
-	Alias        string         `json:"alias"`
-	Provider     ProviderKind   `json:"provider"`
-	Format       ModelFormat    `json:"format"`
-	Capabilities []Capability   `json:"capabilities,omitempty"`
-	HFRepo       string         `json:"hf_repo,omitempty"`
-	HFFile       string         `json:"hf_file,omitempty"`
-	HFRevision   string         `json:"hf_revision,omitempty"`
-	GGUFURL      string         `json:"gguf_url,omitempty"`
-	GPUDevice    string         `json:"gpu_device,omitempty"`
+	Alias        string       `json:"alias"`
+	Provider     ProviderKind `json:"provider"`
+	Format       ModelFormat  `json:"format"`
+	Capabilities []Capability `json:"capabilities,omitempty"`
+	HFRepo       string       `json:"hf_repo,omitempty"`
+	HFFile       string       `json:"hf_file,omitempty"`
+	HFRevision   string       `json:"hf_revision,omitempty"`
+	GGUFURL      string       `json:"gguf_url,omitempty"`
+	GPUDevice    string       `json:"gpu_device,omitempty"`
 
 	// vLLM options
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel,omitempty"`
@@ -35,6 +35,7 @@ type SavedModel struct {
 	LlamaCtxSize     int    `json:"llama_ctx_size,omitempty"`
 	LlamaNParallel   int    `json:"llama_n_parallel,omitempty"`
 	LlamaFlashAttn   bool   `json:"llama_flash_attn,omitempty"`
+	LlamaJinja       bool   `json:"llama_jinja,omitempty"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
@@ -50,16 +51,16 @@ type SavedModel struct {
 
 // ModelStore persists model configurations to disk.
 type ModelStore struct {
-	mu       sync.RWMutex
-	path     string
-	models   map[string]SavedModel
-	logger   *logrus.Logger
+	mu     sync.RWMutex
+	path   string
+	models map[string]SavedModel
+	logger *logrus.Logger
 }
 
 // NewModelStore creates a new model store.
 func NewModelStore(dataDir string, logger *logrus.Logger) (*ModelStore, error) {
 	path := filepath.Join(dataDir, "inference_models.json")
-	
+
 	store := &ModelStore{
 		path:   path,
 		models: make(map[string]SavedModel),
@@ -91,28 +92,29 @@ func (s *ModelStore) Save(model SavedModel) error {
 // SaveFromSpec converts ModelSpec to SavedModel and persists it.
 func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 	saved := SavedModel{
-		Alias:              spec.Alias,
-		Provider:           spec.Provider,
-		Format:             spec.Format,
-		Capabilities:       spec.Capabilities,
-		HFRepo:             spec.HFRepo,
-		HFFile:             spec.HFFile,
-		HFRevision:         spec.HFRevision,
-		GGUFURL:            spec.GGUFURL,
-		GPUDevice:          spec.GPUDevice,
-		VLLMTensorParallel: spec.VLLMTensorParallel,
-		VLLMMaxModelLen:    spec.VLLMMaxModelLen,
-		VLLMGPUUtilization: spec.VLLMGPUUtilization,
-		LlamaMainGPU:       spec.LlamaMainGPU,
-		LlamaTensorSplit:   spec.LlamaTensorSplit,
-		LlamaNGPULayers:    spec.LlamaNGPULayers,
-		LlamaCtxSize:       spec.LlamaCtxSize,
-		LlamaNParallel:     spec.LlamaNParallel,
-		LlamaFlashAttn:     spec.LlamaFlashAttn,
+		Alias:                spec.Alias,
+		Provider:             spec.Provider,
+		Format:               spec.Format,
+		Capabilities:         spec.Capabilities,
+		HFRepo:               spec.HFRepo,
+		HFFile:               spec.HFFile,
+		HFRevision:           spec.HFRevision,
+		GGUFURL:              spec.GGUFURL,
+		GPUDevice:            spec.GPUDevice,
+		VLLMTensorParallel:   spec.VLLMTensorParallel,
+		VLLMMaxModelLen:      spec.VLLMMaxModelLen,
+		VLLMGPUUtilization:   spec.VLLMGPUUtilization,
+		LlamaMainGPU:         spec.LlamaMainGPU,
+		LlamaTensorSplit:     spec.LlamaTensorSplit,
+		LlamaNGPULayers:      spec.LlamaNGPULayers,
+		LlamaCtxSize:         spec.LlamaCtxSize,
+		LlamaNParallel:       spec.LlamaNParallel,
+		LlamaFlashAttn:       spec.LlamaFlashAttn,
+		LlamaJinja:           spec.LlamaJinja,
 		SGLangTensorParallel: spec.SGLangTensorParallel,
-		SGLangMemFraction:  spec.SGLangMemFraction,
-		TGINumShard:        spec.TGINumShard,
-		AutoStart:          autoStart,
+		SGLangMemFraction:    spec.SGLangMemFraction,
+		TGINumShard:          spec.TGINumShard,
+		AutoStart:            autoStart,
 	}
 	return s.Save(saved)
 }
@@ -194,27 +196,28 @@ func (s *ModelStore) SetAutoStart(alias string, autoStart bool) error {
 // ToSpec converts SavedModel back to ModelSpec.
 func (m SavedModel) ToSpec() ModelSpec {
 	return ModelSpec{
-		Alias:              m.Alias,
-		Provider:           m.Provider,
-		Format:             m.Format,
-		Capabilities:       m.Capabilities,
-		HFRepo:             m.HFRepo,
-		HFFile:             m.HFFile,
-		HFRevision:         m.HFRevision,
-		GGUFURL:            m.GGUFURL,
-		GPUDevice:          m.GPUDevice,
-		VLLMTensorParallel: m.VLLMTensorParallel,
-		VLLMMaxModelLen:    m.VLLMMaxModelLen,
-		VLLMGPUUtilization: m.VLLMGPUUtilization,
-		LlamaMainGPU:       m.LlamaMainGPU,
-		LlamaTensorSplit:   m.LlamaTensorSplit,
-		LlamaNGPULayers:    m.LlamaNGPULayers,
-		LlamaCtxSize:       m.LlamaCtxSize,
-		LlamaNParallel:     m.LlamaNParallel,
-		LlamaFlashAttn:     m.LlamaFlashAttn,
+		Alias:                m.Alias,
+		Provider:             m.Provider,
+		Format:               m.Format,
+		Capabilities:         m.Capabilities,
+		HFRepo:               m.HFRepo,
+		HFFile:               m.HFFile,
+		HFRevision:           m.HFRevision,
+		GGUFURL:              m.GGUFURL,
+		GPUDevice:            m.GPUDevice,
+		VLLMTensorParallel:   m.VLLMTensorParallel,
+		VLLMMaxModelLen:      m.VLLMMaxModelLen,
+		VLLMGPUUtilization:   m.VLLMGPUUtilization,
+		LlamaMainGPU:         m.LlamaMainGPU,
+		LlamaTensorSplit:     m.LlamaTensorSplit,
+		LlamaNGPULayers:      m.LlamaNGPULayers,
+		LlamaCtxSize:         m.LlamaCtxSize,
+		LlamaNParallel:       m.LlamaNParallel,
+		LlamaFlashAttn:       m.LlamaFlashAttn,
+		LlamaJinja:           m.LlamaJinja,
 		SGLangTensorParallel: m.SGLangTensorParallel,
-		SGLangMemFraction:  m.SGLangMemFraction,
-		TGINumShard:        m.TGINumShard,
+		SGLangMemFraction:    m.SGLangMemFraction,
+		TGINumShard:          m.TGINumShard,
 	}
 }
 
@@ -257,4 +260,3 @@ func (s *ModelStore) persist() error {
 
 	return os.WriteFile(s.path, data, 0644)
 }
-

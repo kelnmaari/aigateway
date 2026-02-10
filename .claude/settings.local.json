@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(go build:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(ls:*)",
+      "Bash(dir:*)"
     ]
   }
 }

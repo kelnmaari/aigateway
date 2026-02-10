@@ -141,6 +141,24 @@
 	let testGenStep = $state<'scan' | 'generate' | 'results'>('scan');
 	let isCreatingTestsMR = $state(false);
 
+	// Webhooks pause toggle
+	let isTogglingWebhooks = $state(false);
+
+	async function toggleWebhooksPaused() {
+		if (!integration || isTogglingWebhooks) return;
+		isTogglingWebhooks = true;
+		try {
+			const newPaused = !integration.settings?.webhooks_paused;
+			integration = await gitlabApi.updateIntegration(integrationId, {
+				settings: { ...integration.settings, webhooks_paused: newPaused }
+			});
+		} catch (error) {
+			console.error('Failed to toggle webhooks:', error);
+		} finally {
+			isTogglingWebhooks = false;
+		}
+	}
+
 	// Add Project form
 	let formGitLabProjectId = $state('');
 	let formAnalysisModelId = $state('');
@@ -1285,6 +1303,24 @@
 				</a>
 			{/if}
 		</div>
+		{#if integration}
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-muted-foreground">Webhooks</span>
+				<button
+					onclick={toggleWebhooksPaused}
+					disabled={isTogglingWebhooks}
+					class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 {integration.settings?.webhooks_paused ? 'bg-yellow-500' : 'bg-green-500'}"
+					title={integration.settings?.webhooks_paused ? 'Webhooks paused — click to resume' : 'Webhooks active — click to pause'}
+				>
+					<span
+						class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {integration.settings?.webhooks_paused ? 'translate-x-1' : 'translate-x-6'}"
+					></span>
+				</button>
+				{#if integration.settings?.webhooks_paused}
+					<span class="text-xs font-medium text-yellow-600 dark:text-yellow-400">Paused</span>
+				{/if}
+			</div>
+		{/if}
 		{#if activeTab === 'projects'}
 			<Button onclick={openAddProjectModal}>
 				<Plus class="mr-2 h-4 w-4" />

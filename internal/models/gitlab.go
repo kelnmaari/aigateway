@@ -50,6 +50,9 @@ type GitLabIntegrationSettings struct {
 
 	// Rate limiting
 	RateLimitPerMin int `json:"rate_limit_per_min,omitempty"` // Default: 30 (safe for GitLab 2000/min)
+
+	// Webhook control
+	WebhooksPaused bool `json:"webhooks_paused,omitempty"` // Pause incoming webhook processing without disabling integration
 }
 
 // Scan implements sql.Scanner for GitLabIntegrationSettings

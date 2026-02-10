@@ -106,6 +106,14 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request, integrat
 		return
 	}
 
+	// Check if webhooks are paused (return 200 to prevent GitLab retries)
+	if integration.Settings.WebhooksPaused {
+		h.logger.WithField("integration_id", integrationID).Info("Webhooks paused, ignoring event")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK - webhooks paused"))
+		return
+	}
+
 	// Verify webhook secret
 	token := r.Header.Get("X-Gitlab-Token")
 	if !h.verifyToken(token, integration.WebhookSecret) {

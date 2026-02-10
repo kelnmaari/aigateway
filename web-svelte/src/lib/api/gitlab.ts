@@ -25,6 +25,7 @@ export interface GitLabIntegrationSettings {
   request_timeout?: number;
   max_retries?: number;
   rate_limit_per_min?: number;
+  webhooks_paused?: boolean;
 }
 
 export interface GitLabProject {

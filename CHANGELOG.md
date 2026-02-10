@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.10.0] - 2026-02-10
+
+### Added
+
+- **GitLab Webhooks Pause Toggle**: Lightweight switch to pause incoming webhook processing (MR reviews) without disabling the entire integration
+  - New `webhooks_paused` field in integration settings (JSONB, no schema migration needed)
+  - Webhook handler returns HTTP 200 when paused to prevent GitLab retries
+  - Admin UI toggle with yellow visual indicator when paused
+
+### Technical
+
+- Added `WebhooksPaused` bool to `GitLabIntegrationSettings` Go struct
+- Added `webhooks_paused` to frontend `GitLabIntegrationSettings` TypeScript interface
+
+---
+
 ## [4.9.9] - 2026-02-09
 
 ### Added

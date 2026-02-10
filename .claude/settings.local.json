@@ -4,7 +4,9 @@
       "Bash(go build:*)",
       "Bash(npm run:*)",
       "Bash(ls:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

@@ -281,6 +281,7 @@
 		llama_ctx_size: number;
 		llama_n_parallel: number;
 		llama_flash_attn: boolean;
+		llama_jinja: boolean;
 		llama_tensor_split: string;
 		sglang_tensor_parallel: number;
 		sglang_mem_fraction: number;
@@ -1098,6 +1099,7 @@
 			llama_ctx_size: saved.llama_ctx_size || 0,
 			llama_n_parallel: saved.llama_n_parallel || 0,
 			llama_flash_attn: saved.llama_flash_attn || false,
+			llama_jinja: saved.llama_jinja || false,
 			llama_tensor_split: saved.llama_tensor_split || '',
 			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
 			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.10.1] - 2026-02-10
+
+### Fixed
+
+- **llama.cpp Jinja Setting**: Fixed `--jinja` checkbox not persisting when editing saved model configuration
+  - `openEditSavedModal()` was not reading `llama_jinja` from saved model into the edit form
+  - Added missing `llama_jinja` to TypeScript type annotation of `editSavedForm`
+
+---
+
 ## [4.10.0] - 2026-02-10
 
 ### Added

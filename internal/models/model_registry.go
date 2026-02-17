@@ -13,6 +13,7 @@ const (
 	ProviderTypeOpenAI    ModelProviderType = "openai"
 	ProviderTypeAnthropic ModelProviderType = "anthropic"
 	ProviderTypeGemini    ModelProviderType = "gemini"
+	ProviderTypeDeepSeek  ModelProviderType = "deepseek"
 	ProviderTypeCustom    ModelProviderType = "custom"
 )
 

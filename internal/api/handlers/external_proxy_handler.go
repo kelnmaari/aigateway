@@ -77,7 +77,7 @@ func (h *ExternalProxyHandler) HandleChatCompletions(c *gin.Context) {
 	}).Debug("routing to external provider")
 
 	switch provider.ProviderType {
-	case models.ProviderTypeOpenAI, models.ProviderTypeCustom, models.ProviderTypeVLLM:
+	case models.ProviderTypeOpenAI, models.ProviderTypeCustom, models.ProviderTypeVLLM, models.ProviderTypeDeepSeek:
 		h.proxyOpenAICompatible(c, &req, provider)
 	case models.ProviderTypeAnthropic:
 		h.proxyAnthropic(c, &req, provider)

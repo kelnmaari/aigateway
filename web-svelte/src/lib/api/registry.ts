@@ -4,7 +4,7 @@ import { api } from './client';
 
 // ==================== Provider Types ====================
 
-export type ProviderType = 'vllm' | 'openai' | 'anthropic' | 'gemini' | 'custom';
+export type ProviderType = 'vllm' | 'openai' | 'anthropic' | 'gemini' | 'deepseek' | 'custom';
 
 export interface ModelProvider {
 	id: string;

@@ -89,6 +89,8 @@ func (pm *ProviderManager) LoadProvidersFromDB(ctx context.Context) error {
 			provider = NewAnthropicProvider(config.Name, config.BaseURL, config.APIKey)
 		case models.ProviderTypeGemini:
 			provider = NewGeminiProvider(config.Name, config.BaseURL, config.APIKey)
+		case models.ProviderTypeDeepSeek:
+			provider = NewDeepSeekProvider(config.Name, config.BaseURL, config.APIKey)
 		default:
 			pm.logger.Warnf("Unsupported provider type: %s (provider: %s)", config.ProviderType, config.Name)
 			continue

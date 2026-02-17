@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.11.4] - 2026-02-17
+
+### Added
+
+- **Providers**: DeepSeek provider — OpenAI-compatible backend for DeepSeek API (`deepseek-chat`, `deepseek-reasoner`, etc.)
+
+### Technical
+
+- `DeepSeekProvider` implementation with HealthCheck, ListModels, GetModelInfo (OpenAI-compatible format)
+- `inferDeepSeekCapabilities()` — function calling support for deepseek-chat, deepseek-v3, deepseek-reasoner
+- Proxy routing: DeepSeek uses `proxyOpenAICompatible` (same as OpenAI/vLLM/Custom)
+- Frontend: DeepSeek in provider type dropdown with indigo color badge and default URL `https://api.deepseek.com`
+
+---
+
 ## [4.11.3] - 2026-02-17
 
 ### Fixed

@@ -1616,12 +1616,14 @@ func (r *Router) setupOpenAIRoutes() {
 	}
 
 
-	// /v1/models endpoint - returns models from inference manager or empty list
+	// /v1/models endpoint - returns models from inference manager + model registry
 	v1.GET("/models", func(c *gin.Context) {
+		var data []gin.H
+
+		// 1. Inference models (Docker-based)
 		if r.inferenceRouter != nil {
-			models := r.inferenceRouter.ListModels()
-			data := make([]gin.H, 0, len(models))
-			for _, m := range models {
+			inferenceList := r.inferenceRouter.ListModels()
+			for _, m := range inferenceList {
 				data = append(data, gin.H{
 					"id":       m.Spec.Alias,
 					"object":   "model",
@@ -1629,10 +1631,35 @@ func (r *Router) setupOpenAIRoutes() {
 					"created":  0,
 				})
 			}
-			c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
-			return
 		}
-		c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+
+		// 2. Model Registry models (external providers: OpenAI, DeepSeek, Anthropic, Gemini, etc.)
+		if r.db != nil && r.registryHandler != nil {
+			filter := &models.ModelRegistryFilter{
+				Status: models.ModelStatusActive,
+			}
+			registryModels, err := r.db.ListModelRegistry(c.Request.Context(), filter)
+			if err == nil {
+				for _, m := range registryModels {
+					// Determine owned_by from provider
+					ownedBy := m.ProviderID
+					if provider, err := r.db.GetModelProvider(c.Request.Context(), m.ProviderID); err == nil {
+						ownedBy = string(provider.ProviderType) + ":" + provider.Name
+					}
+					data = append(data, gin.H{
+						"id":       m.ModelID,
+						"object":   "model",
+						"owned_by": ownedBy,
+						"created":  0,
+					})
+				}
+			}
+		}
+
+		if data == nil {
+			data = []gin.H{}
+		}
+		c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
 	})
 
 	// /v1/chat/completions and /v1/completions via inference proxy

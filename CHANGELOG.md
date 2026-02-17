@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.12.0] - 2026-02-17
+
+### Added
+
+- **Chat UI**: `/v1/models` endpoint now returns models from both inference (Docker) and Model Registry (external providers)
+- Models from external providers (OpenAI, DeepSeek, Anthropic, Gemini) now appear in Chat UI model dropdown
+
+### Technical
+
+- `/v1/models` aggregates inference models + active Model Registry models in a single response
+- Registry models include `owned_by` field as `{provider_type}:{provider_name}` (e.g. `deepseek:deepseek`)
+
+---
+
 ## [4.11.5] - 2026-02-17
 
 ### Fixed

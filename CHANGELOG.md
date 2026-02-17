@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.12.1] - 2026-02-17
+
+### Added
+
+- **Unified Chat Routing**: `/v1/chat/completions` and `/api/chat/completions` now route to both inference (Docker) and external providers (Model Registry)
+- Chat UI can now send messages to external provider models (DeepSeek, OpenAI, Anthropic, Gemini) directly
+
+### Technical
+
+- `unifiedChatCompletions()` handler: peeks at `model` field, checks inference first, then Model Registry, delegates to appropriate handler
+- Replaces previous `if/else if` routing — both inference and external proxy coexist on the same endpoint
+- `/v1/external/chat/completions` still available as dedicated external-only route
+
+---
+
 ## [4.12.0] - 2026-02-17
 
 ### Added

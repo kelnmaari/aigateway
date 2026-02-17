@@ -2,11 +2,14 @@
 package router
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/http/pprof"
@@ -746,15 +749,70 @@ func (r *Router) setupInferenceProxyRoutes() {
 	r.logger.Info("Inference v4 OpenAI proxy routes configured: /v1/inference/*")
 
 	// /api/chat/completions - Chat with tools support (web search etc.)
-	if r.chatToolsHandler != nil {
+	// Supports both inference and external provider models
+	{
 		apiChat := r.engine.Group("/api/chat")
 		if r.jwtManager != nil && r.db != nil {
 			apiChat.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
 		}
-		{
-			apiChat.POST("/completions", r.chatToolsHandler.HandleChatWithTools)
-		}
+		apiChat.POST("/completions", r.unifiedChatCompletions())
 		r.logger.Info("Chat with tools route configured: /api/chat/completions")
+	}
+}
+
+// unifiedChatCompletions returns a handler that routes chat completions
+// to inference (Docker) or external providers (Model Registry) based on model source.
+func (r *Router) unifiedChatCompletions() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Read body and preserve it for downstream handlers
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{"type": "invalid_request_error", "message": "failed to read request body"},
+			})
+			return
+		}
+
+		// Parse model from request
+		var peek struct {
+			Model string `json:"model"`
+		}
+		if err := json.Unmarshal(bodyBytes, &peek); err != nil || peek.Model == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{"type": "invalid_request_error", "message": "model is required"},
+			})
+			return
+		}
+
+		// Check inference first (Docker-based models)
+		if r.inferenceRouter != nil {
+			if _, running := r.inferenceRouter.GetModel(peek.Model); running {
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				if r.chatToolsHandler != nil {
+					r.chatToolsHandler.HandleChatWithTools(c)
+				} else {
+					r.inferenceProxyHandler.HandleChatCompletions(c)
+				}
+				return
+			}
+		}
+
+		// Check external providers (Model Registry)
+		if r.externalProxyHandler != nil && r.db != nil {
+			if _, err := r.db.GetModelRegistryByModelID(c.Request.Context(), peek.Model); err == nil {
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				r.externalProxyHandler.HandleChatCompletions(c)
+				return
+			}
+		}
+
+		// Model not found anywhere
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"type":    "model_not_found",
+				"message": fmt.Sprintf("model '%s' not found in inference or model registry", peek.Model),
+			},
+		})
 	}
 }
 
@@ -1662,13 +1720,10 @@ func (r *Router) setupOpenAIRoutes() {
 		c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
 	})
 
-	// /v1/chat/completions and /v1/completions via inference proxy
+	// /v1/chat/completions — unified handler: inference models + external providers
+	v1.POST("/chat/completions", r.unifiedChatCompletions())
 	if r.inferenceProxyHandler != nil {
-		v1.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
 		v1.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
-	} else if r.externalProxyHandler != nil {
-		// No local inference — route directly to external providers
-		v1.POST("/chat/completions", r.externalProxyHandler.HandleChatCompletions)
 	}
 
 	// /v1/external/chat/completions — dedicated external provider route (v4.11.0+)

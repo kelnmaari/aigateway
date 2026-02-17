@@ -35,6 +35,7 @@
 	let models = $state<ModelRegistry[]>([]);
 	let isLoading = $state(true);
 	let isLoadingModels = $state(false);
+	let registryDisabled = $state(false);
 
 	// Dialog state
 	let showFormDialog = $state(false);
@@ -95,21 +96,30 @@
 			const response = await registryApi.listProviders();
 			providers = response.providers || [];
 		} catch (error) {
-			console.error('Failed to load providers:', error);
-			toast.error('Failed to load providers');
+			const msg = error instanceof Error ? error.message : String(error);
+			if (msg.includes('404') || msg.includes('endpoint not found')) {
+				registryDisabled = true;
+			} else {
+				console.error('Failed to load providers:', error);
+				toast.error('Failed to load providers');
+			}
 		} finally {
 			isLoading = false;
 		}
 	}
 
 	async function loadModels() {
+		if (registryDisabled) return;
 		isLoadingModels = true;
 		try {
 			const response = await registryApi.listModels();
 			models = response.models || [];
 		} catch (error) {
-			console.error('Failed to load registry models:', error);
-			toast.error('Failed to load registry models');
+			const msg = error instanceof Error ? error.message : String(error);
+			if (!msg.includes('404')) {
+				console.error('Failed to load registry models:', error);
+				toast.error('Failed to load registry models');
+			}
 		} finally {
 			isLoadingModels = false;
 		}
@@ -327,7 +337,15 @@
 	</div>
 
 	<!-- Providers Table -->
-	{#if isLoading}
+	{#if registryDisabled}
+		<div class="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 py-16 text-center">
+			<Server class="mx-auto h-12 w-12 text-amber-500/60" />
+			<p class="mt-4 text-lg font-medium text-amber-700 dark:text-amber-400">Model Registry is disabled</p>
+			<p class="mt-1 text-sm text-amber-600/70 dark:text-amber-500/70">
+				Enable it in server configuration: <code class="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded text-xs">model_registry.enabled: true</code>
+			</p>
+		</div>
+	{:else if isLoading}
 		<div class="flex items-center justify-center py-20">
 			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>

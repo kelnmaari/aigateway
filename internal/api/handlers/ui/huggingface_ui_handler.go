@@ -107,9 +107,10 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	models, err := h.hfClient.SearchModels(ctx, filters)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to search models")
+		statusCode := hfErrorStatusCode(err)
 		// Check if JSON response is requested
 		if strings.Contains(c.GetHeader("Accept"), "application/json") {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(statusCode, gin.H{"error": err.Error()})
 			return
 		}
 		h.renderError(c, "Failed to search models: "+err.Error())
@@ -361,9 +362,10 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	models, err := h.hfClient.SearchModels(ctx, filters)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get popular models")
+		statusCode := hfErrorStatusCode(err)
 		// Check if JSON response is requested
 		if strings.Contains(c.GetHeader("Accept"), "application/json") {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(statusCode, gin.H{"error": err.Error()})
 			return
 		}
 		h.renderError(c, "Failed to load popular models: "+err.Error())
@@ -608,5 +610,21 @@ func (h *HuggingFaceUIHandler) renderError(c *gin.Context, message string) {
 	`, message)
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, html)
+}
+
+// hfErrorStatusCode returns appropriate HTTP status code based on HuggingFace API error.
+// Returns 401 for auth errors (expired/invalid token), 500 for everything else.
+func hfErrorStatusCode(err error) int {
+	if err == nil {
+		return http.StatusOK
+	}
+	errLower := strings.ToLower(err.Error())
+	if strings.Contains(errLower, "expired") ||
+		strings.Contains(errLower, "unauthorized") ||
+		strings.Contains(errLower, "invalid token") ||
+		strings.Contains(errLower, "401") {
+		return http.StatusUnauthorized
+	}
+	return http.StatusInternalServerError
 }
 

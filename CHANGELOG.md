@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.11.1] - 2026-02-17
+
+### Fixed
+
+- **Admin UI**: Providers page gracefully handles disabled Model Registry — shows informational banner instead of 404 console error
+- **HuggingFace**: Returns HTTP 401 instead of 500 when API token is expired or unauthorized
+
+---
+
 ## [4.11.0] - 2026-02-17
 
 ### Added

@@ -651,6 +651,16 @@ func (s *SQLiteDB) DeleteModelRegistry(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteModelRegistryByProviderID удаляет все модели провайдера из registry
+func (s *SQLiteDB) DeleteModelRegistryByProviderID(ctx context.Context, providerID string) error {
+	query := `DELETE FROM model_registry WHERE provider_id = ?`
+	_, err := s.db.ExecContext(ctx, query, providerID)
+	if err != nil {
+		return fmt.Errorf("failed to delete registry models for provider %s: %w", providerID, err)
+	}
+	return nil
+}
+
 // ListModelRegistry возвращает список моделей с фильтрацией
 func (s *SQLiteDB) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
 	query := `

@@ -525,6 +525,7 @@ type Database interface {
 	GetModelRegistryByModelID(ctx context.Context, modelID string) (*models.ModelRegistry, error)
 	UpdateModelRegistry(ctx context.Context, model *models.ModelRegistry) error
 	DeleteModelRegistry(ctx context.Context, id string) error
+	DeleteModelRegistryByProviderID(ctx context.Context, providerID string) error
 	ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error)
 	UpdateModelRegistryHealth(ctx context.Context, id string, health models.ModelHealthStatus) error
 	UpdateModelRegistryMetrics(ctx context.Context, id string, latency float64, tokensPerSec float64) error

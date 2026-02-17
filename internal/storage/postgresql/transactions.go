@@ -570,6 +570,10 @@ func (tx *postgresqlTx) DeleteModelRegistry(ctx context.Context, id string) erro
 	return tx.db.DeleteModelRegistry(ctx, id)
 }
 
+func (tx *postgresqlTx) DeleteModelRegistryByProviderID(ctx context.Context, providerID string) error {
+	return tx.db.DeleteModelRegistryByProviderID(ctx, providerID)
+}
+
 func (tx *postgresqlTx) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
 	return tx.db.ListModelRegistry(ctx, filter)
 }

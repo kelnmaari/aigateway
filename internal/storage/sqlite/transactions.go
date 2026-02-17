@@ -678,6 +678,10 @@ func (tx *sqliteTx) DeleteModelRegistry(ctx context.Context, id string) error {
 	return tx.db.DeleteModelRegistry(ctx, id)
 }
 
+func (tx *sqliteTx) DeleteModelRegistryByProviderID(ctx context.Context, providerID string) error {
+	return tx.db.DeleteModelRegistryByProviderID(ctx, providerID)
+}
+
 func (tx *sqliteTx) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
 	return tx.db.ListModelRegistry(ctx, filter)
 }

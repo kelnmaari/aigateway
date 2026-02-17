@@ -718,6 +718,16 @@ func (db *PostgreSQLDB) DeleteModelRegistry(ctx context.Context, id string) erro
 	return nil
 }
 
+// DeleteModelRegistryByProviderID удаляет все модели провайдера из registry
+func (db *PostgreSQLDB) DeleteModelRegistryByProviderID(ctx context.Context, providerID string) error {
+	query := `DELETE FROM model_registry WHERE provider_id = $1`
+	_, err := db.db.ExecContext(ctx, query, providerID)
+	if err != nil {
+		return fmt.Errorf("failed to delete registry models for provider %s: %w", providerID, err)
+	}
+	return nil
+}
+
 // ListModelRegistry возвращает список моделей с фильтрацией
 func (db *PostgreSQLDB) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
 	query := `

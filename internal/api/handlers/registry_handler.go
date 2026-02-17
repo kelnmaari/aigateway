@@ -166,10 +166,16 @@ func (h *RegistryHandler) UpdateProvider(c *gin.Context) {
 	c.JSON(http.StatusOK, provider)
 }
 
-// DeleteProvider удаляет provider
+// DeleteProvider удаляет provider и все его модели из registry
 // DELETE /api/admin/registry/providers/:id
 func (h *RegistryHandler) DeleteProvider(c *gin.Context) {
 	providerID := c.Param("id")
+
+	// Удаляем модели провайдера из registry (на случай если CASCADE не сработает)
+	if err := h.db.DeleteModelRegistryByProviderID(c.Request.Context(), providerID); err != nil {
+		h.logger.WithError(err).Warnf("Failed to cleanup registry models for provider: %s", providerID)
+		// Continue — provider deletion may still cascade
+	}
 
 	if err := h.db.DeleteModelProvider(c.Request.Context(), providerID); err != nil {
 		h.logger.WithError(err).Errorf("Failed to delete provider: %s", providerID)

@@ -1699,15 +1699,15 @@ func (r *Router) setupOpenAIRoutes() {
 			registryModels, err := r.db.ListModelRegistry(c.Request.Context(), filter)
 			if err == nil {
 				for _, m := range registryModels {
-					// Determine owned_by from provider
-					ownedBy := m.ProviderID
-					if provider, err := r.db.GetModelProvider(c.Request.Context(), m.ProviderID); err == nil {
-						ownedBy = string(provider.ProviderType) + ":" + provider.Name
+					// Skip models whose provider is missing or disabled
+					provider, err := r.db.GetModelProvider(c.Request.Context(), m.ProviderID)
+					if err != nil || !provider.Enabled {
+						continue
 					}
 					data = append(data, gin.H{
 						"id":       m.ModelID,
 						"object":   "model",
-						"owned_by": ownedBy,
+						"owned_by": string(provider.ProviderType) + ":" + provider.Name,
 						"created":  0,
 					})
 				}

@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGateway — Self-Hosted AI Infrastructure Platform</title>
+    <meta name="description" content="OpenAI-compatible API Gateway with multi-provider inference. Run your own private LLM infrastructure with enterprise security.">
+    <meta property="og:title" content="AIGateway — Self-Hosted AI Infrastructure Platform">
+    <meta property="og:description" content="OpenAI-compatible API Gateway with multi-provider inference. Deploy vLLM, SGLang, TGI, llama.cpp with enterprise-grade security.">
+    <meta property="og:type" content="website">
+    <style>
+        /* ===== Reset & Base ===== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0a0a1a;
+            --bg-secondary: #111128;
+            --bg-card: #16163a;
+            --bg-card-hover: #1e1e4a;
+            --text-primary: #f0f0ff;
+            --text-secondary: #a0a0c0;
+            --text-muted: #6a6a8a;
+            --accent-1: #6366f1;
+            --accent-2: #8b5cf6;
+            --accent-3: #06b6d4;
+            --accent-4: #22d3ee;
+            --gradient-main: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+            --gradient-hero: linear-gradient(135deg, #0a0a1a 0%, #1a1040 30%, #0d1a3a 60%, #0a0a1a 100%);
+            --border-color: rgba(99, 102, 241, 0.15);
+            --radius: 12px;
+            --radius-lg: 20px;
+            --max-width: 1200px;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        .container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* ===== Animations ===== */
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.5); }
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ===== Navbar ===== */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 16px 0;
+            background: rgba(10, 10, 26, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.3s;
+        }
+
+        .navbar .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .navbar-logo svg { width: 32px; height: 32px; }
+
+        .navbar-logo .logo-gradient {
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .navbar-links a {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+        }
+
+        .navbar-links a:hover { color: var(--text-primary); }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--gradient-main);
+            background-size: 200% 200%;
+            color: white;
+            animation: gradient-shift 4s ease infinite;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-1);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .btn-lg {
+            padding: 14px 32px;
+            font-size: 1rem;
+            border-radius: 10px;
+        }
+
+        .mobile-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        /* ===== Hero ===== */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 120px 24px 80px;
+            background: var(--gradient-hero);
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 50%, rgba(6, 182, 212, 0.06) 0%, transparent 50%);
+            animation: gradient-shift 8s ease infinite;
+            background-size: 200% 200%;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            font-size: 0.85rem;
+            color: var(--accent-3);
+            margin-bottom: 24px;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero h1 .gradient-text {
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: clamp(1.1rem, 2vw, 1.3rem);
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 36px;
+            line-height: 1.7;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .hero-code {
+            margin-top: 48px;
+            background: rgba(17, 17, 40, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px 28px;
+            text-align: left;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            display: inline-block;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .hero-code .comment { color: var(--text-muted); }
+        .hero-code .keyword { color: var(--accent-3); }
+        .hero-code .string { color: #a5d6a7; }
+        .hero-code .url { color: var(--accent-2); }
+
+        /* ===== Section Styles ===== */
+        .section {
+            padding: 100px 0;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 64px;
+        }
+
+        .section-header .badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 16px;
+            background: rgba(99, 102, 241, 0.12);
+            color: var(--accent-1);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        .section-header p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ===== Features ===== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            background: rgba(99, 102, 241, 0.15);
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-1);
+        }
+
+        .feature-card h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ===== Providers ===== */
+        .providers-section { background: var(--bg-secondary); }
+
+        .providers-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+        }
+
+        .provider-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 28px 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .provider-card:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .provider-logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            background: rgba(99, 102, 241, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-1);
+        }
+
+        .provider-card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .provider-card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ===== GitLab ===== */
+        .gitlab-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px;
+            align-items: center;
+        }
+
+        .gitlab-features {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .gitlab-feature-item {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .gitlab-feature-icon {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            border-radius: 10px;
+            background: rgba(252, 109, 38, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gitlab-feature-icon svg {
+            width: 20px;
+            height: 20px;
+            color: #fc6d26;
+        }
+
+        .gitlab-feature-item h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .gitlab-feature-item p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .gitlab-visual {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+        }
+
+        .gitlab-visual-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .gitlab-visual-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .gitlab-visual-line {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        .gitlab-visual-line .prefix { color: var(--accent-3); }
+        .gitlab-visual-line .ok { color: #4ade80; }
+        .gitlab-visual-line .warn { color: #fbbf24; }
+
+        /* ===== Self-Hosted ===== */
+        .selfhosted-section { background: var(--bg-secondary); }
+
+        .selfhosted-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .selfhosted-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 36px 28px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .selfhosted-card:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .selfhosted-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            background: rgba(6, 182, 212, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        .selfhosted-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--accent-3);
+        }
+
+        .selfhosted-card h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .selfhosted-card p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ===== Architecture ===== */
+        .arch-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 48px 32px;
+            overflow-x: auto;
+        }
+
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            min-width: 700px;
+        }
+
+        .arch-node {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            text-align: center;
+            min-width: 140px;
+        }
+
+        .arch-node.gateway {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+            border-color: rgba(99, 102, 241, 0.4);
+            animation: pulse-glow 3s ease infinite;
+        }
+
+        .arch-node h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .arch-node p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .arch-arrow {
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            color: var(--accent-1);
+            font-size: 1.4rem;
+        }
+
+        .arch-providers {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .arch-providers .arch-node {
+            padding: 12px 18px;
+            min-width: 120px;
+        }
+
+        .arch-providers .arch-node h4 { font-size: 0.8rem; }
+        .arch-providers .arch-node p { font-size: 0.7rem; }
+
+        /* ===== CTA Footer ===== */
+        .cta-section {
+            padding: 100px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-content h2 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .cta-content p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin: 0 auto 36px;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* ===== Footer ===== */
+        .footer {
+            padding: 40px 0;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .footer p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 16px;
+            list-style: none;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover { color: var(--text-primary); }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 1024px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .providers-grid { grid-template-columns: repeat(3, 1fr); }
+            .selfhosted-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .navbar-links { display: none; }
+            .navbar-links.open {
+                display: flex;
+                flex-direction: column;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: rgba(10, 10, 26, 0.95);
+                backdrop-filter: blur(20px);
+                padding: 24px;
+                gap: 16px;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .mobile-toggle { display: block; }
+            .features-grid { grid-template-columns: 1fr; }
+            .providers-grid { grid-template-columns: repeat(2, 1fr); }
+            .gitlab-grid { grid-template-columns: 1fr; }
+            .selfhosted-grid { grid-template-columns: 1fr; }
+            .arch-flow { min-width: auto; flex-direction: column; }
+            .arch-arrow { transform: rotate(90deg); }
+            .arch-providers { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+            .section { padding: 60px 0; }
+            .hero { padding: 100px 16px 60px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav class="navbar">
+    <div class="container">
+        <a href="#" class="navbar-logo">
+            <svg viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+                <path d="M8 16L14 10L20 16L14 22Z" fill="white" opacity="0.9"/>
+                <path d="M14 16L20 10L26 16L20 22Z" fill="white" opacity="0.6"/>
+                <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+            </svg>
+            <span class="logo-gradient">AIGateway</span>
+        </a>
+        <ul class="navbar-links" id="navLinks">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#providers">Providers</a></li>
+            <li><a href="#gitlab">GitLab</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#sign-in" class="btn btn-primary">Sign In</a></li>
+        </ul>
+        <button class="mobile-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')" aria-label="Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+    </div>
+</nav>
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Self-Hosted AI Infrastructure
+        </div>
+        <h1>
+            Your Private<br>
+            <span class="gradient-text">AI Gateway</span>
+        </h1>
+        <p>OpenAI-compatible API gateway with multi-provider inference. Deploy vLLM, SGLang, TGI, and llama.cpp behind a unified API with enterprise-grade security.</p>
+        <div class="hero-buttons">
+            <a href="#get-started" class="btn btn-primary btn-lg">Get Started</a>
+            <a href="#features" class="btn btn-secondary btn-lg">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                Learn More
+            </a>
+        </div>
+        <div class="hero-code">
+            <div><span class="comment"># Drop-in OpenAI replacement</span></div>
+            <div><span class="keyword">curl</span> <span class="url">https://your-server/v1/chat/completions</span> \</div>
+            <div>&nbsp;&nbsp;-H <span class="string">"Authorization: Bearer $API_KEY"</span> \</div>
+            <div>&nbsp;&nbsp;-d <span class="string">'{"model":"llama-3","messages":[{"role":"user","content":"Hello!"}]}'</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Features ===== -->
+<section class="section" id="features">
+    <div class="container">
+        <div class="section-header fade-in">
+            <span class="badge">Features</span>
+            <h2>Everything You Need to Run AI at Scale</h2>
+            <p>A complete platform for deploying, managing, and scaling large language models in your own infrastructure.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card fade-in">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <h3>Multi-Provider Inference</h3>
+                <p>Run models on vLLM, SGLang, TGI, llama.cpp, and TEI simultaneously. Auto-manage Docker containers with GPU allocation.</p>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: rgba(6, 182, 212, 0.15);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-3);"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </div>
+                <h3>OpenAI-Compatible API</h3>
+                <p>Drop-in replacement for OpenAI API. Works with any client that supports /v1/chat/completions, /v1/models, and /v1/embeddings.</p>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: rgba(139, 92, 246, 0.15);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-2);"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                </div>
+                <h3>Docker-Based Deployment</h3>
+                <p>One-click model deployment via Docker. Automatic GPU detection, tensor parallelism, health checks, and container lifecycle management.</p>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: rgba(34, 211, 238, 0.15);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-4);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <h3>RAG Pipeline</h3>
+                <p>Built-in Retrieval-Augmented Generation with PgVector and Qdrant. Index documents, generate embeddings, and enrich LLM context.</p>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: rgba(250, 204, 21, 0.12);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #facc15;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <h3>Enterprise Security</h3>
+                <p>JWT authentication, LDAP/OIDC SSO, RBAC with multi-tenancy, API key management, rate limiting, quotas, and audit logging.</p>
+            </div>
+            <div class="feature-card fade-in">
+                <div class="feature-icon" style="background: rgba(74, 222, 128, 0.12);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #4ade80;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
+                <h3>Monitoring & Analytics</h3>
+                <p>Prometheus metrics, real-time dashboards, usage analytics per user/tenant, container logs, and system health monitoring.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Providers ===== -->
+<section class="section providers-section" id="providers">
+    <div class="container">
+        <div class="section-header fade-in">
+            <span class="badge">Providers</span>
+            <h2>Run Any Model, Any Backend</h2>
+            <p>Support for all major inference engines. Load HuggingFace models or GGUF quantizations with a single click.</p>
+        </div>
+        <div class="providers-grid">
+            <div class="provider-card fade-in">
+                <div class="provider-logo">vL</div>
+                <h3>vLLM</h3>
+                <p>High-throughput production inference</p>
+            </div>
+            <div class="provider-card fade-in">
+                <div class="provider-logo" style="color: var(--accent-3);">SG</div>
+                <h3>SGLang</h3>
+                <p>Fast structured generation</p>
+            </div>
+            <div class="provider-card fade-in">
+                <div class="provider-logo" style="color: var(--accent-2);">TG</div>
+                <h3>TGI</h3>
+                <p>HuggingFace Text Generation</p>
+            </div>
+            <div class="provider-card fade-in">
+                <div class="provider-logo" style="color: #4ade80;">LC</div>
+                <h3>llama.cpp</h3>
+                <p>CPU &amp; GGUF model inference</p>
+            </div>
+            <div class="provider-card fade-in">
+                <div class="provider-logo" style="color: #facc15;">TE</div>
+                <h3>TEI</h3>
+                <p>Text Embeddings Inference</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== GitLab Integration ===== -->
+<section class="section" id="gitlab">
+    <div class="container">
+        <div class="section-header fade-in">
+            <span class="badge">Integration</span>
+            <h2>AI-Powered GitLab Workflows</h2>
+            <p>Automate code reviews, security scanning, and test generation with AI directly in your GitLab pipeline.</p>
+        </div>
+        <div class="gitlab-grid fade-in">
+            <div class="gitlab-features">
+                <div class="gitlab-feature-item">
+                    <div class="gitlab-feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+                    </div>
+                    <div>
+                        <h4>AI Code Review</h4>
+                        <p>Automated merge request reviews with per-file analysis, context-aware suggestions, and quality scoring.</p>
+                    </div>
+                </div>
+                <div class="gitlab-feature-item">
+                    <div class="gitlab-feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div>
+                        <h4>SAST &amp; Secrets Scanning</h4>
+                        <p>AI-powered static analysis and secrets detection. Find vulnerabilities before they reach production.</p>
+                    </div>
+                </div>
+                <div class="gitlab-feature-item">
+                    <div class="gitlab-feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    </div>
+                    <div>
+                        <h4>Test Generation</h4>
+                        <p>Automatically generate unit tests for new and changed code. Improve coverage without manual effort.</p>
+                    </div>
+                </div>
+                <div class="gitlab-feature-item">
+                    <div class="gitlab-feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </div>
+                    <div>
+                        <h4>Auto Documentation</h4>
+                        <p>Generate and maintain documentation from code changes. Keep docs in sync with your codebase.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="gitlab-visual">
+                <div class="gitlab-visual-header">
+                    <div class="gitlab-visual-dot" style="background: #ff5f57;"></div>
+                    <div class="gitlab-visual-dot" style="background: #febc2e;"></div>
+                    <div class="gitlab-visual-dot" style="background: #28c840;"></div>
+                </div>
+                <div class="gitlab-visual-line"><span class="prefix">$</span> aigateway review MR !142</div>
+                <div class="gitlab-visual-line">&nbsp;</div>
+                <div class="gitlab-visual-line"><span class="ok">&#10003;</span> Analyzing 12 changed files...</div>
+                <div class="gitlab-visual-line"><span class="ok">&#10003;</span> Code review complete</div>
+                <div class="gitlab-visual-line"><span class="ok">&#10003;</span> SAST scan passed</div>
+                <div class="gitlab-visual-line"><span class="warn">!</span> 2 suggestions for improvement</div>
+                <div class="gitlab-visual-line"><span class="ok">&#10003;</span> No secrets detected</div>
+                <div class="gitlab-visual-line"><span class="ok">&#10003;</span> 8 tests generated</div>
+                <div class="gitlab-visual-line">&nbsp;</div>
+                <div class="gitlab-visual-line"><span class="prefix">Quality Score:</span> <span class="ok">92/100</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Self-Hosted ===== -->
+<section class="section selfhosted-section" id="selfhosted">
+    <div class="container">
+        <div class="section-header fade-in">
+            <span class="badge">Self-Hosted</span>
+            <h2>Your Data. Your Infrastructure. Your Rules.</h2>
+            <p>Complete control over your AI stack. No data leaves your network.</p>
+        </div>
+        <div class="selfhosted-grid">
+            <div class="selfhosted-card fade-in">
+                <div class="selfhosted-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <h3>Full Data Privacy</h3>
+                <p>All inference runs on your hardware. Prompts, completions, and embeddings never leave your network perimeter.</p>
+            </div>
+            <div class="selfhosted-card fade-in">
+                <div class="selfhosted-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+                </div>
+                <h3>Air-Gapped Ready</h3>
+                <p>Deploy in fully disconnected environments. Pre-load models, run offline. Perfect for regulated industries.</p>
+            </div>
+            <div class="selfhosted-card fade-in">
+                <div class="selfhosted-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <h3>Compliance Ready</h3>
+                <p>Built-in audit logging, RBAC, and tenant isolation. Meet SOC 2, HIPAA, and GDPR requirements with ease.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Architecture ===== -->
+<section class="section" id="architecture">
+    <div class="container">
+        <div class="section-header fade-in">
+            <span class="badge">Architecture</span>
+            <h2>Simple Yet Powerful</h2>
+            <p>A unified API layer that abstracts away the complexity of multi-provider inference.</p>
+        </div>
+        <div class="arch-diagram fade-in">
+            <div class="arch-flow">
+                <div class="arch-node">
+                    <h4>Clients</h4>
+                    <p>OpenAI SDK, curl,<br>any HTTP client</p>
+                </div>
+                <div class="arch-arrow">&rarr;</div>
+                <div class="arch-node gateway">
+                    <h4>AIGateway</h4>
+                    <p>Auth, routing,<br>rate limiting</p>
+                </div>
+                <div class="arch-arrow">&rarr;</div>
+                <div class="arch-providers">
+                    <div class="arch-node">
+                        <h4>vLLM</h4>
+                        <p>GPU inference</p>
+                    </div>
+                    <div class="arch-node">
+                        <h4>SGLang</h4>
+                        <p>Fast generation</p>
+                    </div>
+                    <div class="arch-node">
+                        <h4>llama.cpp</h4>
+                        <p>CPU / GGUF</p>
+                    </div>
+                </div>
+                <div class="arch-arrow">&rarr;</div>
+                <div class="arch-node">
+                    <h4>Models</h4>
+                    <p>HuggingFace,<br>GGUF, custom</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="cta-section">
+    <div class="container">
+        <div class="cta-content fade-in">
+            <h2>Ready to Own Your AI?</h2>
+            <p>Deploy AIGateway in minutes and start running models on your own infrastructure.</p>
+            <div class="cta-buttons">
+                <a href="#get-started" class="btn btn-primary btn-lg">Get Started</a>
+                <a href="https://github.com" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer class="footer">
+    <div class="container">
+        <ul class="footer-links">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#providers">Providers</a></li>
+            <li><a href="#gitlab">GitLab</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+        </ul>
+        <p>AIGateway &mdash; Self-Hosted AI Infrastructure Platform</p>
+    </div>
+</footer>
+
+<script>
+    // Intersection Observer for fade-in animations
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry, index) => {
+            if (entry.isIntersecting) {
+                setTimeout(() => {
+                    entry.target.classList.add('visible');
+                }, index * 80);
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // Close mobile menu on link click
+    document.querySelectorAll('.navbar-links a').forEach(link => {
+        link.addEventListener('click', () => {
+            document.getElementById('navLinks').classList.remove('open');
+        });
+    });
+</script>
+</body>
+</html>

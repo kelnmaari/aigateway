@@ -70,7 +70,7 @@
 	let editMaxReviewTokens = $state('8192');
 	let editSkipDraftMRs = $state(true);
 	let editSkipBots = $state(true);
-	let editPerFileReview = $state(false);
+	let editReviewMode = $state('standard');
 	let editReviewLanguage = $state('en');
 	let editCollectionName = $state('');
 	let editStatus = $state<'active' | 'disabled'>('active');
@@ -1191,7 +1191,7 @@
 		editMaxReviewTokens = String(project.settings?.max_review_tokens || 8192);
 		editSkipDraftMRs = project.settings?.skip_draft_mrs ?? true;
 		editSkipBots = project.settings?.skip_bots ?? true;
-		editPerFileReview = project.settings?.per_file_review ?? false;
+		editReviewMode = project.settings?.review_mode || (project.settings?.per_file_review ? 'per_file' : 'standard');
 		editReviewLanguage = project.settings?.review_language || 'en';
 		editCollectionName = project.settings?.collection_name || '';
 		saveError = '';
@@ -1231,7 +1231,7 @@
 					max_review_tokens: parseInt(editMaxReviewTokens) || 8192,
 					skip_draft_mrs: editSkipDraftMRs,
 					skip_bots: editSkipBots,
-					per_file_review: editPerFileReview,
+					review_mode: editReviewMode,
 					review_language: editReviewLanguage,
 					collection_name: editCollectionName || undefined
 				}
@@ -2285,15 +2285,16 @@
 							<label for="editSkipBots" class="text-sm">{m.admin_project_skip_bots()}</label>
 						</div>
 						<div class="flex items-center gap-2">
-							<input
-								type="checkbox"
-								id="editPerFileReview"
-								bind:checked={editPerFileReview}
-								class="rounded border-gray-300"
-							/>
-							<label for="editPerFileReview" class="text-sm" title="Review each file separately with tool calling for better context">
-								Per-file review (with tools)
-							</label>
+							<label for="editReviewMode" class="text-sm">Review Mode:</label>
+							<select
+								id="editReviewMode"
+								bind:value={editReviewMode}
+								class="rounded border px-2 py-1 bg-background text-sm"
+							>
+								<option value="standard">Standard (batch JSON)</option>
+								<option value="per_file">Per-file (with read tools)</option>
+								<option value="tool_based">Tool-based (structured output)</option>
+							</select>
 						</div>
 						<div class="flex items-center gap-2">
 							<label for="editReviewLanguage" class="text-sm">Review Language:</label>

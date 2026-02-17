@@ -106,17 +106,17 @@
                     <div class="metric-value">{{.Uptime}}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Ollama Status</div>
+                    <div class="metric-label">Inference Status</div>
                     <div class="metric-value">
-                        <span class="status-badge {{if eq .OllamaStatus "online"}}status-online{{else}}status-offline{{end}}">
-                            {{.OllamaStatus}}
+                        <span class="status-badge {{if eq .InferenceStatus "online"}}status-online{{else}}status-offline{{end}}">
+                            {{.InferenceStatus}}
                         </span>
                     </div>
                 </div>
-                {{if .OllamaVersion}}
+                {{if .InferenceVersion}}
                 <div class="metric-card">
-                    <div class="metric-label">Ollama Version</div>
-                    <div class="metric-value" style="font-size: 16px;">{{.OllamaVersion}}</div>
+                    <div class="metric-label">Inference Version</div>
+                    <div class="metric-value" style="font-size: 16px;">{{.InferenceVersion}}</div>
                 </div>
                 {{end}}
                 <div class="metric-card">

@@ -24,13 +24,9 @@ services:
       - AIGATEWAY_SERVER_HOST=0.0.0.0
       
       # Inference Backend (v3.0.5+)
-      - AIGATEWAY_INFERENCE_BACKEND=yzma  # "yzma" (default), "ollama" (fallback)
+      - AIGATEWAY_INFERENCE_BACKEND=docker
       - AIGATEWAY_INFERENCE_MAX_LOADED_MODELS=3
       - AIGATEWAY_INFERENCE_GPU_LAYERS=-1  # Auto GPU offloading
-      
-      # Yzma settings (Primary Backend)
-      - YZMA_LIB=/app/lib/libllama.so  # Path to llama.cpp shared library
-      - AIGATEWAY_INFERENCE_YZMA_MODELS_DIR=/app/data/models
       
       # Ollama settings (Fallback Backend - optional)
       - AIGATEWAY_INFERENCE_OLLAMA_URL=http://ollama:11434

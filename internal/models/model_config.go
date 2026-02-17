@@ -7,7 +7,6 @@ import (
 )
 
 // ModelConfig представляет конфигурацию параметров модели
-// Основано на официальном Ollama API: ollama-lib/api/types.go Options & Runner
 type ModelConfig struct {
 	ID        string    `json:"id" db:"id"`
 	ModelName string    `json:"model_name" db:"model_name"` // e.g., "llama3.1:latest"
@@ -22,8 +21,7 @@ type ModelConfig struct {
 	Parameters ModelParameters `json:"parameters" db:"parameters"`
 }
 
-// ModelParameters представляет параметры модели
-// Соответствует официальной структуре api.Options из ollama-lib
+// ModelParameters представляет параметры модели для inference
 type ModelParameters struct {
 	// ========================================
 	// Predict Options (Runtime) - api.Options
@@ -92,7 +90,7 @@ type ModelParameters struct {
 	NumThread *int `json:"num_thread,omitempty"`
 }
 
-// DefaultParameters возвращает значения по умолчанию согласно Ollama best practices
+// DefaultParameters возвращает значения по умолчанию для параметров модели
 func DefaultParameters() ModelParameters {
 	return ModelParameters{
 		// Predict options defaults
@@ -148,74 +146,6 @@ func PresetCoding() ModelParameters {
 		RepeatPenalty: Float32Ptr(1.05),
 		NumCtx:        IntPtr(8192),
 	}
-}
-
-// ToOllamaOptions конвертирует ModelParameters в формат для Ollama API
-func (p *ModelParameters) ToOllamaOptions() map[string]interface{} {
-	opts := make(map[string]interface{})
-
-	// Predict options
-	if p.NumKeep != nil {
-		opts["num_keep"] = *p.NumKeep
-	}
-	if p.Seed != nil {
-		opts["seed"] = *p.Seed
-	}
-	if p.NumPredict != nil {
-		opts["num_predict"] = *p.NumPredict
-	}
-	if p.TopK != nil {
-		opts["top_k"] = *p.TopK
-	}
-	if p.TopP != nil {
-		opts["top_p"] = *p.TopP
-	}
-	if p.MinP != nil {
-		opts["min_p"] = *p.MinP
-	}
-	if p.TypicalP != nil {
-		opts["typical_p"] = *p.TypicalP
-	}
-	if p.RepeatLastN != nil {
-		opts["repeat_last_n"] = *p.RepeatLastN
-	}
-	if p.Temperature != nil {
-		opts["temperature"] = *p.Temperature
-	}
-	if p.RepeatPenalty != nil {
-		opts["repeat_penalty"] = *p.RepeatPenalty
-	}
-	if p.PresencePenalty != nil {
-		opts["presence_penalty"] = *p.PresencePenalty
-	}
-	if p.FrequencyPenalty != nil {
-		opts["frequency_penalty"] = *p.FrequencyPenalty
-	}
-	if len(p.Stop) > 0 {
-		opts["stop"] = p.Stop
-	}
-
-	// Runner options
-	if p.NumCtx != nil {
-		opts["num_ctx"] = *p.NumCtx
-	}
-	if p.NumBatch != nil {
-		opts["num_batch"] = *p.NumBatch
-	}
-	if p.NumGPU != nil {
-		opts["num_gpu"] = *p.NumGPU
-	}
-	if p.MainGPU != nil {
-		opts["main_gpu"] = *p.MainGPU
-	}
-	if p.UseMMap != nil {
-		opts["use_mmap"] = *p.UseMMap
-	}
-	if p.NumThread != nil {
-		opts["num_thread"] = *p.NumThread
-	}
-
-	return opts
 }
 
 // MergeWith объединяет параметры с приоритетом (override имеет приоритет)

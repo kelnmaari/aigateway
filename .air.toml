@@ -30,7 +30,6 @@ tmp_dir = "tmp"
 
   # Environment variables for build and run
   [build.envs]
-    YZMA_LIB = "C:/llama"  # Path to llama.cpp DLLs and backends
     PATH = "C:/llama;${PATH}"  # Add llama.cpp DLLs to PATH for Windows
 
 [color]

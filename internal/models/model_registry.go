@@ -9,10 +9,10 @@ import (
 type ModelProviderType string
 
 const (
-	ProviderTypeOllama    ModelProviderType = "ollama"
 	ProviderTypeVLLM      ModelProviderType = "vllm"
 	ProviderTypeOpenAI    ModelProviderType = "openai"
 	ProviderTypeAnthropic ModelProviderType = "anthropic"
+	ProviderTypeGemini    ModelProviderType = "gemini"
 	ProviderTypeCustom    ModelProviderType = "custom"
 )
 
@@ -81,12 +81,12 @@ func EmbeddingModelCapabilities() []ModelCapability {
 // Model Provider
 // ========================================
 
-// ModelProvider представляет конфигурацию для model provider (Ollama, vLLM, etc)
+// ModelProvider представляет конфигурацию для model provider (vLLM, OpenAI, Anthropic, Gemini, etc)
 type ModelProvider struct {
 	ID           string            `json:"id" db:"id"`
-	Name         string            `json:"name" db:"name"`                   // "ollama-local", "vllm-gpu1"
-	ProviderType ModelProviderType `json:"provider_type" db:"provider_type"` // "ollama", "vllm"
-	BaseURL      string            `json:"base_url" db:"base_url"`           // "http://localhost:11434"
+	Name         string            `json:"name" db:"name"`                   // "openai-main", "vllm-gpu1"
+	ProviderType ModelProviderType `json:"provider_type" db:"provider_type"` // "openai", "vllm", "anthropic", "gemini"
+	BaseURL      string            `json:"base_url" db:"base_url"`           // "https://api.openai.com"
 	APIKey       string            `json:"-" db:"api_key"`                   // Encrypted, не возвращается в API
 
 	// Configuration

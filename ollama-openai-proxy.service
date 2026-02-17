@@ -1,6 +1,6 @@
 [Unit]
-Description=Ollama OpenAI Proxy Server
-Documentation=https://github.com/your-repo/ollama-openai-proxy
+Description=AIGateway Server
+Documentation=https://github.com/kelnmaari/ollama-openai-proxy
 After=network.target
 Wants=network-online.target
 
@@ -8,8 +8,8 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/opt/ollama-openai-proxy
-ExecStart=/opt/ollama-openai-proxy/bin/server -config /opt/ollama-openai-proxy/configs/config.yaml
+WorkingDirectory=/opt/aigateway
+ExecStart=/opt/aigateway/bin/server -config /opt/aigateway/configs/config.yaml
 
 # Restart policy
 Restart=on-failure
@@ -23,11 +23,10 @@ MemoryLimit=2G
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=ollama-proxy
+SyslogIdentifier=aigateway
 
 # Environment
 Environment="GIN_MODE=release"
 
 [Install]
 WantedBy=multi-user.target
-

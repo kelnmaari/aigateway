@@ -48,10 +48,11 @@ type QdrantConfig struct {
 
 // EmbeddingsConfig конфигурация embeddings
 type EmbeddingsConfig struct {
-	Provider        string        `mapstructure:"provider"`         // "ollama", "openai"
-	OllamaURL       string        `mapstructure:"ollama_url"`       // Ollama API URL
-	Model           string        `mapstructure:"model"`            // "nomic-embed-text" или "bge-m3"
-	Dimensions      int           `mapstructure:"dimensions"`       // 768 или 1024
+	Provider        string        `mapstructure:"provider"`         // "openai", "custom"
+	BaseURL         string        `mapstructure:"base_url"`         // Embeddings API URL
+	APIKey          string        `mapstructure:"api_key"`          // API key for provider
+	Model           string        `mapstructure:"model"`            // "text-embedding-3-small" или "bge-m3"
+	Dimensions      int           `mapstructure:"dimensions"`       // 768 или 1536
 	BatchSize       int           `mapstructure:"batch_size"`       // 32
 	Timeout         time.Duration `mapstructure:"timeout"`          // 60s
 	ParallelWorkers int           `mapstructure:"parallel_workers"` // 2 для multi-GPU
@@ -163,9 +164,10 @@ func DefaultConfig() RAGConfig {
 			},
 		},
 		Embeddings: EmbeddingsConfig{
-			Provider:        "ollama",
-			Model:           "nomic-embed-text",
-			Dimensions:      768,
+			Provider:        "openai",
+			BaseURL:         "https://api.openai.com",
+			Model:           "text-embedding-3-small",
+			Dimensions:      1536,
 			BatchSize:       32,
 			Timeout:         60 * time.Second,
 			ParallelWorkers: 2,

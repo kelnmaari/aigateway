@@ -105,7 +105,7 @@ class ModelPanelController {
         });
     }
 
-    // Load models from API (v3.0.5+: yzma only)
+    // Load models from API
     async loadModels() {
         try {
             const token = localStorage.getItem('access_token');
@@ -279,7 +279,7 @@ class ModelPanelController {
     getRequestParams() {
         const params = this.getCurrentParams();
         
-        // Convert to yzma API format (v3.0.5+: Ollama removed)
+        // Convert to API format (OpenAI-compatible)
         return {
             model: this.getSelectedModel(),
             temperature: params.temperature,

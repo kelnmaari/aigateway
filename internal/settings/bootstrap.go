@@ -130,7 +130,7 @@ func GenerateBootstrapCommand(ctx context.Context, cfg *config.Config, logger *l
 	fmt.Println("\n🚫 What's NOT included (loaded from DB):")
 	fmt.Println("   • Server settings (port, timeouts, TLS)")
 	fmt.Println("   • Auth settings (JWT, OIDC, LDAP)")
-	fmt.Println("   • Inference settings (Yzma, models)")
+	fmt.Println("   • Inference settings (Docker, models)")
 	fmt.Println("   • Metrics, RAG, all other configs")
 	fmt.Println("\n🔄 Next steps:")
 	fmt.Println("   1. Review generated bootstrap.yaml")

@@ -162,6 +162,13 @@ const (
 	GitLabProjectStatusError    GitLabProjectStatus = "error"
 )
 
+// Review mode constants
+const (
+	ReviewModeStandard  = "standard"   // Batch mode: all diffs in one LLM call, expects JSON response
+	ReviewModePerFile   = "per_file"   // Per-file mode: each file reviewed separately with read tools
+	ReviewModeToolBased = "tool_based" // Tool-based mode: LLM uses output tools to submit structured results
+)
+
 // GitLabProjectSettings contains settings for a GitLab project
 type GitLabProjectSettings struct {
 	// File Filters
@@ -176,7 +183,8 @@ type GitLabProjectSettings struct {
 
 	// LLM settings
 	MaxReviewTokens int    `json:"max_review_tokens,omitempty"` // Max tokens for LLM response, default: 8192
-	PerFileReview   bool   `json:"per_file_review,omitempty"`   // Review each file separately with tool calling
+	ReviewMode      string `json:"review_mode,omitempty"`       // "standard", "per_file", "tool_based"
+	PerFileReview   bool   `json:"per_file_review,omitempty"`   // Deprecated: use ReviewMode instead
 	ReviewLanguage  string `json:"review_language,omitempty"`   // Language for review output: "en", "ru", etc.
 
 	// Chunking settings
@@ -207,6 +215,19 @@ func (s *GitLabProjectSettings) Scan(value interface{}) error {
 		bytes = []byte(str)
 	}
 	return json.Unmarshal(bytes, s)
+}
+
+// GetReviewMode returns the effective review mode.
+// If ReviewMode is explicitly set, it takes priority.
+// Otherwise falls back to PerFileReview bool for backward compatibility.
+func (s *GitLabProjectSettings) GetReviewMode() string {
+	if s.ReviewMode != "" {
+		return s.ReviewMode
+	}
+	if s.PerFileReview {
+		return ReviewModePerFile
+	}
+	return ReviewModeStandard
 }
 
 // ============================================================================

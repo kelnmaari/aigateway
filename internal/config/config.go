@@ -15,7 +15,7 @@ import (
 // Config представляет конфигурацию всего приложения
 type Config struct {
 	Server        ServerConfig        `mapstructure:"server"`
-	Inference     InferenceConfig     `mapstructure:"inference"` // Version 3.0.5+: Unified inference backend (yzma only)
+	Inference     InferenceConfig     `mapstructure:"inference"` // Version 3.0.5+: Unified inference backend
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Database      DatabaseConfig      `mapstructure:"database"` // Version 1.3.0+: Database abstraction
 	Logging       LoggingConfig       `mapstructure:"logging"`
@@ -33,7 +33,6 @@ type Config struct {
 	ModelRegistry ModelRegistryConfig `mapstructure:"model_registry"` // Version 2.3.0+: Model Registry system
 	Agent         AgentConfig         `mapstructure:"agent"`          // Version 2.5.0+: Agentic AI configuration
 	HuggingFace   HuggingFaceConfig   `mapstructure:"huggingface"`    // Version 3.0.0+: Hugging Face integration
-	Yzma          YzmaConfig          `mapstructure:"yzma"`           // DEPRECATED: Use inference.yzma instead (kept for backward compatibility)
 	GitLab        GitLabConfig        `mapstructure:"gitlab"`         // Version 3.1.0+: GitLab MR Review integration
 }
 
@@ -76,18 +75,14 @@ type GitLabRAGConfig struct {
 
 // InferenceConfig represents unified inference backend configuration (v3.0.6+)
 type InferenceConfig struct {
-	// Backend: "yzma" (legacy in-process) or "docker" (v3.3.0+ multi-provider containers)
+	// Backend: "docker" (multi-provider containers)
 	Backend string `mapstructure:"backend"`
 
 	// MaxLoadedModels limits how many models can be loaded simultaneously
 	MaxLoadedModels int `mapstructure:"max_loaded_models"`
 
 	// GPULayers controls GPU offloading (-1 = auto, 0 = CPU only, >0 = specific layer count)
-	// Used by yzma backend only
 	GPULayers int `mapstructure:"gpu_layers"`
-
-	// Yzma configuration (legacy backend)
-	Yzma YzmaConfig `mapstructure:"yzma"`
 
 	// Docker configuration (v3.3.0+ multi-provider backend)
 	Docker DockerInferenceConfig `mapstructure:"docker"`
@@ -418,7 +413,7 @@ type LoggingConfig struct {
 
 // ModelsConfig конфигурация управления моделями
 type ModelsConfig struct {
-	// Маппинг имен моделей OpenAI -> yzma
+	// Маппинг имен моделей
 	Mapping map[string]string `mapstructure:"mapping"`
 
 	// Алиасы моделей
@@ -773,33 +768,11 @@ func Load(configPath string) (*Config, error) {
 func migrateToInferenceConfig(config *Config) *Config {
 	// Check if new inference config is already set
 	if config.Inference.Backend != "" {
-		// New format detected - ensure nested configs are populated
-		if config.Inference.Yzma.ModelsDir == "" && config.Yzma.ModelsDir != "" {
-			// Copy from deprecated top-level Yzma
-			config.Inference.Yzma = config.Yzma
-		}
 		return config
 	}
 
-	// Old format detected - migrate to new structure
-	fmt.Println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("📝 CONFIG MIGRATION (v3.0.5+):")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("⚠️  Old config format detected.")
-	fmt.Println("   Migrating to inference-based structure...")
-
-	// Determine backend based on what's configured
-	if config.Yzma.Enabled {
-		config.Inference.Backend = "yzma"
-		config.Inference.Yzma = config.Yzma
-		fmt.Println("   ✅ Detected yzma backend")
-	} else {
-		// Default to yzma
-		config.Inference.Backend = "yzma"
-		config.Inference.Yzma.Enabled = true
-		config.Inference.Yzma.ModelsDir = "./data/models"
-		fmt.Println("   ⚙️  No backend detected, defaulting to yzma")
-	}
+	// Default to docker backend
+	config.Inference.Backend = "docker"
 
 	// Set inference-level defaults
 	if config.Inference.MaxLoadedModels == 0 {
@@ -835,9 +808,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.webui.version", "legacy") // "legacy" or "svelte"
 
 	// Inference defaults (v3.0.5+)
-	v.SetDefault("inference.backend", "yzma")      // Primary: yzma (local) or "docker" (multi-provider containers)
+	v.SetDefault("inference.backend", "docker")    // Docker multi-provider containers
 	v.SetDefault("inference.max_loaded_models", 3) // Keep 3 models in memory
-	v.SetDefault("inference.gpu_layers", -1)       // Auto GPU offloading (yzma only)
+	v.SetDefault("inference.gpu_layers", -1)       // Auto GPU offloading
 
 	// Inference > Docker defaults (v3.3.0+ multi-provider)
 	v.SetDefault("inference.docker.enabled", false)
@@ -852,24 +825,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("inference.docker.max_concurrent_downloads", 2)
 	v.SetDefault("inference.docker.auto_resume", true)
 	v.SetDefault("inference.docker.default_provider", "vllm")
-
-	// Inference > Yzma defaults (legacy)
-	v.SetDefault("inference.yzma.enabled", true)
-	v.SetDefault("inference.yzma.models_dir", "./data/models")
-	v.SetDefault("inference.yzma.context_size", 4096)
-	v.SetDefault("inference.yzma.batch_size", 2048)
-	v.SetDefault("inference.yzma.ubatch_size", 2048)
-	v.SetDefault("inference.yzma.temperature", 0.7)
-	v.SetDefault("inference.yzma.top_k", 40)
-	v.SetDefault("inference.yzma.top_p", 0.9)
-	v.SetDefault("inference.yzma.min_p", 0.1)
-	v.SetDefault("inference.yzma.verbose", false)
-	// GPU configuration (v3.2.1+)
-	v.SetDefault("inference.yzma.main_gpu", 0)
-	v.SetDefault("inference.yzma.tensor_split", "")      // Empty = single GPU
-	v.SetDefault("inference.yzma.flash_attention", true) // Enable by default for modern GPUs
-	v.SetDefault("inference.yzma.threads", 0)            // 0 = auto (use all CPU cores)
-	v.SetDefault("inference.yzma.threads_batch", 0)      // 0 = same as threads
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
@@ -1112,68 +1067,6 @@ type HuggingFaceConfig struct {
 
 	// AutoResume - automatically resume interrupted downloads
 	AutoResume bool `mapstructure:"auto_resume"`
-}
-
-// YzmaConfig represents yzma local inference settings (Version 3.0.0+)
-type YzmaConfig struct {
-	// Enabled - enable yzma local inference
-	Enabled bool `mapstructure:"enabled"`
-
-	// LibPath - path to llama.cpp shared library (can also use YZMA_LIB env var)
-	LibPath string `mapstructure:"lib_path"`
-
-	// ModelsDir - directory for GGUF models (shared with HuggingFace)
-	ModelsDir string `mapstructure:"models_dir"`
-
-	// ContextSize - context window size (default: 4096)
-	ContextSize uint32 `mapstructure:"context_size"`
-
-	// BatchSize - logical batch size (default: 2048)
-	BatchSize uint32 `mapstructure:"batch_size"`
-
-	// UBatchSize - physical batch size (default: 2048)
-	UBatchSize uint32 `mapstructure:"ubatch_size"`
-
-	// Temperature - default sampling temperature (default: 0.7)
-	Temperature float32 `mapstructure:"temperature"`
-
-	// TopK - Top-K sampling (default: 40)
-	TopK int32 `mapstructure:"top_k"`
-
-	// TopP - Top-P sampling (default: 0.9)
-	TopP float32 `mapstructure:"top_p"`
-
-	// MinP - Min-P sampling (default: 0.1)
-	MinP float32 `mapstructure:"min_p"`
-
-	// Verbose - enable llama.cpp logging
-	Verbose bool `mapstructure:"verbose"`
-
-	// RequestTimeout - maximum time for a single generation request (default: 30m)
-	// Set to 0 for no timeout (use with caution)
-	RequestTimeout time.Duration `mapstructure:"request_timeout"`
-
-	// === GPU Configuration (v3.2.1+) ===
-
-	// MainGPU - index of the GPU to use for scratch buffers (default: 0)
-	// When using tensor_split, this GPU handles temporary computations
-	MainGPU int32 `mapstructure:"main_gpu"`
-
-	// TensorSplit - how to distribute model layers across GPUs
-	// Example: "0.5,0.5" for 50/50 split between 2 GPUs
-	// Empty string = all layers on MainGPU
-	TensorSplit string `mapstructure:"tensor_split"`
-
-	// FlashAttention - enable Flash Attention for faster inference (default: true)
-	// Recommended for Ada Lovelace (RTX 40xx) and newer
-	FlashAttention bool `mapstructure:"flash_attention"`
-
-	// Threads - number of CPU threads for generation (default: number of CPU cores)
-	// Used for preprocessing and CPU-based operations
-	Threads int32 `mapstructure:"threads"`
-
-	// ThreadsBatch - number of CPU threads for batch processing (default: same as Threads)
-	ThreadsBatch int32 `mapstructure:"threads_batch"`
 }
 
 // GetServerAddr возвращает адрес сервера в формате host:port

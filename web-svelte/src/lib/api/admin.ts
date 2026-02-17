@@ -220,37 +220,6 @@ export interface GPUMetricsResponse {
 	data?: GPUMetrics;
 }
 
-// ==================== Yzma GPU/Health (v3.2.2+) ====================
-export interface YzmaGPUInfo {
-	max_devices: number;
-	supports_gpu: boolean;
-	n_gpu_layers: number;
-	main_gpu: number;
-	tensor_split?: number[];
-	flash_attention: boolean;
-	threads: number;
-	threads_batch: number;
-	context_size: number;
-	batch_size: number;
-	initialized: boolean;
-	models_loading: boolean;
-	loaded_model_count: number;
-}
-
-export interface YzmaGPUResponse {
-	gpu: YzmaGPUInfo;
-	backend_ready: boolean;
-	models_ready: boolean;
-	loaded_model_count: number;
-}
-
-export interface YzmaHealthResponse {
-	status: 'initializing' | 'waiting_for_models' | 'ready';
-	initialized: boolean;
-	loaded_model_count: number;
-	loaded_models: string[];
-}
-
 // ==================== API ====================
 export const adminApi = {
 	// Stats
@@ -329,10 +298,6 @@ export const adminApi = {
 	// GPU Metrics
 	getGPUMetrics: () => api.get<GPUMetricsResponse>('/api/gpu/metrics'),
 
-	// Yzma GPU/Health (v3.2.2+) - works before models are loaded
-	getYzmaGPUInfo: () => api.get<YzmaGPUResponse>('/api/system/yzma/gpu'),
-	getYzmaHealth: () => api.get<YzmaHealthResponse>('/api/system/yzma/health'),
-
 	// Backend status (v3.3.x) - shows which inference backend is active
 	getBackendStatus: () => api.get<BackendStatusResponse>('/api/system/backend'),
 
@@ -342,13 +307,12 @@ export const adminApi = {
 };
 
 export interface BackendStatusResponse {
-	backend: 'docker' | 'yzma';
+	backend: 'docker';
 	ready: boolean;
 	loaded_models?: number;
 	running_models?: number;
 	max_running_models?: number;
 	docker_enabled?: boolean;
-	yzma_enabled?: boolean;
 }
 
 export interface DockerImageStatus {

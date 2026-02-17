@@ -57,7 +57,8 @@ export interface GitLabProjectSettings {
   chunk_size?: number;
   chunk_overlap?: number;
   max_review_tokens?: number;
-  per_file_review?: boolean;
+  review_mode?: string;       // "standard", "per_file", "tool_based"
+  per_file_review?: boolean;  // Deprecated: use review_mode instead
   review_language?: string;
   target_branches?: string[];
   ignore_branches?: string[];

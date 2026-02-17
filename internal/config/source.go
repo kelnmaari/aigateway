@@ -90,7 +90,6 @@ type TypedConfigSource interface {
 	
 	// Inference configuration
 	GetInferenceProvider() string
-	GetInferenceYzmaLibPath() string
 	GetInferenceContextSize() int
 	GetInferenceBatchSize() int
 	GetInferenceGPULayers() int

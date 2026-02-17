@@ -1,4 +1,4 @@
-// Package logger provides structured logging setup for Ollama-OpenAI Proxy
+// Package logger provides structured logging setup for AIGateway
 package logger
 
 import (
@@ -76,7 +76,7 @@ func Setup(cfg *config.Config) *logrus.Logger {
 
 	// Добавляем базовые поля для всех логов
 	logger = logger.WithFields(logrus.Fields{
-		"service": "ollama-openai-proxy",
+		"service": "aigateway",
 		"version": version.Version,
 	}).Logger
 

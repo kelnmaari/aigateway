@@ -367,31 +367,6 @@ EXECUTE FUNCTION update_model_registry_timestamp();
 	`
 }
 
-// getSeedDefaultOllamaProviderMigration returns SQL for seeding default Ollama provider (v6 migration)
-func (p *PostgreSQLDB) getSeedDefaultOllamaProviderMigration() string {
-	return `
--- Seed default Ollama provider (local)
--- Используем фиксированный ID для идемпотентности
-INSERT INTO model_providers (
-    id, name, provider_type, base_url, 
-    enabled, priority, config, 
-    health_status, created_at, updated_at
-) VALUES (
-    'ollama-local-default',
-    'ollama-local',
-    'ollama',
-    'http://localhost:11434',
-    true,
-    100,
-    '{}'::jsonb,
-    'unknown',
-    NOW(),
-    NOW()
-)
-ON CONFLICT (id) DO NOTHING;
-	`
-}
-
 // ========================================
 // Transaction Methods (Delegation)
 // ========================================

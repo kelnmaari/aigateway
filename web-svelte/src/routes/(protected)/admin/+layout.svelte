@@ -14,7 +14,8 @@
 		Mail,
 		Download,
 		Cpu,
-		GitBranch
+		GitBranch,
+		Cloud
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
@@ -27,6 +28,7 @@
 		{ id: 'invitations', label: 'Invitations', icon: Mail, href: '/admin/invitations' },
 		{ id: 'api-keys', label: 'API Keys', icon: Key, href: '/admin/api-keys' },
 		{ id: 'models', label: m.admin_models, icon: Cpu, href: '/admin/models' },
+		{ id: 'providers', label: 'Providers', icon: Cloud, href: '/admin/providers' },
 		{ id: 'downloads', label: 'Downloads', icon: Download, href: '/admin/downloads' },
 		{ id: 'mcp', label: 'MCP', icon: Server, href: '/admin/mcp' },
 		{ id: 'gitlab', label: 'GitLab', icon: GitBranch, href: '/admin/gitlab' },

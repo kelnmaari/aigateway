@@ -223,7 +223,7 @@ func (g *ReportGenerator) generateSystemHealthReport(ctx context.Context) (*Syst
 		CurrentGoroutines: currentGoroutines,
 		AvgGoroutines:     currentGoroutines,
 		PeakGoroutines:    currentGoroutines,
-		OllamaStatus:      "unknown",
+		InferenceStatus:   "unknown",
 	}
 
 	// Get performance monitor metrics if available

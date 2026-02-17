@@ -191,7 +191,7 @@ class VLMManager {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    // Validate before sending (v3.0.5+: VLM always supported via yzma)
+    // Validate before sending
     validateBeforeSend() {
         if (!this.hasImages()) {
             return { valid: true };

@@ -45,10 +45,6 @@ func (r *ReloadHandlerRegistry) registerAllHandlers() {
 	// r.manager.RegisterReloadHandler("auth.rate_limiting.default_requests_per_minute", ...)
 	// r.manager.RegisterReloadHandler("auth.rate_limiting.default_requests_per_hour", ...)
 	
-	// Inference parameters (handlers would be registered by yzma client)
-	// r.manager.RegisterReloadHandler("inference.yzma.temperature", ...)
-	// r.manager.RegisterReloadHandler("inference.yzma.top_k", ...)
-	
 	r.logger.Info("Registered live reload handlers")
 }
 
@@ -126,23 +122,4 @@ func (r *ReloadHandlerRegistry) handleRateLimitRPMChange(ctx context.Context, se
 }
 */
 
-// Example handler for yzma temperature (to be implemented by yzma client)
-/*
-func (r *ReloadHandlerRegistry) handleYzmaTemperatureChange(ctx context.Context, setting *Setting) error {
-	temp, err := strconv.ParseFloat(setting.Value, 64)
-	if err != nil {
-		return fmt.Errorf("invalid temperature value: %w", err)
-	}
-	
-	if temp < 0.0 || temp > 2.0 {
-		return fmt.Errorf("temperature must be between 0.0 and 2.0, got %.2f", temp)
-	}
-	
-	// Update yzma client default temperature
-	// yzmaClient.SetDefaultTemperature(temp)
-	
-	r.logger.WithField("temperature", temp).Info("Yzma temperature updated")
-	return nil
-}
-*/
 

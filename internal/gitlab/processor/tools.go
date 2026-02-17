@@ -121,6 +121,130 @@ func (t *ReviewTools) GetToolDefinitions() []ToolDefinition {
 	}
 }
 
+// GetOutputToolDefinitions returns tool definitions for structured review output.
+// These tools allow the LLM to submit review results incrementally via tool calls
+// instead of returning raw JSON, which is more reliable and validates per-call.
+func GetOutputToolDefinitions() []ToolDefinition {
+	return []ToolDefinition{
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "report_issue",
+				Description: "Report a code issue found during review. Call this for each issue you find.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"file_path": map[string]interface{}{
+							"type":        "string",
+							"description": "Path to the file containing the issue",
+						},
+						"line": map[string]interface{}{
+							"type":        "integer",
+							"description": "Line number where the issue starts (from diff @@ markers)",
+						},
+						"end_line": map[string]interface{}{
+							"type":        "integer",
+							"description": "End line number for multi-line issues (optional)",
+						},
+						"severity": map[string]interface{}{
+							"type":        "string",
+							"enum":        []string{"critical", "warning", "info", "suggestion"},
+							"description": "Issue severity level",
+						},
+						"category": map[string]interface{}{
+							"type":        "string",
+							"enum":        []string{"security", "bugs", "style", "performance", "best_practice"},
+							"description": "Issue category",
+						},
+						"message": map[string]interface{}{
+							"type":        "string",
+							"description": "Clear description of what the issue is",
+						},
+						"suggestion": map[string]interface{}{
+							"type":        "string",
+							"description": "How to fix the issue (optional)",
+						},
+					},
+					"required": []string{"file_path", "line", "severity", "category", "message"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "report_suggestion",
+				Description: "Report an improvement suggestion for the code. Call this for general recommendations.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"title": map[string]interface{}{
+							"type":        "string",
+							"description": "Short title for the suggestion",
+						},
+						"description": map[string]interface{}{
+							"type":        "string",
+							"description": "Detailed description of the improvement",
+						},
+						"priority": map[string]interface{}{
+							"type":        "string",
+							"enum":        []string{"high", "medium", "low"},
+							"description": "Suggestion priority",
+						},
+						"file_path": map[string]interface{}{
+							"type":        "string",
+							"description": "File this suggestion relates to (optional)",
+						},
+						"line": map[string]interface{}{
+							"type":        "integer",
+							"description": "Line number if applicable (optional)",
+						},
+						"category": map[string]interface{}{
+							"type":        "string",
+							"enum":        []string{"security", "bugs", "style", "performance", "best_practice"},
+							"description": "Suggestion category (optional)",
+						},
+					},
+					"required": []string{"title", "description", "priority"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "set_review_summary",
+				Description: "Set the overall review summary and score. Call this once after reviewing all files.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"summary": map[string]interface{}{
+							"type":        "string",
+							"description": "Brief overall assessment of the code changes in 1-3 sentences",
+						},
+						"overall_score": map[string]interface{}{
+							"type":        "integer",
+							"description": "Overall code quality score from 0 to 100 (higher is better)",
+							"minimum":     0,
+							"maximum":     100,
+						},
+					},
+					"required": []string{"summary", "overall_score"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "finish_review",
+				Description: "Signal that the review is complete. Call this as the last tool after reporting all issues and setting the summary.",
+				Parameters: map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				},
+			},
+		},
+	}
+}
+
 // ExecuteTool executes a tool call and returns the result
 func (t *ReviewTools) ExecuteTool(ctx context.Context, call ToolCall) (*ToolResult, error) {
 	t.logger.WithFields(logrus.Fields{

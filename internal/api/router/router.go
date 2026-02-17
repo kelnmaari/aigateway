@@ -1,4 +1,4 @@
-// Package router provides HTTP routing setup for Ollama-OpenAI Proxy
+// Package router provides HTTP routing setup for AIGateway
 package router
 
 import (
@@ -69,7 +69,6 @@ import (
 	"aigateway/internal/web/framework"
 	"aigateway/internal/web/templates"
 	"aigateway/internal/websocket"
-	"aigateway/internal/yzma"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -225,14 +224,10 @@ type Router struct {
 	inferenceHandler      *handlers.InferenceHandler
 	inferenceProxyHandler *handlers.InferenceProxyHandler
 	chatToolsHandler      *handlers.ChatToolsHandler // Chat with tools support (v4.0.3+)
+	externalProxyHandler  *handlers.ExternalProxyHandler // External provider proxy (v4.11.0+)
 	inferenceModelStore   *inference.ModelStore
 
-	// yzma Local Inference (Version 3.0.0+: YZMA-01)
-	yzmaClient    *yzma.Client
-	yzmaHandler   *handlers.YzmaHandler     // yzma inference handler
-	yzmaUIHandler *handlersUI.YzmaUIHandler // yzma UI handler (YZMA-UI-01)
-
-	// Agent Service (v2.5.0+, v3.0.6+: restored for YZMA)
+	// Agent Service (v2.5.0+)
 	agentService *agentService.AgentService // Conversational agent with tools
 
 	// UI Framework (v3.1.0: Optimized JS+CSS bundling)
@@ -403,16 +398,6 @@ func (r *Router) Close() error {
 		r.keyManager.Close()
 	}
 
-	// Shutdown yzma client (v3.0.5+: Free GPU memory!)
-	if r.yzmaClient != nil {
-		r.logger.Info("🗑️ Shutting down yzma client...")
-		if err := r.yzmaClient.Shutdown(); err != nil {
-			r.logger.WithError(err).Error("Failed to shutdown yzma client")
-		} else {
-			r.logger.Info("✅ yzma client shut down successfully")
-		}
-	}
-
 	// Shutdown GitLab indexer (v4.1.0+: invalidate in-progress indexations)
 	if r.gitlabIndexer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -428,9 +413,6 @@ func (r *Router) Close() error {
 			r.logger.WithError(err).Error("Failed to close Redis connections")
 		}
 	}
-
-	// Legacy: Ollama client removed (v3.0.5+)
-	// All inference now goes through yzma
 
 	return nil
 }
@@ -474,7 +456,7 @@ func (r *Router) setupMiddleware() {
 	sessionSecret := []byte(r.config.Auth.JWT.Secret) // Используем JWT secret для session encryption
 	if len(sessionSecret) < 32 {
 		// Ensure session secret is at least 32 bytes for security
-		sessionSecret = []byte("ollama-proxy-session-secret-change-this-in-production!")
+		sessionSecret = []byte("aigateway-session-secret-change-this-in-production!")
 		r.logger.Warn("Using default session secret - please configure a secure JWT secret")
 	}
 	store := cookie.NewStore(sessionSecret)
@@ -485,7 +467,7 @@ func (r *Router) setupMiddleware() {
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
 	})
-	r.engine.Use(sessions.Sessions("ollama_session", store))
+	r.engine.Use(sessions.Sessions("aigateway_session", store))
 	r.logger.Info("Session middleware enabled for OIDC authentication")
 
 	// Slow request logging middleware (v1.6.2) - после tracing
@@ -1032,38 +1014,6 @@ func (r *Router) setupUIRoutes() {
 		r.logger.Info("✅ Hugging Face UI routes registered")
 	}
 
-	// yzma Model Management UI (v3.0.0+: YZMA-UI-01)
-	if r.yzmaUIHandler != nil {
-		yzma := ui.Group("/yzma")
-		{
-			// Models management
-			yzma.GET("/models", r.yzmaUIHandler.GetModelsList)
-			yzma.GET("/loaded", r.yzmaUIHandler.GetLoadedModelsList)
-			yzma.POST("/load", r.yzmaUIHandler.PostLoadModel)
-			yzma.POST("/cancel", r.yzmaUIHandler.PostCancelModel)
-			yzma.POST("/unload", r.yzmaUIHandler.PostUnloadModel)
-			yzma.POST("/delete", r.yzmaUIHandler.PostDeleteModel)
-
-			// Statistics
-			yzma.GET("/stats", r.yzmaUIHandler.GetStats)
-
-			// Model metadata (v3.2.0+)
-			yzma.GET("/metadata/*model_path", r.yzmaUIHandler.GetModelMetadata)
-
-			// Provider integration for chat
-			yzma.GET("/provider/models", r.yzmaUIHandler.GetProviderModels)
-		}
-		r.logger.Info("✅ yzma UI routes registered")
-	}
-
-	// GPU Info endpoint (v3.2.2+) - separate from UI handler to work before models load
-	if r.yzmaHandler != nil {
-		// These work even during model loading
-		ui.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)
-		ui.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck)
-		r.logger.Info("✅ yzma GPU/Health UI routes registered")
-	}
-
 	r.logger.Info("✅ HTMX UI routes setup completed")
 }
 
@@ -1107,10 +1057,6 @@ func (r *Router) setupStatsRoutes() {
 
 // setupConfigRoutes настраивает эндпоинты конфигурации для TUI
 func (r *Router) setupConfigRoutes() {
-	// v3.0.5+: Legacy Ollama routes removed
-	// Use yzma endpoints: /v1/yzma/models
-	// r.engine.GET("/api/models", r.modelsHandler.List)
-	// r.engine.GET("/api/v1/models", r.modelsHandler.List)
 }
 
 // setupMetricsHistoryRoutes настраивает эндпоинты для historical metrics (Phase 12.1)
@@ -1187,48 +1133,25 @@ func (r *Router) setupSystemRoutes() {
 			system.GET("/changelogs/:version", r.changelogHandler.GetChangelog)
 		}
 
-		// Public models endpoint for login page (v3.0.7+)
-		if r.yzmaHandler != nil {
-			system.GET("/models", r.yzmaHandler.HandleModels)
-			// GPU info and health check - public endpoints (v3.2.2+)
-			// These work even before models are loaded, allowing WebUI to show status
-			system.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)
-			system.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck)
-		} else {
-			// Stub endpoints when yzma is disabled (v3.3.0+)
-			system.GET("/models", func(c *gin.Context) {
-				// Return models from inference v4 if available
-				if r.inferenceRouter != nil {
-					models := r.inferenceRouter.ListModels()
-					data := make([]gin.H, 0, len(models))
-					for _, m := range models {
-						data = append(data, gin.H{
-							"id":       m.Spec.Alias,
-							"object":   "model",
-							"owned_by": string(m.Spec.Provider),
-							"created":  0,
-						})
-					}
-					c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
-					return
+		// Public models endpoint for login page
+		system.GET("/models", func(c *gin.Context) {
+			// Return models from inference v4 if available
+			if r.inferenceRouter != nil {
+				models := r.inferenceRouter.ListModels()
+				data := make([]gin.H, 0, len(models))
+				for _, m := range models {
+					data = append(data, gin.H{
+						"id":       m.Spec.Alias,
+						"object":   "model",
+						"owned_by": string(m.Spec.Provider),
+						"created":  0,
+					})
 				}
-				c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
-			})
-			system.GET("/yzma/gpu", func(c *gin.Context) {
-				c.JSON(http.StatusOK, gin.H{
-					"available":    false,
-					"device_name":  "N/A (yzma disabled)",
-					"cuda_version": "",
-					"message":      "yzma inference backend is disabled, using Docker-based inference",
-				})
-			})
-			system.GET("/yzma/health", func(c *gin.Context) {
-				c.JSON(http.StatusOK, gin.H{
-					"status":  "unavailable",
-					"message": "yzma inference backend is disabled",
-				})
-			})
-		}
+				c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+		})
 
 		// Backend status endpoint (v3.3.x) - shows which inference backend is active
 		system.GET("/backend", func(c *gin.Context) {
@@ -1255,9 +1178,6 @@ func (r *Router) setupSystemRoutes() {
 				resp["running_models"] = runningCount
 				resp["max_running_models"] = r.config.Inference.Docker.MaxRunningModels
 				resp["docker_enabled"] = r.config.Inference.Docker.Enabled
-			} else if backendType == "yzma" && r.yzmaHandler != nil {
-				resp["ready"] = true
-				resp["yzma_enabled"] = true
 			}
 
 			c.JSON(http.StatusOK, resp)
@@ -1569,6 +1489,7 @@ func (r *Router) setupSvelteUIRoutes() {
 		"/admin/settings",
 		"/admin/backups",
 		"/admin/logs",
+		"/admin/providers",
 	}
 
 	for _, route := range svelteRoutes {
@@ -1630,7 +1551,6 @@ func (r *Router) setupLegacyUIRoutes() {
 	r.engine.StaticFile("/admin-rag.html", "./web/admin-rag.html")                 // RAG Management (v1.13.0)
 	r.engine.StaticFile("/admin-registry.html", "./web/admin-registry.html")       // Model Registry (REGISTRY-03, v2.3.0)
 	r.engine.StaticFile("/huggingface.html", "./web/huggingface.html")             // Hugging Face Model Browser (HF-UI-01, v3.0.0)
-	r.engine.StaticFile("/yzma.html", "./web/yzma.html")                           // yzma Model Management (YZMA-UI-01, v3.0.0)
 	r.engine.StaticFile("/downloads.html", "./web/downloads.html")                 // Active Downloads Window (HF-UI-02, v3.0.5)
 
 	// Serve CSS and JS directories
@@ -1665,10 +1585,6 @@ func (r *Router) setupOpenAIRoutes() {
 		// Rate limiting только для API Keys (JWT users не ограничены per-key лимитами)
 		// Model authorization остается
 
-		// v3.0.5+: Legacy Ollama routes removed - use /v1/yzma/* endpoints
-		// v1.GET("/models", r.modelsHandler.List)
-		// v1.POST("/chat/completions", r.chatHandler.Completion)
-
 	} else if r.config.Auth.Enabled && r.authenticator != nil {
 		// Только API Key auth (legacy mode)
 		r.logger.Info("Using API Key authentication for /v1 endpoints")
@@ -1687,9 +1603,6 @@ func (r *Router) setupOpenAIRoutes() {
 			v1.Use(r.authenticator.RecordUsageMiddleware())
 		}
 
-		// v3.0.5+: Legacy Ollama routes removed - use /v1/yzma/* endpoints
-		// v1.GET("/models", r.authenticator.PermissionMiddleware("models"), r.modelsHandler.List)
-		// v1.POST("/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.chatHandler.Completion)
 	} else {
 		// Открытые эндпоинты (MVP mode без аутентификации)
 		r.logger.Info("Using NO authentication for /v1 endpoints (MVP mode)")
@@ -1700,142 +1613,62 @@ func (r *Router) setupOpenAIRoutes() {
 			r.logger.Info("Usage tracking enabled for /v1 endpoints (No auth mode)")
 		}
 
-		// v3.0.5+: Legacy Ollama routes removed - use /v1/yzma/* endpoints
-		// v1.GET("/models", r.modelsHandler.List)
-		// v1.POST("/chat/completions", r.chatHandler.Completion)
 	}
 
-	// v3.0.5+: Embeddings and Completions endpoints removed (Ollama-based)
-	// All inference now goes through yzma: /v1/yzma/chat/completions
-	// if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
-	// 	v1.POST("/embeddings", r.embeddingsHandler.HandleEmbeddings)
-	// } else if r.config.Auth.Enabled && r.authenticator != nil {
-	// 	v1.POST("/embeddings", r.authenticator.PermissionMiddleware("embeddings"), r.embeddingsHandler.HandleEmbeddings)
-	// } else {
-	// 	v1.POST("/embeddings", r.embeddingsHandler.HandleEmbeddings)
-	// }
 
-	// if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
-	// 	v1.POST("/completions", r.completionsHandler.HandleCompletions)
-	// } else if r.config.Auth.Enabled && r.authenticator != nil {
-	// 	v1.POST("/completions", r.authenticator.PermissionMiddleware("completions"), r.completionsHandler.HandleCompletions)
-	// } else {
-	// 	v1.POST("/completions", r.completionsHandler.HandleCompletions)
-	// }
+	// /v1/models endpoint - returns models from inference manager or empty list
+	v1.GET("/models", func(c *gin.Context) {
+		if r.inferenceRouter != nil {
+			models := r.inferenceRouter.ListModels()
+			data := make([]gin.H, 0, len(models))
+			for _, m := range models {
+				data = append(data, gin.H{
+					"id":       m.Spec.Alias,
+					"object":   "model",
+					"owned_by": string(m.Spec.Provider),
+					"created":  0,
+				})
+			}
+			c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+	})
 
-	// yzma local inference (Version 3.0.0+: YZMA-03)
-	if r.yzmaHandler != nil {
-		r.logger.Info("Setting up yzma local inference endpoints")
+	// /v1/chat/completions and /v1/completions via inference proxy
+	if r.inferenceProxyHandler != nil {
+		v1.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
+		v1.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
+	} else if r.externalProxyHandler != nil {
+		// No local inference — route directly to external providers
+		v1.POST("/chat/completions", r.externalProxyHandler.HandleChatCompletions)
+	}
 
-		// v3.0.5+: OpenAI-compatible routes (no /yzma prefix)
-		// These routes make yzma a drop-in replacement for OpenAI API
+	// /v1/external/chat/completions — dedicated external provider route (v4.11.0+)
+	if r.externalProxyHandler != nil {
+		v1ext := v1.Group("/external")
+		v1ext.POST("/chat/completions", r.externalProxyHandler.HandleChatCompletions)
+	}
+
+	// Agent API endpoints (v2.5.0+)
+	if r.agentHandler != nil {
+		r.logger.Info("Setting up Agent API endpoints")
+
 		if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
 			// Hybrid auth
-			v1.POST("/chat/completions", r.yzmaHandler.HandleChatCompletion)
-			v1.POST("/completions", r.yzmaHandler.HandleCompletions)
-			v1.POST("/embeddings", r.yzmaHandler.HandleEmbeddings)
-			v1.GET("/models", r.yzmaHandler.HandleModels)
+			v1.GET("/agent/tools", r.agentHandler.HandleListTools)
+			v1.GET("/agent/tools/:category", r.agentHandler.HandleListToolsByCategory)
 		} else if r.config.Auth.Enabled && r.authenticator != nil {
 			// API Key auth
-			v1.POST("/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.yzmaHandler.HandleChatCompletion)
-			v1.POST("/completions", r.authenticator.PermissionMiddleware("completions"), r.yzmaHandler.HandleCompletions)
-			v1.POST("/embeddings", r.authenticator.PermissionMiddleware("embeddings"), r.yzmaHandler.HandleEmbeddings)
-			v1.GET("/models", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleModels)
+			v1.GET("/agent/tools", r.authenticator.PermissionMiddleware("chat"), r.agentHandler.HandleListTools)
+			v1.GET("/agent/tools/:category", r.authenticator.PermissionMiddleware("chat"), r.agentHandler.HandleListToolsByCategory)
 		} else {
 			// No auth
-			v1.POST("/chat/completions", r.yzmaHandler.HandleChatCompletion)
-			v1.POST("/completions", r.yzmaHandler.HandleCompletions)
-			v1.POST("/embeddings", r.yzmaHandler.HandleEmbeddings)
-			v1.GET("/models", r.yzmaHandler.HandleModels)
+			v1.GET("/agent/tools", r.agentHandler.HandleListTools)
+			v1.GET("/agent/tools/:category", r.agentHandler.HandleListToolsByCategory)
 		}
 
-		r.logger.Info("✅ OpenAI-compatible routes: /v1/chat/completions, /v1/completions, /v1/embeddings, /v1/models")
-
-		// Agent API endpoints (v2.5.0+, v3.0.6+: restored for YZMA)
-		if r.agentHandler != nil {
-			r.logger.Info("Setting up Agent API endpoints")
-
-			// Agent tools endpoint (same auth as yzma routes)
-			if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
-				// Hybrid auth
-				v1.GET("/agent/tools", r.agentHandler.HandleListTools)
-				v1.GET("/agent/tools/:category", r.agentHandler.HandleListToolsByCategory)
-			} else if r.config.Auth.Enabled && r.authenticator != nil {
-				// API Key auth
-				v1.GET("/agent/tools", r.authenticator.PermissionMiddleware("chat"), r.agentHandler.HandleListTools)
-				v1.GET("/agent/tools/:category", r.authenticator.PermissionMiddleware("chat"), r.agentHandler.HandleListToolsByCategory)
-			} else {
-				// No auth
-				v1.GET("/agent/tools", r.agentHandler.HandleListTools)
-				v1.GET("/agent/tools/:category", r.agentHandler.HandleListToolsByCategory)
-			}
-
-			r.logger.Info("✅ Agent API routes: /v1/agent/tools, /v1/agent/tools/:category")
-		}
-
-		// yzma-specific routes (with /yzma prefix for advanced features)
-		// yzma routes use same auth as other v1 endpoints
-		if r.jwtManager != nil && r.authenticator != nil && r.config.Auth.Enabled {
-			// Hybrid auth уже применен к v1 группе
-			v1.POST("/yzma/chat/completions", r.yzmaHandler.HandleChatCompletion)
-			v1.GET("/yzma/models", r.yzmaHandler.HandleModels)
-			v1.GET("/yzma/models/:model", r.yzmaHandler.HandleModelInfo)
-			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
-			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
-			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
-			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
-		} else if r.config.Auth.Enabled && r.authenticator != nil {
-			// API Key auth
-			v1.POST("/yzma/chat/completions", r.authenticator.PermissionMiddleware("chat"), r.yzmaHandler.HandleChatCompletion)
-			v1.GET("/yzma/models", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleModels)
-			v1.GET("/yzma/models/:model", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleModelInfo)
-			v1.POST("/yzma/models/load", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleLoadModel)
-			v1.POST("/yzma/models/unload", r.authenticator.PermissionMiddleware("admin"), r.yzmaHandler.HandleUnloadModel)
-			v1.GET("/yzma/stats", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
-			v1.GET("/yzma/health", r.authenticator.PermissionMiddleware("models"), r.yzmaHandler.HandleHealthCheck) // v3.2.2+
-		} else {
-			// No auth
-			v1.POST("/yzma/chat/completions", r.yzmaHandler.HandleChatCompletion)
-			v1.GET("/yzma/models", r.yzmaHandler.HandleModels)
-			v1.GET("/yzma/models/:model", r.yzmaHandler.HandleModelInfo)
-			v1.POST("/yzma/models/load", r.yzmaHandler.HandleLoadModel)
-			v1.POST("/yzma/models/unload", r.yzmaHandler.HandleUnloadModel)
-			v1.GET("/yzma/stats", r.yzmaHandler.HandleYzmaStats)
-			v1.GET("/yzma/gpu", r.yzmaHandler.HandleGPUInfo)        // v3.2.2+
-			v1.GET("/yzma/health", r.yzmaHandler.HandleHealthCheck) // v3.2.2+
-		}
-	} else {
-		// Fallback /v1/models endpoint when yzma is disabled (v3.3.0+)
-		// Returns models from inference v4 or empty list
-		r.logger.Info("yzma disabled - registering fallback /v1/models endpoint")
-		v1.GET("/models", func(c *gin.Context) {
-			// Try to get models from inference v4 manager
-			if r.inferenceRouter != nil {
-				models := r.inferenceRouter.ListModels()
-				data := make([]gin.H, 0, len(models))
-				for _, m := range models {
-					data = append(data, gin.H{
-						"id":       m.Spec.Alias,
-						"object":   "model",
-						"owned_by": string(m.Spec.Provider),
-						"created":  0,
-					})
-				}
-				c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
-				return
-			}
-			// No inference manager - return empty list
-			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
-		})
-
-		// Fallback /v1/chat/completions for inference v4 models (v3.3.x)
-		if r.inferenceProxyHandler != nil {
-			r.logger.Info("yzma disabled - registering fallback /v1/chat/completions endpoint for inference v4")
-			v1.POST("/chat/completions", r.inferenceProxyHandler.HandleChatCompletions)
-			v1.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
-		}
+		r.logger.Info("Agent API routes: /v1/agent/tools, /v1/agent/tools/:category")
 	}
 }
 
@@ -2011,9 +1844,6 @@ func (r *Router) setupAdminRoutes() {
 			c.JSON(200, gin.H{"message": "Rate limiting disabled"})
 		}
 	})
-
-	// v3.0.5+: Legacy models endpoint removed - use /v1/yzma/models
-	// admin.GET("/models", r.modelsHandler.List)
 
 	// Logs viewer (v1.5.1 - Enhanced Logs System)
 	if r.logsHandler != nil {
@@ -2199,13 +2029,6 @@ func (r *Router) setupRedis(cfg *config.Config, logger *logrus.Logger) error {
 		}).Info("Redis connected successfully")
 	}
 
-	// Invalidate model list cache on startup (v3.0.7+: ensure fresh data)
-	if err := redisManager.Cache.Delete(ctx, "models:list:yzma"); err != nil {
-		logger.WithError(err).Warn("Failed to invalidate model list cache on startup")
-	} else {
-		logger.Info("✅ Model list cache invalidated on startup")
-	}
-
 	r.redisManager = redisManager
 
 	logger.Info("✅ Redis initialized successfully")
@@ -2304,9 +2127,6 @@ func (r *Router) setupInvitationsRoutes() {
 func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	logger.WithField("db_is_nil", r.db == nil).Info("DEBUG: setupHandlers called")
 
-	// v3.0.5+: Health and Models removed (Ollama-based)
-	// Use yzma endpoints: /v1/yzma/models, /v1/yzma/stats
-
 	// RAG Data Sources handler (v1.13.1+)
 	if r.ragDataSourceService != nil {
 		r.ragDataSourcesHandler = handlers.NewRAGDataSourcesHandler(r.ragDataSourceService, logger)
@@ -2314,12 +2134,6 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 
 	// RAG Stats handler (v3.2.0+)
 	r.ragStatsHandler = handlers.NewRAGStatsHandler(r.vectorStore, logger)
-
-	// v3.0.5+: Chat, Embeddings, Completions handlers removed (Ollama-based)
-	// Use yzma endpoints: /v1/yzma/chat/completions
-	// r.chatHandler = handlers.NewChatHandlerWithDB(cfg, logger, ollamaClient, r.db)
-	// r.embeddingsHandler = handlers.NewEmbeddingsHandler(cfg, logger, ollamaClient)
-	// r.completionsHandler = handlers.NewCompletionsHandler(cfg, logger, ollamaClient)
 
 	// Logs handler (v1.5.1) - извлекаем директорию из Logging.FilePath
 	logsDir := "./logs" // По умолчанию
@@ -2565,8 +2379,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	r.requestStorage.Start()
 
 	// Stats Handler с metrics storage для latency данных и Database (Version 1.3.0+)
-	// v3.0.5+: StatsHandler with yzma client
-	r.statsHandler = handlers.NewStatsHandler(cfg, logger, r.yzmaClient, r.keyManager, r.version, r.metricsStorage, r.db)
+	r.statsHandler = handlers.NewStatsHandler(cfg, logger, r.keyManager, r.version, r.metricsStorage, r.db)
 
 	// Metrics History Handler
 	r.metricsHistoryHandler = handlers.NewMetricsHistoryHandler(cfg, logger, r.metricsStorage)
@@ -2584,7 +2397,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	// Set database for API key validation (DESKTOP-03)
 	r.wsHandler.SetDatabase(r.db)
 
-	// v3.0.5+: WebSocket chat handler temporarily disabled (needs refactoring for yzma)
+	// v3.0.5+: WebSocket chat handler temporarily disabled
 	// r.wsChatHandler = websocket.NewChatHandler(cfg, logger, r.ollamaClient, r.wsHub)
 	// r.wsHandler.SetChatHandler(r.wsChatHandler)
 	// if r.agentService != nil && r.db != nil {
@@ -2739,10 +2552,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 	} else {
 		// Legacy fallback for non-docker mode
 		infHFCache = downloadsDir
-		infGGUFCache = cfg.Yzma.ModelsDir
-		if infGGUFCache == "" {
-			infGGUFCache = infHFCache
-		}
+		infGGUFCache = infHFCache
 		infHTTPTimeout = cfg.HuggingFace.DefaultDownloadTimeout
 		if infHTTPTimeout == 0 {
 			infHTTPTimeout = 5 * time.Minute
@@ -2833,217 +2643,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		}).Info("Inference v4 service initialized")
 	}
 
-	// yzma Local Inference (Version 3.0.0+: YZMA-01)
-	// v3.0.5+: Use Inference.Yzma
-	yzmaEnabled := cfg.Inference.Yzma.Enabled
-	if !yzmaEnabled && cfg.Yzma.Enabled {
-		// Backward compatibility: fallback to old cfg.Yzma.Enabled
-		yzmaEnabled = true
-		logger.Warn("Using deprecated cfg.Yzma - migrate to cfg.Inference.Yzma")
-	}
-
-	if yzmaEnabled {
-		logger.Info("Initializing yzma local inference...")
-
-		// Use new Inference.Yzma, fallback to old cfg.Yzma for backward compat
-		yzmaModelsDir := cfg.Inference.Yzma.ModelsDir
-		if yzmaModelsDir == "" {
-			yzmaModelsDir = cfg.Yzma.ModelsDir
-		}
-
-		yzmaLibPath := cfg.Inference.Yzma.LibPath
-		if yzmaLibPath == "" {
-			yzmaLibPath = cfg.Yzma.LibPath
-		}
-
-		yzmaContextSize := cfg.Inference.Yzma.ContextSize
-		if yzmaContextSize == 0 {
-			yzmaContextSize = cfg.Yzma.ContextSize
-		}
-
-		yzmaBatchSize := cfg.Inference.Yzma.BatchSize
-		if yzmaBatchSize == 0 {
-			yzmaBatchSize = cfg.Yzma.BatchSize
-		}
-
-		yzmaUBatchSize := cfg.Inference.Yzma.UBatchSize
-		if yzmaUBatchSize == 0 {
-			yzmaUBatchSize = cfg.Yzma.UBatchSize
-		}
-
-		yzmaTemperature := cfg.Inference.Yzma.Temperature
-		if yzmaTemperature == 0 {
-			yzmaTemperature = cfg.Yzma.Temperature
-		}
-
-		yzmaTopK := cfg.Inference.Yzma.TopK
-		if yzmaTopK == 0 {
-			yzmaTopK = cfg.Yzma.TopK
-		}
-
-		yzmaTopP := cfg.Inference.Yzma.TopP
-		if yzmaTopP == 0 {
-			yzmaTopP = cfg.Yzma.TopP
-		}
-
-		yzmaMinP := cfg.Inference.Yzma.MinP
-		if yzmaMinP == 0 {
-			yzmaMinP = cfg.Yzma.MinP
-		}
-
-		// Create separate logger for yzma with dedicated log file
-		yzmaLogger := internalLogger.NewFileLogger("logs/yzma.log", cfg.Logging.Level)
-		yzmaLogger.Info("🦙 yzma logger initialized with separate log file")
-
-		// Create conversation logger for user requests/responses (v3.0.6+)
-		conversationLogger := internalLogger.NewFileLogger("logs/yzma-conversations.log", "info")
-		conversationLogger.Info("💬 Conversation logger initialized for request/response tracking")
-
-		// GPU offloading configuration (v3.0.6+)
-		gpuLayers := int32(cfg.Inference.GPULayers)
-		if gpuLayers == 0 {
-			// Default to -1 (auto-detect GPU) if not explicitly set to 0 (CPU-only)
-			gpuLayers = -1
-		}
-
-		// Parse tensor_split string into []float32 (v3.2.1+)
-		var tensorSplit []float32
-		tensorSplitStr := cfg.Inference.Yzma.TensorSplit
-		if tensorSplitStr == "" {
-			tensorSplitStr = cfg.Yzma.TensorSplit
-		}
-		yzmaLogger.WithFields(logrus.Fields{
-			"tensor_split_str": tensorSplitStr,
-			"from_inference":   cfg.Inference.Yzma.TensorSplit,
-			"from_yzma":        cfg.Yzma.TensorSplit,
-		}).Debug("🔍 Parsing tensor_split from config")
-
-		if tensorSplitStr != "" {
-			parts := strings.Split(tensorSplitStr, ",")
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				if val, err := strconv.ParseFloat(part, 32); err == nil {
-					tensorSplit = append(tensorSplit, float32(val))
-				} else {
-					yzmaLogger.WithError(err).WithField("part", part).Warn("Failed to parse tensor_split value")
-				}
-			}
-			yzmaLogger.WithField("tensor_split", tensorSplit).Info("🎮 Multi-GPU tensor split configured")
-		} else {
-			yzmaLogger.Warn("⚠️ tensor_split not configured - using single GPU mode")
-		}
-
-		// Get flash_attention setting (v3.2.1+)
-		flashAttention := cfg.Inference.Yzma.FlashAttention
-		// Note: FlashAttention defaults to true if not set
-
-		yzmaConfig := yzma.ClientConfig{
-			ModelsDir:   yzmaModelsDir,
-			LibPath:     yzmaLibPath,
-			ContextSize: yzmaContextSize,
-			BatchSize:   yzmaBatchSize,
-			UBatchSize:  yzmaUBatchSize,
-			Temperature: yzmaTemperature,
-			TopK:        yzmaTopK,
-			TopP:        yzmaTopP,
-			MinP:        yzmaMinP,
-			Verbose:     cfg.Inference.Yzma.Verbose || cfg.Yzma.Verbose,
-			NGpuLayers:  gpuLayers, // v3.0.6+: GPU offloading from config
-			// Multi-GPU configuration (v3.2.1+)
-			MainGPU:        cfg.Inference.Yzma.MainGPU,
-			TensorSplit:    tensorSplit,
-			FlashAttention: flashAttention,
-			Threads:        cfg.Inference.Yzma.Threads,
-			ThreadsBatch:   cfg.Inference.Yzma.ThreadsBatch,
-		}
-
-		yzmaClient, err := yzma.NewClient(yzmaConfig, yzmaLogger)
-		if err != nil {
-			yzmaLogger.WithError(err).Error("Failed to initialize yzma client - local inference disabled")
-		} else {
-			// Set conversation logger (v3.0.6+)
-			yzmaClient.SetConversationLogger(conversationLogger)
-
-			r.yzmaClient = yzmaClient
-			r.yzmaHandler = handlers.NewYzmaHandler(yzmaClient, yzmaLogger)
-
-			// Configure request timeout from config (v3.0.9+)
-			if r.config.Yzma.RequestTimeout > 0 {
-				r.yzmaHandler.SetRequestTimeout(r.config.Yzma.RequestTimeout)
-			} else if r.config.Yzma.RequestTimeout == 0 {
-				// Explicit 0 = no timeout (for very long thinking operations)
-				r.yzmaHandler.SetRequestTimeout(0)
-				yzmaLogger.Warn("⚠️ Yzma request timeout disabled (request_timeout: 0)")
-			}
-
-			// Initialize UI handler (YZMA-UI-01)
-			if r.templateRenderer != nil {
-				r.yzmaUIHandler = handlersUI.NewYzmaUIHandler(yzmaClient, r.db, r.templateRenderer, yzmaLogger)
-				yzmaLogger.Info("✅ yzma UI handler initialized")
-			}
-
-			yzmaLogger.Info("✅ yzma local inference initialized")
-
-			// Set DB for model persistence (v3.0.6+)
-			if r.db != nil {
-				yzmaClient.SetDB(r.db)
-
-				// Auto-load persisted models ASYNCHRONOUSLY (v3.2.2+)
-				// This prevents blocking server startup and WebUI access
-				go func() {
-					yzmaLogger.Info("🔄 Starting background model loading...")
-					ctx := context.Background()
-					if err := yzmaClient.LoadPersistedModels(ctx); err != nil {
-						yzmaLogger.WithError(err).Warn("Failed to auto-load persisted models")
-					} else {
-						yzmaLogger.Info("✅ Background model loading completed")
-					}
-				}()
-			}
-
-			// Start model list background worker (v3.0.6+: background sync)
-			if r.redisManager != nil && r.redisManager.BackgroundSync != nil {
-				// Create model list provider
-				modelProvider := yzma.NewModelListProvider(yzmaClient, yzmaLogger)
-
-				// Start worker (updates every 30s)
-				modelWorker := r.redisManager.BackgroundSync.ModelListWorker
-				if modelWorker == nil {
-					// Initialize if not already done
-					modelWorker = redis.NewModelListWorker(
-						r.redisManager,
-						yzmaLogger,
-						modelProvider,
-						30*time.Second,
-					)
-					modelWorker.Start()
-					r.redisManager.BackgroundSync.ModelListWorker = modelWorker
-				}
-
-				// Connect worker to client for cache invalidation
-				yzmaClient.SetModelWorker(modelWorker)
-
-				// Connect worker to handler for cache reads
-				r.yzmaHandler.SetModelWorker(modelWorker)
-
-				yzmaLogger.Info("🤖 Model list background worker started (30s interval)")
-			} else {
-				yzmaLogger.Debug("Model list background worker disabled (Redis not available)")
-			}
-
-			// Initialize Agent Service (v2.5.0+, v3.0.6+: restored for YZMA)
-			r.agentService = agentService.NewAgentService(yzmaClient, yzmaLogger)
-			r.agentHandler = handlers.NewAgentHandler(r.agentService, yzmaLogger)
-
-			// Enable agent support in YZMA handler
-			if r.yzmaHandler != nil {
-				r.yzmaHandler.SetAgentService(r.agentService)
-			}
-
-			yzmaLogger.WithField("tools_count", r.agentService.GetToolRegistry().Count()).Info("✅ Agent service initialized")
-		}
-	} else {
-		logger.Info("yzma local inference disabled in config")
+	// External Provider Proxy (v4.11.0+)
+	if r.db != nil {
+		r.externalProxyHandler = handlers.NewExternalProxyHandler(r.db, logger)
+		logger.Info("External provider proxy handler initialized")
 	}
 
 	// GitLab Integration (v3.1.0+)
@@ -3620,17 +3223,6 @@ func (r *Router) setupK8sProbes() {
 			}
 			var result string
 			return r.redisManager.Cache.GetJSON(ctx, testKey, &result)
-		})
-	}
-
-	// Yzma client probe (local inference)
-	if r.yzmaClient != nil {
-		r.healthChecker.RegisterProbe("yzma", func(ctx context.Context) error {
-			loadedModels := r.yzmaClient.ListLoadedModels()
-			if len(loadedModels) == 0 {
-				return fmt.Errorf("no models loaded")
-			}
-			return nil
 		})
 	}
 

@@ -383,33 +383,15 @@ func (h *HybridConfigSource) getMetricsField(field string) string {
 
 // getInferenceField extracts inference config fields
 func (h *HybridConfigSource) getInferenceField(field string) string {
-	// Fields are spread between InferenceConfig and nested Yzma
 	switch field {
 	case "provider":
-		return "yzma" // Fixed value for v3.0.6+
+		return "docker"
 	case "backend":
 		return h.fallback.Inference.Backend
 	case "gpu_layers":
 		return strconv.Itoa(h.fallback.Inference.GPULayers)
 	case "max_loaded_models":
 		return strconv.Itoa(h.fallback.Inference.MaxLoadedModels)
-	case "yzma.lib_path":
-		return h.fallback.Inference.Yzma.LibPath
-	case "yzma.context_size":
-		return strconv.FormatUint(uint64(h.fallback.Inference.Yzma.ContextSize), 10)
-	case "yzma.batch_size":
-		return strconv.FormatUint(uint64(h.fallback.Inference.Yzma.BatchSize), 10)
-	case "yzma.temperature":
-		return strconv.FormatFloat(float64(h.fallback.Inference.Yzma.Temperature), 'f', -1, 64)
-	// Legacy: support old Yzma config for backward compat
-	case "lib_path":
-		return h.fallback.Yzma.LibPath
-	case "context_size":
-		return strconv.FormatUint(uint64(h.fallback.Yzma.ContextSize), 10)
-	case "batch_size":
-		return strconv.FormatUint(uint64(h.fallback.Yzma.BatchSize), 10)
-	case "temperature":
-		return strconv.FormatFloat(float64(h.fallback.Yzma.Temperature), 'f', -1, 64)
 	default:
 		return ""
 	}

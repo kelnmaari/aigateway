@@ -25,9 +25,9 @@ server:
 
 # Inference Configuration (v3.3.0+: Docker-based multi-provider)
 inference:
-  backend: "docker"  # "docker" (multi-provider containers) or "yzma" (legacy in-process)
+  backend: "docker"  # "docker" (multi-provider containers)
   max_loaded_models: 3
-  gpu_layers: -1  # Only used by yzma backend
+  gpu_layers: -1
   
   # Docker-based inference (v3.3.0+ multi-provider)
   # Providers: vLLM, SGLang, TGI, TensorRT-LLM, llama.cpp server
@@ -55,20 +55,6 @@ inference:
     # Default provider when not specified in load request
     default_provider: "vllm"                # vllm | sglang | tgi | tensorrt-llm | llama.cpp
   
-  # Legacy yzma backend (in-process llama.cpp, deprecated)
-  yzma:
-    enabled: false
-    lib_path: "C:/llama"
-    models_dir: "./data/models"
-    context_size: 4096
-    batch_size: 2048
-    ubatch_size: 2048
-    temperature: 0.7
-    top_k: 40
-    top_p: 0.9
-    min_p: 0.1
-    verbose: true
-    request_timeout: "30m"
 
 auth:
   enabled: true
@@ -357,7 +343,7 @@ rag:
     max_file_size: "100MB"
   
   embeddings:
-    provider: "yzma"
+    provider: "openai"
     model: "mxbai-embed-large"
     batch_size: 32
     timeout: "30s"

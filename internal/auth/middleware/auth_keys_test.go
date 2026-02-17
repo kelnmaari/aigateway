@@ -35,9 +35,6 @@ func setupTestRouter(t *testing.T) (*gin.Engine, *apikey.Manager, context.Contex
 			Host: "localhost",
 			Port: 8080,
 		},
-		Ollama: config.OllamaConfig{
-			URL: "http://localhost:11434",
-		},
 	}
 
 	logger := logrus.New()
@@ -453,7 +450,6 @@ func BenchmarkAuthMiddleware_ValidateAPIKey(b *testing.B) {
 	cfg := &config.Config{
 		Auth:   config.AuthConfig{Enabled: true},
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
-		Ollama: config.OllamaConfig{URL: "http://localhost:11434"},
 	}
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)

@@ -72,7 +72,7 @@ func DefaultDatabaseConfig() DatabaseConfig {
 		PostgreSQL: PostgreSQLConfig{
 			Host:            "localhost",
 			Port:            5432,
-			Database:        "ollama_proxy",
+			Database:        "aigateway",
 			User:            "postgres",
 			Password:        "",
 			SSLMode:         "disable",

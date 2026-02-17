@@ -505,6 +505,16 @@ func convertFullResult(fullResult *AnalysisResult) *AnalysisResultParsed {
 
 // normalizeSeverity normalizes severity strings to expected values
 func normalizeSeverity(severity string) string {
+	return NormalizeSeverity(severity)
+}
+
+// normalizeCategory normalizes category strings to expected values
+func normalizeCategory(category string) string {
+	return NormalizeCategory(category)
+}
+
+// NormalizeSeverity normalizes severity strings to expected values (exported for tool_reviewer).
+func NormalizeSeverity(severity string) string {
 	severity = strings.ToLower(strings.TrimSpace(severity))
 	switch severity {
 	case "critical", "high", "error":
@@ -520,8 +530,8 @@ func normalizeSeverity(severity string) string {
 	}
 }
 
-// normalizeCategory normalizes category strings to expected values
-func normalizeCategory(category string) string {
+// NormalizeCategory normalizes category strings to expected values (exported for tool_reviewer).
+func NormalizeCategory(category string) string {
 	category = strings.ToLower(strings.TrimSpace(category))
 	switch category {
 	case "security", "vulnerability", "sec":
@@ -536,6 +546,21 @@ func normalizeCategory(category string) string {
 		return CategoryBestPractice
 	default:
 		return CategoryBestPractice
+	}
+}
+
+// NormalizePriority normalizes priority strings to expected values (exported for tool_reviewer).
+func NormalizePriority(priority string) string {
+	priority = strings.ToLower(strings.TrimSpace(priority))
+	switch priority {
+	case "high", "critical":
+		return "high"
+	case "medium", "normal":
+		return "medium"
+	case "low", "minor":
+		return "low"
+	default:
+		return "medium"
 	}
 }
 

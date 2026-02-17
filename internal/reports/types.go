@@ -105,8 +105,8 @@ type SystemHealthReportData struct {
 	ActiveAPIKeys     int
 	ActiveUsers       int
 	TotalUsers        int
-	OllamaStatus      string
-	OllamaVersion     string
+	InferenceStatus   string
+	InferenceVersion  string
 	LastBackup        *time.Time
 }
 

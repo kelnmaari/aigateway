@@ -225,15 +225,6 @@ func (r *Renderer) getInlineTemplatePath(name string) string {
 		return "hf_download_paused.html"
 	case "hf_downloads_list":
 		return "hf_downloads_list.html"
-	// yzma templates (v3.0.0+: YZMA-UI-01)
-	case "yzma_models_list":
-		return "yzma_models_list.html"
-	case "yzma_model_card":
-		return "yzma_model_card.html"
-	case "yzma_stats":
-		return "yzma_stats.html"
-	case "yzma_loaded_models":
-		return "yzma_loaded_models.html"
 	// Registry templates
 	case "models_table":
 		return "partials/registry/models_table.html"

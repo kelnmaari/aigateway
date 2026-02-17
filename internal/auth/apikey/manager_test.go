@@ -1,4 +1,4 @@
-// Package apikey provides API Key management for Ollama-OpenAI Proxy
+// Package apikey provides API Key management for AIGateway
 package apikey
 
 import (
@@ -27,9 +27,6 @@ func setupTestManager(t *testing.T) (*Manager, context.Context) {
 		Server: config.ServerConfig{
 			Host: "localhost",
 			Port: 8080,
-		},
-		Ollama: config.OllamaConfig{
-			URL: "http://localhost:11434",
 		},
 	}
 
@@ -674,7 +671,6 @@ func BenchmarkCreateAPIKey(b *testing.B) {
 	cfg := &config.Config{
 		Auth:   config.AuthConfig{Enabled: true},
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
-		Ollama: config.OllamaConfig{URL: "http://localhost:11434"},
 	}
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
@@ -700,7 +696,6 @@ func BenchmarkValidateAPIKey(b *testing.B) {
 	cfg := &config.Config{
 		Auth:   config.AuthConfig{Enabled: true},
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
-		Ollama: config.OllamaConfig{URL: "http://localhost:11434"},
 	}
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)

@@ -1,4 +1,4 @@
-%define name ollama-openai-proxy
+%define name aigateway
 # Version and release passed via --define from CI
 # For tags: version=X.Y.Z, release=1
 # For branches: version=X.Y.Z, release=branch.jobid
@@ -9,7 +9,7 @@
 Name:           %{name}
 Version:        %{version}
 Release:        %{release}%{?dist}
-Summary:        OpenAI-compatible API proxy for local LLM inference
+Summary:        OpenAI-compatible AI Gateway for multi-provider LLM inference
 
 License:        MIT
 URL:            https://github.com/kelnmaari/ollama-openai-proxy
@@ -24,8 +24,9 @@ URL:            https://github.com/kelnmaari/ollama-openai-proxy
 # No dependencies - user manages runtime environment
 
 %description
-AIGateway (Ollama OpenAI Proxy) provides an OpenAI-compatible API for local
-LLM inference using container-based backends (vLLM, llama.cpp, SGLang, TGI).
+AIGateway provides an OpenAI-compatible API for multi-provider LLM inference
+using container-based backends (vLLM, llama.cpp, SGLang, TGI) and external
+providers (OpenAI, Anthropic, Gemini).
 Features include multi-tenant support, API key management, GitLab MR reviews,
 and a modern web UI.
 
@@ -39,27 +40,27 @@ Requires container runtime: docker-ce or podman (install separately).
 
 %install
 # Create directories
-mkdir -p %{buildroot}/opt/ollama-openai-proxy/bin
-mkdir -p %{buildroot}/opt/ollama-openai-proxy/configs
-mkdir -p %{buildroot}/opt/ollama-openai-proxy/data
-mkdir -p %{buildroot}/opt/ollama-openai-proxy/web
+mkdir -p %{buildroot}/opt/aigateway/bin
+mkdir -p %{buildroot}/opt/aigateway/configs
+mkdir -p %{buildroot}/opt/aigateway/data
+mkdir -p %{buildroot}/opt/aigateway/web
 mkdir -p %{buildroot}%{_unitdir}
 
 # Install binary
-install -m 755 %{_sourcedir}/aigateway-linux-amd64 %{buildroot}/opt/ollama-openai-proxy/bin/aigateway-linux-amd64
+install -m 755 %{_sourcedir}/aigateway-linux-amd64 %{buildroot}/opt/aigateway/bin/aigateway-linux-amd64
 
 # Install systemd service
 install -m 644 %{_sourcedir}/oop.service %{buildroot}%{_unitdir}/oop.service
 
 %files
 %defattr(-,root,root,-)
-/opt/ollama-openai-proxy/bin/aigateway-linux-amd64
+/opt/aigateway/bin/aigateway-linux-amd64
 %{_unitdir}/oop.service
-%dir /opt/ollama-openai-proxy
-%dir /opt/ollama-openai-proxy/bin
-%dir /opt/ollama-openai-proxy/configs
-%dir /opt/ollama-openai-proxy/data
-%dir /opt/ollama-openai-proxy/web
+%dir /opt/aigateway
+%dir /opt/aigateway/bin
+%dir /opt/aigateway/configs
+%dir /opt/aigateway/data
+%dir /opt/aigateway/web
 
 %pre
 # Pre-install: nothing special needed
@@ -73,7 +74,7 @@ systemctl restart oop
 
 echo ""
 echo "=============================================="
-echo " Ollama OpenAI Proxy installed/updated!"
+echo " AIGateway installed/updated!"
 echo "=============================================="
 sleep 2
 systemctl status oop --no-pager || true
@@ -95,4 +96,3 @@ systemctl daemon-reload
 %changelog
 * %(date "+%a %b %d %Y") AIGateway Team <team@example.com> - %{version}-%{release}
 - Automated build from CI/CD
-

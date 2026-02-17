@@ -29,9 +29,6 @@ func setupSecurityTestManager(t *testing.T) (*apikey.Manager, context.Context) {
 			Host: "localhost",
 			Port: 8080,
 		},
-		Ollama: config.OllamaConfig{
-			URL: "http://localhost:11434",
-		},
 	}
 
 	logger := logrus.New()
@@ -550,7 +547,6 @@ func BenchmarkSecurity_ValidationUnderLoad(b *testing.B) {
 	cfg := &config.Config{
 		Auth:   config.AuthConfig{Enabled: true},
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
-		Ollama: config.OllamaConfig{URL: "http://localhost:11434"},
 	}
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)

@@ -465,15 +465,15 @@ func main() {
 				// Конфигурация embedder
 				embedConfig := embeddings.EmbedderConfig{
 					Provider:     cfg.RAG.Embeddings.Provider,
-					BaseURL:      cfg.RAG.Embeddings.OllamaURL,
+					BaseURL:      cfg.RAG.Embeddings.BaseURL,
 					Model:        cfg.RAG.Embeddings.Model,
 					Dimensions:   cfg.RAG.Embeddings.Dimensions,
 					Timeout:      int(cfg.RAG.Embeddings.Timeout.Seconds()),
 					MaxBatchSize: cfg.RAG.Embeddings.BatchSize,
 					RateLimit:    10.0, // 10 req/sec
 				}
-				
-				embedder = embeddings.NewOllamaEmbedder(embedConfig, appLogger)
+
+				embedder = embeddings.NewOpenAIEmbedder(embedConfig, appLogger)
 				appLogger.WithFields(map[string]interface{}{
 					"provider": embedConfig.Provider,
 					"model":    embedConfig.Model,

@@ -94,7 +94,8 @@
 			max_lines_per_file: 1000,
 			skip_draft_mrs: true,
 			skip_bots: true,
-			per_file_review: true,
+			review_mode: 'tool_based',
+			per_file_review: false,
 			max_review_tokens: 8192,
 			review_language: 'ru'
 		}
@@ -122,7 +123,8 @@
 			max_lines_per_file: 1000,
 			skip_draft_mrs: true,
 			skip_bots: true,
-			per_file_review: true,
+			review_mode: 'tool_based',
+			per_file_review: false,
 			max_review_tokens: 8192,
 			review_language: 'ru'
 		}
@@ -353,7 +355,8 @@
 					max_lines_per_file: 1000,
 					skip_draft_mrs: true,
 					skip_bots: true,
-					per_file_review: true,
+					review_mode: 'tool_based',
+					per_file_review: false,
 					max_review_tokens: 8192,
 					review_language: 'ru'
 				}
@@ -507,7 +510,8 @@
 				max_lines_per_file: project.settings?.max_lines_per_file || 2000,
 				skip_draft_mrs: project.settings?.skip_draft_mrs || false,
 				skip_bots: project.settings?.skip_bots || false,
-				per_file_review: project.settings?.per_file_review || false,
+				review_mode: project.settings?.review_mode || (project.settings?.per_file_review ? 'per_file' : 'standard'),
+				per_file_review: false,
 				max_review_tokens: project.settings?.max_review_tokens || 8192,
 				review_language: project.settings?.review_language || 'en'
 			}
@@ -560,7 +564,7 @@
 					max_lines_per_file: editForm.settings.max_lines_per_file,
 					skip_draft_mrs: editForm.settings.skip_draft_mrs,
 					skip_bots: editForm.settings.skip_bots,
-					per_file_review: editForm.settings.per_file_review,
+					review_mode: editForm.settings.review_mode,
 					max_review_tokens: editForm.settings.max_review_tokens,
 					review_language: editForm.settings.review_language
 				}
@@ -2629,13 +2633,16 @@
 							<label for="edit-skip-bots" class="text-xs text-gray-400">Skip Bots</label>
 						</div>
 						<div class="flex items-center gap-3">
-							<input
-								type="checkbox"
-								id="edit-per-file"
-								bind:checked={editForm.settings.per_file_review}
-								class="h-4 w-4 rounded border-gray-600 bg-gray-700"
-							/>
-							<label for="edit-per-file" class="text-xs text-gray-400">Per-file review</label>
+							<label for="edit-review-mode" class="text-xs text-gray-400">Review mode:</label>
+							<select
+								id="edit-review-mode"
+								bind:value={editForm.settings.review_mode}
+								class="rounded border border-gray-600 bg-gray-700 px-2 py-1 text-xs text-gray-200"
+							>
+								<option value="standard">Standard</option>
+								<option value="per_file">Per-file</option>
+								<option value="tool_based">Tool-based</option>
+							</select>
 						</div>
 					</div>
 
@@ -3244,15 +3251,16 @@
 								</label>
 							</div>
 							<div class="flex items-center gap-3">
-								<input
-									type="checkbox"
-									id="bulk-per-file"
-									bind:checked={newProject.settings.per_file_review}
-									class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-600"
-								/>
-								<label for="bulk-per-file" class="text-sm font-medium text-gray-200">
-									Per-file review (Experimental)
-								</label>
+								<label for="bulk-review-mode" class="text-sm font-medium text-gray-200">Review mode:</label>
+								<select
+									id="bulk-review-mode"
+									bind:value={newProject.settings.review_mode}
+									class="rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-gray-200"
+								>
+									<option value="standard">Standard</option>
+									<option value="per_file">Per-file</option>
+									<option value="tool_based">Tool-based</option>
+								</select>
 							</div>
 						</div>
 					</div>

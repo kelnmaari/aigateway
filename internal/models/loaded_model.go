@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// LoadedModel represents a yzma model that should be loaded on server startup (v3.0.6+)
+// LoadedModel represents a model that should be loaded on server startup (v3.0.6+)
 type LoadedModel struct {
 	ID          string    `json:"id" db:"id"`
 	ModelPath   string    `json:"model_path" db:"model_path"`

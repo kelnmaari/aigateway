@@ -1,4 +1,4 @@
-// Package agent provides Agent service for orchestrating ReAct loops (v2.5.0+, v3.0.6+ YZMA compatibility)
+// Package agent provides Agent service for orchestrating ReAct loops (v2.5.0+)
 package agent
 
 import (
@@ -10,13 +10,11 @@ import (
 
 	"aigateway/internal/models"
 	"aigateway/internal/services/agent/tools"
-	"aigateway/internal/yzma"
 )
 
 // AgentService orchestrates conversational agent with ReAct loop
-// v3.0.6+: Tools are NOT executed on server - only orchestration and reasoning
+// Tools are NOT executed on server - only orchestration and reasoning
 type AgentService struct {
-	yzmaClient   *yzma.Client
 	toolRegistry *tools.Registry
 	logger       *logrus.Logger
 	mu           sync.RWMutex
@@ -26,14 +24,13 @@ type AgentService struct {
 }
 
 // NewAgentService creates a new agent service
-func NewAgentService(yzmaClient *yzma.Client, logger *logrus.Logger) *AgentService {
+func NewAgentService(logger *logrus.Logger) *AgentService {
 	toolRegistry := tools.NewRegistry(logger)
 
 	// Register default tools (descriptor-only for client execution)
 	registerDefaultTools(toolRegistry)
 
 	return &AgentService{
-		yzmaClient:   yzmaClient,
 		toolRegistry: toolRegistry,
 		logger:       logger,
 		sessions:     make(map[string]*models.AgentContext),

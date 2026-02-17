@@ -156,7 +156,7 @@ func (s *Scheduler) executeReport(ctx context.Context, schedule ReportSchedule) 
 	}
 
 	// Prepare email subject
-	subject := fmt.Sprintf("[Ollama Proxy] %s - %s", 
+	subject := fmt.Sprintf("[AIGateway] %s - %s",
 		formatReportType(schedule.Type),
 		time.Now().Format("2006-01-02"),
 	)

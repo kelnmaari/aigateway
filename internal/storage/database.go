@@ -532,7 +532,7 @@ type Database interface {
 	GetModelRegistryStats(ctx context.Context) (*models.ModelRegistryStats, error)
 	
 	// ========================================
-	// Loaded Models (v3.0.6+: Persistence for yzma loaded models)
+	// Loaded Models (v3.0.6+: Persistence for loaded models)
 	// ========================================
 	
 	// SaveLoadedModel сохраняет информацию о загруженной модели для persistence

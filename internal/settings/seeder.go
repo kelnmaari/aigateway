@@ -237,35 +237,6 @@ func (s *ConfigSeeder) MapConfigToSettings(cfg *config.Config) []Setting {
 		UpdatedAt:       time.Now(),
 	})
 
-	// === Inference Settings (yzma) ===
-	settings = append(settings, Setting{
-		ID:           "inference.yzma.enabled",
-		Category:     CategoryInference,
-		Key:          "yzma_enabled",
-		Value:        fmt.Sprintf("%t", cfg.Yzma.Enabled),
-		Type:         TypeBool,
-		DefaultValue: "true",
-		Description:  "Enable yzma local inference engine",
-		IsEditable:   false, // Requires restart
-		IsRequired:   false,
-		IsMigrated:   true,
-		UpdatedAt:    time.Now(),
-	})
-
-	settings = append(settings, Setting{
-		ID:           "inference.yzma.models_dir",
-		Category:     CategoryInference,
-		Key:          "models_directory",
-		Value:        cfg.Yzma.ModelsDir,
-		Type:         TypeString,
-		DefaultValue: "./models",
-		Description:  "Directory for GGUF models",
-		IsEditable:   false, // Requires restart
-		IsRequired:   true,
-		IsMigrated:   true,
-		UpdatedAt:    time.Now(),
-	})
-
 	// === Database Settings ===
 	settings = append(settings, Setting{
 		ID:           "database.type",
@@ -820,154 +791,6 @@ func (s *ConfigSeeder) MapConfigToSettings(cfg *config.Config) []Setting {
 		})
 	}
 
-	// === Inference.Yzma (extended) ===
-	if cfg.Inference.Yzma.Enabled {
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.lib_path",
-			Category:     CategoryInference,
-			Key:          "yzma_lib_path",
-			Value:        cfg.Inference.Yzma.LibPath,
-			Type:         TypeString,
-			DefaultValue: "",
-			Description:  "Path to yzma shared library",
-			IsEditable:   false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.context_size",
-			Category:     CategoryInference,
-			Key:          "yzma_context_size",
-			Value:        fmt.Sprintf("%d", cfg.Inference.Yzma.ContextSize),
-			Type:         TypeInt,
-			DefaultValue: "4096",
-			Description:  "Yzma context window size",
-			IsEditable:   false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.batch_size",
-			Category:     CategoryInference,
-			Key:          "yzma_batch_size",
-			Value:        fmt.Sprintf("%d", cfg.Inference.Yzma.BatchSize),
-			Type:         TypeInt,
-			DefaultValue: "512",
-			Description:  "Yzma batch size",
-			IsEditable:   false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.ubatch_size",
-			Category:     CategoryInference,
-			Key:          "yzma_ubatch_size",
-			Value:        fmt.Sprintf("%d", cfg.Inference.Yzma.UBatchSize),
-			Type:         TypeInt,
-			DefaultValue: "128",
-			Description:  "Yzma micro-batch size",
-			IsEditable:   false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.temperature",
-			Category:     CategoryInference,
-			Key:          "yzma_temperature",
-			Value:        fmt.Sprintf("%.2f", cfg.Inference.Yzma.Temperature),
-			Type:         TypeFloat,
-			DefaultValue: "0.8",
-			Description:  "Yzma sampling temperature",
-			IsEditable:   true,
-			RequiresRestart: false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.top_k",
-			Category:     CategoryInference,
-			Key:          "yzma_top_k",
-			Value:        fmt.Sprintf("%d", cfg.Inference.Yzma.TopK),
-			Type:         TypeInt,
-			DefaultValue: "40",
-			Description:  "Yzma top-k sampling",
-			IsEditable:   true,
-			RequiresRestart: false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.top_p",
-			Category:     CategoryInference,
-			Key:          "yzma_top_p",
-			Value:        fmt.Sprintf("%.2f", cfg.Inference.Yzma.TopP),
-			Type:         TypeFloat,
-			DefaultValue: "0.95",
-			Description:  "Yzma top-p (nucleus) sampling",
-			IsEditable:   true,
-			RequiresRestart: false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.min_p",
-			Category:     CategoryInference,
-			Key:          "yzma_min_p",
-			Value:        fmt.Sprintf("%.2f", cfg.Inference.Yzma.MinP),
-			Type:         TypeFloat,
-			DefaultValue: "0.05",
-			Description:  "Yzma minimum probability threshold",
-			IsEditable:   true,
-			RequiresRestart: false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.gpu_layers",
-			Category:     CategoryInference,
-			Key:          "yzma_gpu_layers",
-			Value:        fmt.Sprintf("%d", cfg.Inference.GPULayers),
-			Type:         TypeInt,
-			DefaultValue: "-1",
-			Description:  "Number of layers to offload to GPU (-1 = auto, 0 = CPU only, >0 = specific count)",
-			IsEditable:   false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-
-		settings = append(settings, Setting{
-			ID:           "inference.yzma.verbose",
-			Category:     CategoryInference,
-			Key:          "yzma_verbose",
-			Value:        fmt.Sprintf("%t", cfg.Inference.Yzma.Verbose),
-			Type:         TypeBool,
-			DefaultValue: "false",
-			Description:  "Enable verbose Yzma logging",
-			IsEditable:   true,
-			RequiresRestart: false,
-			IsRequired:   false,
-			IsMigrated:   true,
-			UpdatedAt:    time.Now(),
-		})
-	}
-
 	// === Metrics (extended) ===
 	settings = append(settings, Setting{
 		ID:           "metrics.prometheus_path",
@@ -1005,8 +828,8 @@ func (s *ConfigSeeder) MapConfigToSettings(cfg *config.Config) []Setting {
 			Key:          "embeddings_provider",
 			Value:        cfg.RAG.Embeddings.Provider,
 			Type:         TypeString,
-			DefaultValue: "ollama",
-			Description:  "Embeddings provider (ollama, openai)",
+			DefaultValue: "openai",
+			Description:  "Embeddings provider (openai, custom)",
 			IsEditable:   false,
 			IsRequired:   false,
 			IsMigrated:   true,

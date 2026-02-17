@@ -74,7 +74,7 @@ func (m *Manager) GenerateTokenPair(userID, username, email string, tenantIDs []
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "ollama-openai-proxy",
+			Issuer:    "aigateway",
 			Subject:   userID,
 		},
 	}
@@ -91,7 +91,7 @@ func (m *Manager) GenerateTokenPair(userID, username, email string, tenantIDs []
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.refreshTokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(now),
-			Issuer:    "ollama-openai-proxy",
+			Issuer:    "aigateway",
 			Subject:   userID,
 		},
 	}

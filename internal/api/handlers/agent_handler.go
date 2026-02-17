@@ -1,4 +1,4 @@
-// Package handlers provides HTTP handlers for Agent API (v2.5.0+, v3.0.6+ YZMA compatibility)
+// Package handlers provides HTTP handlers for Agent API (v2.5.0+)
 package handlers
 
 import (

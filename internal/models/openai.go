@@ -23,7 +23,7 @@ type ChatCompletionRequest struct {
 	ToolChoice       interface{}        `json:"tool_choice,omitempty"`
 	ResponseFormat   *ResponseFormat    `json:"response_format,omitempty"`
 	Seed             *int               `json:"seed,omitempty"`
-	// Ollama-specific options (v1.9.1+)
+	// Provider-specific options
 	Options map[string]interface{} `json:"options,omitempty"`
 	// Дополнительные поля для функций
 	Functions    []Function  `json:"functions,omitempty"`     // Deprecated
@@ -156,14 +156,10 @@ type Model struct {
 	OwnedBy    string       `json:"owned_by"`
 	Permission []Permission `json:"permission"`
 
-	// Extended Ollama-specific fields (optional, won't break OpenAI compatibility)
+	// Extended fields (optional, won't break OpenAI compatibility)
 	Size              *int64  `json:"size,omitempty"`               // Model size in bytes
-	Digest            *string `json:"digest,omitempty"`             // Model digest/hash
-	Format            *string `json:"format,omitempty"`             // Model format (e.g., "gguf")
 	Family            *string `json:"family,omitempty"`             // Model family (e.g., "llama", "qwen")
 	ParameterSize     *string `json:"parameter_size,omitempty"`     // Parameter size (e.g., "7B", "30B")
-	QuantizationLevel *string `json:"quantization_level,omitempty"` // Quantization (e.g., "Q4_K_M")
-	ModifiedAt        *int64  `json:"modified_at,omitempty"`        // Last modified timestamp
 }
 
 // Permission представляет разрешение для модели

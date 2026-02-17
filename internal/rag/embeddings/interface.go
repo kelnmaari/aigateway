@@ -54,8 +54,9 @@ type Embedder interface {
 
 // EmbedderConfig конфигурация для embedder
 type EmbedderConfig struct {
-	Provider      string  // "ollama", "openai", "custom"
+	Provider      string  // "openai", "custom"
 	BaseURL       string  // Base URL для API
+	APIKey        string  // API key for authentication
 	Model         string  // Модель по умолчанию
 	Dimensions    int     // Размерность векторов
 	Timeout       int     // Timeout в секундах
@@ -66,10 +67,10 @@ type EmbedderConfig struct {
 // DefaultEmbedderConfig возвращает конфигурацию по умолчанию
 func DefaultEmbedderConfig() EmbedderConfig {
 	return EmbedderConfig{
-		Provider:     "ollama",
-		BaseURL:      "http://localhost:11434",
-		Model:        "mxbai-embed-large",
-		Dimensions:   1024,
+		Provider:     "openai",
+		BaseURL:      "https://api.openai.com",
+		Model:        "text-embedding-3-small",
+		Dimensions:   1536,
 		Timeout:      30,
 		MaxBatchSize: 100,
 		RateLimit:    10.0, // 10 req/sec

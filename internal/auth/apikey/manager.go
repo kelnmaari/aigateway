@@ -1,4 +1,4 @@
-// Package apikey provides API Key management for Ollama-OpenAI Proxy
+// Package apikey provides API Key management for AIGateway
 package apikey
 
 import (

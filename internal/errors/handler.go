@@ -1,4 +1,4 @@
-// Package errors provides centralized error handling for Ollama-OpenAI Proxy
+// Package errors provides centralized error handling for AIGateway
 package errors
 
 import (
@@ -38,7 +38,7 @@ const (
 	ErrorTypeTimeout            ErrorType = "timeout"
 	ErrorTypeConversion         ErrorType = "conversion"
 	ErrorTypeModelNotFound      ErrorType = "model_not_found"
-	ErrorTypeOllamaError        ErrorType = "ollama_error"
+	ErrorTypeUpstreamError        ErrorType = "upstream_error"
 )
 
 // ApplicationError представляет ошибку приложения
@@ -237,16 +237,16 @@ func NewConversionError(direction string, cause error) *ApplicationError {
 	}
 }
 
-// NewOllamaError создает ошибку от Ollama сервиса
-func NewOllamaError(ollamaMsg string, cause error) *ApplicationError {
+// NewUpstreamError creates an error from an upstream provider
+func NewUpstreamError(msg string, cause error) *ApplicationError {
 	return &ApplicationError{
-		Type:       ErrorTypeOllamaError,
-		Message:    fmt.Sprintf("Ollama error: %s", ollamaMsg),
-		Code:       "ollama_error",
+		Type:       ErrorTypeUpstreamError,
+		Message:    fmt.Sprintf("upstream error: %s", msg),
+		Code:       "upstream_error",
 		StatusCode: http.StatusServiceUnavailable,
 		Cause:      cause,
 		Metadata: map[string]interface{}{
-			"ollama_message": ollamaMsg,
+			"upstream_message": msg,
 		},
 	}
 }
@@ -262,7 +262,7 @@ func IsRetriableError(err error) bool {
 	retriableTypes := map[ErrorType]bool{
 		ErrorTypeServiceUnavailable: true,
 		ErrorTypeTimeout:            true,
-		ErrorTypeOllamaError:        true,
+		ErrorTypeUpstreamError:        true,
 	}
 
 	return retriableTypes[appErr.Type]

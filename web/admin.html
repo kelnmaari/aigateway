@@ -573,32 +573,32 @@
                 </div>
             </div>
 
-            <!-- Models Tab (v3.0.6+: yzma only) -->
+            <!-- Models Tab -->
             <div id="models-tab" class="tab-pane">
                 <!-- Sub-tabs -->
                 <div class="sub-tabs">
-                    <button class="sub-tab-btn active" data-subtab="available-models">Local Models (yzma)</button>
+                    <button class="sub-tab-btn active" data-subtab="available-models">Local Models</button>
                     <button class="sub-tab-btn" data-subtab="huggingface-browser">Hugging Face Browser</button>
                 </div>
 
-                <!-- Available Models Sub-tab (yzma) -->
+                <!-- Available Models Sub-tab -->
                 <div id="available-models-subtab" class="sub-tab-pane active">
                     <div class="section-header">
-                        <h2>🚀 Local Inference with yzma</h2>
+                        <h2>Local Inference</h2>
                         <p style="color: var(--text-secondary); margin-top: 8px;">
-                            Pure Go inference engine powered by llama.cpp - run GGUF models locally
+                            Run GGUF models locally with llama.cpp
                         </p>
                     </div>
 
-                    <!-- yzma Statistics (HTMX) -->
+                    <!-- Statistics (HTMX) -->
                     <div class="stats-grid" style="margin: 2rem 0;"
-                         hx-get="/api/ui/yzma/stats"
+                         hx-get="/api/ui/models/stats"
                          hx-trigger="load, every 5s"
                          hx-swap="innerHTML">
                         <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Loading...</div></div>
                     </div>
 
-                    <!-- Loading Indicator for yzma operations -->
+                    <!-- Loading Indicator for model operations -->
                     <div id="loading-indicator" class="htmx-indicator" style="
                         position: fixed;
                         top: 50%;
@@ -627,11 +627,11 @@
                     <!-- Currently Loaded Models Section -->
                     <div class="section" style="margin-bottom: 2rem;">
                         <div class="section-header">
-                            <h3 style="margin: 0;">✅ Currently Loaded Models</h3>
+                            <h3 style="margin: 0;">Currently Loaded Models</h3>
                         </div>
-                        
-                        <div id="yzma-loaded-models"
-                             hx-get="/api/ui/yzma/loaded"
+
+                        <div id="loaded-models"
+                             hx-get="/api/ui/models/loaded"
                              hx-trigger="load, every 3s"
                              hx-swap="innerHTML">
                             <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
@@ -643,10 +643,10 @@
                     <!-- Available GGUF Models Section -->
                     <div class="section">
                         <div class="section-header">
-                            <h3 style="margin: 0;">📦 Available GGUF Models</h3>
-                            <button class="btn btn-secondary" 
-                                    hx-get="/api/ui/yzma/models"
-                                    hx-target="#yzma-models-list"
+                            <h3 style="margin: 0;">Available GGUF Models</h3>
+                            <button class="btn btn-secondary"
+                                    hx-get="/api/ui/models/available"
+                                    hx-target="#models-list"
                                     hx-swap="innerHTML">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke-width="2"/>
@@ -654,9 +654,9 @@
                                 Refresh
                             </button>
                         </div>
-                        
-                        <div id="yzma-models-list"
-                             hx-get="/api/ui/yzma/models"
+
+                        <div id="models-list"
+                             hx-get="/api/ui/models/available"
                              hx-trigger="load"
                              hx-swap="innerHTML">
                             <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
@@ -1845,11 +1845,11 @@
         }
 
         /* =================================================
-           yzma & Hugging Face Component Styles (v3.0)
+           Model & Hugging Face Component Styles (v3.0)
            ================================================= */
 
         /* Models list - Simple list */
-        #yzma-models-list {
+        #models-list {
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -1999,7 +1999,7 @@
             margin-left: auto;
         }
 
-        /* Stat cards for yzma */
+        /* Stat cards for models */
         .stats-grid .stat-card {
             background: var(--bg-tertiary, #3a3a3a);
             border: 1px solid var(--border-color);
@@ -2399,27 +2399,27 @@
     <link rel="stylesheet" href="/framework/framework.css">
 
     <script>
-        // YZMA Model Deletion with Beautiful Modal
-        async function deleteYzmaModel(button, modelPath, modelName, isPartial) {
-            const message = isPartial 
+        // Model Deletion with Beautiful Modal
+        async function deleteModel(button, modelPath, modelName, isPartial) {
+            const message = isPartial
                 ? `Delete incomplete download?`
                 : `Are you sure you want to permanently delete this model?`;
-            
+
             const details = `File: ${modelName}\n\nThis action cannot be undone.`;
-            
+
             const confirmed = await modal.danger(message, 'Delete Model', details);
-            
+
             if (!confirmed) return;
-            
+
             // Get form from button
             const form = button.closest('form');
             if (!form) {
                 console.error('Form not found for model:', modelPath);
                 return;
             }
-            
+
             // Programmatically trigger HTMX delete
-            htmx.ajax('POST', '/api/ui/yzma/delete', {
+            htmx.ajax('POST', '/api/ui/models/delete', {
                 source: form,
                 target: form.closest('.model-row'),
                 swap: 'outerHTML swap:300ms',

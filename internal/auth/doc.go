@@ -1,4 +1,4 @@
-// Package auth provides authentication and authorization functionality for the Ollama-OpenAI Proxy.
+// Package auth provides authentication and authorization functionality for AIGateway.
 //
 // This package includes sub-packages for:
 //   - jwt: JWT token generation and validation

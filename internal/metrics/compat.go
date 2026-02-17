@@ -23,16 +23,16 @@ func (m *Metrics) RecordAPIKeyRateLimitExceeded(apiKeyID string) {
 	// Rate limiting metrics handled elsewhere
 }
 
-// RecordOllamaRequest records Ollama request
-func (m *Metrics) RecordOllamaRequest(model, operation, status string, duration time.Duration) {
+// RecordProviderRequest records provider request
+func (m *Metrics) RecordProviderRequest(model, operation, status string, duration time.Duration) {
 	if m == nil {
 		return
 	}
 	ModelRequestDuration.WithLabelValues(model).Observe(duration.Seconds())
 }
 
-// RecordOllamaError records Ollama error
-func (m *Metrics) RecordOllamaError(model, operation, errorType string) {
+// RecordProviderError records provider error
+func (m *Metrics) RecordProviderError(model, operation, errorType string) {
 	if m == nil {
 		return
 	}

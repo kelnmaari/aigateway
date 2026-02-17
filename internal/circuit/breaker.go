@@ -1,4 +1,4 @@
-// Package circuit provides circuit breaker implementation for Ollama-OpenAI Proxy
+// Package circuit provides circuit breaker implementation for AIGateway
 package circuit
 
 import (
@@ -9,7 +9,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"aigateway/internal/config"
 )
 
 // State представляет состояние circuit breaker
@@ -67,18 +66,12 @@ type Stats struct {
 type Operation func(ctx context.Context) (interface{}, error)
 
 // NewBreaker создает новый circuit breaker
-func NewBreaker(name string, cfg *config.Config, logger *logrus.Logger) *Breaker {
-	maxFailures := 5
-	resetTimeout := 60 * time.Second
-
-	// Используем конфигурацию если доступна
-	if cfg.Ollama.CircuitBreaker.Enabled {
-		if cfg.Ollama.CircuitBreaker.MaxFailures > 0 {
-			maxFailures = cfg.Ollama.CircuitBreaker.MaxFailures
-		}
-		if cfg.Ollama.CircuitBreaker.ResetTimeout > 0 {
-			resetTimeout = cfg.Ollama.CircuitBreaker.ResetTimeout
-		}
+func NewBreaker(name string, maxFailures int, resetTimeout time.Duration, logger *logrus.Logger) *Breaker {
+	if maxFailures <= 0 {
+		maxFailures = 5
+	}
+	if resetTimeout <= 0 {
+		resetTimeout = 60 * time.Second
 	}
 
 	breaker := &Breaker{
@@ -294,18 +287,20 @@ func NewCircuitBreakerError(name, message string) *CircuitBreakerError {
 
 // Manager управляет несколькими circuit breaker'ами
 type Manager struct {
-	config   *config.Config
-	logger   *logrus.Logger
-	breakers map[string]*Breaker
-	mutex    sync.RWMutex
+	logger       *logrus.Logger
+	maxFailures  int
+	resetTimeout time.Duration
+	breakers     map[string]*Breaker
+	mutex        sync.RWMutex
 }
 
 // NewManager создает новый manager для circuit breaker'ов
-func NewManager(cfg *config.Config, logger *logrus.Logger) *Manager {
+func NewManager(maxFailures int, resetTimeout time.Duration, logger *logrus.Logger) *Manager {
 	return &Manager{
-		config:   cfg,
-		logger:   logger,
-		breakers: make(map[string]*Breaker),
+		logger:       logger,
+		maxFailures:  maxFailures,
+		resetTimeout: resetTimeout,
+		breakers:     make(map[string]*Breaker),
 	}
 }
 
@@ -328,7 +323,7 @@ func (m *Manager) GetBreaker(name string) *Breaker {
 		return breaker
 	}
 
-	breaker = NewBreaker(name, m.config, m.logger)
+	breaker = NewBreaker(name, m.maxFailures, m.resetTimeout, m.logger)
 	m.breakers[name] = breaker
 
 	return breaker

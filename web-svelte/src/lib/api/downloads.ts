@@ -75,9 +75,6 @@ export const downloadsApi = {
 		params.set('limit', limit.toString());
 		params.set('page', page.toString());
 		return api.get<HuggingFaceSearchResponse>(`/api/ui/huggingface/popular?${params}`);
-	},
-
-	// Ollama pull (via yzma)
-	pullOllamaModel: (model: string) => api.post('/v1/yzma/models/load', { name: model })
+	}
 };
 

@@ -184,7 +184,6 @@ class AdminPanel {
                 break;
             case 'models':
                 // Models tab now uses HTMX for data loading
-                // See admin.html lines 530-761 (yzma and Hugging Face sections)
                 console.log('Models tab loaded - using HTMX');
                 break;
             case 'mcp':
@@ -730,11 +729,7 @@ class AdminPanel {
     // ==================== SYSTEM ====================
 
     // Load Models (v1.9.3+)
-    // DEPRECATED v3.0.5+: Ollama-based /api/admin/models endpoint removed
-    // Models tab now uses HTMX with yzma endpoints:
-    // - /api/ui/yzma/models (available GGUF models)
-    // - /api/ui/yzma/loaded (currently loaded models)
-    // - /api/ui/huggingface/search (Hugging Face browser)
+    // DEPRECATED v3.0.5+: Models tab now uses HTMX
     async loadModels() {
         console.warn('loadModels() is deprecated since v3.0.5+ - Models tab uses HTMX');
         // No-op: Models are loaded via HTMX in admin.html
@@ -756,7 +751,7 @@ class AdminPanel {
     }
 
     // DEPRECATED v3.0.5+: Models accordion UI removed
-    // Models are now managed via yzma HTMX UI
+    // Models are now managed via HTMX UI
     renderModels() {
         console.warn('renderModels() is deprecated since v3.0.5+');
     }
@@ -878,7 +873,6 @@ class AdminPanel {
 
     // Refresh models (v1.9.3+)
     // DEPRECATED v3.0.5+: Models refresh now handled by HTMX
-    // Use hx-get="/api/ui/yzma/models" with hx-trigger="load" in HTML
     async refreshModels() {
         console.warn('refreshModels() is deprecated since v3.0.5+ - Use HTMX refresh buttons');
     }

@@ -265,7 +265,7 @@ func (w *ModelListWorker) updateModelList() {
 	}
 	
 	// Cache models in Redis
-	key := "models:list:yzma"
+	key := "models:list:inference"
 	if err := w.manager.Cache.SetJSON(ctx, key, models, w.interval*2); err != nil {
 		w.logger.WithError(err).Warn("Failed to cache model list in Redis")
 		return
@@ -276,7 +276,7 @@ func (w *ModelListWorker) updateModelList() {
 
 // GetCachedModelList retrieves cached model list from Redis
 func (w *ModelListWorker) GetCachedModelList(ctx context.Context) (interface{}, error) {
-	key := "models:list:yzma"
+	key := "models:list:inference"
 	
 	var models interface{}
 	if err := w.manager.Cache.GetJSON(ctx, key, &models); err != nil {
@@ -290,7 +290,7 @@ func (w *ModelListWorker) GetCachedModelList(ctx context.Context) (interface{}, 
 
 // InvalidateModelListCache invalidates model list cache (call on load/unload)
 func (w *ModelListWorker) InvalidateModelListCache(ctx context.Context) error {
-	key := "models:list:yzma"
+	key := "models:list:inference"
 	if err := w.manager.Cache.Delete(ctx, key); err != nil {
 		w.logger.WithError(err).Warn("Failed to invalidate model list cache")
 		return err

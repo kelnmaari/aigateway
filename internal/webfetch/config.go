@@ -81,7 +81,7 @@ func DefaultConfig() Config {
 		Enabled: true,
 		HTTP: HTTPConfig{
 			Timeout:         30 * time.Second,
-			UserAgent:       "OllamaProxy-Bot/1.0",
+			UserAgent:       "AIGateway-Bot/1.0",
 			FollowRedirects: true,
 			MaxRedirects:    5,
 			MaxResponseSize: 10 * 1024 * 1024, // 10MB
@@ -129,7 +129,7 @@ func DefaultConfig() Config {
 		},
 		Summarization: SummarizationConfig{
 			Enabled:         false, // По умолчанию выключено
-			Provider:        "ollama",
+			Provider:        "openai",
 			Model:           "llama3.1:8b",
 			MaxInputTokens:  4096,
 			MaxOutputTokens: 256,

@@ -16,7 +16,7 @@ import (
 
 // Prometheus metrics namespace
 const (
-	namespace = "ollama_proxy"
+	namespace = "aigateway"
 )
 
 // ========================================

@@ -30,9 +30,6 @@ func setupPerformanceTestManager(t *testing.T) (*apikey.Manager, context.Context
 			Host: "localhost",
 			Port: 8080,
 		},
-		Ollama: config.OllamaConfig{
-			URL: "http://localhost:11434",
-		},
 	}
 
 	logger := logrus.New()
@@ -59,9 +56,6 @@ func setupRateLimiter(t *testing.T) *ratelimit.Limiter {
 		Server: config.ServerConfig{
 			Host: "localhost",
 			Port: 8080,
-		},
-		Ollama: config.OllamaConfig{
-			URL: "http://localhost:11434",
 		},
 	}
 	cfg.Auth.RateLimiting.Enabled = true
@@ -505,7 +499,6 @@ func BenchmarkRateLimiter_CheckRateLimit(b *testing.B) {
 			Enabled: true,
 		},
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
-		Ollama: config.OllamaConfig{URL: "http://localhost:11434"},
 	}
 	cfg.Auth.RateLimiting.Enabled = true
 	logger := logrus.New()
@@ -534,7 +527,6 @@ func BenchmarkAPIKeyValidation_Parallel(b *testing.B) {
 	cfg := &config.Config{
 		Auth:   config.AuthConfig{Enabled: true},
 		Server: config.ServerConfig{Host: "localhost", Port: 8080},
-		Ollama: config.OllamaConfig{URL: "http://localhost:11434"},
 	}
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)

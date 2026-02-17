@@ -162,10 +162,6 @@ func TestSeedFromYAML_SuccessfulSeed(t *testing.T) {
 			Level:  "info",
 			Format: "json",
 		},
-		Yzma: config.YzmaConfig{
-			Enabled:   true,
-			ModelsDir: "./models",
-		},
 		Database: config.DatabaseConfig{
 			Type: "postgresql",
 		},

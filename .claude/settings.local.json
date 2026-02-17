@@ -6,7 +6,11 @@
       "Bash(ls:*)",
       "Bash(dir:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(go test:*)",
+      "Bash(go mod tidy:*)"
     ]
   }
 }

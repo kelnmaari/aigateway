@@ -283,9 +283,14 @@ func (p *Processor) analyzeWithLLM(
 	chunks []chunker.Chunk,
 	ragContext []rag.CodeChunk,
 ) (*analyzer.AnalysisResultParsed, int, error) {
-	// Check if per-file review mode is enabled
-	if project.Settings.PerFileReview {
+	// Route to the appropriate review mode
+	switch project.Settings.GetReviewMode() {
+	case models.ReviewModeToolBased:
+		return p.analyzeToolBased(ctx, project, diffs, chunks, ragContext)
+	case models.ReviewModePerFile:
 		return p.analyzePerFile(ctx, project, diffs)
+	default:
+		// Standard batch mode — fall through
 	}
 	
 	// Build the prompt
@@ -533,6 +538,52 @@ func (p *Processor) analyzePerFile(
 	)
 	
 	return reviewer.ReviewFiles(ctx, project, diffs, modelID)
+}
+
+// analyzeToolBased uses tool-based review mode with output tools
+func (p *Processor) analyzeToolBased(
+	ctx context.Context,
+	project *models.GitLabProject,
+	diffs []client.Diff,
+	chunks []chunker.Chunk,
+	ragContext []rag.CodeChunk,
+) (*analyzer.AnalysisResultParsed, int, error) {
+	p.logger.WithFields(logrus.Fields{
+		"project":     project.Name,
+		"files_count": len(diffs),
+	}).Info("Using tool-based review mode with output tools")
+
+	llmURL := p.llmBaseURL
+	if llmURL == "" {
+		llmURL = "http://localhost:8080"
+	}
+
+	modelID := project.AnalysisModelID
+	if modelID == "" {
+		modelID = "default"
+	}
+
+	maxTokens := project.Settings.MaxReviewTokens
+	if maxTokens <= 0 {
+		maxTokens = 8192
+	}
+
+	reviewLang := project.Settings.ReviewLanguage
+	if reviewLang == "" {
+		reviewLang = "en"
+	}
+
+	reviewer := NewToolBasedReviewer(
+		p.ragService,
+		project.ID,
+		llmURL,
+		p.llmAPIKey,
+		maxTokens,
+		reviewLang,
+		p.logger,
+	)
+
+	return reviewer.Review(ctx, diffs, ragContext, modelID)
 }
 
 // buildReviewResult converts analysis result to review result

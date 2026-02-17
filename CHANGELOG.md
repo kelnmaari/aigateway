@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.11.0] - 2026-02-17
+
+### Added
+
+- **GitLab**: Tool-based review mode — LLM uses structured tool calling (`report_issue`, `report_suggestion`, `set_review_summary`, `finish_review`) instead of raw JSON output for more reliable code reviews
+- **GitLab**: `ReviewMode` setting per project — choose between Standard (batch JSON), Per-file (with read tools), or Tool-based (structured output)
+
+### Technical
+
+- Output tools with JSON schema validation: `report_issue`, `report_suggestion`, `set_review_summary`, `finish_review`
+- `ReviewCollector` accumulates results from tool calls with severity/category/priority normalization
+- Fallback to JSON parsing when model returns text (tool_choice: auto)
+- Exported `NormalizeSeverity()`, `NormalizeCategory()`, `NormalizePriority()` in analyzer package
+- Backward compatible: `PerFileReview: true` still maps to `per_file` mode via `GetReviewMode()`
+- Frontend updated with review mode dropdown (Standard / Per-file / Tool-based) replacing checkbox
+
+---
+
 ## [4.10.1] - 2026-02-10
 
 ### Fixed

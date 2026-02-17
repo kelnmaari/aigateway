@@ -55,7 +55,7 @@ func NewTracerProvider(cfg TracingConfig) (*TracerProvider, error) {
 
 	// Set default service name if not provided
 	if cfg.ServiceName == "" {
-		cfg.ServiceName = "ollama-proxy"
+		cfg.ServiceName = "aigateway"
 	}
 
 	// Set default sampling rate if not provided
@@ -111,7 +111,7 @@ func NewTracerProvider(cfg TracingConfig) (*TracerProvider, error) {
 
 	return &TracerProvider{
 		provider: tp,
-		tracer:   tp.Tracer("ollama-proxy"),
+		tracer:   tp.Tracer("aigateway"),
 	}, nil
 }
 

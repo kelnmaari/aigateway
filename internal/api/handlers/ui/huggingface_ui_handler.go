@@ -613,7 +613,8 @@ func (h *HuggingFaceUIHandler) renderError(c *gin.Context, message string) {
 }
 
 // hfErrorStatusCode returns appropriate HTTP status code based on HuggingFace API error.
-// Returns 401 for auth errors (expired/invalid token), 500 for everything else.
+// Returns 502 Bad Gateway for upstream auth errors (expired/invalid token) to distinguish
+// from 401 which triggers user session logout in the frontend client.
 func hfErrorStatusCode(err error) int {
 	if err == nil {
 		return http.StatusOK
@@ -623,7 +624,7 @@ func hfErrorStatusCode(err error) int {
 		strings.Contains(errLower, "unauthorized") ||
 		strings.Contains(errLower, "invalid token") ||
 		strings.Contains(errLower, "401") {
-		return http.StatusUnauthorized
+		return http.StatusBadGateway
 	}
 	return http.StatusInternalServerError
 }

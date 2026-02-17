@@ -209,6 +209,63 @@ func (pm *ProviderManager) DiscoverModels(ctx context.Context) (int, error) {
 	return totalDiscovered, nil
 }
 
+// DiscoverModelsFromProvider обнаруживает модели от одного provider и сохраняет в registry.
+// Возвращает количество новых моделей и список всех обнаруженных моделей.
+func (pm *ProviderManager) DiscoverModelsFromProvider(ctx context.Context, providerID string) (int, []*models.ModelRegistry, error) {
+	pm.mu.RLock()
+	provider, exists := pm.providers[providerID]
+	pm.mu.RUnlock()
+
+	if !exists {
+		return 0, nil, fmt.Errorf("provider not found: %s", providerID)
+	}
+
+	pm.logger.Infof("Discovering models from provider: %s (%s)", provider.GetName(), provider.GetType())
+
+	providerModels, err := provider.ListModels(ctx)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to list models from provider %s: %w", providerID, err)
+	}
+
+	pm.logger.Infof("Found %d models from %s", len(providerModels), provider.GetName())
+
+	var discovered int
+	var allModels []*models.ModelRegistry
+
+	for _, providerModel := range providerModels {
+		// Проверяем существует ли модель уже
+		existing, err := pm.db.GetModelRegistryByModelID(ctx, providerModel.ID)
+		if err == nil && existing != nil {
+			allModels = append(allModels, existing)
+			continue
+		}
+
+		// Создаем новую запись в registry
+		registryModel := &models.ModelRegistry{
+			ModelID:      providerModel.ID,
+			ModelName:    providerModel.Name,
+			ProviderID:   providerID,
+			Capabilities: []models.ModelCapability{},
+			Parameters:   make(map[string]interface{}),
+			Tags:         []string{},
+			Status:       models.ModelStatusActive,
+			HealthStatus: models.HealthStatusUnknown,
+		}
+
+		if err := pm.db.CreateModelRegistry(ctx, registryModel); err != nil {
+			pm.logger.WithError(err).Errorf("Failed to register model: %s", providerModel.ID)
+			continue
+		}
+
+		discovered++
+		allModels = append(allModels, registryModel)
+		pm.logger.Infof("Registered model: %s from %s", providerModel.ID, provider.GetName())
+	}
+
+	pm.logger.Infof("Provider discovery complete for %s: %d new models registered", providerID, discovered)
+	return discovered, allModels, nil
+}
+
 // RunDiscoveryLoop запускает периодическое обнаружение моделей
 func (pm *ProviderManager) RunDiscoveryLoop(ctx context.Context, interval time.Duration) {
 	pm.logger.Infof("Starting model discovery loop with interval: %s", interval)

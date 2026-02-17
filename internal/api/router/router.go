@@ -1892,6 +1892,8 @@ func (r *Router) setupAdminRoutes() {
 		admin.GET("/registry/providers/:id", r.registryHandler.GetProvider)
 		admin.PUT("/registry/providers/:id", r.registryHandler.UpdateProvider)
 		admin.DELETE("/registry/providers/:id", r.registryHandler.DeleteProvider)
+		admin.POST("/registry/providers/:id/health", r.registryHandler.HealthCheckProvider)
+		admin.POST("/registry/providers/:id/discover", r.registryHandler.DiscoverModelsProvider)
 
 		// Model Registry Management
 		admin.GET("/registry/models", r.registryHandler.ListModels)

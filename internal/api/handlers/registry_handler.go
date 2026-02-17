@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"aigateway/internal/models"
 	"aigateway/internal/providers"
@@ -191,6 +192,57 @@ func (h *RegistryHandler) HealthCheckProviders(c *gin.Context) {
 		"providers": results,
 		"total":     len(results),
 	})
+}
+
+// HealthCheckProvider проверяет health одного provider по ID
+// POST /api/admin/registry/providers/:id/health
+func (h *RegistryHandler) HealthCheckProvider(c *gin.Context) {
+	providerID := c.Param("id")
+
+	provider, err := h.providerManager.GetProvider(providerID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"status":  "error",
+			"message": fmt.Sprintf("Provider not found: %s", providerID),
+		})
+		return
+	}
+
+	startTime := time.Now()
+	healthErr := provider.HealthCheck(c.Request.Context())
+	latency := time.Since(startTime)
+
+	result := gin.H{
+		"response_time_ms": latency.Milliseconds(),
+	}
+
+	if healthErr != nil {
+		result["status"] = "unhealthy"
+		result["message"] = healthErr.Error()
+
+		// Update health status in DB
+		go func() {
+			updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := h.db.UpdateModelProviderHealth(updateCtx, providerID, models.HealthStatusUnhealthy, healthErr.Error()); err != nil {
+				h.logger.WithError(err).Errorf("Failed to update provider health: %s", providerID)
+			}
+		}()
+	} else {
+		result["status"] = "healthy"
+		result["message"] = "Provider is reachable"
+
+		// Update health status in DB
+		go func() {
+			updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := h.db.UpdateModelProviderHealth(updateCtx, providerID, models.HealthStatusHealthy, ""); err != nil {
+				h.logger.WithError(err).Errorf("Failed to update provider health: %s", providerID)
+			}
+		}()
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // ========================================
@@ -415,6 +467,25 @@ func (h *RegistryHandler) DiscoverModels(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Model discovery completed",
 		"discovered": totalDiscovered,
+	})
+}
+
+// DiscoverModelsProvider запускает discovery моделей от одного provider
+// POST /api/admin/registry/providers/:id/discover
+func (h *RegistryHandler) DiscoverModelsProvider(c *gin.Context) {
+	providerID := c.Param("id")
+
+	discovered, registryModels, err := h.providerManager.DiscoverModelsFromProvider(c.Request.Context(), providerID)
+	if err != nil {
+		h.logger.WithError(err).Errorf("Failed to discover models from provider: %s", providerID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      fmt.Sprintf("Discovered %d new models", discovered),
+		"models_found": len(registryModels),
+		"models":       registryModels,
 	})
 }
 

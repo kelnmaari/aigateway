@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.2] - 2026-03-03
+
+### Fixed
+
+- **Svelte Frontend TEI/Rerank Filters**: Added TEI and Rerank provider filters to the SvelteKit HuggingFace model browser (previously only added to legacy HTML UI)
+- **Provider Hints**: Added provider hints for TEI and Rerank filters in search UI
+- **Recommended Provider**: TEI/Rerank filters now correctly recommend TEI provider when selecting a model
+
+### Technical
+
+- `HFProviderFilter` type extended with `'tei'` and `'rerank'` in `+page.svelte`
+- `useHFModel()` switch cases added for `tei` and `rerank` provider filters
+- Provider hint and recommended provider sections updated in Svelte template
+
+---
+
 ## [4.13.1] - 2026-03-03
 
 ### Added

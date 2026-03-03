@@ -816,6 +816,105 @@ func (r *Router) unifiedChatCompletions() gin.HandlerFunc {
 	}
 }
 
+// unifiedPassthrough returns a generic handler that routes any OpenAI-compatible request
+// to inference (Docker) or external providers (Model Registry) based on model source.
+// Supports both JSON and multipart/form-data requests (embeddings, rerank, audio, images, moderations).
+func (r *Router) unifiedPassthrough(endpointPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{"type": "invalid_request_error", "message": "failed to read request body"},
+			})
+			return
+		}
+
+		model := handlers.ExtractModelFromRequest(bodyBytes, c.GetHeader("Content-Type"))
+		if model == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": gin.H{"type": "invalid_request_error", "message": "model is required"},
+			})
+			return
+		}
+
+		// Check inference first (Docker-based models)
+		if r.inferenceRouter != nil {
+			if _, running := r.inferenceRouter.GetModel(model); running {
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				r.inferenceProxyHandler.HandlePassthrough(c, endpointPath)
+				return
+			}
+		}
+
+		// Check external providers (Model Registry)
+		if r.externalProxyHandler != nil && r.db != nil {
+			modelEntry, err := r.db.GetModelRegistryByModelID(c.Request.Context(), model)
+			if err == nil {
+				provider, err := r.db.GetModelProvider(c.Request.Context(), modelEntry.ProviderID)
+				if err == nil && provider.Enabled {
+					c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+					r.externalProxyHandler.HandlePassthrough(c, provider, endpointPath)
+					return
+				}
+			}
+		}
+
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"type":    "model_not_found",
+				"message": fmt.Sprintf("model '%s' not found in inference or model registry", model),
+			},
+		})
+	}
+}
+
+// handleGetModel returns a handler for GET /v1/models/:model.
+// Returns model details from inference or Model Registry.
+func (r *Router) handleGetModel() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		modelID := c.Param("model")
+
+		// Check inference first
+		if r.inferenceRouter != nil {
+			for _, m := range r.inferenceRouter.ListModels() {
+				if m.Spec.Alias == modelID {
+					c.JSON(http.StatusOK, gin.H{
+						"id":       m.Spec.Alias,
+						"object":   "model",
+						"created":  m.LastUsed.Unix(),
+						"owned_by": string(m.Spec.Provider),
+					})
+					return
+				}
+			}
+		}
+
+		// Check Model Registry
+		if r.db != nil {
+			entry, err := r.db.GetModelRegistryByModelID(c.Request.Context(), modelID)
+			if err == nil {
+				provider, err := r.db.GetModelProvider(c.Request.Context(), entry.ProviderID)
+				if err == nil && provider.Enabled {
+					c.JSON(http.StatusOK, gin.H{
+						"id":       entry.ModelID,
+						"object":   "model",
+						"created":  entry.CreatedAt.Unix(),
+						"owned_by": string(provider.ProviderType) + ":" + provider.Name,
+					})
+					return
+				}
+			}
+		}
+
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"type":    "model_not_found",
+				"message": fmt.Sprintf("model '%s' not found", modelID),
+			},
+		})
+	}
+}
+
 // setupHealthRoutes настраивает health check endpoint для desktop client
 func (r *Router) setupHealthRoutes() {
 	// Health endpoint without authentication (needed for API key verification)
@@ -1725,6 +1824,23 @@ func (r *Router) setupOpenAIRoutes() {
 	if r.inferenceProxyHandler != nil {
 		v1.POST("/completions", r.inferenceProxyHandler.HandleCompletions)
 	}
+
+	// /v1/models/:model — retrieve model details (v4.13.0+)
+	v1.GET("/models/:model", r.handleGetModel())
+
+	// Unified passthrough endpoints (v4.13.0+)
+	// Routes to inference (Docker) or external providers (Model Registry) based on model.
+	// Supports both JSON and multipart/form-data bodies.
+	v1.POST("/embeddings", r.unifiedPassthrough("/v1/embeddings"))
+	v1.POST("/rerank", r.unifiedPassthrough("/v1/rerank"))
+	v1.POST("/audio/transcriptions", r.unifiedPassthrough("/v1/audio/transcriptions"))
+	v1.POST("/audio/translations", r.unifiedPassthrough("/v1/audio/translations"))
+	v1.POST("/audio/speech", r.unifiedPassthrough("/v1/audio/speech"))
+	v1.POST("/images/generations", r.unifiedPassthrough("/v1/images/generations"))
+	v1.POST("/images/edits", r.unifiedPassthrough("/v1/images/edits"))
+	v1.POST("/images/variations", r.unifiedPassthrough("/v1/images/variations"))
+	v1.POST("/moderations", r.unifiedPassthrough("/v1/moderations"))
+	r.logger.Info("OpenAI-compatible passthrough routes configured: embeddings, rerank, audio/*, images/*, moderations")
 
 	// /v1/external/chat/completions — dedicated external provider route (v4.11.0+)
 	if r.externalProxyHandler != nil {

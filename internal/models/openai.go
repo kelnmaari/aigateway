@@ -260,6 +260,38 @@ type Embedding struct {
 	Embedding []float64 `json:"embedding"`
 }
 
+// OpenAI-compatible Rerank API (used by Jina, Cohere, vLLM, TEI, etc.)
+
+// RerankRequest представляет запрос на reranking документов
+type RerankRequest struct {
+	Model           string   `json:"model" binding:"required"`
+	Query           string   `json:"query" binding:"required"`
+	Documents       []string `json:"documents" binding:"required"`
+	TopN            *int     `json:"top_n,omitempty"`
+	ReturnDocuments *bool    `json:"return_documents,omitempty"`
+}
+
+// RerankResponse представляет ответ с reranking результатами
+type RerankResponse struct {
+	ID      string         `json:"id"`
+	Object  string         `json:"object"`
+	Model   string         `json:"model"`
+	Results []RerankResult `json:"results"`
+	Usage   Usage          `json:"usage"`
+}
+
+// RerankResult представляет один результат reranking
+type RerankResult struct {
+	Index          int             `json:"index"`
+	RelevanceScore float64        `json:"relevance_score"`
+	Document       *RerankDocument `json:"document,omitempty"`
+}
+
+// RerankDocument представляет документ в rerank ответе
+type RerankDocument struct {
+	Text string `json:"text"`
+}
+
 // Общие структуры
 
 // Usage представляет информацию об использовании токенов

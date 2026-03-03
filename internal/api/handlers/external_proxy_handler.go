@@ -378,6 +378,51 @@ func (h *ExternalProxyHandler) streamGeminiToOpenAI(c *gin.Context, resp *http.R
 	}
 }
 
+// HandlePassthrough forwards the request body as-is to the provider's endpoint path.
+// Supports both JSON and multipart/form-data requests (audio, images, embeddings, rerank, etc.).
+// Body must be pre-loaded into c.Request.Body by the caller (unified handler).
+func (h *ExternalProxyHandler) HandlePassthrough(c *gin.Context, provider *models.ModelProvider, path string) {
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "failed to read request body")
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"provider":      provider.Name,
+		"provider_type": provider.ProviderType,
+		"path":          path,
+	}).Debug("proxying request to external provider")
+
+	endpoint := strings.TrimRight(provider.BaseURL, "/") + path
+	proxyReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "internal_error", err.Error())
+		return
+	}
+
+	// Preserve original Content-Type (important for multipart/form-data with boundary)
+	contentType := c.GetHeader("Content-Type")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	proxyReq.Header.Set("Content-Type", contentType)
+
+	if provider.APIKey != "" {
+		proxyReq.Header.Set("Authorization", "Bearer "+provider.APIKey)
+	}
+
+	resp, err := h.client.Do(proxyReq)
+	if err != nil {
+		h.logger.WithError(err).WithField("provider", provider.Name).Error("external proxy request failed")
+		h.errorResponse(c, http.StatusBadGateway, "upstream_error", err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
+}
+
 func (h *ExternalProxyHandler) errorResponse(c *gin.Context, status int, errType, message string) {
 	c.JSON(status, gin.H{
 		"error": gin.H{

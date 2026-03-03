@@ -217,14 +217,24 @@ func (h *InferenceProxyHandler) HandlePassthrough(c *gin.Context, path string) {
 		return
 	}
 
-	endpoint := inst.Handle.Endpoint + path
+	// TEI provider requires path and format translation for rerank
+	if inst.Spec.Provider == inference.ProviderTEI && path == "/v1/rerank" {
+		h.handleTEIRerank(c, inst, model, bodyBytes)
+		return
+	}
+
+	// TEI provider: map /v1/embeddings to /v1/embeddings (already OpenAI-compatible)
+	// For other paths, apply provider-specific path mapping
+	actualPath := h.mapProviderPath(inst.Spec.Provider, path)
+	endpoint := inst.Handle.Endpoint + actualPath
 
 	h.logger.WithFields(logrus.Fields{
-		"model":    model,
-		"alias":    inst.Spec.Alias,
-		"provider": inst.Spec.Provider,
-		"endpoint": endpoint,
-		"path":     path,
+		"model":       model,
+		"alias":       inst.Spec.Alias,
+		"provider":    inst.Spec.Provider,
+		"endpoint":    endpoint,
+		"path":        path,
+		"actual_path": actualPath,
 	}).Debug("proxying passthrough request")
 
 	proxyReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
@@ -249,6 +259,150 @@ func (h *InferenceProxyHandler) HandlePassthrough(c *gin.Context, path string) {
 	defer resp.Body.Close()
 
 	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
+}
+
+// mapProviderPath translates OpenAI-compatible paths to provider-specific paths.
+// Most providers support OpenAI paths natively; TEI is the exception for some endpoints.
+func (h *InferenceProxyHandler) mapProviderPath(provider inference.ProviderKind, path string) string {
+	if provider == inference.ProviderTEI {
+		switch path {
+		case "/v1/embeddings":
+			return "/v1/embeddings" // TEI supports OpenAI-compatible embeddings
+		default:
+			return path
+		}
+	}
+	return path
+}
+
+// handleTEIRerank translates OpenAI-compatible rerank requests to TEI format and back.
+//
+// OpenAI/Dify format:
+//
+//	Request:  {"model":"...", "query":"...", "documents":["..."], "top_n":3}
+//	Response: {"id":"...", "object":"rerank", "model":"...", "results":[{"index":0, "relevance_score":0.95}]}
+//
+// TEI format:
+//
+//	Request:  {"query":"...", "texts":["..."], "return_text":false}
+//	Response: [{"index":0, "score":0.95}]
+func (h *InferenceProxyHandler) handleTEIRerank(c *gin.Context, inst *inference.ModelInstance, model string, bodyBytes []byte) {
+	// Parse OpenAI-compatible rerank request
+	var openAIReq struct {
+		Model           string   `json:"model"`
+		Query           string   `json:"query"`
+		Documents       []string `json:"documents"`
+		TopN            *int     `json:"top_n,omitempty"`
+		ReturnDocuments *bool    `json:"return_documents,omitempty"`
+	}
+	if err := json.Unmarshal(bodyBytes, &openAIReq); err != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "invalid rerank request: "+err.Error())
+		return
+	}
+
+	if openAIReq.Query == "" || len(openAIReq.Documents) == 0 {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "query and documents are required")
+		return
+	}
+
+	// Build TEI rerank request
+	teiReq := map[string]interface{}{
+		"query":       openAIReq.Query,
+		"texts":       openAIReq.Documents,
+		"return_text": false,
+		"raw_scores":  false,
+	}
+
+	teiBody, err := json.Marshal(teiReq)
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "internal_error", "failed to build TEI request")
+		return
+	}
+
+	endpoint := inst.Handle.Endpoint + "/rerank"
+
+	h.logger.WithFields(logrus.Fields{
+		"model":    model,
+		"alias":    inst.Spec.Alias,
+		"provider": inst.Spec.Provider,
+		"endpoint": endpoint,
+		"docs":     len(openAIReq.Documents),
+	}).Debug("proxying rerank to TEI (format translation)")
+
+	proxyReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(teiBody))
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "internal_error", err.Error())
+		return
+	}
+	proxyReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.client.Do(proxyReq)
+	if err != nil {
+		h.logger.WithError(err).Error("TEI rerank request failed")
+		h.errorResponse(c, http.StatusBadGateway, "upstream_error", err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		h.errorResponse(c, http.StatusBadGateway, "upstream_error", "failed to read TEI response")
+		return
+	}
+
+	// If TEI returned an error, forward it
+	if resp.StatusCode != http.StatusOK {
+		h.logger.WithFields(logrus.Fields{
+			"status": resp.StatusCode,
+			"body":   string(respBytes),
+		}).Warn("TEI rerank returned non-200")
+		c.Data(resp.StatusCode, "application/json", respBytes)
+		return
+	}
+
+	// Parse TEI response: [{"index":0, "score":0.95}, ...]
+	var teiResults []struct {
+		Index int     `json:"index"`
+		Score float64 `json:"score"`
+	}
+	if err := json.Unmarshal(respBytes, &teiResults); err != nil {
+		h.logger.WithError(err).WithField("body", string(respBytes)).Error("failed to parse TEI rerank response")
+		h.errorResponse(c, http.StatusBadGateway, "upstream_error", "failed to parse TEI response")
+		return
+	}
+
+	// Apply top_n filter
+	results := teiResults
+	if openAIReq.TopN != nil && *openAIReq.TopN > 0 && *openAIReq.TopN < len(results) {
+		results = results[:*openAIReq.TopN]
+	}
+
+	// Convert to OpenAI-compatible rerank response
+	openAIResults := make([]gin.H, 0, len(results))
+	for _, r := range results {
+		item := gin.H{
+			"index":           r.Index,
+			"relevance_score": r.Score,
+		}
+		// Include document text if requested
+		if openAIReq.ReturnDocuments != nil && *openAIReq.ReturnDocuments && r.Index < len(openAIReq.Documents) {
+			item["document"] = gin.H{
+				"text": openAIReq.Documents[r.Index],
+			}
+		}
+		openAIResults = append(openAIResults, item)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":      "rerank-" + model,
+		"object":  "rerank",
+		"model":   model,
+		"results": openAIResults,
+		"usage": gin.H{
+			"prompt_tokens": 0,
+			"total_tokens":  0,
+		},
+	})
 }
 
 func (h *InferenceProxyHandler) streamResponse(c *gin.Context, resp *http.Response) {

@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.0] - 2026-03-03
+
+### Added
+
+- **Full OpenAI-compatible API**: All major OpenAI API endpoints now available through unified passthrough routing
+- **Embeddings API**: `POST /v1/embeddings` — text embeddings generation
+- **Rerank API**: `POST /v1/rerank` — document reranking (Cohere/Jina/TEI-compatible)
+- **Audio API**: `POST /v1/audio/transcriptions`, `/v1/audio/translations`, `/v1/audio/speech` — Whisper STT, translation, and TTS
+- **Images API**: `POST /v1/images/generations`, `/v1/images/edits`, `/v1/images/variations` — DALL-E-compatible image generation
+- **Moderations API**: `POST /v1/moderations` — content moderation
+- **Model Details**: `GET /v1/models/:model` — retrieve specific model information
+- **Dify Integration**: Full support for all OpenAI-API-compatible model types (LLM, Text Embedding, Rerank, Speech2Text, TTS)
+
+### Technical
+
+- `unifiedPassthrough(path)` — generic handler factory: extracts model from JSON or multipart/form-data, routes to inference or Model Registry
+- `ExtractModelFromRequest()` helper — supports both JSON and multipart body parsing for model field extraction
+- `ExternalProxyHandler.HandlePassthrough()` — generic passthrough proxy preserving Content-Type (JSON and multipart)
+- `InferenceProxyHandler.HandlePassthrough()` — generic passthrough proxy to Docker-based inference containers
+- `handleGetModel()` — model detail endpoint, queries both inference and Model Registry
+- `RerankRequest`, `RerankResponse`, `RerankResult`, `RerankDocument` models added
+
+---
+
 ## [4.12.2] - 2026-02-17
 
 ### Fixed

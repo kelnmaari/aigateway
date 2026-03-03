@@ -190,6 +190,67 @@ func (h *InferenceProxyHandler) HandleModels(c *gin.Context) {
 	})
 }
 
+// HandlePassthrough proxies any OpenAI-compatible request to the inference provider container.
+// Supports both JSON and multipart/form-data (audio, images, embeddings, rerank, etc.).
+// Body must be pre-loaded into c.Request.Body by the caller (unified handler).
+func (h *InferenceProxyHandler) HandlePassthrough(c *gin.Context, path string) {
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "failed to read request body")
+		return
+	}
+
+	model := ExtractModelFromRequest(bodyBytes, c.GetHeader("Content-Type"))
+	if model == "" {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "model is required")
+		return
+	}
+
+	inst, err := h.router.EnsureByAlias(c.Request.Context(), model)
+	if err != nil {
+		h.errorResponse(c, http.StatusServiceUnavailable, "model_not_available", err.Error())
+		return
+	}
+
+	if inst.Handle == nil || inst.Handle.Endpoint == "" {
+		h.errorResponse(c, http.StatusServiceUnavailable, "model_not_available", "model container not running")
+		return
+	}
+
+	endpoint := inst.Handle.Endpoint + path
+
+	h.logger.WithFields(logrus.Fields{
+		"model":    model,
+		"alias":    inst.Spec.Alias,
+		"provider": inst.Spec.Provider,
+		"endpoint": endpoint,
+		"path":     path,
+	}).Debug("proxying passthrough request")
+
+	proxyReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "internal_error", err.Error())
+		return
+	}
+
+	// Preserve original Content-Type (important for multipart/form-data with boundary)
+	contentType := c.GetHeader("Content-Type")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	proxyReq.Header.Set("Content-Type", contentType)
+
+	resp, err := h.client.Do(proxyReq)
+	if err != nil {
+		h.logger.WithError(err).WithField("path", path).Error("passthrough proxy request failed")
+		h.errorResponse(c, http.StatusBadGateway, "upstream_error", err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
+}
+
 func (h *InferenceProxyHandler) streamResponse(c *gin.Context, resp *http.Response) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")

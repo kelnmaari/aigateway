@@ -830,6 +830,12 @@ func (r *Router) unifiedPassthrough(endpointPath string) gin.HandlerFunc {
 		}
 
 		model := handlers.ExtractModelFromRequest(bodyBytes, c.GetHeader("Content-Type"))
+
+		r.logger.WithFields(logrus.Fields{
+			"path":  endpointPath,
+			"model": model,
+		}).Debug("unifiedPassthrough: incoming request")
+
 		if model == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": gin.H{"type": "invalid_request_error", "message": "model is required"},
@@ -840,6 +846,10 @@ func (r *Router) unifiedPassthrough(endpointPath string) gin.HandlerFunc {
 		// Check inference first (Docker-based models)
 		if r.inferenceRouter != nil {
 			if _, running := r.inferenceRouter.GetModel(model); running {
+				r.logger.WithFields(logrus.Fields{
+					"path":  endpointPath,
+					"model": model,
+				}).Debug("unifiedPassthrough: routing to inference")
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 				r.inferenceProxyHandler.HandlePassthrough(c, endpointPath)
 				return
@@ -852,12 +862,22 @@ func (r *Router) unifiedPassthrough(endpointPath string) gin.HandlerFunc {
 			if err == nil {
 				provider, err := r.db.GetModelProvider(c.Request.Context(), modelEntry.ProviderID)
 				if err == nil && provider.Enabled {
+					r.logger.WithFields(logrus.Fields{
+						"path":     endpointPath,
+						"model":    model,
+						"provider": provider.Name,
+					}).Debug("unifiedPassthrough: routing to external provider")
 					c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 					r.externalProxyHandler.HandlePassthrough(c, provider, endpointPath)
 					return
 				}
 			}
 		}
+
+		r.logger.WithFields(logrus.Fields{
+			"path":  endpointPath,
+			"model": model,
+		}).Warn("unifiedPassthrough: model not found in inference or model registry")
 
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{

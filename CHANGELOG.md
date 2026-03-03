@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.3] - 2026-03-03
+
+### Fixed
+
+- **TEI Rerank Adapter**: Fixed 404 error when using `/v1/rerank` with TEI inference provider — TEI uses `/rerank` endpoint (not `/v1/rerank`) with a different request/response format
+- **Dify Integration**: Rerank model validation now works correctly with TEI-based models (e.g., `bge-reranker-v2-m3`)
+
+### Added
+
+- **TEI Request/Response Translation**: Automatic format conversion between OpenAI-compatible rerank API and TEI native format
+  - Request: `documents` → `texts`, strips `model` field
+  - Response: `[{index, score}]` → `{results: [{index, relevance_score}], model, id}`
+- **Provider-aware Path Mapping**: `mapProviderPath()` translates OpenAI paths to provider-specific paths for inference containers
+- **Debug Logging**: `unifiedPassthrough` now logs incoming requests with model name and routing decisions
+
+### Technical
+
+- `handleTEIRerank()` — full format adapter: OpenAI rerank ↔ TEI rerank with `top_n` and `return_documents` support
+- `mapProviderPath()` — extensible path translation for provider-specific endpoints
+- Enhanced logging in `unifiedPassthrough` for debugging routing issues
+
+---
+
 ## [4.13.2] - 2026-03-03
 
 ### Fixed

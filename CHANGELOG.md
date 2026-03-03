@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.1] - 2026-03-03
+
+### Added
+
+- **HuggingFace TEI Filter**: Provider filter `tei` for searching TEI-compatible models (embeddings & reranking) via `sentence-similarity` tag
+- **HuggingFace Rerank Filter**: Provider filter `rerank` for searching reranking models via `text-classification` tag
+- **Provider Dropdown**: HuggingFace model browser UI now includes Provider filter dropdown (All, vLLM/SGLang/TGI, llama.cpp, TEI, Embedding, Rerank)
+
+### Technical
+
+- `GetModelsSearch()` and `GetPopularModels()` extended with `tei` and `rerank` provider filter cases
+- Provider dropdown added to both `web/huggingface.html` and `internal/web/static/huggingface.html`
+
+---
+
 ## [4.13.0] - 2026-03-03
 
 ### Added

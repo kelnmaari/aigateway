@@ -75,13 +75,20 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		tags = append(tags, "text-generation")
 		library = "transformers"
 	case "embedding":
-		// Embedding models
+		// Embedding models (feature-extraction pipeline)
 		tags = append(tags, "feature-extraction")
+	case "tei":
+		// TEI supports both embedding and reranking models
+		// sentence-similarity covers both use cases on HuggingFace
+		tags = append(tags, "sentence-similarity")
+	case "rerank":
+		// Reranking models (cross-encoder / reranker)
+		tags = append(tags, "text-classification")
 	default:
 		// "all" - show text-generation models (most common for inference)
 		tags = append(tags, "text-generation")
 	}
-	
+
 	// Build filters
 	filters := huggingface.ModelFilters{
 		Search:       search,
@@ -342,6 +349,12 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		library = "transformers"
 	case "embedding":
 		baseTags = []string{"feature-extraction"}
+	case "tei":
+		// TEI supports both embedding and reranking models
+		baseTags = []string{"sentence-similarity"}
+	case "rerank":
+		// Reranking models (cross-encoder / reranker)
+		baseTags = []string{"text-classification"}
 	default:
 		// "all" - show text-generation models
 		baseTags = []string{"text-generation"}

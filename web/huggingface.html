@@ -312,6 +312,18 @@
             
             <div class="search-filters">
                 <div class="filter-group">
+                    <label for="provider">Provider:</label>
+                    <select name="provider" id="provider" class="filter-select">
+                        <option value="all">All (Text Generation)</option>
+                        <option value="vllm">vLLM / SGLang / TGI</option>
+                        <option value="llama.cpp">llama.cpp (GGUF)</option>
+                        <option value="tei">TEI (Embeddings & Rerank)</option>
+                        <option value="embedding">Embedding</option>
+                        <option value="rerank">Rerank</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
                     <label for="sort">Sort by:</label>
                     <select name="sort" id="sort" class="filter-select">
                         <option value="downloads">Most Downloads</option>
@@ -320,7 +332,7 @@
                         <option value="createdAt">Recently Added</option>
                     </select>
                 </div>
-                
+
                 <div class="filter-group">
                     <label for="limit">Results:</label>
                     <select name="limit" id="limit" class="filter-select">

@@ -84,7 +84,15 @@
 		warning?: string;
 	}
 	let memoryRecommendation = $state<MemoryRecommendation | null>(null);
-	type HFProviderFilter = 'all' | 'vllm' | 'sglang' | 'tgi' | 'llama.cpp' | 'embedding';
+	type HFProviderFilter =
+		| 'all'
+		| 'vllm'
+		| 'sglang'
+		| 'tgi'
+		| 'llama.cpp'
+		| 'tei'
+		| 'embedding'
+		| 'rerank';
 	const hfProviderFilters: {
 		id: HFProviderFilter;
 		label: string;
@@ -102,10 +110,22 @@
 			icon: '🦙'
 		},
 		{
+			id: 'tei',
+			label: 'TEI',
+			description: 'Text Embeddings Inference compatible',
+			icon: '🔗'
+		},
+		{
 			id: 'embedding',
 			label: 'Embeddings',
 			description: 'Feature extraction & embeddings',
 			icon: '📊'
+		},
+		{
+			id: 'rerank',
+			label: 'Rerank',
+			description: 'Reranking & cross-encoder models',
+			icon: '🔀'
 		}
 	];
 
@@ -694,8 +714,16 @@
 					form.provider = 'tgi';
 					form.capabilities = [...CHAT_IMPLIED_CAPABILITIES];
 					break;
+				case 'tei':
+					form.provider = 'tei';
+					form.capabilities = [...EMBEDDING_IMPLIED_CAPABILITIES];
+					break;
 				case 'embedding':
 					form.provider = 'tei'; // TEI (Text Embeddings Inference) is best for embeddings
+					form.capabilities = [...EMBEDDING_IMPLIED_CAPABILITIES];
+					break;
+				case 'rerank':
+					form.provider = 'tei'; // Reranking also runs on TEI
 					form.capabilities = [...EMBEDDING_IMPLIED_CAPABILITIES];
 					break;
 				default:
@@ -2134,8 +2162,12 @@
 						🚀 Models for <strong>SGLang</strong> — fast inference with RadixAttention
 					{:else if hfProviderFilter === 'tgi'}
 						🤗 Models for <strong>TGI</strong> — HuggingFace Text Generation Inference
+					{:else if hfProviderFilter === 'tei'}
+						🔗 Models for <strong>TEI</strong> — Text Embeddings Inference (embeddings & reranking)
 					{:else if hfProviderFilter === 'embedding'}
 						📊 Embedding models for <strong>vLLM/SGLang</strong> — feature extraction & RAG
+					{:else if hfProviderFilter === 'rerank'}
+						🔀 Reranking models for <strong>TEI</strong> — cross-encoder reranking
 					{:else}
 						💡 Filter by provider to find compatible models
 					{/if}
@@ -2315,6 +2347,8 @@
 								Recommended: <strong>TGI</strong>
 							{:else if hfProviderFilter === 'sglang'}
 								Recommended: <strong>SGLang</strong>
+							{:else if hfProviderFilter === 'tei' || hfProviderFilter === 'rerank'}
+								Recommended: <strong>TEI</strong>
 							{:else if hfProviderFilter === 'embedding'}
 								Recommended: <strong>SGLang</strong> or <strong>vLLM</strong>
 							{:else}

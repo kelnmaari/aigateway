@@ -36,6 +36,8 @@ type SavedModel struct {
 	LlamaNParallel   int    `json:"llama_n_parallel,omitempty"`
 	LlamaFlashAttn   bool   `json:"llama_flash_attn,omitempty"`
 	LlamaJinja       bool   `json:"llama_jinja,omitempty"`
+	LlamaCacheReuse  int    `json:"llama_cache_reuse,omitempty"`
+	LlamaExtraArgs   string `json:"llama_extra_args,omitempty"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
@@ -111,6 +113,8 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		LlamaNParallel:       spec.LlamaNParallel,
 		LlamaFlashAttn:       spec.LlamaFlashAttn,
 		LlamaJinja:           spec.LlamaJinja,
+		LlamaCacheReuse:      spec.LlamaCacheReuse,
+		LlamaExtraArgs:       spec.LlamaExtraArgs,
 		SGLangTensorParallel: spec.SGLangTensorParallel,
 		SGLangMemFraction:    spec.SGLangMemFraction,
 		TGINumShard:          spec.TGINumShard,
@@ -215,6 +219,8 @@ func (m SavedModel) ToSpec() ModelSpec {
 		LlamaNParallel:       m.LlamaNParallel,
 		LlamaFlashAttn:       m.LlamaFlashAttn,
 		LlamaJinja:           m.LlamaJinja,
+		LlamaCacheReuse:      m.LlamaCacheReuse,
+		LlamaExtraArgs:       m.LlamaExtraArgs,
 		SGLangTensorParallel: m.SGLangTensorParallel,
 		SGLangMemFraction:    m.SGLangMemFraction,
 		TGINumShard:          m.TGINumShard,

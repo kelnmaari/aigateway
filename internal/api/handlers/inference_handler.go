@@ -57,8 +57,10 @@ type LoadRequest struct {
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers"`
 	LlamaCtxSize     int    `json:"llama_ctx_size"`   // Context size (default: 2048)
 	LlamaNParallel   int    `json:"llama_n_parallel"` // Parallel slots (concurrent requests)
-	LlamaFlashAttn   bool   `json:"llama_flash_attn"` // Enable Flash Attention
-	LlamaJinja       bool   `json:"llama_jinja"`      // Enable Jinja template processing
+	LlamaFlashAttn   bool   `json:"llama_flash_attn"`   // Enable Flash Attention
+	LlamaJinja       bool   `json:"llama_jinja"`       // Enable Jinja template processing
+	LlamaCacheReuse  int    `json:"llama_cache_reuse"` // KV cache reuse (0=default, -1=disable for SWA models)
+	LlamaExtraArgs   string `json:"llama_extra_args"`  // Extra CLI args for llama-server
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel"`
@@ -104,6 +106,8 @@ type ModelsResponse struct {
 	LlamaNParallel       int     `json:"llama_n_parallel,omitempty"`
 	LlamaFlashAttn       bool    `json:"llama_flash_attn,omitempty"`
 	LlamaJinja           bool    `json:"llama_jinja,omitempty"`
+	LlamaCacheReuse      int     `json:"llama_cache_reuse,omitempty"`
+	LlamaExtraArgs       string  `json:"llama_extra_args,omitempty"`
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    float64 `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
@@ -151,6 +155,8 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		LlamaNParallel:     req.LlamaNParallel,
 		LlamaFlashAttn:     req.LlamaFlashAttn,
 		LlamaJinja:         req.LlamaJinja,
+		LlamaCacheReuse:    req.LlamaCacheReuse,
+		LlamaExtraArgs:     req.LlamaExtraArgs,
 		// SGLang
 		SGLangTensorParallel: req.SGLangTensorParallel,
 		SGLangDataParallel:   req.SGLangDataParallel,
@@ -374,6 +380,8 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 			LlamaNParallel:       m.Spec.LlamaNParallel,
 			LlamaFlashAttn:       m.Spec.LlamaFlashAttn,
 			LlamaJinja:           m.Spec.LlamaJinja,
+			LlamaCacheReuse:      m.Spec.LlamaCacheReuse,
+			LlamaExtraArgs:       m.Spec.LlamaExtraArgs,
 			SGLangTensorParallel: m.Spec.SGLangTensorParallel,
 			SGLangMemFraction:    m.Spec.SGLangMemFraction,
 			TGINumShard:          m.Spec.TGINumShard,
@@ -687,6 +695,8 @@ type UpdateSavedRequest struct {
 	LlamaFlashAttn       *bool    `json:"llama_flash_attn,omitempty"`
 	LlamaJinja           *bool    `json:"llama_jinja,omitempty"`
 	LlamaTensorSplit     *string  `json:"llama_tensor_split,omitempty"`
+	LlamaCacheReuse      *int     `json:"llama_cache_reuse,omitempty"`
+	LlamaExtraArgs       *string  `json:"llama_extra_args,omitempty"`
 	SGLangTensorParallel *int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
 	TGINumShard          *int     `json:"tgi_num_shard,omitempty"`
@@ -745,6 +755,12 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.LlamaTensorSplit != nil {
 			m.LlamaTensorSplit = *req.LlamaTensorSplit
 		}
+		if req.LlamaCacheReuse != nil {
+			m.LlamaCacheReuse = *req.LlamaCacheReuse
+		}
+		if req.LlamaExtraArgs != nil {
+			m.LlamaExtraArgs = *req.LlamaExtraArgs
+		}
 		if req.SGLangTensorParallel != nil {
 			m.SGLangTensorParallel = *req.SGLangTensorParallel
 		}
@@ -800,6 +816,8 @@ type CreateSavedRequest struct {
 	LlamaNParallel       int      `json:"llama_n_parallel"`
 	LlamaFlashAttn       bool     `json:"llama_flash_attn"`
 	LlamaJinja           bool     `json:"llama_jinja"`
+	LlamaCacheReuse      int      `json:"llama_cache_reuse"`
+	LlamaExtraArgs       string   `json:"llama_extra_args"`
 	SGLangTensorParallel int      `json:"sglang_tensor_parallel"`
 	SGLangMemFraction    float64  `json:"sglang_mem_fraction"`
 	TGINumShard          int      `json:"tgi_num_shard"`
@@ -847,6 +865,8 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		LlamaNParallel:       req.LlamaNParallel,
 		LlamaFlashAttn:       req.LlamaFlashAttn,
 		LlamaJinja:           req.LlamaJinja,
+		LlamaCacheReuse:      req.LlamaCacheReuse,
+		LlamaExtraArgs:       req.LlamaExtraArgs,
 		SGLangTensorParallel: req.SGLangTensorParallel,
 		SGLangMemFraction:    req.SGLangMemFraction,
 		TGINumShard:          req.TGINumShard,

@@ -227,3 +227,78 @@ func TestBuildLlamaCPPRequest_TensorSplit(t *testing.T) {
 	}
 }
 
+func TestBuildLlamaCPPRequest_CacheReuse(t *testing.T) {
+	tests := []struct {
+		name        string
+		cacheReuse  int
+		expectFlag  bool
+		expectValue string
+	}{
+		{"zero omits flag", 0, false, ""},
+		{"positive value sets flag", 128, true, "128"},
+		{"negative one disables", -1, true, "-1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := ModelSpec{
+				Alias:           "test-llama",
+				LocalPath:       "/data/gguf/test.gguf",
+				LlamaCacheReuse: tt.cacheReuse,
+			}
+
+			req, err := BuildLlamaCPPRequest(spec)
+			if err != nil {
+				t.Fatalf("BuildLlamaCPPRequest failed: %v", err)
+			}
+
+			found := false
+			for i, c := range req.Command {
+				if c == "--cache-reuse" && i+1 < len(req.Command) {
+					found = true
+					if req.Command[i+1] != tt.expectValue {
+						t.Errorf("--cache-reuse value = %q, want %q", req.Command[i+1], tt.expectValue)
+					}
+					break
+				}
+			}
+			if tt.expectFlag && !found {
+				t.Errorf("expected --cache-reuse flag but not found in %v", req.Command)
+			}
+			if !tt.expectFlag && found {
+				t.Errorf("did not expect --cache-reuse flag but found it in %v", req.Command)
+			}
+		})
+	}
+}
+
+func TestBuildLlamaCPPRequest_ExtraArgs(t *testing.T) {
+	spec := ModelSpec{
+		Alias:          "test-llama",
+		LocalPath:      "/data/gguf/test.gguf",
+		LlamaExtraArgs: "--no-mmap --verbose",
+	}
+
+	req, err := BuildLlamaCPPRequest(spec)
+	if err != nil {
+		t.Fatalf("BuildLlamaCPPRequest failed: %v", err)
+	}
+
+	foundNoMmap := false
+	foundVerbose := false
+	for _, c := range req.Command {
+		if c == "--no-mmap" {
+			foundNoMmap = true
+		}
+		if c == "--verbose" {
+			foundVerbose = true
+		}
+	}
+	if !foundNoMmap {
+		t.Error("Command missing --no-mmap from extra_args")
+	}
+	if !foundVerbose {
+		t.Error("Command missing --verbose from extra_args")
+	}
+}
+

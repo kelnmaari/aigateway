@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -355,6 +356,14 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	}
 	if spec.LlamaJinja {
 		cmd = append(cmd, "--jinja")
+	}
+	// Cache reuse: 0=don't pass (llama.cpp default 256), -1=disable, >0=set value
+	if spec.LlamaCacheReuse != 0 {
+		cmd = append(cmd, "--cache-reuse", fmt.Sprintf("%d", spec.LlamaCacheReuse))
+	}
+	// Extra args: split by whitespace and append as raw CLI args
+	if spec.LlamaExtraArgs != "" {
+		cmd = append(cmd, strings.Fields(spec.LlamaExtraArgs)...)
 	}
 
 	return ContainerStartRequest{

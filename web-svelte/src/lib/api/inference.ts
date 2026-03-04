@@ -56,6 +56,8 @@ export interface ModelInfo {
 	llama_n_parallel?: number;
 	llama_flash_attn?: boolean;
 	llama_jinja?: boolean;
+	llama_cache_reuse?: number;
+	llama_extra_args?: string;
 
 	// SGLang params
 	sglang_tensor_parallel?: number;
@@ -147,6 +149,8 @@ export interface SavedModel {
 	llama_flash_attn?: boolean;
 	llama_jinja?: boolean;
 	llama_tensor_split?: string;
+	llama_cache_reuse?: number;
+	llama_extra_args?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	tgi_num_shard?: number;
@@ -165,6 +169,8 @@ export interface UpdateSavedRequest {
 	llama_flash_attn?: boolean;
 	llama_jinja?: boolean;
 	llama_tensor_split?: string;
+	llama_cache_reuse?: number;
+	llama_extra_args?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	tgi_num_shard?: number;
@@ -192,6 +198,8 @@ export interface CreateSavedRequest {
 	llama_n_parallel?: number;
 	llama_flash_attn?: boolean;
 	llama_jinja?: boolean;
+	llama_cache_reuse?: number;
+	llama_extra_args?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	tgi_num_shard?: number;
@@ -221,6 +229,8 @@ export interface LoadRequest {
 	llama_n_parallel?: number;
 	llama_flash_attn?: boolean;
 	llama_jinja?: boolean;
+	llama_cache_reuse?: number;
+	llama_extra_args?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	tgi_num_shard?: number;

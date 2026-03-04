@@ -60,6 +60,8 @@ type ModelSpec struct {
 	LlamaNParallel   int    // --parallel (concurrent request slots)
 	LlamaFlashAttn   bool   // --flash-attn (enable flash attention)
 	LlamaJinja       bool   // --jinja (enable Jinja template processing)
+	LlamaCacheReuse  int    // --cache-reuse (0=default, -1=disable for SWA models)
+	LlamaExtraArgs   string // extra CLI args appended to llama-server command
 
 	// SGLang-specific
 	SGLangTensorParallel int     // --tp (tensor parallel)

@@ -302,6 +302,8 @@
 		llama_n_parallel: number;
 		llama_flash_attn: boolean;
 		llama_jinja: boolean;
+		llama_cache_reuse: number;
+		llama_extra_args: string;
 		llama_tensor_split: string;
 		sglang_tensor_parallel: number;
 		sglang_mem_fraction: number;
@@ -319,6 +321,8 @@
 		llama_n_parallel: 0,
 		llama_flash_attn: false,
 		llama_jinja: false,
+		llama_cache_reuse: 0,
+		llama_extra_args: '',
 		llama_tensor_split: '',
 		sglang_tensor_parallel: 1,
 		sglang_mem_fraction: 0.9,
@@ -346,6 +350,8 @@
 		llama_n_parallel: 0,
 		llama_flash_attn: false,
 		llama_jinja: false,
+		llama_cache_reuse: 0,
+		llama_extra_args: '',
 		sglang_tensor_parallel: 0,
 		sglang_mem_fraction: 0.8,
 		tgi_num_shard: 1
@@ -879,6 +885,9 @@
 				llama_ctx_size: form.llama_ctx_size,
 				llama_n_parallel: form.llama_n_parallel,
 				llama_flash_attn: form.llama_flash_attn,
+				llama_jinja: form.llama_jinja,
+				llama_cache_reuse: form.llama_cache_reuse,
+				llama_extra_args: form.llama_extra_args,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
 				tgi_num_shard: form.tgi_num_shard
@@ -935,6 +944,9 @@
 				llama_ctx_size: form.llama_ctx_size,
 				llama_n_parallel: form.llama_n_parallel,
 				llama_flash_attn: form.llama_flash_attn,
+				llama_jinja: form.llama_jinja,
+				llama_cache_reuse: form.llama_cache_reuse,
+				llama_extra_args: form.llama_extra_args,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
 				tgi_num_shard: form.tgi_num_shard
@@ -1128,6 +1140,8 @@
 			llama_n_parallel: saved.llama_n_parallel || 0,
 			llama_flash_attn: saved.llama_flash_attn || false,
 			llama_jinja: saved.llama_jinja || false,
+			llama_cache_reuse: saved.llama_cache_reuse || 0,
+			llama_extra_args: saved.llama_extra_args || '',
 			llama_tensor_split: saved.llama_tensor_split || '',
 			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
 			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,
@@ -1720,6 +1734,28 @@
 									bind:value={form.llama_tensor_split}
 									placeholder="0.5,0.5"
 								/>
+							</label>
+						</div>
+						<div class="grid gap-3 pt-2 sm:grid-cols-2">
+							<label class="flex flex-col gap-1 text-sm">
+								<span title="KV cache reuse size. 0 = llama.cpp default (256). -1 = disable (recommended for SWA models like GPT-OSS)">cache_reuse</span>
+								<input
+									type="number"
+									min="-1"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.llama_cache_reuse}
+									placeholder="0"
+								/>
+								<span class="text-muted-foreground text-xs">0 = default, -1 = disable (SWA models)</span>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<span title="Extra command-line args passed to llama-server (space-separated)">extra_args</span>
+								<input
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.llama_extra_args}
+									placeholder="--no-mmap --verbose"
+								/>
+								<span class="text-muted-foreground text-xs">Additional CLI flags for llama-server</span>
 							</label>
 						</div>
 					{:else if form.provider === 'sglang'}
@@ -2895,6 +2931,39 @@
 							/>
 							<p class="text-muted-foreground mt-1 text-xs">
 								Comma-separated split ratios for multi-GPU
+							</p>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<label for="edit-llama-cache-reuse" class="mb-1 block text-sm font-medium"
+								>Cache Reuse</label
+							>
+							<input
+								id="edit-llama-cache-reuse"
+								type="number"
+								min="-1"
+								class="bg-background w-full rounded border px-3 py-2"
+								placeholder="0"
+								bind:value={editSavedForm.llama_cache_reuse}
+							/>
+							<p class="text-muted-foreground mt-1 text-xs">
+								0 = default (256), -1 = disable (for SWA models)
+							</p>
+						</div>
+						<div>
+							<label for="edit-llama-extra-args" class="mb-1 block text-sm font-medium"
+								>Extra Args</label
+							>
+							<input
+								id="edit-llama-extra-args"
+								type="text"
+								class="bg-background w-full rounded border px-3 py-2"
+								placeholder="--no-mmap --verbose"
+								bind:value={editSavedForm.llama_extra_args}
+							/>
+							<p class="text-muted-foreground mt-1 text-xs">
+								Additional CLI flags for llama-server
 							</p>
 						</div>
 					</div>

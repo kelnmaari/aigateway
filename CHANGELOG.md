@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.5] - 2026-03-04
+
+### Added
+
+- **llama.cpp Cache Reuse**: New `cache_reuse` parameter for llama-server `--cache-reuse` flag. Value `0` = use llama.cpp default (256), `-1` = explicitly disable cache reuse (recommended for SWA models like GPT-OSS that waste 170–1200ms per request on useless prompt cache operations)
+- **llama.cpp Extra Args**: New `extra_args` parameter for passing arbitrary additional CLI flags to llama-server command
+
+### Technical
+
+- Added `LlamaCacheReuse` (int) and `LlamaExtraArgs` (string) fields to `ModelSpec`, `SavedModel`, `LoadRequest`, `CreateSavedRequest`, `UpdateSavedRequest`, and `ModelsResponse`
+- Updated `BuildLlamaCPPRequest` to emit `--cache-reuse N` when non-zero and to split/append extra args via `strings.Fields()`
+- Updated SvelteKit model create and edit forms with new fields, tooltips, and help text
+
+---
+
 ## [4.13.4] - 2026-03-04
 
 ### Fixed

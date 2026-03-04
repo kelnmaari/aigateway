@@ -51,7 +51,7 @@ type ChatRequest struct {
 // ChatMessage represents a message in the conversation.
 type ChatMessage struct {
 	Role       string           `json:"role"`
-	Content    string           `json:"content,omitempty"`
+	Content    interface{}      `json:"content,omitempty"` // string or []ContentPart for multimodal
 	ToolCalls  []tools.ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
@@ -203,7 +203,7 @@ type llmResponse struct {
 	Choices []struct {
 		Message struct {
 			Role      string           `json:"role"`
-			Content   string           `json:"content"`
+			Content   interface{}      `json:"content"`
 			ToolCalls []tools.ToolCall `json:"tool_calls"`
 		} `json:"message"`
 	} `json:"choices"`

@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.4] - 2026-03-04
+
+### Fixed
+
+- **Chat Tools Handler**: Fixed `json: cannot unmarshal array into Go struct field ChatMessage.messages.content of type string` error when clients (e.g. OpenClaw) send `content` as array (multimodal format per OpenAI API spec) instead of plain string
+
+### Technical
+
+- Changed `Content` field type from `string` to `interface{}` in `ChatMessage` and `llmResponse` structs in `chat_tools_handler.go` to support both string and array content formats
+
+---
+
 ## [4.13.3] - 2026-03-03
 
 ### Fixed

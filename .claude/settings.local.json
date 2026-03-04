@@ -10,7 +10,11 @@
       "Bash(wc:*)",
       "Bash(grep:*)",
       "Bash(go test:*)",
-      "Bash(go mod tidy:*)"
+      "Bash(go mod tidy:*)",
+      "Bash(git add VERSION CHANGELOG.md internal/storage/postgresql/migrations/164_add_changelog_v4_13_1.up.sql internal/storage/postgresql/migrations/164_add_changelog_v4_13_1.down.sql internal/storage/postgresql/migrations/167_add_changelog_v4_13_4.up.sql internal/storage/postgresql/migrations/167_add_changelog_v4_13_4.down.sql)",
+      "Bash(git rebase --continue)",
+      "Bash(GIT_EDITOR=true git rebase --continue)",
+      "Bash(git add .claude/settings.local.json)"
     ]
   }
 }

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.6] - 2026-03-16
+
+### Fixed
+
+- **Chat Empty Response Crash**: Fixed 400 error when streaming returns empty response — previously `CreateMessageRequest.Content required` validation rejected empty assistant messages. Removed `binding:"required"` from `Content` field since assistant/tool messages can legitimately have empty content (e.g. tool_calls, empty stream)
+- **Frontend Empty Save**: Frontend no longer attempts to save empty assistant responses to backend after streaming completes with no content
+
+### Technical
+
+- Changed `Content` field in `CreateMessageRequest` from `binding:"required"` to no binding constraint in `conversations.go`
+- Added `fullResponse.trim()` guard before `chatApi.createMessage()` call in SvelteKit chat page
+
+---
+
 ## [4.13.5] - 2026-03-04
 
 ### Added

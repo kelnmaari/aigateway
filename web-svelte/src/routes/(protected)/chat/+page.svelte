@@ -195,13 +195,15 @@
 			};
 			chatStore.addMessage(assistantMessage);
 
-			// Save to backend
-			await chatApi.createMessage(
-				conversationId,
-				'assistant',
-				fullResponse,
-				chatStore.selectedModel
-			);
+			// Save to backend (skip if response is empty — e.g. stream returned no content)
+			if (fullResponse.trim()) {
+				await chatApi.createMessage(
+					conversationId,
+					'assistant',
+					fullResponse,
+					chatStore.selectedModel
+				);
+			}
 
 			// Refresh conversations to update timestamp
 			await loadConversations();

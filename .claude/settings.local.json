@@ -14,7 +14,12 @@
       "Bash(git add VERSION CHANGELOG.md internal/storage/postgresql/migrations/164_add_changelog_v4_13_1.up.sql internal/storage/postgresql/migrations/164_add_changelog_v4_13_1.down.sql internal/storage/postgresql/migrations/167_add_changelog_v4_13_4.up.sql internal/storage/postgresql/migrations/167_add_changelog_v4_13_4.down.sql)",
       "Bash(git rebase --continue)",
       "Bash(GIT_EDITOR=true git rebase --continue)",
-      "Bash(git add .claude/settings.local.json)"
+      "Bash(git add .claude/settings.local.json)",
+      "Bash(git push --set-upstream origin develop)",
+      "Bash(git add VERSION CHANGELOG.md internal/inference/types.go internal/inference/model_store.go internal/inference/provider_builders.go internal/inference/provider_builders_test.go internal/api/handlers/inference_handler.go web-svelte/src/lib/api/inference.ts \"web-svelte/src/routes/\\(protected\\)/admin/models/+page.svelte\" internal/storage/postgresql/migrations/168_add_changelog_v4_13_5.up.sql internal/storage/postgresql/migrations/168_add_changelog_v4_13_5.down.sql)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(docker ps --format '{{.ID}} {{.Image}} {{.Ports}}')"
     ]
   }
 }

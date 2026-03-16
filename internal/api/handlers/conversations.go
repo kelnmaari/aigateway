@@ -429,7 +429,7 @@ func (h *ConversationHandler) DeleteConversation(c *gin.Context) {
 // CreateMessageRequest represents a request to create a message
 type CreateMessageRequest struct {
 	Role    string   `json:"role" binding:"required,oneof=user assistant system tool"`
-	Content string   `json:"content" binding:"required"`
+	Content string   `json:"content"`
 	Model   string   `json:"model,omitempty"`
 	FileIDs []string `json:"file_ids,omitempty"` // FILE-STORAGE-01: Phase 4, v1.10.0+
 }

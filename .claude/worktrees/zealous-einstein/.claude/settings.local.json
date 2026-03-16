@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find D:golangollama-openai-proxy.claudeworktreeszealous-einsteinweb-sveltesrc -type f \\\\\\(-name *.svelte -o -name *.ts -o -name *.js \\\\\\))"
+    ]
+  }
+}

@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.0] - 2026-03-26
+
+### Added
+
+- **Inference Container Parameters**: Added ~27 new configurable parameters across all 5 inference providers with dedicated UI controls (dropdowns, checkboxes, number inputs) and informative tooltips
+- **vLLM** (8 new): `quantization` (awq/gptq/squeezellm/fp8), `dtype`, `kv_cache_dtype` (fp8 for 50% VRAM reduction), `max_num_seqs`, `enforce_eager`, `enable_prefix_caching`, `enable_chunked_prefill`, `swap_space`
+- **SGLang** (6 new): `data_parallel`, `context_len`, `chunked_prefill`, `quantization` (awq/fp8/gptq/marlin), `attention_backend` (flashinfer/triton/torch_native), `extra_args`
+- **TGI** (6 new): `max_concurrent_reqs`, `max_input_len`, `max_total_tokens`, `quantize` (awq/gptq/eetq/fp8/bitsandbytes), `cuda_memory_fraction`, `extra_args`
+- **TEI** (5 new): `max_batch_tokens`, `max_concurrent_reqs`, `pooling` (cls/mean/splade/last-token), `dtype`, `extra_args`
+- **llama.cpp** (5 new): `batch_size`, `ubatch_size`, `cache_type_k`/`cache_type_v` (f16/q8_0/q4_0 for reduced VRAM), `mlock`
+- **FormLabel Tooltips**: All ~41 inference parameters now have `<FormLabel>` with `<Tooltip>` icons showing parameter descriptions on hover
+- **extra_args for all providers**: SGLang, TGI, TEI now have `extra_args` text field as fallback for unlisted CLI flags
+
+### Changed
+
+- **UI Pattern**: Replaced all `<span title="...">` native tooltips with `<FormLabel description="...">` + FontAwesome `?` icon tooltips across the entire models admin page
+- **TEI Section**: TEI provider now has its own configuration section in the model form (previously had no configurable fields)
+
+### Technical
+
+- Added fields to `ModelSpec`, `SavedModel`, `LoadRequest`, `CreateSavedRequest`, `UpdateSavedRequest` structs
+- Updated all 5 provider builders (`BuildVLLMRequest`, `BuildSGLangRequest`, `BuildTGIRequest`, `BuildTEIRequest`, `BuildLlamaCPPRequest`) to wire new CLI arguments
+- Updated `SaveFromSpec()`/`ToSpec()` in model_store.go and all handler mapping functions
+- Added TypeScript types for all new fields in `inference.ts`
+- Load form, edit modal, and submit functions updated with all new fields
+
+---
+
 ## [5.0.2] - 2026-03-26
 
 ### Changed

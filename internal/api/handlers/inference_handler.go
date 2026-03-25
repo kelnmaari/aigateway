@@ -50,7 +50,15 @@ type LoadRequest struct {
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel"`
 	VLLMMaxModelLen    int     `json:"vllm_max_model_len"`
 	VLLMGPUUtilization float64 `json:"vllm_gpu_utilization"`
-	VLLMExtraArgs      string  `json:"vllm_extra_args"`
+	VLLMExtraArgs           string  `json:"vllm_extra_args"`
+	VLLMQuantization        string  `json:"vllm_quantization"`
+	VLLMDtype               string  `json:"vllm_dtype"`
+	VLLMKVCacheDtype        string  `json:"vllm_kv_cache_dtype"`
+	VLLMMaxNumSeqs          int     `json:"vllm_max_num_seqs"`
+	VLLMEnforceEager        bool    `json:"vllm_enforce_eager"`
+	VLLMEnablePrefixCaching bool    `json:"vllm_enable_prefix_caching"`
+	VLLMEnableChunkedPrefill bool   `json:"vllm_enable_chunked_prefill"`
+	VLLMSwapSpace           int     `json:"vllm_swap_space"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
@@ -62,19 +70,37 @@ type LoadRequest struct {
 	LlamaJinja       bool   `json:"llama_jinja"`       // Enable Jinja template processing
 	LlamaCacheReuse  int    `json:"llama_cache_reuse"` // KV cache reuse (0=default, -1=disable for SWA models)
 	LlamaExtraArgs   string `json:"llama_extra_args"`  // Extra CLI args for llama-server
+	LlamaBatchSize   int    `json:"llama_batch_size"`
+	LlamaUBatchSize  int    `json:"llama_ubatch_size"`
+	LlamaCacheTypeK  string `json:"llama_cache_type_k"`
+	LlamaCacheTypeV  string `json:"llama_cache_type_v"`
+	LlamaMlock       bool   `json:"llama_mlock"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel"`
 	SGLangDataParallel   int     `json:"sglang_data_parallel"`
 	SGLangMemFraction    float64 `json:"sglang_mem_fraction"`
 	SGLangContextLen     int     `json:"sglang_context_len"`
-	SGLangChunkedPrefill bool    `json:"sglang_chunked_prefill"`
+	SGLangChunkedPrefill   bool    `json:"sglang_chunked_prefill"`
+	SGLangQuantization     string  `json:"sglang_quantization"`
+	SGLangAttentionBackend string  `json:"sglang_attention_backend"`
+	SGLangExtraArgs        string  `json:"sglang_extra_args"`
 
 	// TGI options
 	TGINumShard          int `json:"tgi_num_shard"`
 	TGIMaxConcurrentReqs int `json:"tgi_max_concurrent_reqs"`
 	TGIMaxInputLen       int `json:"tgi_max_input_len"`
-	TGIMaxTotalTokens    int `json:"tgi_max_total_tokens"`
+	TGIMaxTotalTokens     int     `json:"tgi_max_total_tokens"`
+	TGIQuantize           string  `json:"tgi_quantize"`
+	TGICudaMemoryFraction float64 `json:"tgi_cuda_memory_fraction"`
+	TGIExtraArgs          string  `json:"tgi_extra_args"`
+
+	// TEI options
+	TEIMaxBatchTokens    int    `json:"tei_max_batch_tokens"`
+	TEIMaxConcurrentReqs int    `json:"tei_max_concurrent_reqs"`
+	TEIPooling           string `json:"tei_pooling"`
+	TEIDtype             string `json:"tei_dtype"`
+	TEIExtraArgs         string `json:"tei_extra_args"`
 }
 
 // ModelsResponse describes current tracked models.
@@ -171,6 +197,34 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		TGIMaxConcurrentReqs: req.TGIMaxConcurrentReqs,
 		TGIMaxInputLen:       req.TGIMaxInputLen,
 		TGIMaxTotalTokens:    req.TGIMaxTotalTokens,
+		TGIQuantize:          req.TGIQuantize,
+		TGICudaMemoryFraction: req.TGICudaMemoryFraction,
+		TGIExtraArgs:         req.TGIExtraArgs,
+		// TEI
+		TEIMaxBatchTokens:    req.TEIMaxBatchTokens,
+		TEIMaxConcurrentReqs: req.TEIMaxConcurrentReqs,
+		TEIPooling:           req.TEIPooling,
+		TEIDtype:             req.TEIDtype,
+		TEIExtraArgs:         req.TEIExtraArgs,
+		// vLLM new fields
+		VLLMQuantization:        req.VLLMQuantization,
+		VLLMDtype:               req.VLLMDtype,
+		VLLMKVCacheDtype:        req.VLLMKVCacheDtype,
+		VLLMMaxNumSeqs:          req.VLLMMaxNumSeqs,
+		VLLMEnforceEager:        req.VLLMEnforceEager,
+		VLLMEnablePrefixCaching: req.VLLMEnablePrefixCaching,
+		VLLMEnableChunkedPrefill: req.VLLMEnableChunkedPrefill,
+		VLLMSwapSpace:           req.VLLMSwapSpace,
+		// SGLang new fields
+		SGLangQuantization:     req.SGLangQuantization,
+		SGLangAttentionBackend: req.SGLangAttentionBackend,
+		SGLangExtraArgs:        req.SGLangExtraArgs,
+		// llama.cpp new fields
+		LlamaBatchSize:  req.LlamaBatchSize,
+		LlamaUBatchSize: req.LlamaUBatchSize,
+		LlamaCacheTypeK: req.LlamaCacheTypeK,
+		LlamaCacheTypeV: req.LlamaCacheTypeV,
+		LlamaMlock:      req.LlamaMlock,
 	}
 
 	// Always use the provided spec from the request, not a cached one from registry.
@@ -750,9 +804,33 @@ type UpdateSavedRequest struct {
 	LlamaExtraArgs       *string  `json:"llama_extra_args,omitempty"`
 	SGLangTensorParallel *int     `json:"sglang_tensor_parallel,omitempty"`
 	SGLangMemFraction    *float64 `json:"sglang_mem_fraction,omitempty"`
-	TGINumShard          *int     `json:"tgi_num_shard,omitempty"`
-	GPUDevice            *string  `json:"gpu_device,omitempty"`
-	AutoStart            *bool    `json:"auto_start,omitempty"` // Whether to auto-start on boot
+	TGINumShard              *int     `json:"tgi_num_shard,omitempty"`
+	TGIQuantize              *string  `json:"tgi_quantize,omitempty"`
+	TGICudaMemoryFraction    *float64 `json:"tgi_cuda_memory_fraction,omitempty"`
+	TGIExtraArgs             *string  `json:"tgi_extra_args,omitempty"`
+	TEIMaxBatchTokens        *int     `json:"tei_max_batch_tokens,omitempty"`
+	TEIMaxConcurrentReqs     *int     `json:"tei_max_concurrent_reqs,omitempty"`
+	TEIPooling               *string  `json:"tei_pooling,omitempty"`
+	TEIDtype                 *string  `json:"tei_dtype,omitempty"`
+	TEIExtraArgs             *string  `json:"tei_extra_args,omitempty"`
+	VLLMQuantization         *string  `json:"vllm_quantization,omitempty"`
+	VLLMDtype                *string  `json:"vllm_dtype,omitempty"`
+	VLLMKVCacheDtype         *string  `json:"vllm_kv_cache_dtype,omitempty"`
+	VLLMMaxNumSeqs           *int     `json:"vllm_max_num_seqs,omitempty"`
+	VLLMEnforceEager         *bool    `json:"vllm_enforce_eager,omitempty"`
+	VLLMEnablePrefixCaching  *bool    `json:"vllm_enable_prefix_caching,omitempty"`
+	VLLMEnableChunkedPrefill *bool    `json:"vllm_enable_chunked_prefill,omitempty"`
+	VLLMSwapSpace            *int     `json:"vllm_swap_space,omitempty"`
+	SGLangQuantization       *string  `json:"sglang_quantization,omitempty"`
+	SGLangAttentionBackend   *string  `json:"sglang_attention_backend,omitempty"`
+	SGLangExtraArgs          *string  `json:"sglang_extra_args,omitempty"`
+	LlamaBatchSize           *int     `json:"llama_batch_size,omitempty"`
+	LlamaUBatchSize          *int     `json:"llama_ubatch_size,omitempty"`
+	LlamaCacheTypeK          *string  `json:"llama_cache_type_k,omitempty"`
+	LlamaCacheTypeV          *string  `json:"llama_cache_type_v,omitempty"`
+	LlamaMlock               *bool    `json:"llama_mlock,omitempty"`
+	GPUDevice                *string  `json:"gpu_device,omitempty"`
+	AutoStart                *bool    `json:"auto_start,omitempty"` // Whether to auto-start on boot
 }
 
 // PostUpdateSaved updates a saved model configuration.
@@ -824,6 +902,78 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.TGINumShard != nil {
 			m.TGINumShard = *req.TGINumShard
 		}
+		if req.TGIQuantize != nil {
+			m.TGIQuantize = *req.TGIQuantize
+		}
+		if req.TGICudaMemoryFraction != nil {
+			m.TGICudaMemoryFraction = *req.TGICudaMemoryFraction
+		}
+		if req.TGIExtraArgs != nil {
+			m.TGIExtraArgs = *req.TGIExtraArgs
+		}
+		if req.TEIMaxBatchTokens != nil {
+			m.TEIMaxBatchTokens = *req.TEIMaxBatchTokens
+		}
+		if req.TEIMaxConcurrentReqs != nil {
+			m.TEIMaxConcurrentReqs = *req.TEIMaxConcurrentReqs
+		}
+		if req.TEIPooling != nil {
+			m.TEIPooling = *req.TEIPooling
+		}
+		if req.TEIDtype != nil {
+			m.TEIDtype = *req.TEIDtype
+		}
+		if req.TEIExtraArgs != nil {
+			m.TEIExtraArgs = *req.TEIExtraArgs
+		}
+		if req.VLLMQuantization != nil {
+			m.VLLMQuantization = *req.VLLMQuantization
+		}
+		if req.VLLMDtype != nil {
+			m.VLLMDtype = *req.VLLMDtype
+		}
+		if req.VLLMKVCacheDtype != nil {
+			m.VLLMKVCacheDtype = *req.VLLMKVCacheDtype
+		}
+		if req.VLLMMaxNumSeqs != nil {
+			m.VLLMMaxNumSeqs = *req.VLLMMaxNumSeqs
+		}
+		if req.VLLMEnforceEager != nil {
+			m.VLLMEnforceEager = *req.VLLMEnforceEager
+		}
+		if req.VLLMEnablePrefixCaching != nil {
+			m.VLLMEnablePrefixCaching = *req.VLLMEnablePrefixCaching
+		}
+		if req.VLLMEnableChunkedPrefill != nil {
+			m.VLLMEnableChunkedPrefill = *req.VLLMEnableChunkedPrefill
+		}
+		if req.VLLMSwapSpace != nil {
+			m.VLLMSwapSpace = *req.VLLMSwapSpace
+		}
+		if req.SGLangQuantization != nil {
+			m.SGLangQuantization = *req.SGLangQuantization
+		}
+		if req.SGLangAttentionBackend != nil {
+			m.SGLangAttentionBackend = *req.SGLangAttentionBackend
+		}
+		if req.SGLangExtraArgs != nil {
+			m.SGLangExtraArgs = *req.SGLangExtraArgs
+		}
+		if req.LlamaBatchSize != nil {
+			m.LlamaBatchSize = *req.LlamaBatchSize
+		}
+		if req.LlamaUBatchSize != nil {
+			m.LlamaUBatchSize = *req.LlamaUBatchSize
+		}
+		if req.LlamaCacheTypeK != nil {
+			m.LlamaCacheTypeK = *req.LlamaCacheTypeK
+		}
+		if req.LlamaCacheTypeV != nil {
+			m.LlamaCacheTypeV = *req.LlamaCacheTypeV
+		}
+		if req.LlamaMlock != nil {
+			m.LlamaMlock = *req.LlamaMlock
+		}
 		if req.GPUDevice != nil {
 			m.GPUDevice = *req.GPUDevice
 		}
@@ -874,8 +1024,32 @@ type CreateSavedRequest struct {
 	LlamaCacheReuse      int      `json:"llama_cache_reuse"`
 	LlamaExtraArgs       string   `json:"llama_extra_args"`
 	SGLangTensorParallel int      `json:"sglang_tensor_parallel"`
-	SGLangMemFraction    float64  `json:"sglang_mem_fraction"`
-	TGINumShard          int      `json:"tgi_num_shard"`
+	SGLangMemFraction      float64  `json:"sglang_mem_fraction"`
+	SGLangQuantization     string   `json:"sglang_quantization"`
+	SGLangAttentionBackend string   `json:"sglang_attention_backend"`
+	SGLangExtraArgs        string   `json:"sglang_extra_args"`
+	TGINumShard            int      `json:"tgi_num_shard"`
+	TGIQuantize            string   `json:"tgi_quantize"`
+	TGICudaMemoryFraction  float64  `json:"tgi_cuda_memory_fraction"`
+	TGIExtraArgs           string   `json:"tgi_extra_args"`
+	TEIMaxBatchTokens      int      `json:"tei_max_batch_tokens"`
+	TEIMaxConcurrentReqs   int      `json:"tei_max_concurrent_reqs"`
+	TEIPooling             string   `json:"tei_pooling"`
+	TEIDtype               string   `json:"tei_dtype"`
+	TEIExtraArgs           string   `json:"tei_extra_args"`
+	VLLMQuantization        string  `json:"vllm_quantization"`
+	VLLMDtype               string  `json:"vllm_dtype"`
+	VLLMKVCacheDtype        string  `json:"vllm_kv_cache_dtype"`
+	VLLMMaxNumSeqs          int     `json:"vllm_max_num_seqs"`
+	VLLMEnforceEager        bool    `json:"vllm_enforce_eager"`
+	VLLMEnablePrefixCaching bool    `json:"vllm_enable_prefix_caching"`
+	VLLMEnableChunkedPrefill bool   `json:"vllm_enable_chunked_prefill"`
+	VLLMSwapSpace           int     `json:"vllm_swap_space"`
+	LlamaBatchSize   int    `json:"llama_batch_size"`
+	LlamaUBatchSize  int    `json:"llama_ubatch_size"`
+	LlamaCacheTypeK  string `json:"llama_cache_type_k"`
+	LlamaCacheTypeV  string `json:"llama_cache_type_v"`
+	LlamaMlock       bool   `json:"llama_mlock"`
 }
 
 // PostCreateSaved creates a new saved model configuration directly from form data.
@@ -923,9 +1097,33 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		LlamaJinja:           req.LlamaJinja,
 		LlamaCacheReuse:      req.LlamaCacheReuse,
 		LlamaExtraArgs:       req.LlamaExtraArgs,
-		SGLangTensorParallel: req.SGLangTensorParallel,
-		SGLangMemFraction:    req.SGLangMemFraction,
-		TGINumShard:          req.TGINumShard,
+		SGLangTensorParallel:    req.SGLangTensorParallel,
+		SGLangMemFraction:       req.SGLangMemFraction,
+		SGLangQuantization:      req.SGLangQuantization,
+		SGLangAttentionBackend:  req.SGLangAttentionBackend,
+		SGLangExtraArgs:         req.SGLangExtraArgs,
+		TGINumShard:             req.TGINumShard,
+		TGIQuantize:             req.TGIQuantize,
+		TGICudaMemoryFraction:   req.TGICudaMemoryFraction,
+		TGIExtraArgs:            req.TGIExtraArgs,
+		TEIMaxBatchTokens:       req.TEIMaxBatchTokens,
+		TEIMaxConcurrentReqs:    req.TEIMaxConcurrentReqs,
+		TEIPooling:              req.TEIPooling,
+		TEIDtype:                req.TEIDtype,
+		TEIExtraArgs:            req.TEIExtraArgs,
+		VLLMQuantization:        req.VLLMQuantization,
+		VLLMDtype:               req.VLLMDtype,
+		VLLMKVCacheDtype:        req.VLLMKVCacheDtype,
+		VLLMMaxNumSeqs:          req.VLLMMaxNumSeqs,
+		VLLMEnforceEager:        req.VLLMEnforceEager,
+		VLLMEnablePrefixCaching: req.VLLMEnablePrefixCaching,
+		VLLMEnableChunkedPrefill: req.VLLMEnableChunkedPrefill,
+		VLLMSwapSpace:           req.VLLMSwapSpace,
+		LlamaBatchSize:          req.LlamaBatchSize,
+		LlamaUBatchSize:         req.LlamaUBatchSize,
+		LlamaCacheTypeK:         req.LlamaCacheTypeK,
+		LlamaCacheTypeV:         req.LlamaCacheTypeV,
+		LlamaMlock:              req.LlamaMlock,
 	}
 
 	if err := h.modelStore.Save(saved); err != nil {

@@ -48,6 +48,14 @@ export interface ModelInfo {
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
 	vllm_extra_args?: string;
+	vllm_quantization?: string;
+	vllm_dtype?: string;
+	vllm_kv_cache_dtype?: string;
+	vllm_max_num_seqs?: number;
+	vllm_enforce_eager?: boolean;
+	vllm_enable_prefix_caching?: boolean;
+	vllm_enable_chunked_prefill?: boolean;
+	vllm_swap_space?: number;
 
 	// llama.cpp params
 	llama_main_gpu?: number;
@@ -59,13 +67,37 @@ export interface ModelInfo {
 	llama_jinja?: boolean;
 	llama_cache_reuse?: number;
 	llama_extra_args?: string;
+	llama_batch_size?: number;
+	llama_ubatch_size?: number;
+	llama_cache_type_k?: string;
+	llama_cache_type_v?: string;
+	llama_mlock?: boolean;
 
 	// SGLang params
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
+	sglang_data_parallel?: number;
+	sglang_context_len?: number;
+	sglang_chunked_prefill?: boolean;
+	sglang_quantization?: string;
+	sglang_attention_backend?: string;
+	sglang_extra_args?: string;
 
 	// TGI params
 	tgi_num_shard?: number;
+	tgi_max_concurrent_reqs?: number;
+	tgi_max_input_len?: number;
+	tgi_max_total_tokens?: number;
+	tgi_quantize?: string;
+	tgi_cuda_memory_fraction?: number;
+	tgi_extra_args?: string;
+
+	// TEI params
+	tei_max_batch_tokens?: number;
+	tei_max_concurrent_reqs?: number;
+	tei_pooling?: string;
+	tei_dtype?: string;
+	tei_extra_args?: string;
 }
 
 export interface ArtifactInfo {
@@ -144,6 +176,14 @@ export interface SavedModel {
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
 	vllm_extra_args?: string;
+	vllm_quantization?: string;
+	vllm_dtype?: string;
+	vllm_kv_cache_dtype?: string;
+	vllm_max_num_seqs?: number;
+	vllm_enforce_eager?: boolean;
+	vllm_enable_prefix_caching?: boolean;
+	vllm_enable_chunked_prefill?: boolean;
+	vllm_swap_space?: number;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
 	llama_ctx_size?: number;
@@ -153,9 +193,31 @@ export interface SavedModel {
 	llama_tensor_split?: string;
 	llama_cache_reuse?: number;
 	llama_extra_args?: string;
+	llama_batch_size?: number;
+	llama_ubatch_size?: number;
+	llama_cache_type_k?: string;
+	llama_cache_type_v?: string;
+	llama_mlock?: boolean;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
+	sglang_data_parallel?: number;
+	sglang_context_len?: number;
+	sglang_chunked_prefill?: boolean;
+	sglang_quantization?: string;
+	sglang_attention_backend?: string;
+	sglang_extra_args?: string;
 	tgi_num_shard?: number;
+	tgi_max_concurrent_reqs?: number;
+	tgi_max_input_len?: number;
+	tgi_max_total_tokens?: number;
+	tgi_quantize?: string;
+	tgi_cuda_memory_fraction?: number;
+	tgi_extra_args?: string;
+	tei_max_batch_tokens?: number;
+	tei_max_concurrent_reqs?: number;
+	tei_pooling?: string;
+	tei_dtype?: string;
+	tei_extra_args?: string;
 }
 
 export interface UpdateSavedRequest {
@@ -165,6 +227,14 @@ export interface UpdateSavedRequest {
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
 	vllm_extra_args?: string;
+	vllm_quantization?: string;
+	vllm_dtype?: string;
+	vllm_kv_cache_dtype?: string;
+	vllm_max_num_seqs?: number;
+	vllm_enforce_eager?: boolean;
+	vllm_enable_prefix_caching?: boolean;
+	vllm_enable_chunked_prefill?: boolean;
+	vllm_swap_space?: number;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
 	llama_ctx_size?: number;
@@ -174,9 +244,31 @@ export interface UpdateSavedRequest {
 	llama_tensor_split?: string;
 	llama_cache_reuse?: number;
 	llama_extra_args?: string;
+	llama_batch_size?: number;
+	llama_ubatch_size?: number;
+	llama_cache_type_k?: string;
+	llama_cache_type_v?: string;
+	llama_mlock?: boolean;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
+	sglang_data_parallel?: number;
+	sglang_context_len?: number;
+	sglang_chunked_prefill?: boolean;
+	sglang_quantization?: string;
+	sglang_attention_backend?: string;
+	sglang_extra_args?: string;
 	tgi_num_shard?: number;
+	tgi_max_concurrent_reqs?: number;
+	tgi_max_input_len?: number;
+	tgi_max_total_tokens?: number;
+	tgi_quantize?: string;
+	tgi_cuda_memory_fraction?: number;
+	tgi_extra_args?: string;
+	tei_max_batch_tokens?: number;
+	tei_max_concurrent_reqs?: number;
+	tei_pooling?: string;
+	tei_dtype?: string;
+	tei_extra_args?: string;
 	gpu_device?: string;
 }
 
@@ -195,6 +287,14 @@ export interface CreateSavedRequest {
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
 	vllm_extra_args?: string;
+	vllm_quantization?: string;
+	vllm_dtype?: string;
+	vllm_kv_cache_dtype?: string;
+	vllm_max_num_seqs?: number;
+	vllm_enforce_eager?: boolean;
+	vllm_enable_prefix_caching?: boolean;
+	vllm_enable_chunked_prefill?: boolean;
+	vllm_swap_space?: number;
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
@@ -204,9 +304,31 @@ export interface CreateSavedRequest {
 	llama_jinja?: boolean;
 	llama_cache_reuse?: number;
 	llama_extra_args?: string;
+	llama_batch_size?: number;
+	llama_ubatch_size?: number;
+	llama_cache_type_k?: string;
+	llama_cache_type_v?: string;
+	llama_mlock?: boolean;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
+	sglang_data_parallel?: number;
+	sglang_context_len?: number;
+	sglang_chunked_prefill?: boolean;
+	sglang_quantization?: string;
+	sglang_attention_backend?: string;
+	sglang_extra_args?: string;
 	tgi_num_shard?: number;
+	tgi_max_concurrent_reqs?: number;
+	tgi_max_input_len?: number;
+	tgi_max_total_tokens?: number;
+	tgi_quantize?: string;
+	tgi_cuda_memory_fraction?: number;
+	tgi_extra_args?: string;
+	tei_max_batch_tokens?: number;
+	tei_max_concurrent_reqs?: number;
+	tei_pooling?: string;
+	tei_dtype?: string;
+	tei_extra_args?: string;
 }
 
 export interface LoadRequest {
@@ -227,6 +349,14 @@ export interface LoadRequest {
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
 	vllm_extra_args?: string;
+	vllm_quantization?: string;
+	vllm_dtype?: string;
+	vllm_kv_cache_dtype?: string;
+	vllm_max_num_seqs?: number;
+	vllm_enforce_eager?: boolean;
+	vllm_enable_prefix_caching?: boolean;
+	vllm_enable_chunked_prefill?: boolean;
+	vllm_swap_space?: number;
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
@@ -236,9 +366,31 @@ export interface LoadRequest {
 	llama_jinja?: boolean;
 	llama_cache_reuse?: number;
 	llama_extra_args?: string;
+	llama_batch_size?: number;
+	llama_ubatch_size?: number;
+	llama_cache_type_k?: string;
+	llama_cache_type_v?: string;
+	llama_mlock?: boolean;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
+	sglang_data_parallel?: number;
+	sglang_context_len?: number;
+	sglang_chunked_prefill?: boolean;
+	sglang_quantization?: string;
+	sglang_attention_backend?: string;
+	sglang_extra_args?: string;
 	tgi_num_shard?: number;
+	tgi_max_concurrent_reqs?: number;
+	tgi_max_input_len?: number;
+	tgi_max_total_tokens?: number;
+	tgi_quantize?: string;
+	tgi_cuda_memory_fraction?: number;
+	tgi_extra_args?: string;
+	tei_max_batch_tokens?: number;
+	tei_max_concurrent_reqs?: number;
+	tei_pooling?: string;
+	tei_dtype?: string;
+	tei_extra_args?: string;
 }
 
 import { api } from './client';

@@ -51,7 +51,15 @@ type ModelSpec struct {
 	VLLMTensorParallel int     // --tensor-parallel-size
 	VLLMMaxModelLen    int     // --max-model-len
 	VLLMGPUUtilization float64 // --gpu-memory-utilization (0..1)
-	VLLMExtraArgs      string  // extra CLI args appended to vllm command (e.g. --enable-auto-tool-choice --tool-call-parser hermes)
+	VLLMExtraArgs           string  // extra CLI args appended to vllm command (e.g. --enable-auto-tool-choice --tool-call-parser hermes)
+	VLLMQuantization        string  // --quantization (awq, gptq, squeezellm, fp8)
+	VLLMDtype               string  // --dtype (auto, float16, bfloat16, float32)
+	VLLMKVCacheDtype        string  // --kv-cache-dtype (auto, fp8)
+	VLLMMaxNumSeqs          int     // --max-num-seqs (max concurrent sequences)
+	VLLMEnforceEager        bool    // --enforce-eager (disable CUDA graphs)
+	VLLMEnablePrefixCaching bool    // --enable-prefix-caching
+	VLLMEnableChunkedPrefill bool   // --enable-chunked-prefill
+	VLLMSwapSpace           int     // --swap-space (GiB)
 
 	// llama.cpp server-specific
 	LlamaMainGPU     int    // --main-gpu
@@ -63,19 +71,37 @@ type ModelSpec struct {
 	LlamaJinja       bool   // --jinja (enable Jinja template processing)
 	LlamaCacheReuse  int    // --cache-reuse (0=default, -1=disable for SWA models)
 	LlamaExtraArgs   string // extra CLI args appended to llama-server command
+	LlamaBatchSize   int    // --batch-size
+	LlamaUBatchSize  int    // --ubatch-size
+	LlamaCacheTypeK  string // --cache-type-k (f16, q8_0, q4_0)
+	LlamaCacheTypeV  string // --cache-type-v (f16, q8_0, q4_0)
+	LlamaMlock       bool   // --mlock
 
 	// SGLang-specific
 	SGLangTensorParallel int     // --tp (tensor parallel)
 	SGLangDataParallel   int     // --dp (data parallel)
 	SGLangMemFraction    float64 // --mem-fraction-static (0..1)
 	SGLangContextLen     int     // --context-length
-	SGLangChunkedPrefill bool    // --chunked-prefill-size (enable chunked prefill)
+	SGLangChunkedPrefill   bool    // --chunked-prefill-size (enable chunked prefill)
+	SGLangQuantization     string  // --quantization (awq, fp8, gptq, marlin)
+	SGLangAttentionBackend string  // --attention-backend (flashinfer, triton, torch_native)
+	SGLangExtraArgs        string  // extra CLI args
 
 	// TGI-specific
 	TGINumShard          int // --num-shard
 	TGIMaxConcurrentReqs int // --max-concurrent-requests
 	TGIMaxInputLen       int // --max-input-length
-	TGIMaxTotalTokens    int // --max-total-tokens
+	TGIMaxTotalTokens    int     // --max-total-tokens
+	TGIQuantize          string  // --quantize (awq, gptq, eetq, fp8, bitsandbytes, bitsandbytes-nf4)
+	TGICudaMemoryFraction float64 // --cuda-memory-fraction (0..1)
+	TGIExtraArgs         string  // extra CLI args
+
+	// TEI-specific
+	TEIMaxBatchTokens    int    // --max-batch-tokens
+	TEIMaxConcurrentReqs int    // --max-concurrent-requests
+	TEIPooling           string // --pooling (cls, mean, splade, last-token)
+	TEIDtype             string // --dtype (float16, float32)
+	TEIExtraArgs         string // extra CLI args
 }
 
 // ModelStatus represents container+artifact state.

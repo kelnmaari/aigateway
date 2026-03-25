@@ -27,7 +27,15 @@ type SavedModel struct {
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel,omitempty"`
 	VLLMMaxModelLen    int     `json:"vllm_max_model_len,omitempty"`
 	VLLMGPUUtilization float64 `json:"vllm_gpu_utilization,omitempty"`
-	VLLMExtraArgs      string  `json:"vllm_extra_args,omitempty"`
+	VLLMExtraArgs           string  `json:"vllm_extra_args,omitempty"`
+	VLLMQuantization        string  `json:"vllm_quantization,omitempty"`
+	VLLMDtype               string  `json:"vllm_dtype,omitempty"`
+	VLLMKVCacheDtype        string  `json:"vllm_kv_cache_dtype,omitempty"`
+	VLLMMaxNumSeqs          int     `json:"vllm_max_num_seqs,omitempty"`
+	VLLMEnforceEager        bool    `json:"vllm_enforce_eager,omitempty"`
+	VLLMEnablePrefixCaching bool    `json:"vllm_enable_prefix_caching,omitempty"`
+	VLLMEnableChunkedPrefill bool   `json:"vllm_enable_chunked_prefill,omitempty"`
+	VLLMSwapSpace           int     `json:"vllm_swap_space,omitempty"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
@@ -39,13 +47,31 @@ type SavedModel struct {
 	LlamaJinja       bool   `json:"llama_jinja,omitempty"`
 	LlamaCacheReuse  int    `json:"llama_cache_reuse,omitempty"`
 	LlamaExtraArgs   string `json:"llama_extra_args,omitempty"`
+	LlamaBatchSize   int    `json:"llama_batch_size,omitempty"`
+	LlamaUBatchSize  int    `json:"llama_ubatch_size,omitempty"`
+	LlamaCacheTypeK  string `json:"llama_cache_type_k,omitempty"`
+	LlamaCacheTypeV  string `json:"llama_cache_type_v,omitempty"`
+	LlamaMlock       bool   `json:"llama_mlock,omitempty"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
-	SGLangMemFraction    float64 `json:"sglang_mem_fraction,omitempty"`
+	SGLangMemFraction      float64 `json:"sglang_mem_fraction,omitempty"`
+	SGLangQuantization     string  `json:"sglang_quantization,omitempty"`
+	SGLangAttentionBackend string  `json:"sglang_attention_backend,omitempty"`
+	SGLangExtraArgs        string  `json:"sglang_extra_args,omitempty"`
 
 	// TGI options
-	TGINumShard int `json:"tgi_num_shard,omitempty"`
+	TGINumShard           int     `json:"tgi_num_shard,omitempty"`
+	TGIQuantize           string  `json:"tgi_quantize,omitempty"`
+	TGICudaMemoryFraction float64 `json:"tgi_cuda_memory_fraction,omitempty"`
+	TGIExtraArgs          string  `json:"tgi_extra_args,omitempty"`
+
+	// TEI options
+	TEIMaxBatchTokens    int    `json:"tei_max_batch_tokens,omitempty"`
+	TEIMaxConcurrentReqs int    `json:"tei_max_concurrent_reqs,omitempty"`
+	TEIPooling           string `json:"tei_pooling,omitempty"`
+	TEIDtype             string `json:"tei_dtype,omitempty"`
+	TEIExtraArgs         string `json:"tei_extra_args,omitempty"`
 
 	// Meta
 	AutoStart bool      `json:"auto_start"` // Start on server boot
@@ -117,10 +143,34 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		LlamaJinja:           spec.LlamaJinja,
 		LlamaCacheReuse:      spec.LlamaCacheReuse,
 		LlamaExtraArgs:       spec.LlamaExtraArgs,
-		SGLangTensorParallel: spec.SGLangTensorParallel,
-		SGLangMemFraction:    spec.SGLangMemFraction,
-		TGINumShard:          spec.TGINumShard,
-		AutoStart:            autoStart,
+		SGLangTensorParallel:    spec.SGLangTensorParallel,
+		SGLangMemFraction:       spec.SGLangMemFraction,
+		SGLangQuantization:      spec.SGLangQuantization,
+		SGLangAttentionBackend:  spec.SGLangAttentionBackend,
+		SGLangExtraArgs:         spec.SGLangExtraArgs,
+		TGINumShard:             spec.TGINumShard,
+		TGIQuantize:             spec.TGIQuantize,
+		TGICudaMemoryFraction:   spec.TGICudaMemoryFraction,
+		TGIExtraArgs:            spec.TGIExtraArgs,
+		TEIMaxBatchTokens:       spec.TEIMaxBatchTokens,
+		TEIMaxConcurrentReqs:    spec.TEIMaxConcurrentReqs,
+		TEIPooling:              spec.TEIPooling,
+		TEIDtype:                spec.TEIDtype,
+		TEIExtraArgs:            spec.TEIExtraArgs,
+		VLLMQuantization:        spec.VLLMQuantization,
+		VLLMDtype:               spec.VLLMDtype,
+		VLLMKVCacheDtype:        spec.VLLMKVCacheDtype,
+		VLLMMaxNumSeqs:          spec.VLLMMaxNumSeqs,
+		VLLMEnforceEager:        spec.VLLMEnforceEager,
+		VLLMEnablePrefixCaching: spec.VLLMEnablePrefixCaching,
+		VLLMEnableChunkedPrefill: spec.VLLMEnableChunkedPrefill,
+		VLLMSwapSpace:           spec.VLLMSwapSpace,
+		LlamaBatchSize:          spec.LlamaBatchSize,
+		LlamaUBatchSize:         spec.LlamaUBatchSize,
+		LlamaCacheTypeK:         spec.LlamaCacheTypeK,
+		LlamaCacheTypeV:         spec.LlamaCacheTypeV,
+		LlamaMlock:              spec.LlamaMlock,
+		AutoStart:               autoStart,
 	}
 	return s.Save(saved)
 }
@@ -224,9 +274,33 @@ func (m SavedModel) ToSpec() ModelSpec {
 		LlamaJinja:           m.LlamaJinja,
 		LlamaCacheReuse:      m.LlamaCacheReuse,
 		LlamaExtraArgs:       m.LlamaExtraArgs,
-		SGLangTensorParallel: m.SGLangTensorParallel,
-		SGLangMemFraction:    m.SGLangMemFraction,
-		TGINumShard:          m.TGINumShard,
+		SGLangTensorParallel:    m.SGLangTensorParallel,
+		SGLangMemFraction:       m.SGLangMemFraction,
+		SGLangQuantization:      m.SGLangQuantization,
+		SGLangAttentionBackend:  m.SGLangAttentionBackend,
+		SGLangExtraArgs:         m.SGLangExtraArgs,
+		TGINumShard:             m.TGINumShard,
+		TGIQuantize:             m.TGIQuantize,
+		TGICudaMemoryFraction:   m.TGICudaMemoryFraction,
+		TGIExtraArgs:            m.TGIExtraArgs,
+		TEIMaxBatchTokens:       m.TEIMaxBatchTokens,
+		TEIMaxConcurrentReqs:    m.TEIMaxConcurrentReqs,
+		TEIPooling:              m.TEIPooling,
+		TEIDtype:                m.TEIDtype,
+		TEIExtraArgs:            m.TEIExtraArgs,
+		VLLMQuantization:        m.VLLMQuantization,
+		VLLMDtype:               m.VLLMDtype,
+		VLLMKVCacheDtype:        m.VLLMKVCacheDtype,
+		VLLMMaxNumSeqs:          m.VLLMMaxNumSeqs,
+		VLLMEnforceEager:        m.VLLMEnforceEager,
+		VLLMEnablePrefixCaching: m.VLLMEnablePrefixCaching,
+		VLLMEnableChunkedPrefill: m.VLLMEnableChunkedPrefill,
+		VLLMSwapSpace:           m.VLLMSwapSpace,
+		LlamaBatchSize:          m.LlamaBatchSize,
+		LlamaUBatchSize:         m.LlamaUBatchSize,
+		LlamaCacheTypeK:         m.LlamaCacheTypeK,
+		LlamaCacheTypeV:         m.LlamaCacheTypeV,
+		LlamaMlock:              m.LlamaMlock,
 	}
 }
 

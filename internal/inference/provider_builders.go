@@ -66,6 +66,30 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 	if spec.VLLMGPUUtilization > 0 {
 		cmd = append(cmd, "--gpu-memory-utilization", fmt.Sprintf("%.2f", spec.VLLMGPUUtilization))
 	}
+	if spec.VLLMQuantization != "" {
+		cmd = append(cmd, "--quantization", spec.VLLMQuantization)
+	}
+	if spec.VLLMDtype != "" && spec.VLLMDtype != "auto" {
+		cmd = append(cmd, "--dtype", spec.VLLMDtype)
+	}
+	if spec.VLLMKVCacheDtype != "" && spec.VLLMKVCacheDtype != "auto" {
+		cmd = append(cmd, "--kv-cache-dtype", spec.VLLMKVCacheDtype)
+	}
+	if spec.VLLMMaxNumSeqs > 0 {
+		cmd = append(cmd, "--max-num-seqs", fmt.Sprintf("%d", spec.VLLMMaxNumSeqs))
+	}
+	if spec.VLLMEnforceEager {
+		cmd = append(cmd, "--enforce-eager")
+	}
+	if spec.VLLMEnablePrefixCaching {
+		cmd = append(cmd, "--enable-prefix-caching")
+	}
+	if spec.VLLMEnableChunkedPrefill {
+		cmd = append(cmd, "--enable-chunked-prefill")
+	}
+	if spec.VLLMSwapSpace > 0 {
+		cmd = append(cmd, "--swap-space", fmt.Sprintf("%d", spec.VLLMSwapSpace))
+	}
 
 	// Extra args: split by whitespace and append as raw CLI args
 	// e.g. "--enable-auto-tool-choice --tool-call-parser hermes"
@@ -152,6 +176,18 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 	if spec.SGLangChunkedPrefill {
 		cmd = append(cmd, "--chunked-prefill-size", "8192")
 	}
+	if spec.SGLangQuantization != "" {
+		cmd = append(cmd, "--quantization", spec.SGLangQuantization)
+	}
+	if spec.SGLangAttentionBackend != "" {
+		cmd = append(cmd, "--attention-backend", spec.SGLangAttentionBackend)
+	}
+	// SGLang extra args
+	if spec.SGLangExtraArgs != "" {
+		for _, arg := range strings.Fields(spec.SGLangExtraArgs) {
+			cmd = append(cmd, arg)
+		}
+	}
 
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID",
@@ -224,6 +260,18 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	if spec.TGIMaxTotalTokens > 0 {
 		cmd = append(cmd, "--max-total-tokens", fmt.Sprintf("%d", spec.TGIMaxTotalTokens))
 	}
+	if spec.TGIQuantize != "" {
+		cmd = append(cmd, "--quantize", spec.TGIQuantize)
+	}
+	if spec.TGICudaMemoryFraction > 0 && spec.TGICudaMemoryFraction < 1.0 {
+		cmd = append(cmd, "--cuda-memory-fraction", fmt.Sprintf("%.2f", spec.TGICudaMemoryFraction))
+	}
+	// TGI extra args
+	if spec.TGIExtraArgs != "" {
+		for _, arg := range strings.Fields(spec.TGIExtraArgs) {
+			cmd = append(cmd, arg)
+		}
+	}
 
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
@@ -274,6 +322,24 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	cmd := []string{
 		"--model-id", modelArg,
 		"--port", fmt.Sprintf("%d", defaultTEIPort),
+	}
+	if spec.TEIMaxBatchTokens > 0 {
+		cmd = append(cmd, "--max-batch-tokens", fmt.Sprintf("%d", spec.TEIMaxBatchTokens))
+	}
+	if spec.TEIMaxConcurrentReqs > 0 {
+		cmd = append(cmd, "--max-concurrent-requests", fmt.Sprintf("%d", spec.TEIMaxConcurrentReqs))
+	}
+	if spec.TEIPooling != "" {
+		cmd = append(cmd, "--pooling", spec.TEIPooling)
+	}
+	if spec.TEIDtype != "" {
+		cmd = append(cmd, "--dtype", spec.TEIDtype)
+	}
+	// TEI extra args
+	if spec.TEIExtraArgs != "" {
+		for _, arg := range strings.Fields(spec.TEIExtraArgs) {
+			cmd = append(cmd, arg)
+		}
 	}
 
 	// Determine if GPU is available - use GPU image variant
@@ -366,6 +432,21 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	// Cache reuse: 0=don't pass (llama.cpp default 256), -1=disable, >0=set value
 	if spec.LlamaCacheReuse != 0 {
 		cmd = append(cmd, "--cache-reuse", fmt.Sprintf("%d", spec.LlamaCacheReuse))
+	}
+	if spec.LlamaBatchSize > 0 {
+		cmd = append(cmd, "--batch-size", fmt.Sprintf("%d", spec.LlamaBatchSize))
+	}
+	if spec.LlamaUBatchSize > 0 {
+		cmd = append(cmd, "--ubatch-size", fmt.Sprintf("%d", spec.LlamaUBatchSize))
+	}
+	if spec.LlamaCacheTypeK != "" && spec.LlamaCacheTypeK != "f16" {
+		cmd = append(cmd, "--cache-type-k", spec.LlamaCacheTypeK)
+	}
+	if spec.LlamaCacheTypeV != "" && spec.LlamaCacheTypeV != "f16" {
+		cmd = append(cmd, "--cache-type-v", spec.LlamaCacheTypeV)
+	}
+	if spec.LlamaMlock {
+		cmd = append(cmd, "--mlock")
 	}
 	// Extra args: split by whitespace and append as raw CLI args
 	if spec.LlamaExtraArgs != "" {

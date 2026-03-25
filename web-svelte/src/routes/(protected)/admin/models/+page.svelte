@@ -17,6 +17,7 @@
 	} from '$lib/api/inference';
 	import { api } from '$lib/api/client';
 	import { downloadsApi } from '$lib/api/downloads';
+	import { FormLabel } from '$lib/components/ui/form-label';
 	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import { faMagnifyingGlass, faDownload, faArrowUpRightFromSquare, faSpinner, faFont, faBolt, faRocket, faFaceSmile, faHorse, faLink, faChartBar, faShuffle, faGear, faArrowsRotate, faPause, faPlay, faXmark, faCircleCheck, faTriangleExclamation, faCircleXmark, faHourglass, faFolder, faTrashCan, faLightbulb, faArrowRight, faBan, faArrowDown } from '@fortawesome/free-solid-svg-icons';
 	import { faHeart } from '@fortawesome/free-regular-svg-icons';
@@ -299,6 +300,14 @@
 		vllm_max_model_len: number;
 		vllm_gpu_utilization: number;
 		vllm_extra_args: string;
+		vllm_quantization: string;
+		vllm_dtype: string;
+		vllm_kv_cache_dtype: string;
+		vllm_max_num_seqs: number;
+		vllm_enforce_eager: boolean;
+		vllm_enable_prefix_caching: boolean;
+		vllm_enable_chunked_prefill: boolean;
+		vllm_swap_space: number;
 		llama_main_gpu: number;
 		llama_n_gpu_layers: number;
 		llama_ctx_size: number;
@@ -308,9 +317,31 @@
 		llama_cache_reuse: number;
 		llama_extra_args: string;
 		llama_tensor_split: string;
+		llama_batch_size: number;
+		llama_ubatch_size: number;
+		llama_cache_type_k: string;
+		llama_cache_type_v: string;
+		llama_mlock: boolean;
 		sglang_tensor_parallel: number;
 		sglang_mem_fraction: number;
+		sglang_data_parallel: number;
+		sglang_context_len: number;
+		sglang_chunked_prefill: boolean;
+		sglang_quantization: string;
+		sglang_attention_backend: string;
+		sglang_extra_args: string;
 		tgi_num_shard: number;
+		tgi_max_concurrent_reqs: number;
+		tgi_max_input_len: number;
+		tgi_max_total_tokens: number;
+		tgi_quantize: string;
+		tgi_cuda_memory_fraction: number;
+		tgi_extra_args: string;
+		tei_max_batch_tokens: number;
+		tei_max_concurrent_reqs: number;
+		tei_pooling: string;
+		tei_dtype: string;
+		tei_extra_args: string;
 		gpu_device: string;
 	}>({
 		capabilities: ['chat'],
@@ -319,6 +350,14 @@
 		vllm_max_model_len: 0,
 		vllm_gpu_utilization: 0.9,
 		vllm_extra_args: '',
+		vllm_quantization: '',
+		vllm_dtype: 'auto',
+		vllm_kv_cache_dtype: 'auto',
+		vllm_max_num_seqs: 0,
+		vllm_enforce_eager: false,
+		vllm_enable_prefix_caching: false,
+		vllm_enable_chunked_prefill: false,
+		vllm_swap_space: 0,
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
 		llama_ctx_size: 0,
@@ -328,9 +367,31 @@
 		llama_cache_reuse: 0,
 		llama_extra_args: '',
 		llama_tensor_split: '',
+		llama_batch_size: 0,
+		llama_ubatch_size: 0,
+		llama_cache_type_k: '',
+		llama_cache_type_v: '',
+		llama_mlock: false,
 		sglang_tensor_parallel: 1,
 		sglang_mem_fraction: 0.9,
+		sglang_data_parallel: 0,
+		sglang_context_len: 0,
+		sglang_chunked_prefill: false,
+		sglang_quantization: '',
+		sglang_attention_backend: '',
+		sglang_extra_args: '',
 		tgi_num_shard: 1,
+		tgi_max_concurrent_reqs: 0,
+		tgi_max_input_len: 0,
+		tgi_max_total_tokens: 0,
+		tgi_quantize: '',
+		tgi_cuda_memory_fraction: 0,
+		tgi_extra_args: '',
+		tei_max_batch_tokens: 0,
+		tei_max_concurrent_reqs: 0,
+		tei_pooling: '',
+		tei_dtype: '',
+		tei_extra_args: '',
 		gpu_device: ''
 	});
 
@@ -348,6 +409,14 @@
 		vllm_max_model_len: 0,
 		vllm_gpu_utilization: 0.8,
 		vllm_extra_args: '',
+		vllm_quantization: '',
+		vllm_dtype: 'auto',
+		vllm_kv_cache_dtype: 'auto',
+		vllm_max_num_seqs: 0,
+		vllm_enforce_eager: false,
+		vllm_enable_prefix_caching: false,
+		vllm_enable_chunked_prefill: false,
+		vllm_swap_space: 0,
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
@@ -357,9 +426,31 @@
 		llama_jinja: false,
 		llama_cache_reuse: 0,
 		llama_extra_args: '',
+		llama_batch_size: 0,
+		llama_ubatch_size: 0,
+		llama_cache_type_k: '',
+		llama_cache_type_v: '',
+		llama_mlock: false,
 		sglang_tensor_parallel: 0,
 		sglang_mem_fraction: 0.8,
-		tgi_num_shard: 1
+		sglang_data_parallel: 0,
+		sglang_context_len: 0,
+		sglang_chunked_prefill: false,
+		sglang_quantization: '',
+		sglang_attention_backend: '',
+		sglang_extra_args: '',
+		tgi_num_shard: 1,
+		tgi_max_concurrent_reqs: 0,
+		tgi_max_input_len: 0,
+		tgi_max_total_tokens: 0,
+		tgi_quantize: '',
+		tgi_cuda_memory_fraction: 0,
+		tgi_extra_args: '',
+		tei_max_batch_tokens: 0,
+		tei_max_concurrent_reqs: 0,
+		tei_pooling: '',
+		tei_dtype: '',
+		tei_extra_args: ''
 	});
 
 	// TRT conversion form
@@ -885,6 +976,14 @@
 				vllm_max_model_len: form.vllm_max_model_len,
 				vllm_gpu_utilization: form.vllm_gpu_utilization,
 				vllm_extra_args: form.vllm_extra_args,
+				vllm_quantization: form.vllm_quantization,
+				vllm_dtype: form.vllm_dtype,
+				vllm_kv_cache_dtype: form.vllm_kv_cache_dtype,
+				vllm_max_num_seqs: form.vllm_max_num_seqs,
+				vllm_enforce_eager: form.vllm_enforce_eager,
+				vllm_enable_prefix_caching: form.vllm_enable_prefix_caching,
+				vllm_enable_chunked_prefill: form.vllm_enable_chunked_prefill,
+				vllm_swap_space: form.vllm_swap_space,
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
@@ -894,9 +993,31 @@
 				llama_jinja: form.llama_jinja,
 				llama_cache_reuse: form.llama_cache_reuse,
 				llama_extra_args: form.llama_extra_args,
+				llama_batch_size: form.llama_batch_size,
+				llama_ubatch_size: form.llama_ubatch_size,
+				llama_cache_type_k: form.llama_cache_type_k,
+				llama_cache_type_v: form.llama_cache_type_v,
+				llama_mlock: form.llama_mlock,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
-				tgi_num_shard: form.tgi_num_shard
+				sglang_data_parallel: form.sglang_data_parallel,
+				sglang_context_len: form.sglang_context_len,
+				sglang_chunked_prefill: form.sglang_chunked_prefill,
+				sglang_quantization: form.sglang_quantization,
+				sglang_attention_backend: form.sglang_attention_backend,
+				sglang_extra_args: form.sglang_extra_args,
+				tgi_num_shard: form.tgi_num_shard,
+				tgi_max_concurrent_reqs: form.tgi_max_concurrent_reqs,
+				tgi_max_input_len: form.tgi_max_input_len,
+				tgi_max_total_tokens: form.tgi_max_total_tokens,
+				tgi_quantize: form.tgi_quantize,
+				tgi_cuda_memory_fraction: form.tgi_cuda_memory_fraction,
+				tgi_extra_args: form.tgi_extra_args,
+				tei_max_batch_tokens: form.tei_max_batch_tokens,
+				tei_max_concurrent_reqs: form.tei_max_concurrent_reqs,
+				tei_pooling: form.tei_pooling,
+				tei_dtype: form.tei_dtype,
+				tei_extra_args: form.tei_extra_args
 			};
 			if (start) {
 				await inferenceApi.load(req);
@@ -945,6 +1066,14 @@
 				vllm_max_model_len: form.vllm_max_model_len,
 				vllm_gpu_utilization: form.vllm_gpu_utilization,
 				vllm_extra_args: form.vllm_extra_args,
+				vllm_quantization: form.vllm_quantization,
+				vllm_dtype: form.vllm_dtype,
+				vllm_kv_cache_dtype: form.vllm_kv_cache_dtype,
+				vllm_max_num_seqs: form.vllm_max_num_seqs,
+				vllm_enforce_eager: form.vllm_enforce_eager,
+				vllm_enable_prefix_caching: form.vllm_enable_prefix_caching,
+				vllm_enable_chunked_prefill: form.vllm_enable_chunked_prefill,
+				vllm_swap_space: form.vllm_swap_space,
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
@@ -954,9 +1083,31 @@
 				llama_jinja: form.llama_jinja,
 				llama_cache_reuse: form.llama_cache_reuse,
 				llama_extra_args: form.llama_extra_args,
+				llama_batch_size: form.llama_batch_size,
+				llama_ubatch_size: form.llama_ubatch_size,
+				llama_cache_type_k: form.llama_cache_type_k,
+				llama_cache_type_v: form.llama_cache_type_v,
+				llama_mlock: form.llama_mlock,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
-				tgi_num_shard: form.tgi_num_shard
+				sglang_data_parallel: form.sglang_data_parallel,
+				sglang_context_len: form.sglang_context_len,
+				sglang_chunked_prefill: form.sglang_chunked_prefill,
+				sglang_quantization: form.sglang_quantization,
+				sglang_attention_backend: form.sglang_attention_backend,
+				sglang_extra_args: form.sglang_extra_args,
+				tgi_num_shard: form.tgi_num_shard,
+				tgi_max_concurrent_reqs: form.tgi_max_concurrent_reqs,
+				tgi_max_input_len: form.tgi_max_input_len,
+				tgi_max_total_tokens: form.tgi_max_total_tokens,
+				tgi_quantize: form.tgi_quantize,
+				tgi_cuda_memory_fraction: form.tgi_cuda_memory_fraction,
+				tgi_extra_args: form.tgi_extra_args,
+				tei_max_batch_tokens: form.tei_max_batch_tokens,
+				tei_max_concurrent_reqs: form.tei_max_concurrent_reqs,
+				tei_pooling: form.tei_pooling,
+				tei_dtype: form.tei_dtype,
+				tei_extra_args: form.tei_extra_args
 			};
 
 			await inferenceApi.createSaved(config);
@@ -1059,15 +1210,48 @@
 				vllm_max_model_len: m.vllm_max_model_len,
 				vllm_gpu_utilization: m.vllm_gpu_utilization,
 				vllm_extra_args: m.vllm_extra_args,
+				vllm_quantization: m.vllm_quantization,
+				vllm_dtype: m.vllm_dtype,
+				vllm_kv_cache_dtype: m.vllm_kv_cache_dtype,
+				vllm_max_num_seqs: m.vllm_max_num_seqs,
+				vllm_enforce_eager: m.vllm_enforce_eager,
+				vllm_enable_prefix_caching: m.vllm_enable_prefix_caching,
+				vllm_enable_chunked_prefill: m.vllm_enable_chunked_prefill,
+				vllm_swap_space: m.vllm_swap_space,
 				llama_main_gpu: m.llama_main_gpu,
 				llama_tensor_split: m.llama_tensor_split,
 				llama_n_gpu_layers: m.llama_n_gpu_layers,
 				llama_ctx_size: m.llama_ctx_size,
 				llama_n_parallel: m.llama_n_parallel,
 				llama_flash_attn: m.llama_flash_attn,
+				llama_jinja: m.llama_jinja,
+				llama_cache_reuse: m.llama_cache_reuse,
+				llama_extra_args: m.llama_extra_args,
+				llama_batch_size: m.llama_batch_size,
+				llama_ubatch_size: m.llama_ubatch_size,
+				llama_cache_type_k: m.llama_cache_type_k,
+				llama_cache_type_v: m.llama_cache_type_v,
+				llama_mlock: m.llama_mlock,
 				sglang_tensor_parallel: m.sglang_tensor_parallel,
 				sglang_mem_fraction: m.sglang_mem_fraction,
-				tgi_num_shard: m.tgi_num_shard
+				sglang_data_parallel: m.sglang_data_parallel,
+				sglang_context_len: m.sglang_context_len,
+				sglang_chunked_prefill: m.sglang_chunked_prefill,
+				sglang_quantization: m.sglang_quantization,
+				sglang_attention_backend: m.sglang_attention_backend,
+				sglang_extra_args: m.sglang_extra_args,
+				tgi_num_shard: m.tgi_num_shard,
+				tgi_max_concurrent_reqs: m.tgi_max_concurrent_reqs,
+				tgi_max_input_len: m.tgi_max_input_len,
+				tgi_max_total_tokens: m.tgi_max_total_tokens,
+				tgi_quantize: m.tgi_quantize,
+				tgi_cuda_memory_fraction: m.tgi_cuda_memory_fraction,
+				tgi_extra_args: m.tgi_extra_args,
+				tei_max_batch_tokens: m.tei_max_batch_tokens,
+				tei_max_concurrent_reqs: m.tei_max_concurrent_reqs,
+				tei_pooling: m.tei_pooling,
+				tei_dtype: m.tei_dtype,
+				tei_extra_args: m.tei_extra_args
 			};
 			await inferenceApi.load(req);
 			showMsg(`Модель ${m.alias} запускается`, 'success');
@@ -1154,6 +1338,14 @@
 			vllm_max_model_len: saved.vllm_max_model_len || 0,
 			vllm_gpu_utilization: saved.vllm_gpu_utilization || 0.9,
 			vllm_extra_args: saved.vllm_extra_args || '',
+			vllm_quantization: saved.vllm_quantization || '',
+			vllm_dtype: saved.vllm_dtype || 'auto',
+			vllm_kv_cache_dtype: saved.vllm_kv_cache_dtype || 'auto',
+			vllm_max_num_seqs: saved.vllm_max_num_seqs || 0,
+			vllm_enforce_eager: saved.vllm_enforce_eager || false,
+			vllm_enable_prefix_caching: saved.vllm_enable_prefix_caching || false,
+			vllm_enable_chunked_prefill: saved.vllm_enable_chunked_prefill || false,
+			vllm_swap_space: saved.vllm_swap_space || 0,
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
 			llama_ctx_size: saved.llama_ctx_size || 0,
@@ -1163,9 +1355,31 @@
 			llama_cache_reuse: saved.llama_cache_reuse || 0,
 			llama_extra_args: saved.llama_extra_args || '',
 			llama_tensor_split: saved.llama_tensor_split || '',
+			llama_batch_size: saved.llama_batch_size || 0,
+			llama_ubatch_size: saved.llama_ubatch_size || 0,
+			llama_cache_type_k: saved.llama_cache_type_k || '',
+			llama_cache_type_v: saved.llama_cache_type_v || '',
+			llama_mlock: saved.llama_mlock || false,
 			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
 			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,
+			sglang_data_parallel: saved.sglang_data_parallel || 0,
+			sglang_context_len: saved.sglang_context_len || 0,
+			sglang_chunked_prefill: saved.sglang_chunked_prefill || false,
+			sglang_quantization: saved.sglang_quantization || '',
+			sglang_attention_backend: saved.sglang_attention_backend || '',
+			sglang_extra_args: saved.sglang_extra_args || '',
 			tgi_num_shard: saved.tgi_num_shard || 1,
+			tgi_max_concurrent_reqs: saved.tgi_max_concurrent_reqs || 0,
+			tgi_max_input_len: saved.tgi_max_input_len || 0,
+			tgi_max_total_tokens: saved.tgi_max_total_tokens || 0,
+			tgi_quantize: saved.tgi_quantize || '',
+			tgi_cuda_memory_fraction: saved.tgi_cuda_memory_fraction || 0,
+			tgi_extra_args: saved.tgi_extra_args || '',
+			tei_max_batch_tokens: saved.tei_max_batch_tokens || 0,
+			tei_max_concurrent_reqs: saved.tei_max_concurrent_reqs || 0,
+			tei_pooling: saved.tei_pooling || '',
+			tei_dtype: saved.tei_dtype || '',
+			tei_extra_args: saved.tei_extra_args || '',
 			gpu_device: saved.gpu_device || ''
 		};
 	}
@@ -1220,14 +1434,48 @@
 				vllm_max_model_len: saved.vllm_max_model_len,
 				vllm_gpu_utilization: saved.vllm_gpu_utilization,
 				vllm_extra_args: saved.vllm_extra_args,
+				vllm_quantization: saved.vllm_quantization,
+				vllm_dtype: saved.vllm_dtype,
+				vllm_kv_cache_dtype: saved.vllm_kv_cache_dtype,
+				vllm_max_num_seqs: saved.vllm_max_num_seqs,
+				vllm_enforce_eager: saved.vllm_enforce_eager,
+				vllm_enable_prefix_caching: saved.vllm_enable_prefix_caching,
+				vllm_enable_chunked_prefill: saved.vllm_enable_chunked_prefill,
+				vllm_swap_space: saved.vllm_swap_space,
 				llama_main_gpu: saved.llama_main_gpu,
 				llama_n_gpu_layers: saved.llama_n_gpu_layers,
 				llama_ctx_size: saved.llama_ctx_size,
 				llama_n_parallel: saved.llama_n_parallel,
 				llama_flash_attn: saved.llama_flash_attn,
+				llama_jinja: saved.llama_jinja,
+				llama_cache_reuse: saved.llama_cache_reuse,
+				llama_extra_args: saved.llama_extra_args,
+				llama_batch_size: saved.llama_batch_size,
+				llama_ubatch_size: saved.llama_ubatch_size,
+				llama_cache_type_k: saved.llama_cache_type_k,
+				llama_cache_type_v: saved.llama_cache_type_v,
+				llama_mlock: saved.llama_mlock,
+				llama_tensor_split: saved.llama_tensor_split,
 				sglang_tensor_parallel: saved.sglang_tensor_parallel,
 				sglang_mem_fraction: saved.sglang_mem_fraction,
-				tgi_num_shard: saved.tgi_num_shard
+				sglang_data_parallel: saved.sglang_data_parallel,
+				sglang_context_len: saved.sglang_context_len,
+				sglang_chunked_prefill: saved.sglang_chunked_prefill,
+				sglang_quantization: saved.sglang_quantization,
+				sglang_attention_backend: saved.sglang_attention_backend,
+				sglang_extra_args: saved.sglang_extra_args,
+				tgi_num_shard: saved.tgi_num_shard,
+				tgi_max_concurrent_reqs: saved.tgi_max_concurrent_reqs,
+				tgi_max_input_len: saved.tgi_max_input_len,
+				tgi_max_total_tokens: saved.tgi_max_total_tokens,
+				tgi_quantize: saved.tgi_quantize,
+				tgi_cuda_memory_fraction: saved.tgi_cuda_memory_fraction,
+				tgi_extra_args: saved.tgi_extra_args,
+				tei_max_batch_tokens: saved.tei_max_batch_tokens,
+				tei_max_concurrent_reqs: saved.tei_max_concurrent_reqs,
+				tei_pooling: saved.tei_pooling,
+				tei_dtype: saved.tei_dtype,
+				tei_extra_args: saved.tei_extra_args
 			};
 			await inferenceApi.load(req);
 			showMsg(`Модель ${saved.alias} запускается`, 'success');
@@ -1667,40 +1915,93 @@
 
 					<!-- Provider-specific params -->
 					{#if form.provider === 'vllm'}
-						<div class="grid gap-3 border-t pt-2 sm:grid-cols-3">
+						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
 							<label class="flex flex-col gap-1 text-sm">
-								<span>Tensor Parallel</span>
+								<FormLabel label="Tensor Parallel" description="Number of GPUs for tensor parallelism. Must match GPU count in gpu_device" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="0"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.vllm_tensor_parallel}
 								/>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span>Max Model Len</span>
+								<FormLabel label="Max Model Len" description="Maximum context length in tokens. Lower values reduce VRAM. 0 = model default" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="0"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.vllm_max_model_len}
 								/>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span>GPU Utilization</span>
+								<FormLabel label="GPU Utilization" description="Fraction of GPU memory for model (0.0-1.0). Leave headroom for KV cache" />
 								<input
-									type="number"
-									step="0.01"
-									min="0"
-									max="1"
+									type="number" step="0.01" min="0" max="1"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.vllm_gpu_utilization}
 								/>
 							</label>
-						</div>
-						<div class="pt-2">
 							<label class="flex flex-col gap-1 text-sm">
-								<span title="Extra command-line args passed to vLLM (space-separated). E.g. --enable-auto-tool-choice --tool-call-parser hermes">extra_args</span>
+								<FormLabel label="Quantization" description="Quantization method. Reduces VRAM at slight quality cost" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.vllm_quantization}>
+									<option value="">None</option>
+									<option value="awq">AWQ</option>
+									<option value="gptq">GPTQ</option>
+									<option value="squeezellm">SqueezeLLM</option>
+									<option value="fp8">FP8</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Dtype" description="Model weight data type. auto uses model config" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.vllm_dtype}>
+									<option value="auto">auto</option>
+									<option value="float16">float16</option>
+									<option value="bfloat16">bfloat16</option>
+									<option value="float32">float32</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="KV Cache Dtype" description="KV cache data type. fp8 reduces VRAM ~50%" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.vllm_kv_cache_dtype}>
+									<option value="auto">auto</option>
+									<option value="fp8">fp8</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Max Num Seqs" description="Max concurrent sequences in batch. Lower = less memory. 0 = default (256)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.vllm_max_num_seqs}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Swap Space" description="CPU swap space per GPU in GiB for KV cache offloading. 0 = default (4)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.vllm_swap_space}
+								/>
+							</label>
+						</div>
+						<div class="mt-3 flex flex-wrap gap-4">
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_enforce_eager} />
+								<FormLabel label="Enforce Eager" description="Disable CUDA graphs, use eager PyTorch. May fix model compatibility issues" />
+							</label>
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_enable_prefix_caching} />
+								<FormLabel label="Prefix Caching" description="Reuse KV cache for shared prompt prefixes. Saves compute for similar prompts" />
+							</label>
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_enable_chunked_prefill} />
+								<FormLabel label="Chunked Prefill" description="Process long prompts in chunks to reduce memory spikes" />
+							</label>
+						</div>
+						<div class="mt-3">
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Extra Args" description="Additional CLI flags for vLLM, space-separated" />
 								<input
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.vllm_extra_args}
@@ -1710,67 +2011,49 @@
 							</label>
 						</div>
 					{:else if form.provider === 'llama.cpp'}
-						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-4">
+						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
 							<label class="flex flex-col gap-1 text-sm">
-								<span>n_gpu_layers</span>
+								<FormLabel label="n_gpu_layers" description="GPU layers (-ngl). -1 = all layers, 0 = CPU only" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="-1"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.llama_n_gpu_layers}
 								/>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span title="Context size (0 = default 2048)">ctx_size</span>
+								<FormLabel label="ctx_size" description="Context size in tokens. 0 = model default" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="0"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.llama_ctx_size}
-									placeholder="32768"
 								/>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span title="Parallel request slots (0 = auto)">n_parallel</span>
+								<FormLabel label="n_parallel" description="Parallel sequences/slots for concurrent requests" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="0"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.llama_n_parallel}
-									placeholder="4"
 								/>
 							</label>
-							<label class="flex items-center gap-2 pt-5 text-sm">
-								<input type="checkbox" class="h-4 w-4" bind:checked={form.llama_flash_attn} />
-								<span title="Enable Flash Attention for faster inference">Flash Attn</span>
-							</label>
-							<label class="flex items-center gap-2 pt-5 text-sm">
-								<input type="checkbox" class="h-4 w-4" bind:checked={form.llama_jinja} />
-								<span title="Enable Jinja template processing for chat templates">Jinja</span>
-							</label>
-						</div>
-						<div class="grid gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-3">
 							<label class="flex flex-col gap-1 text-sm">
-								<span>main_gpu</span>
+								<FormLabel label="main_gpu" description="Primary GPU index for computation" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="0"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.llama_main_gpu}
 								/>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span>tensor_split</span>
+								<FormLabel label="tensor_split" description="GPU split ratio, e.g. '3,1' = 75%/25% across 2 GPUs" />
 								<input
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.llama_tensor_split}
 									placeholder="0.5,0.5"
 								/>
 							</label>
-						</div>
-						<div class="grid gap-3 pt-2 sm:grid-cols-2">
 							<label class="flex flex-col gap-1 text-sm">
-								<span title="KV cache reuse size. 0 = llama.cpp default (256). -1 = disable (recommended for SWA models like GPT-OSS)">cache_reuse</span>
+								<FormLabel label="cache_reuse" description="KV cache reuse. 0 = default (256), -1 = disable (SWA models)" />
 								<input
 									type="number"
 									min="-1"
@@ -1778,10 +2061,73 @@
 									bind:value={form.llama_cache_reuse}
 									placeholder="0"
 								/>
-								<span class="text-muted-foreground text-xs">0 = default, -1 = disable (SWA models)</span>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span title="Extra command-line args passed to llama-server (space-separated)">extra_args</span>
+								<FormLabel label="batch_size" description="Logical max batch size. Higher = faster prompt processing. 0 = default (2048)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.llama_batch_size}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="ubatch_size" description="Physical max batch per computation step. 0 = default (512)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.llama_ubatch_size}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="cache_type_k" description="KV cache key dtype. Lower precision = less VRAM" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.llama_cache_type_k}>
+									<option value="">Default</option>
+									<option value="f32">f32</option>
+									<option value="f16">f16</option>
+									<option value="bf16">bf16</option>
+									<option value="q8_0">q8_0</option>
+									<option value="q4_0">q4_0</option>
+									<option value="q4_1">q4_1</option>
+									<option value="iq4_nl">iq4_nl</option>
+									<option value="q5_0">q5_0</option>
+									<option value="q5_1">q5_1</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="cache_type_v" description="KV cache value dtype. Lower precision = less VRAM" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.llama_cache_type_v}>
+									<option value="">Default</option>
+									<option value="f32">f32</option>
+									<option value="f16">f16</option>
+									<option value="bf16">bf16</option>
+									<option value="q8_0">q8_0</option>
+									<option value="q4_0">q4_0</option>
+									<option value="q4_1">q4_1</option>
+									<option value="iq4_nl">iq4_nl</option>
+									<option value="q5_0">q5_0</option>
+									<option value="q5_1">q5_1</option>
+								</select>
+							</label>
+						</div>
+						<div class="mt-3 flex flex-wrap gap-4">
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.llama_flash_attn} />
+								<FormLabel label="Flash Attn" description="Enable Flash Attention for faster inference and lower memory" />
+							</label>
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.llama_jinja} />
+								<FormLabel label="Jinja" description="Enable Jinja2 template processing for chat templates" />
+							</label>
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.llama_mlock} />
+								<FormLabel label="mlock" description="Lock model in memory to prevent pageouts" />
+							</label>
+						</div>
+						<div class="mt-3">
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Extra Args" description="Additional CLI flags for llama.cpp, space-separated" />
 								<input
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.llama_extra_args}
@@ -1791,38 +2137,197 @@
 							</label>
 						</div>
 					{:else if form.provider === 'sglang'}
-						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2">
+						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
 							<label class="flex flex-col gap-1 text-sm">
-								<span>Tensor Parallel</span>
+								<FormLabel label="Tensor Parallel" description="Tensor parallelism GPUs (--tp). 0 = default (1)" />
 								<input
-									type="number"
-									min="0"
+									type="number" min="0"
 									class="bg-background rounded border px-3 py-2"
 									bind:value={form.sglang_tensor_parallel}
 								/>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<span>Mem Fraction</span>
+								<FormLabel label="Mem Fraction" description="GPU memory fraction for KV cache (--mem-fraction-static). 0 = default (~0.88)" />
+								<input
+									type="number" step="0.01" min="0" max="1"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.sglang_mem_fraction}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Data Parallel" description="Data parallel replicas (--dp). Total GPUs = TP x DP. 0 = default (1)" />
+								<input
+									type="number" min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.sglang_data_parallel}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Context Len" description="Override model default context length. 0 = model default" />
+								<input
+									type="number" min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.sglang_context_len}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Quantization" description="Quantization method for reduced VRAM usage" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.sglang_quantization}>
+									<option value="">None</option>
+									<option value="awq">AWQ</option>
+									<option value="fp8">FP8</option>
+									<option value="gptq">GPTQ</option>
+									<option value="marlin">Marlin</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Attention Backend" description="Attention kernel implementation. Empty = auto (flashinfer)" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.sglang_attention_backend}>
+									<option value="">Auto</option>
+									<option value="flashinfer">flashinfer</option>
+									<option value="triton">triton</option>
+									<option value="torch_native">torch_native</option>
+								</select>
+							</label>
+						</div>
+						<div class="mt-3 flex flex-wrap gap-4">
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.sglang_chunked_prefill} />
+								<FormLabel label="Chunked Prefill" description="Enable chunked prefill (size 8192) for long-context throughput" />
+							</label>
+						</div>
+						<div class="mt-3">
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Extra Args" description="Additional CLI flags for SGLang, space-separated" />
+								<input
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.sglang_extra_args}
+									placeholder="--disable-radix-cache"
+								/>
+								<span class="text-muted-foreground text-xs">Additional CLI flags for SGLang</span>
+							</label>
+						</div>
+					{:else if form.provider === 'tgi'}
+						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Num Shards" description="GPU shards for model parallelism. 0 = default (1)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tgi_num_shard}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Max Concurrent Reqs" description="Max concurrent requests (backpressure). 0 = default (128)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tgi_max_concurrent_reqs}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Max Input Len" description="Max prompt tokens. 0 = model default" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tgi_max_input_len}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Max Total Tokens" description="Max total tokens (input+output). 0 = model default" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tgi_max_total_tokens}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Quantize" description="Quantization method. Reduces VRAM" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.tgi_quantize}>
+									<option value="">None</option>
+									<option value="awq">AWQ</option>
+									<option value="gptq">GPTQ</option>
+									<option value="eetq">EETQ</option>
+									<option value="fp8">FP8</option>
+									<option value="bitsandbytes">bitsandbytes</option>
+									<option value="bitsandbytes-nf4">bitsandbytes-nf4</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="CUDA Memory Fraction" description="CUDA memory fraction (0.0-1.0). 0 = default (1.0)" />
 								<input
 									type="number"
 									step="0.01"
 									min="0"
 									max="1"
 									class="bg-background rounded border px-3 py-2"
-									bind:value={form.sglang_mem_fraction}
+									bind:value={form.tgi_cuda_memory_fraction}
 								/>
 							</label>
 						</div>
-					{:else if form.provider === 'tgi'}
-						<div class="grid gap-3 border-t pt-2 sm:grid-cols-1">
+						<div class="mt-3">
 							<label class="flex flex-col gap-1 text-sm">
-								<span>Num Shards</span>
+								<FormLabel label="Extra Args" description="Additional CLI flags for TGI, space-separated" />
+								<input
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tgi_extra_args}
+									placeholder="--max-batch-prefill-tokens 4096"
+								/>
+								<span class="text-muted-foreground text-xs">Additional CLI flags for TGI</span>
+							</label>
+						</div>
+					{:else if form.provider === 'tei'}
+						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Max Batch Tokens" description="Max tokens per batch. Higher = more throughput, more VRAM. 0 = default (16384)" />
 								<input
 									type="number"
-									min="1"
+									min="0"
 									class="bg-background rounded border px-3 py-2"
-									bind:value={form.tgi_num_shard}
+									bind:value={form.tei_max_batch_tokens}
 								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Max Concurrent Reqs" description="Max concurrent requests. 0 = default (512)" />
+								<input
+									type="number"
+									min="0"
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tei_max_concurrent_reqs}
+								/>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Pooling" description="Embedding pooling method. Empty = model config" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.tei_pooling}>
+									<option value="">Auto</option>
+									<option value="cls">cls</option>
+									<option value="mean">mean</option>
+									<option value="splade">splade</option>
+									<option value="lasttoken">lasttoken</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Dtype" description="Force weight dtype. Empty = auto" />
+								<select class="bg-background rounded border px-3 py-2" bind:value={form.tei_dtype}>
+									<option value="">Auto</option>
+									<option value="float16">float16</option>
+									<option value="float32">float32</option>
+								</select>
+							</label>
+						</div>
+						<div class="mt-3">
+							<label class="flex flex-col gap-1 text-sm">
+								<FormLabel label="Extra Args" description="Additional CLI flags for TEI, space-separated" />
+								<input
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.tei_extra_args}
+									placeholder="--otlp-endpoint http://localhost:4317"
+								/>
+								<span class="text-muted-foreground text-xs">Additional CLI flags for TEI</span>
 							</label>
 						</div>
 					{/if}
@@ -2795,106 +3300,333 @@
 				{#if editingSavedModel.provider === 'vllm'}
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="edit-vllm-tp" class="mb-1 block text-sm font-medium"
-								>Tensor Parallel</label
-							>
+							<FormLabel label="Tensor Parallel" description="Number of GPUs for tensor parallelism. Must match GPU count in gpu_device" />
 							<input
-								id="edit-vllm-tp"
 								type="number"
-								min="1"
+								min="0"
 								class="bg-background w-full rounded border px-3 py-2"
 								bind:value={editSavedForm.vllm_tensor_parallel}
 							/>
 						</div>
 						<div>
-							<label for="edit-vllm-len" class="mb-1 block text-sm font-medium"
-								>Max Model Length</label
-							>
+							<FormLabel label="Max Model Len" description="Maximum context length in tokens. Lower values reduce VRAM. 0 = model default" />
 							<input
-								id="edit-vllm-len"
 								type="number"
 								min="0"
 								class="bg-background w-full rounded border px-3 py-2"
-								placeholder="0 = auto"
 								bind:value={editSavedForm.vllm_max_model_len}
 							/>
 						</div>
+						<div>
+							<FormLabel label="GPU Utilization" description="Fraction of GPU memory for model (0.0-1.0). Leave headroom for KV cache" />
+							<input
+								type="number"
+								min="0"
+								step="0.05" max="1.0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.vllm_gpu_utilization}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Quantization" description="Quantization method. Reduces VRAM at slight quality cost" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.vllm_quantization}>
+								<option value="">None</option>
+								<option value="awq">AWQ</option>
+								<option value="gptq">GPTQ</option>
+								<option value="squeezellm">SqueezeLLM</option>
+								<option value="fp8">FP8</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="Dtype" description="Model weight data type. auto uses model config" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.vllm_dtype}>
+								<option value="auto">auto</option>
+								<option value="float16">float16</option>
+								<option value="bfloat16">bfloat16</option>
+								<option value="float32">float32</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="KV Cache Dtype" description="KV cache data type. fp8 reduces VRAM ~50%" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.vllm_kv_cache_dtype}>
+								<option value="auto">auto</option>
+								<option value="fp8">fp8</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="Max Num Seqs" description="Max concurrent sequences in batch. Lower = less memory. 0 = default (256)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.vllm_max_num_seqs}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Swap Space" description="CPU swap space per GPU in GiB for KV cache offloading. 0 = default (4)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.vllm_swap_space}
+							/>
+						</div>
+					</div>
+					<div class="mt-3 flex flex-wrap gap-4">
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_enforce_eager} />
+								<FormLabel label="Enforce Eager" description="Disable CUDA graphs, use eager PyTorch. May fix model compatibility issues" />
+							</label>
+						</div>
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_enable_prefix_caching} />
+								<FormLabel label="Prefix Caching" description="Reuse KV cache for shared prompt prefixes. Saves compute for similar prompts" />
+							</label>
+						</div>
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_enable_chunked_prefill} />
+								<FormLabel label="Chunked Prefill" description="Process long prompts in chunks to reduce memory spikes" />
+							</label>
+						</div>
 					</div>
 					<div>
-						<label for="edit-vllm-util" class="mb-1 block text-sm font-medium"
-							>GPU Memory Utilization</label
-						>
+						<FormLabel label="Extra Args" description="Additional CLI flags for vLLM, space-separated" />
 						<input
-							id="edit-vllm-util"
-							type="number"
-							step="0.05"
-							min="0.1"
-							max="1.0"
-							class="bg-background w-full rounded border px-3 py-2"
-							bind:value={editSavedForm.vllm_gpu_utilization}
-						/>
-						<p class="text-muted-foreground mt-1 text-xs">0.1 - 1.0 (default: 0.9)</p>
-					</div>
-					<div>
-						<label for="edit-vllm-extra" class="mb-1 block text-sm font-medium"
-							>Extra Args</label
-						>
-						<input
-							id="edit-vllm-extra"
 							type="text"
 							class="bg-background w-full rounded border px-3 py-2"
 							placeholder="--enable-auto-tool-choice --tool-call-parser hermes"
 							bind:value={editSavedForm.vllm_extra_args}
 						/>
-						<p class="text-muted-foreground mt-1 text-xs">Additional CLI flags for vLLM (e.g. tool calling support)</p>
 					</div>
 				{:else if editingSavedModel.provider === 'sglang'}
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="edit-sglang-tp" class="mb-1 block text-sm font-medium"
-								>Tensor Parallel</label
-							>
+							<FormLabel label="Tensor Parallel" description="Tensor parallelism GPUs (--tp). 0 = default (1)" />
 							<input
-								id="edit-sglang-tp"
 								type="number"
-								min="1"
+								min="0"
 								class="bg-background w-full rounded border px-3 py-2"
 								bind:value={editSavedForm.sglang_tensor_parallel}
 							/>
 						</div>
 						<div>
-							<label for="edit-sglang-mem" class="mb-1 block text-sm font-medium"
-								>Memory Fraction</label
-							>
+							<FormLabel label="Mem Fraction" description="GPU memory fraction for KV cache (--mem-fraction-static). 0 = default (~0.88)" />
 							<input
-								id="edit-sglang-mem"
 								type="number"
-								step="0.05"
-								min="0.1"
-								max="1.0"
+								min="0"
+								step="0.05" max="1.0"
 								class="bg-background w-full rounded border px-3 py-2"
 								bind:value={editSavedForm.sglang_mem_fraction}
 							/>
 						</div>
+						<div>
+							<FormLabel label="Data Parallel" description="Data parallel replicas (--dp). Total GPUs = TP x DP. 0 = default (1)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.sglang_data_parallel}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Context Len" description="Override model default context length. 0 = model default" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.sglang_context_len}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Quantization" description="Quantization method for reduced VRAM usage" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.sglang_quantization}>
+								<option value="">None</option>
+								<option value="awq">AWQ</option>
+								<option value="fp8">FP8</option>
+								<option value="gptq">GPTQ</option>
+								<option value="marlin">Marlin</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="Attention Backend" description="Attention kernel implementation. Empty = auto (flashinfer)" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.sglang_attention_backend}>
+								<option value="">Auto</option>
+								<option value="flashinfer">flashinfer</option>
+								<option value="triton">triton</option>
+								<option value="torch_native">torch_native</option>
+							</select>
+						</div>
+					</div>
+					<div class="mt-3 flex flex-wrap gap-4">
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.sglang_chunked_prefill} />
+								<FormLabel label="Chunked Prefill" description="Enable chunked prefill (size 8192) for long-context throughput" />
+							</label>
+						</div>
+					</div>
+					<div>
+						<FormLabel label="Extra Args" description="Additional CLI flags for SGLang, space-separated" />
+						<input
+							type="text"
+							class="bg-background w-full rounded border px-3 py-2"
+							placeholder="--disable-radix-cache"
+							bind:value={editSavedForm.sglang_extra_args}
+						/>
 					</div>
 				{:else if editingSavedModel.provider === 'tgi'}
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<FormLabel label="Num Shards" description="GPU shards for model parallelism. 0 = default (1)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tgi_num_shard}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Max Concurrent Reqs" description="Max concurrent requests (backpressure). 0 = default (128)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tgi_max_concurrent_reqs}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Max Input Len" description="Max prompt tokens. 0 = model default" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tgi_max_input_len}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Max Total Tokens" description="Max total tokens (input+output). 0 = model default" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tgi_max_total_tokens}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Quantize" description="Quantization method. Reduces VRAM" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.tgi_quantize}>
+								<option value="">None</option>
+								<option value="awq">AWQ</option>
+								<option value="gptq">GPTQ</option>
+								<option value="eetq">EETQ</option>
+								<option value="fp8">FP8</option>
+								<option value="bitsandbytes">bitsandbytes</option>
+								<option value="bitsandbytes-nf4">bitsandbytes-nf4</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="CUDA Memory Fraction" description="CUDA memory fraction (0.0-1.0). 0 = default (1.0)" />
+							<input
+								type="number"
+								min="0"
+								step="0.01" max="1"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tgi_cuda_memory_fraction}
+							/>
+						</div>
+					</div>
 					<div>
-						<label for="edit-tgi-shards" class="mb-1 block text-sm font-medium">Num Shards</label>
+						<FormLabel label="Extra Args" description="Additional CLI flags for TGI, space-separated" />
 						<input
-							id="edit-tgi-shards"
-							type="number"
-							min="1"
+							type="text"
 							class="bg-background w-full rounded border px-3 py-2"
-							bind:value={editSavedForm.tgi_num_shard}
+							placeholder="--max-batch-prefill-tokens 4096"
+							bind:value={editSavedForm.tgi_extra_args}
 						/>
-						<p class="text-muted-foreground mt-1 text-xs">Number of GPUs to shard across</p>
+					</div>
+				{:else if editingSavedModel.provider === 'tei'}
+					<div class="grid grid-cols-2 gap-4">
+						<div>
+							<FormLabel label="Max Batch Tokens" description="Max tokens per batch. Higher = more throughput, more VRAM. 0 = default (16384)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tei_max_batch_tokens}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Max Concurrent Reqs" description="Max concurrent requests. 0 = default (512)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.tei_max_concurrent_reqs}
+							/>
+						</div>
+						<div>
+							<FormLabel label="Pooling" description="Embedding pooling method. Empty = model config" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.tei_pooling}>
+								<option value="">Auto</option>
+								<option value="cls">cls</option>
+								<option value="mean">mean</option>
+								<option value="splade">splade</option>
+								<option value="lasttoken">lasttoken</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="Dtype" description="Force weight dtype. Empty = auto" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.tei_dtype}>
+								<option value="">Auto</option>
+								<option value="float16">float16</option>
+								<option value="float32">float32</option>
+							</select>
+						</div>
+					</div>
+					<div>
+						<FormLabel label="Extra Args" description="Additional CLI flags for TEI, space-separated" />
+						<input
+							type="text"
+							class="bg-background w-full rounded border px-3 py-2"
+							placeholder="--otlp-endpoint http://localhost:4317"
+							bind:value={editSavedForm.tei_extra_args}
+						/>
 					</div>
 				{:else if editingSavedModel.provider === 'llama.cpp'}
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="edit-llama-main" class="mb-1 block text-sm font-medium">Main GPU</label>
+							<FormLabel label="n_gpu_layers" description="GPU layers (-ngl). -1 = all layers, 0 = CPU only" />
 							<input
-								id="edit-llama-main"
+								type="number"
+								min="-1"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.llama_n_gpu_layers}
+							/>
+						</div>
+						<div>
+							<FormLabel label="ctx_size" description="Context size in tokens. 0 = model default" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.llama_ctx_size}
+							/>
+						</div>
+						<div>
+							<FormLabel label="n_parallel" description="Parallel sequences/slots for concurrent requests" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.llama_n_parallel}
+							/>
+						</div>
+						<div>
+							<FormLabel label="main_gpu" description="Primary GPU index for computation" />
+							<input
 								type="number"
 								min="0"
 								class="bg-background w-full rounded border px-3 py-2"
@@ -2902,123 +3634,100 @@
 							/>
 						</div>
 						<div>
-							<label for="edit-llama-layers" class="mb-1 block text-sm font-medium"
-								>N GPU Layers</label
-							>
+							<FormLabel label="tensor_split" description="GPU split ratio, e.g. '3,1' = 75%/25% across 2 GPUs" />
 							<input
-								id="edit-llama-layers"
-								type="number"
-								min="-1"
-								class="bg-background w-full rounded border px-3 py-2"
-								bind:value={editSavedForm.llama_n_gpu_layers}
-							/>
-							<p class="text-muted-foreground mt-1 text-xs">-1 = all layers</p>
-						</div>
-						<div>
-							<label for="edit-llama-ctx" class="mb-1 block text-sm font-medium">Context Size</label
-							>
-							<input
-								id="edit-llama-ctx"
-								type="number"
-								min="0"
-								class="bg-background w-full rounded border px-3 py-2"
-								placeholder="32768"
-								bind:value={editSavedForm.llama_ctx_size}
-							/>
-							<p class="text-muted-foreground mt-1 text-xs">0 = default (2048)</p>
-						</div>
-						<div>
-							<label for="edit-llama-parallel" class="mb-1 block text-sm font-medium"
-								>N Parallel</label
-							>
-							<input
-								id="edit-llama-parallel"
-								type="number"
-								min="0"
-								class="bg-background w-full rounded border px-3 py-2"
-								placeholder="4"
-								bind:value={editSavedForm.llama_n_parallel}
-							/>
-							<p class="text-muted-foreground mt-1 text-xs">Concurrent request slots (0 = auto)</p>
-						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div>
-							<label for="edit-llama-flash" class="mb-1 block text-sm font-medium"
-								>Flash Attention</label
-							>
-							<label class="flex items-center gap-2">
-								<input
-									id="edit-llama-flash"
-									type="checkbox"
-									class="h-4 w-4"
-									bind:checked={editSavedForm.llama_flash_attn}
-								/>
-								<span class="text-muted-foreground text-sm">Enable for faster inference</span>
-							</label>
-						</div>
-						<div>
-							<label for="edit-llama-jinja" class="mb-1 block text-sm font-medium"
-								>Jinja Templates</label
-							>
-							<label class="flex items-center gap-2">
-								<input
-									id="edit-llama-jinja"
-									type="checkbox"
-									class="h-4 w-4"
-									bind:checked={editSavedForm.llama_jinja}
-								/>
-								<span class="text-muted-foreground text-sm">Enable Jinja template processing</span>
-							</label>
-						</div>
-						<div>
-							<label for="edit-llama-split" class="mb-1 block text-sm font-medium"
-								>Tensor Split</label
-							>
-							<input
-								id="edit-llama-split"
 								type="text"
 								class="bg-background w-full rounded border px-3 py-2"
-								placeholder="e.g., 0.5,0.5"
+								placeholder="0.5,0.5"
 								bind:value={editSavedForm.llama_tensor_split}
 							/>
-							<p class="text-muted-foreground mt-1 text-xs">
-								Comma-separated split ratios for multi-GPU
-							</p>
 						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label for="edit-llama-cache-reuse" class="mb-1 block text-sm font-medium"
-								>Cache Reuse</label
-							>
+							<FormLabel label="cache_reuse" description="KV cache reuse. 0 = default (256), -1 = disable (SWA models)" />
 							<input
-								id="edit-llama-cache-reuse"
 								type="number"
 								min="-1"
 								class="bg-background w-full rounded border px-3 py-2"
-								placeholder="0"
 								bind:value={editSavedForm.llama_cache_reuse}
 							/>
-							<p class="text-muted-foreground mt-1 text-xs">
-								0 = default (256), -1 = disable (for SWA models)
-							</p>
 						</div>
 						<div>
-							<label for="edit-llama-extra-args" class="mb-1 block text-sm font-medium"
-								>Extra Args</label
-							>
+							<FormLabel label="batch_size" description="Logical max batch size. Higher = faster prompt processing. 0 = default (2048)" />
 							<input
-								id="edit-llama-extra-args"
-								type="text"
+								type="number"
+								min="0"
 								class="bg-background w-full rounded border px-3 py-2"
-								placeholder="--no-mmap --verbose"
-								bind:value={editSavedForm.llama_extra_args}
+								bind:value={editSavedForm.llama_batch_size}
 							/>
-							<p class="text-muted-foreground mt-1 text-xs">
-								Additional CLI flags for llama-server
-							</p>
 						</div>
+						<div>
+							<FormLabel label="ubatch_size" description="Physical max batch per computation step. 0 = default (512)" />
+							<input
+								type="number"
+								min="0"
+								class="bg-background w-full rounded border px-3 py-2"
+								bind:value={editSavedForm.llama_ubatch_size}
+							/>
+						</div>
+						<div>
+							<FormLabel label="cache_type_k" description="KV cache key dtype. Lower precision = less VRAM" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.llama_cache_type_k}>
+								<option value="">Default</option>
+								<option value="f32">f32</option>
+								<option value="f16">f16</option>
+								<option value="bf16">bf16</option>
+								<option value="q8_0">q8_0</option>
+								<option value="q4_0">q4_0</option>
+								<option value="q4_1">q4_1</option>
+								<option value="iq4_nl">iq4_nl</option>
+								<option value="q5_0">q5_0</option>
+								<option value="q5_1">q5_1</option>
+							</select>
+						</div>
+						<div>
+							<FormLabel label="cache_type_v" description="KV cache value dtype. Lower precision = less VRAM" />
+							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.llama_cache_type_v}>
+								<option value="">Default</option>
+								<option value="f32">f32</option>
+								<option value="f16">f16</option>
+								<option value="bf16">bf16</option>
+								<option value="q8_0">q8_0</option>
+								<option value="q4_0">q4_0</option>
+								<option value="q4_1">q4_1</option>
+								<option value="iq4_nl">iq4_nl</option>
+								<option value="q5_0">q5_0</option>
+								<option value="q5_1">q5_1</option>
+							</select>
+						</div>
+					</div>
+					<div class="mt-3 flex flex-wrap gap-4">
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.llama_flash_attn} />
+								<FormLabel label="Flash Attn" description="Enable Flash Attention for faster inference and lower memory" />
+							</label>
+						</div>
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.llama_jinja} />
+								<FormLabel label="Jinja" description="Enable Jinja2 template processing for chat templates" />
+							</label>
+						</div>
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.llama_mlock} />
+								<FormLabel label="mlock" description="Lock model in memory to prevent pageouts" />
+							</label>
+						</div>
+					</div>
+					<div>
+						<FormLabel label="Extra Args" description="Additional CLI flags for llama.cpp, space-separated" />
+						<input
+							type="text"
+							class="bg-background w-full rounded border px-3 py-2"
+							placeholder="--no-mmap --verbose"
+							bind:value={editSavedForm.llama_extra_args}
+						/>
 					</div>
 				{/if}
 			</div>

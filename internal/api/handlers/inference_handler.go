@@ -50,6 +50,7 @@ type LoadRequest struct {
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel"`
 	VLLMMaxModelLen    int     `json:"vllm_max_model_len"`
 	VLLMGPUUtilization float64 `json:"vllm_gpu_utilization"`
+	VLLMExtraArgs      string  `json:"vllm_extra_args"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
@@ -99,6 +100,7 @@ type ModelsResponse struct {
 	VLLMTensorParallel   int     `json:"vllm_tensor_parallel,omitempty"`
 	VLLMMaxModelLen      int     `json:"vllm_max_model_len,omitempty"`
 	VLLMGPUUtilization   float64 `json:"vllm_gpu_utilization,omitempty"`
+	VLLMExtraArgs        string  `json:"vllm_extra_args,omitempty"`
 	LlamaMainGPU         int     `json:"llama_main_gpu,omitempty"`
 	LlamaTensorSplit     string  `json:"llama_tensor_split,omitempty"`
 	LlamaNGPULayers      int     `json:"llama_n_gpu_layers,omitempty"`
@@ -148,6 +150,7 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		VLLMTensorParallel: req.VLLMTensorParallel,
 		VLLMMaxModelLen:    req.VLLMMaxModelLen,
 		VLLMGPUUtilization: req.VLLMGPUUtilization,
+		VLLMExtraArgs:      req.VLLMExtraArgs,
 		LlamaMainGPU:       req.LlamaMainGPU,
 		LlamaTensorSplit:   req.LlamaTensorSplit,
 		LlamaNGPULayers:    req.LlamaNGPULayers,
@@ -234,6 +237,52 @@ func (h *InferenceHandler) PostStop(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// PostRestart stops running container and starts it again with same parameters.
+func (h *InferenceHandler) PostRestart(c *gin.Context) {
+	alias := c.Query("alias")
+	if alias == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "alias is required"})
+		return
+	}
+
+	// Get current instance to capture the full spec before cleanup
+	inst := h.router.GetModelInstance(alias)
+	if inst == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "model not found: " + alias})
+		return
+	}
+	spec := inst.Spec
+
+	h.logger.WithFields(logrus.Fields{
+		"alias":    alias,
+		"provider": spec.Provider,
+	}).Info("Restarting model")
+
+	// Stop container (ignore error if already stopped)
+	_ = h.router.Stop(c.Request.Context(), alias)
+
+	// Forget old instance to force clean re-start
+	h.router.ForgetModel(alias)
+
+	// Re-register spec and start fresh
+	newInst, err := h.router.EnsureBySpec(c.Request.Context(), spec)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"alias":  newInst.Spec.Alias,
+		"status": newInst.Status,
+		"endpoint": func() string {
+			if newInst.Handle != nil {
+				return newInst.Handle.Endpoint
+			}
+			return ""
+		}(),
+	})
 }
 
 // GetHealth performs health check by alias.
@@ -373,6 +422,7 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 			VLLMTensorParallel:   m.Spec.VLLMTensorParallel,
 			VLLMMaxModelLen:      m.Spec.VLLMMaxModelLen,
 			VLLMGPUUtilization:   m.Spec.VLLMGPUUtilization,
+			VLLMExtraArgs:        m.Spec.VLLMExtraArgs,
 			LlamaMainGPU:         m.Spec.LlamaMainGPU,
 			LlamaTensorSplit:     m.Spec.LlamaTensorSplit,
 			LlamaNGPULayers:      m.Spec.LlamaNGPULayers,
@@ -688,6 +738,7 @@ type UpdateSavedRequest struct {
 	VLLMTensorParallel   *int     `json:"vllm_tensor_parallel,omitempty"`
 	VLLMMaxModelLen      *int     `json:"vllm_max_model_len,omitempty"`
 	VLLMGPUUtilization   *float64 `json:"vllm_gpu_utilization,omitempty"`
+	VLLMExtraArgs        *string  `json:"vllm_extra_args,omitempty"`
 	LlamaMainGPU         *int     `json:"llama_main_gpu,omitempty"`
 	LlamaNGPULayers      *int     `json:"llama_n_gpu_layers,omitempty"`
 	LlamaCtxSize         *int     `json:"llama_ctx_size,omitempty"`
@@ -733,6 +784,9 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		}
 		if req.VLLMGPUUtilization != nil {
 			m.VLLMGPUUtilization = *req.VLLMGPUUtilization
+		}
+		if req.VLLMExtraArgs != nil {
+			m.VLLMExtraArgs = *req.VLLMExtraArgs
 		}
 		if req.LlamaMainGPU != nil {
 			m.LlamaMainGPU = *req.LlamaMainGPU
@@ -809,6 +863,7 @@ type CreateSavedRequest struct {
 	VLLMTensorParallel   int      `json:"vllm_tensor_parallel"`
 	VLLMMaxModelLen      int      `json:"vllm_max_model_len"`
 	VLLMGPUUtilization   float64  `json:"vllm_gpu_utilization"`
+	VLLMExtraArgs        string   `json:"vllm_extra_args"`
 	LlamaMainGPU         int      `json:"llama_main_gpu"`
 	LlamaTensorSplit     string   `json:"llama_tensor_split"`
 	LlamaNGPULayers      int      `json:"llama_n_gpu_layers"`
@@ -858,6 +913,7 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		VLLMTensorParallel:   req.VLLMTensorParallel,
 		VLLMMaxModelLen:      req.VLLMMaxModelLen,
 		VLLMGPUUtilization:   req.VLLMGPUUtilization,
+		VLLMExtraArgs:        req.VLLMExtraArgs,
 		LlamaMainGPU:         req.LlamaMainGPU,
 		LlamaTensorSplit:     req.LlamaTensorSplit,
 		LlamaNGPULayers:      req.LlamaNGPULayers,

@@ -136,6 +136,7 @@ func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*Model
 			existing.Spec.VLLMGPUUtilization != spec.VLLMGPUUtilization ||
 			existing.Spec.VLLMMaxModelLen != spec.VLLMMaxModelLen ||
 			existing.Spec.VLLMTensorParallel != spec.VLLMTensorParallel ||
+			existing.Spec.VLLMExtraArgs != spec.VLLMExtraArgs ||
 			existing.Spec.LocalPath == "" { // Force re-prepare if no LocalPath
 			o.logger.WithFields(logrus.Fields{
 				"alias":          spec.Alias,

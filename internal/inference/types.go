@@ -51,6 +51,7 @@ type ModelSpec struct {
 	VLLMTensorParallel int     // --tensor-parallel-size
 	VLLMMaxModelLen    int     // --max-model-len
 	VLLMGPUUtilization float64 // --gpu-memory-utilization (0..1)
+	VLLMExtraArgs      string  // extra CLI args appended to vllm command (e.g. --enable-auto-tool-choice --tool-call-parser hermes)
 
 	// llama.cpp server-specific
 	LlamaMainGPU     int    // --main-gpu

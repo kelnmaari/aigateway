@@ -365,9 +365,10 @@ func (s *Service) Stop(ctx context.Context, alias string) error {
 	return s.orch.StopModel(ctx, alias)
 }
 
-// Forget removes model from in-memory registry (keeps artifacts on disk).
+// Forget removes model from in-memory registry and spec registry (keeps artifacts on disk).
 func (s *Service) Forget(alias string) {
 	s.orch.ForgetModel(alias)
+	s.registry.Unregister(alias)
 }
 
 // Shutdown stops all running containers and releases downloader workers.

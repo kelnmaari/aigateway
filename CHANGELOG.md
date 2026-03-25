@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.9] - 2026-03-25
+
+### Added
+
+- **Model Restart Button**: Added "Restart" button for running models in the admin UI — stops the container and starts it again with the same parameters in a single action
+- **POST /api/system/inference/restart**: New API endpoint to restart a running model container
+
+### Fixed
+
+- **Model Stuck After Evict**: Fixed bug where a model could not be restarted after stop+evict without a full server restart — `Service.Forget()` now also removes the model from `SpecRegistry`, preventing stale spec resolution that made the system think the model was still registered
+
+### Technical
+
+- Added `SpecRegistry.Unregister()` method to remove specs by alias
+- `Service.Forget()` now calls both `orch.ForgetModel()` and `registry.Unregister()` for complete cleanup
+- Added `Router.GetModelInstance()` and `Router.ForgetModel()` helper methods
+- Added `PostRestart` handler in `inference_handler.go` with stop → forget → re-start flow
+
+---
+
+## [4.13.8] - 2026-03-25
+
+### Added
+
+- **vLLM Extra Args**: New `vllm_extra_args` parameter for passing arbitrary additional CLI flags to vLLM container command (e.g. `--enable-auto-tool-choice --tool-call-parser hermes` for tool/function calling support)
+
+### Fixed
+
+- **Web Search 400 Error with vLLM**: Fixed `"auto" tool choice requires --enable-auto-tool-choice and --tool-call-parser to be set` error when using "Use web search" with vLLM models — vLLM containers were started without tool calling flags, so the `tools` parameter in chat requests was rejected
+
+### Technical
+
+- Added `VLLMExtraArgs` (string) field to `ModelSpec`, `SavedModel`, `LoadRequest`, `CreateSavedRequest`, `UpdateSavedRequest`, and `ModelsResponse`
+- Updated `BuildVLLMRequest` to split/append extra args via `strings.Fields()` (same pattern as `LlamaExtraArgs`)
+- Updated SvelteKit model create and edit forms with `vllm_extra_args` input field, placeholder, and help text
+- Added `VLLMExtraArgs` to orchestrator parameter comparison for model re-preparation detection
+
+---
+
 ## [4.13.7] - 2026-03-25
 
 ### Fixed

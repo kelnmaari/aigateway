@@ -27,6 +27,7 @@ type SavedModel struct {
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel,omitempty"`
 	VLLMMaxModelLen    int     `json:"vllm_max_model_len,omitempty"`
 	VLLMGPUUtilization float64 `json:"vllm_gpu_utilization,omitempty"`
+	VLLMExtraArgs      string  `json:"vllm_extra_args,omitempty"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
@@ -106,6 +107,7 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		VLLMTensorParallel:   spec.VLLMTensorParallel,
 		VLLMMaxModelLen:      spec.VLLMMaxModelLen,
 		VLLMGPUUtilization:   spec.VLLMGPUUtilization,
+		VLLMExtraArgs:        spec.VLLMExtraArgs,
 		LlamaMainGPU:         spec.LlamaMainGPU,
 		LlamaTensorSplit:     spec.LlamaTensorSplit,
 		LlamaNGPULayers:      spec.LlamaNGPULayers,
@@ -212,6 +214,7 @@ func (m SavedModel) ToSpec() ModelSpec {
 		VLLMTensorParallel:   m.VLLMTensorParallel,
 		VLLMMaxModelLen:      m.VLLMMaxModelLen,
 		VLLMGPUUtilization:   m.VLLMGPUUtilization,
+		VLLMExtraArgs:        m.VLLMExtraArgs,
 		LlamaMainGPU:         m.LlamaMainGPU,
 		LlamaTensorSplit:     m.LlamaTensorSplit,
 		LlamaNGPULayers:      m.LlamaNGPULayers,

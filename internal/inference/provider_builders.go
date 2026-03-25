@@ -67,6 +67,12 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 		cmd = append(cmd, "--gpu-memory-utilization", fmt.Sprintf("%.2f", spec.VLLMGPUUtilization))
 	}
 
+	// Extra args: split by whitespace and append as raw CLI args
+	// e.g. "--enable-auto-tool-choice --tool-call-parser hermes"
+	if spec.VLLMExtraArgs != "" {
+		cmd = append(cmd, strings.Fields(spec.VLLMExtraArgs)...)
+	}
+
 	env := map[string]string{
 		"CUDA_DEVICE_ORDER": "PCI_BUS_ID", // Ensure consistent GPU ordering
 		// Enable verbose logging for debugging

@@ -296,6 +296,7 @@
 		vllm_tensor_parallel: number;
 		vllm_max_model_len: number;
 		vllm_gpu_utilization: number;
+		vllm_extra_args: string;
 		llama_main_gpu: number;
 		llama_n_gpu_layers: number;
 		llama_ctx_size: number;
@@ -315,6 +316,7 @@
 		vllm_tensor_parallel: 1,
 		vllm_max_model_len: 0,
 		vllm_gpu_utilization: 0.9,
+		vllm_extra_args: '',
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
 		llama_ctx_size: 0,
@@ -343,6 +345,7 @@
 		vllm_tensor_parallel: 0,
 		vllm_max_model_len: 0,
 		vllm_gpu_utilization: 0.8,
+		vllm_extra_args: '',
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
@@ -879,6 +882,7 @@
 				vllm_tensor_parallel: form.vllm_tensor_parallel,
 				vllm_max_model_len: form.vllm_max_model_len,
 				vllm_gpu_utilization: form.vllm_gpu_utilization,
+				vllm_extra_args: form.vllm_extra_args,
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
@@ -938,6 +942,7 @@
 				vllm_tensor_parallel: form.vllm_tensor_parallel,
 				vllm_max_model_len: form.vllm_max_model_len,
 				vllm_gpu_utilization: form.vllm_gpu_utilization,
+				vllm_extra_args: form.vllm_extra_args,
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
@@ -978,6 +983,17 @@
 			await loadModels();
 		} catch (e: any) {
 			showMsg(e?.message || 'Ошибка остановки', 'error');
+		}
+	}
+
+	async function restartModel(alias: string) {
+		try {
+			showMsg(`Перезапуск ${alias}...`, 'success');
+			await inferenceApi.restart(alias);
+			showMsg(`Модель ${alias} перезапущена`, 'success');
+			await loadModels();
+		} catch (e: any) {
+			showMsg(e?.message || 'Ошибка перезапуска', 'error');
 		}
 	}
 
@@ -1040,6 +1056,7 @@
 				vllm_tensor_parallel: m.vllm_tensor_parallel,
 				vllm_max_model_len: m.vllm_max_model_len,
 				vllm_gpu_utilization: m.vllm_gpu_utilization,
+				vllm_extra_args: m.vllm_extra_args,
 				llama_main_gpu: m.llama_main_gpu,
 				llama_tensor_split: m.llama_tensor_split,
 				llama_n_gpu_layers: m.llama_n_gpu_layers,
@@ -1134,6 +1151,7 @@
 			vllm_tensor_parallel: saved.vllm_tensor_parallel || 1,
 			vllm_max_model_len: saved.vllm_max_model_len || 0,
 			vllm_gpu_utilization: saved.vllm_gpu_utilization || 0.9,
+			vllm_extra_args: saved.vllm_extra_args || '',
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
 			llama_ctx_size: saved.llama_ctx_size || 0,
@@ -1199,6 +1217,7 @@
 				vllm_tensor_parallel: saved.vllm_tensor_parallel,
 				vllm_max_model_len: saved.vllm_max_model_len,
 				vllm_gpu_utilization: saved.vllm_gpu_utilization,
+				vllm_extra_args: saved.vllm_extra_args,
 				llama_main_gpu: saved.llama_main_gpu,
 				llama_n_gpu_layers: saved.llama_n_gpu_layers,
 				llama_ctx_size: saved.llama_ctx_size,
@@ -1677,6 +1696,17 @@
 								/>
 							</label>
 						</div>
+						<div class="pt-2">
+							<label class="flex flex-col gap-1 text-sm">
+								<span title="Extra command-line args passed to vLLM (space-separated). E.g. --enable-auto-tool-choice --tool-call-parser hermes">extra_args</span>
+								<input
+									class="bg-background rounded border px-3 py-2"
+									bind:value={form.vllm_extra_args}
+									placeholder="--enable-auto-tool-choice --tool-call-parser hermes"
+								/>
+								<span class="text-muted-foreground text-xs">Additional CLI flags for vLLM (e.g. tool calling support)</span>
+							</label>
+						</div>
 					{:else if form.provider === 'llama.cpp'}
 						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-4">
 							<label class="flex flex-col gap-1 text-sm">
@@ -1954,6 +1984,14 @@
 									</div>
 									<div class="flex flex-shrink-0 gap-1">
 										{#if mdl.status === 'running' || mdl.status === 'starting'}
+											<button
+												class="hover:bg-muted rounded border px-2 py-1 text-xs"
+												onclick={(e) => {
+													e.stopPropagation();
+													restartModel(mdl.alias);
+												}}
+												title="Restart model container">Restart</button
+											>
 											<button
 												class="hover:bg-muted rounded border px-2 py-1 text-xs"
 												onclick={(e) => {
@@ -2794,6 +2832,19 @@
 							bind:value={editSavedForm.vllm_gpu_utilization}
 						/>
 						<p class="text-muted-foreground mt-1 text-xs">0.1 - 1.0 (default: 0.9)</p>
+					</div>
+					<div>
+						<label for="edit-vllm-extra" class="mb-1 block text-sm font-medium"
+							>Extra Args</label
+						>
+						<input
+							id="edit-vllm-extra"
+							type="text"
+							class="bg-background w-full rounded border px-3 py-2"
+							placeholder="--enable-auto-tool-choice --tool-call-parser hermes"
+							bind:value={editSavedForm.vllm_extra_args}
+						/>
+						<p class="text-muted-foreground mt-1 text-xs">Additional CLI flags for vLLM (e.g. tool calling support)</p>
 					</div>
 				{:else if editingSavedModel.provider === 'sglang'}
 					<div class="grid grid-cols-2 gap-4">

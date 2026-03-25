@@ -64,6 +64,7 @@ type ModelSpecLog struct {
 	VLLMTensorParallel  int     `json:"vllm_tensor_parallel,omitempty"`
 	VLLMMaxModelLen     int     `json:"vllm_max_model_len,omitempty"`
 	VLLMGPUUtilization  float64 `json:"vllm_gpu_utilization,omitempty"`
+	VLLMExtraArgs       string  `json:"vllm_extra_args,omitempty"`
 
 	// SGLang specific
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
@@ -137,6 +138,7 @@ func (pl *ProviderLogger) LogLaunch(spec ModelSpec, req ContainerStartRequest) {
 			VLLMTensorParallel:   spec.VLLMTensorParallel,
 			VLLMMaxModelLen:      spec.VLLMMaxModelLen,
 			VLLMGPUUtilization:   spec.VLLMGPUUtilization,
+			VLLMExtraArgs:        spec.VLLMExtraArgs,
 			SGLangTensorParallel: spec.SGLangTensorParallel,
 			SGLangDataParallel:   spec.SGLangDataParallel,
 			SGLangMemFraction:    spec.SGLangMemFraction,

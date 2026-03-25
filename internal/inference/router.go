@@ -266,6 +266,21 @@ func (r *Router) Evict(ctx context.Context, alias string) error {
 	return r.mgr.Evict(ctx, alias)
 }
 
+// GetModelInstance returns a model instance by alias or nil if not found.
+func (r *Router) GetModelInstance(alias string) *ModelInstance {
+	for _, m := range r.mgr.svc.ListModels() {
+		if m.Spec.Alias == alias {
+			return m
+		}
+	}
+	return nil
+}
+
+// ForgetModel removes model from in-memory registry and spec registry.
+func (r *Router) ForgetModel(alias string) {
+	r.mgr.svc.Forget(alias)
+}
+
 // Pin marks model as pinned (skip auto-stop/evict).
 func (r *Router) Pin(alias string) {
 	r.mgr.Pin(alias)

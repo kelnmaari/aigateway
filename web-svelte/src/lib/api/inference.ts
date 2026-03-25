@@ -47,6 +47,7 @@ export interface ModelInfo {
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
+	vllm_extra_args?: string;
 
 	// llama.cpp params
 	llama_main_gpu?: number;
@@ -142,6 +143,7 @@ export interface SavedModel {
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
+	vllm_extra_args?: string;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
 	llama_ctx_size?: number;
@@ -162,6 +164,7 @@ export interface UpdateSavedRequest {
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
+	vllm_extra_args?: string;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
 	llama_ctx_size?: number;
@@ -191,6 +194,7 @@ export interface CreateSavedRequest {
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
+	vllm_extra_args?: string;
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
@@ -222,6 +226,7 @@ export interface LoadRequest {
 	vllm_tensor_parallel?: number;
 	vllm_max_model_len?: number;
 	vllm_gpu_utilization?: number;
+	vllm_extra_args?: string;
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
@@ -247,6 +252,8 @@ export const inferenceApi = {
 	prepare: (req: LoadRequest) => api.post<{ message: string }>('/api/system/inference/prepare', req),
 
 	stop: (alias: string) => api.post<{ message: string }>(`/api/system/inference/stop?alias=${encodeURIComponent(alias)}`),
+
+	restart: (alias: string) => api.post<{ alias: string; status: string; endpoint: string }>(`/api/system/inference/restart?alias=${encodeURIComponent(alias)}`),
 
 	evict: (alias: string) => api.post<{ message: string }>(`/api/system/inference/evict?alias=${encodeURIComponent(alias)}`),
 

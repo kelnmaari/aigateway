@@ -25,6 +25,13 @@ func (r *SpecRegistry) Register(spec ModelSpec) {
 	r.specs[spec.Alias] = spec
 }
 
+// Unregister removes a spec by alias.
+func (r *SpecRegistry) Unregister(alias string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.specs, alias)
+}
+
 // Get returns a spec by alias.
 func (r *SpecRegistry) Get(alias string) (ModelSpec, bool) {
 	r.mu.RLock()

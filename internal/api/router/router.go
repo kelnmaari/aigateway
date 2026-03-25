@@ -583,6 +583,7 @@ func (r *Router) setupInferenceRoutes() {
 		group.POST("/load", r.inferenceHandler.PostLoad)
 		group.POST("/prepare", r.inferenceHandler.PostPrepare)
 		group.POST("/stop", r.inferenceHandler.PostStop)
+		group.POST("/restart", r.inferenceHandler.PostRestart)
 		group.POST("/evict", r.inferenceHandler.PostEvict)
 		group.POST("/pin", r.inferenceHandler.PostPin)
 		group.POST("/unpin", r.inferenceHandler.PostUnpin)

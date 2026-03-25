@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.0.1] - 2026-03-25
+
+### Fixed
+
+- **Missed Icon Replacements**: Fixed remaining lucide-svelte component references (`Loader2`, `ExternalLink`, `Download`, `HardDrive`, `AlertTriangle`, `XCircle`, `Shield`, `Brain`, `Package`, `FileCode`) in admin/models, admin/downloads, admin/gitlab/[id], and user gitlab/[id] pages
+- **Dynamic Icon Functions**: Fixed `getStatusIcon()` and `getSeverityIcon()` returning old lucide component references instead of Font Awesome icon definitions
+
+### Technical
+
+- Replaced all remaining old icon components with `<FontAwesomeIcon icon={...}>` pattern
+- Updated `getStatusIcon()` / `getSeverityIcon()` to return FA icon definitions
+
+---
+
 ## [5.0.0] - 2026-03-25
 
 ### Changed

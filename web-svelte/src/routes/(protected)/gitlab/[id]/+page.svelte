@@ -2523,7 +2523,7 @@
 							</select>
 							{#if loadingBranches}
 								<div class="absolute top-1/2 right-3 -translate-y-1/2">
-									<Loader2 class="h-4 w-4 animate-spin text-gray-500" />
+									<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-gray-500" />
 								</div>
 							{/if}
 						</div>
@@ -2693,7 +2693,7 @@
 					class="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
 				>
 					{#if updatingProject}
-						<Loader2 class="h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 					{/if}
 					{m.common_save()}
 				</button>
@@ -2718,13 +2718,13 @@
 				<div>
 					<h3 class="flex items-center gap-2 text-xl font-bold text-gray-100">
 						{#if selectedScan.scan_type === 'secrets' || selectedScan.scan_type === 'secrets_deep'}
-							<Shield class="h-6 w-6 text-orange-400" />
+							<FontAwesomeIcon icon={faShield} class="h-6 w-6 text-orange-400" />
 						{:else if selectedScan.scan_type === 'dependencies'}
-							<Package class="h-6 w-6 text-blue-400" />
+							<FontAwesomeIcon icon={faBoxOpen} class="h-6 w-6 text-blue-400" />
 						{:else if selectedScan.scan_type === 'quality'}
-							<Brain class="h-6 w-6 text-indigo-400" />
+							<FontAwesomeIcon icon={faBrain} class="h-6 w-6 text-indigo-400" />
 						{:else}
-							<FileCode class="h-6 w-6 text-gray-400" />
+							<FontAwesomeIcon icon={faFileCode} class="h-6 w-6 text-gray-400" />
 						{/if}
 						Scan Results
 					</h3>
@@ -2913,7 +2913,7 @@
 					class="flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-2 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
 				>
 					{#if addingProject}
-						<Loader2 class="h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 					{/if}
 					{m.common_add()}
 				</button>
@@ -2976,7 +2976,7 @@
 						class="rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
 					>
 						{#if discoveryLoading}
-							<Loader2 class="h-5 w-5 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="h-5 w-5 animate-spin" />
 						{:else}
 							Search
 						{/if}
@@ -2985,7 +2985,7 @@
 
 				{#if discoveryLoading && discoveredProjects.length === 0}
 					<div class="flex flex-col items-center justify-center py-12">
-						<Loader2 class="mb-4 h-12 w-12 animate-spin text-indigo-500" />
+						<FontAwesomeIcon icon={faSpinner} class="mb-4 h-12 w-12 animate-spin text-indigo-500" />
 						<p class="text-gray-400">Discovering projects...</p>
 					</div>
 				{:else if discoveredProjects.length === 0}
@@ -3290,7 +3290,7 @@
 						class="flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-2 font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
 					>
 						{#if discoveryAdding}
-							<Loader2 class="h-5 w-5 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="h-5 w-5 animate-spin" />
 							Importing...
 						{:else}
 							Import Projects

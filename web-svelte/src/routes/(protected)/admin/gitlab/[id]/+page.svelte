@@ -1139,11 +1139,11 @@
 		switch (severity) {
 			case 'critical':
 			case 'high':
-				return XCircle;
+				return faCircleXmark;
 			case 'medium':
-				return AlertCircle;
+				return faCircleExclamation;
 			default:
-				return CheckCircle;
+				return faCircleCheck;
 		}
 	}
 
@@ -1234,16 +1234,16 @@
 		switch (status) {
 			case 'active':
 			case 'completed':
-				return CheckCircle;
+				return faCircleCheck;
 			case 'error':
 			case 'failed':
-				return XCircle;
+				return faCircleXmark;
 			case 'pending':
 			case 'queued':
 			case 'analyzing':
-				return Clock;
+				return faClock;
 			default:
-				return AlertCircle;
+				return faCircleExclamation;
 		}
 	}
 
@@ -1412,7 +1412,7 @@
 									{#if true}
 										{@const StatusIcon = getStatusIcon(project.status)}
 										<div class="flex items-center gap-2">
-											<StatusIcon class={cn('h-4 w-4', getStatusColor(project.status))} />
+											<FontAwesomeIcon icon={StatusIcon} class={cn('h-4 w-4', getStatusColor(project.status))} />
 											<span class="text-sm capitalize">{project.status}</span>
 										</div>
 									{/if}
@@ -1652,7 +1652,7 @@
 									{#if true}
 										{@const ReviewStatusIcon = getStatusIcon(review.status)}
 										<div class="flex items-center gap-2">
-											<ReviewStatusIcon class={cn('h-4 w-4', getStatusColor(review.status))} />
+											<FontAwesomeIcon icon={ReviewStatusIcon} class={cn('h-4 w-4', getStatusColor(review.status))} />
 											<span class="text-sm capitalize">{review.status}</span>
 										</div>
 									{/if}

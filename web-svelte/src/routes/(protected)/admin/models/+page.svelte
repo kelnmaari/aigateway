@@ -2222,7 +2222,7 @@
 						disabled={hfSearching}
 					>
 						{#if hfSearching}
-							<Loader2 class="h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 						{/if}
 						Search
 					</button>
@@ -2306,13 +2306,13 @@
 									class="hover:bg-muted rounded p-1"
 									onclick={(e) => e.stopPropagation()}
 								>
-									<ExternalLink class="h-4 w-4" />
+									<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-4 w-4" />
 								</a>
 							</div>
 						{:else}
 							<div class="px-4 py-8 text-center text-muted-foreground">
 								{#if hfSearching}
-									<Loader2 class="h-6 w-6 animate-spin mx-auto mb-2" />
+									<FontAwesomeIcon icon={faSpinner} class="h-6 w-6 animate-spin mx-auto mb-2" />
 									Searching...
 								{:else if hfSearchError}
 									<div class="text-amber-500">
@@ -2339,7 +2339,7 @@
 									disabled={hfLoadingMore}
 								>
 									{#if hfLoadingMore}
-										<Loader2 class="h-4 w-4 animate-spin" />
+										<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 										{m.common_loading()}
 									{:else}
 										{m.common_loadMore()}
@@ -2444,7 +2444,7 @@
 								target="_blank"
 								class="hover:bg-muted flex items-center gap-2 rounded border px-4 py-2"
 							>
-								<ExternalLink class="h-4 w-4" />
+								<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-4 w-4" />
 								View on HF
 							</a>
 						</div>
@@ -3064,7 +3064,7 @@
 				<div class="flex items-center gap-3">
 					<h2 class="text-lg font-semibold">{m.admin_models_logs_title()}: {logsModalAlias}</h2>
 					{#if logsModalLoading}
-						<Loader2 class="text-muted-foreground h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="text-muted-foreground h-4 w-4 animate-spin" />
 					{/if}
 					<span class="text-muted-foreground bg-muted rounded px-2 py-0.5 text-xs"
 						>{m.admin_models_logs_auto_refresh()}</span

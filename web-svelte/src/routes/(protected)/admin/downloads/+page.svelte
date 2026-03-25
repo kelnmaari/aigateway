@@ -223,11 +223,11 @@
 	<!-- Downloads List -->
 	{#if isLoading && downloads.length === 0}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if downloads.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Download class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faDownload} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium">{m.admin_downloads_empty()}</p>
 			<p class="mt-1 text-muted-foreground">
 				{m.admin_downloads_empty_desc()}
@@ -242,9 +242,9 @@
 						<div class="flex items-start gap-3">
 							<div class={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', getStatusClass(download.status))}>
 								{#if download.status === 'downloading'}
-									<Loader2 class="h-5 w-5 animate-spin" />
+									<FontAwesomeIcon icon={faSpinner} class="h-5 w-5 animate-spin" />
 								{:else}
-									<StatusIcon class="h-5 w-5" />
+									<FontAwesomeIcon icon={StatusIcon} class="h-5 w-5" />
 								{/if}
 							</div>
 							<div>
@@ -252,7 +252,7 @@
 								<p class="text-sm text-muted-foreground">{download.filename}</p>
 								{#if download.error}
 									<p class="mt-1 flex items-center gap-1 text-sm text-red-500">
-										<AlertTriangle class="h-3.5 w-3.5" />
+										<FontAwesomeIcon icon={faTriangleExclamation} class="h-3.5 w-3.5" />
 										{download.error}
 									</p>
 								{/if}
@@ -262,7 +262,7 @@
 						<div class="flex items-center gap-2">
 							{#if download.status === 'downloading' || download.status === 'pending'}
 								<Button variant="ghost" size="sm" onclick={() => cancelDownload(download.id)}>
-									<XCircle class="h-4 w-4" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4" />
 								</Button>
 							{/if}
 						</div>
@@ -290,7 +290,7 @@
 					{:else if download.status === 'completed'}
 						<div class="mt-3 text-sm text-muted-foreground">
 							<span class="flex items-center gap-1">
-								<HardDrive class="h-3.5 w-3.5" />
+								<FontAwesomeIcon icon={faHardDrive} class="h-3.5 w-3.5" />
 								{formatBytes(download.total_size)}
 							</span>
 						</div>

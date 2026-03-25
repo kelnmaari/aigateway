@@ -15,14 +15,14 @@ import (
 
 // TRTEngineMetadata stores version info for TensorRT engine compatibility validation.
 type TRTEngineMetadata struct {
-	ModelID       string    `json:"model_id"`        // HF repo or alias
-	CUDAVersion   string    `json:"cuda_version"`    // e.g., "12.4"
-	TRTVersion    string    `json:"trt_version"`     // e.g., "10.0.1"
-	DriverVersion string    `json:"driver_version"`  // e.g., "550.54.14"
-	GPUSMVersion  string    `json:"gpu_sm_version"`  // e.g., "89" (Ada Lovelace)
-	Dtype         string    `json:"dtype"`           // e.g., "float16", "bfloat16"
-	MaxBatchSize  int       `json:"max_batch_size"`  // Compiled batch size
-	MaxSeqLen     int       `json:"max_seq_len"`     // Compiled sequence length
+	ModelID       string    `json:"model_id"`       // HF repo or alias
+	CUDAVersion   string    `json:"cuda_version"`   // e.g., "12.4"
+	TRTVersion    string    `json:"trt_version"`    // e.g., "10.0.1"
+	DriverVersion string    `json:"driver_version"` // e.g., "550.54.14"
+	GPUSMVersion  string    `json:"gpu_sm_version"` // e.g., "89" (Ada Lovelace)
+	Dtype         string    `json:"dtype"`          // e.g., "float16", "bfloat16"
+	MaxBatchSize  int       `json:"max_batch_size"` // Compiled batch size
+	MaxSeqLen     int       `json:"max_seq_len"`    // Compiled sequence length
 	CreatedAt     time.Time `json:"created_at"`
 	SourceHash    string    `json:"source_hash"` // Hash of source model for change detection
 }
@@ -72,13 +72,13 @@ func NewTRTConverter(cfg TRTConverterConfig) (*TRTConverter, error) {
 
 // ConvertRequest specifies conversion parameters.
 type ConvertRequest struct {
-	ModelID      string // HF repo ID or local path
-	Alias        string // Output engine alias
-	Dtype        string // float16, bfloat16, int8, int4
-	MaxBatchSize int
-	MaxSeqLen    int
-	TensorParallel int // Number of GPUs
-	Force        bool // Force reconversion even if cached
+	ModelID        string // HF repo ID or local path
+	Alias          string // Output engine alias
+	Dtype          string // float16, bfloat16, int8, int4
+	MaxBatchSize   int
+	MaxSeqLen      int
+	TensorParallel int  // Number of GPUs
+	Force          bool // Force reconversion even if cached
 }
 
 // EnginePath returns the expected path for a converted engine.
@@ -290,8 +290,8 @@ func (c *TRTConverter) getSystemInfo(ctx context.Context) (*TRTEngineMetadata, e
 	out, err = cmd.Output()
 	if err == nil {
 		// Parse "Cuda compilation tools, release 12.4, V12.4.131"
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(string(out), "\n")
+		for line := range lines {
 			if strings.Contains(line, "release") {
 				parts := strings.Split(line, "release ")
 				if len(parts) >= 2 {
@@ -308,8 +308,8 @@ func (c *TRTConverter) getSystemInfo(ctx context.Context) (*TRTEngineMetadata, e
 	out, err = cmd.Output()
 	if err == nil {
 		// Parse TensorRT version from output
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(string(out), "\n")
+		for line := range lines {
 			if strings.Contains(line, "TensorRT") {
 				parts := strings.Fields(line)
 				for i, p := range parts {
@@ -408,4 +408,3 @@ func (c *TRTConverter) ListEngines() ([]TRTEngineMetadata, error) {
 func (c *TRTConverter) DeleteEngine(alias string) error {
 	return os.RemoveAll(c.EnginePath(alias))
 }
-

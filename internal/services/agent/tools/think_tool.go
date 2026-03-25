@@ -31,10 +31,10 @@ func (t *ThinkTool) GetInfo() models.AgentTool {
 		Name:        "think",
 		Category:    models.AgentToolCategorySystem, // System category (not file/terminal)
 		Description: "Pause and reflect on the current situation before taking action. Use this when you need to think through a complex problem or reconsider your approach.",
-		Parameters: map[string]interface{}{
+		Parameters: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"reflection": map[string]interface{}{
+			"properties": map[string]any{
+				"reflection": map[string]any{
 					"type":        "string",
 					"description": "Your detailed thoughts about the current situation, what you've learned, and what to do next",
 				},
@@ -47,7 +47,7 @@ func (t *ThinkTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *ThinkTool) Validate(params map[string]interface{}) error {
+func (t *ThinkTool) Validate(params map[string]any) error {
 	reflection, ok := params["reflection"].(string)
 	if !ok || reflection == "" {
 		return fmt.Errorf("'reflection' parameter is required and must be a non-empty string")
@@ -55,18 +55,17 @@ func (t *ThinkTool) Validate(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *ThinkTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *ThinkTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	reflection := params["reflection"].(string)
-	
+
 	// This tool does nothing except acknowledge the reflection
 	// The key is that it forces the model to generate the "reflection" text,
 	// which helps non-reasoning models think through the problem
-	
+
 	acknowledgment := fmt.Sprintf("✓ Reflection acknowledged. You took a moment to think:\n\n\"%s\"\n\nYou may now proceed with your next action.", reflection)
-	
+
 	return &models.AgentStepResult{
 		Success: true,
 		Output:  acknowledgment,
 	}, nil
 }
-

@@ -306,7 +306,7 @@ func (h *InferenceProxyHandler) handleTEIRerank(c *gin.Context, inst *inference.
 	}
 
 	// Build TEI rerank request
-	teiReq := map[string]interface{}{
+	teiReq := map[string]any{
 		"query":       openAIReq.Query,
 		"texts":       openAIReq.Documents,
 		"return_text": false,

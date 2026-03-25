@@ -1,5 +1,4 @@
 //go:build docker_integration
-// +build docker_integration
 
 // Docker integration tests for inference providers.
 // Run with: go test -tags=docker_integration -v ./internal/inference/...
@@ -272,8 +271,8 @@ func TestDockerIntegration_FullFlow_LlamaCPP(t *testing.T) {
 		Provider: ProviderLlamaCPP,
 		Format:   FormatGGUF,
 		// Assuming modelPath is already downloaded
-		Capabilities:      []string{"chat"},
-		LlamaNGPULayers:   99,
+		Capabilities:    []string{"chat"},
+		LlamaNGPULayers: 99,
 	}
 
 	// Note: This test assumes the model is already at modelPath
@@ -343,4 +342,3 @@ func BenchmarkDockerIntegration_ContainerStart(b *testing.B) {
 		}
 	}
 }
-

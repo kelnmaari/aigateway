@@ -260,8 +260,8 @@ func (s *S3Storage) parsePath(path string) (bucket, objectKey string, err error)
 
 	// Нормализуем слэши и разбиваем по "/"
 	normalizedPath := filepath.ToSlash(path)
-	idx := strings.Index(normalizedPath, "/")
-	if idx == -1 {
+	before, after, ok := strings.Cut(normalizedPath, "/")
+	if !ok {
 		// Если нет слэша, используем дефолтный bucket
 		bucket = s.bucket
 		objectKey = path
@@ -269,9 +269,8 @@ func (s *S3Storage) parsePath(path string) (bucket, objectKey string, err error)
 	}
 
 	// Первая часть - bucket, остальное - object key
-	bucket = normalizedPath[:idx]
-	objectKey = normalizedPath[idx+1:]
+	bucket = before
+	objectKey = after
 
 	return bucket, objectKey, nil
 }
-

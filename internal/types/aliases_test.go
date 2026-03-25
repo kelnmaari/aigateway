@@ -151,7 +151,7 @@ func TestOption(t *testing.T) {
 				t.Error("expected panic, got none")
 			}
 		}()
-		
+
 		none := None[int]()
 		none.Unwrap() // Should panic
 	})
@@ -267,7 +267,7 @@ func TestSet(t *testing.T) {
 func TestCache(t *testing.T) {
 	type UserCache = Cache[string, string]
 	cache := make(UserCache)
-	
+
 	cache["user-123"] = "John"
 	cache["user-456"] = "Jane"
 
@@ -279,7 +279,7 @@ func TestCache(t *testing.T) {
 func TestCounter(t *testing.T) {
 	type WordCounter = Counter[string]
 	counter := make(WordCounter)
-	
+
 	counter["hello"]++
 	counter["hello"]++
 	counter["world"]++
@@ -295,7 +295,7 @@ func TestCounter(t *testing.T) {
 func TestIndex(t *testing.T) {
 	type TagIndex = Index[string, string]
 	index := make(TagIndex)
-	
+
 	index["golang"] = []string{"doc1", "doc2"}
 	index["rust"] = []string{"doc3"}
 
@@ -315,7 +315,7 @@ func BenchmarkSet_Add(b *testing.B) {
 
 func BenchmarkSet_Contains(b *testing.B) {
 	set := NewSet[int]()
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		set.Add(i)
 	}
 	b.ResetTimer()
@@ -339,4 +339,3 @@ func BenchmarkOption_UnwrapOr(b *testing.B) {
 		_ = opt.UnwrapOr(99)
 	}
 }
-

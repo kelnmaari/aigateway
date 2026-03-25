@@ -111,7 +111,7 @@ func (a *Analyzer) AnalyzeChangelog(ctx context.Context, req AnalyzeRequest) (*C
 
 // callLLM makes a request to the LLM API.
 func (a *Analyzer) callLLM(ctx context.Context, modelID, systemPrompt, userPrompt string) (string, int, error) {
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemPrompt},
@@ -250,8 +250,8 @@ func (a *Analyzer) parseLLMResponse(response string, result *ChangelogAnalysis) 
 	response = strings.TrimSpace(response)
 
 	var parsed struct {
-		Summary            string `json:"summary"`
-		BreakingChanges    []struct {
+		Summary         string `json:"summary"`
+		BreakingChanges []struct {
 			Description  string `json:"description"`
 			AffectedArea string `json:"affected_area"`
 			Severity     string `json:"severity"`
@@ -298,4 +298,3 @@ func (a *Analyzer) parseLLMResponse(response string, result *ChangelogAnalysis) 
 
 	return nil
 }
-

@@ -21,12 +21,12 @@ type APIDataSource struct {
 	auth       *APIAuth
 	httpClient *http.Client
 	logger     *logrus.Logger
-	
+
 	// Response parsing
-	dataPath       string   // JSON path to documents array
-	titleField     string   // Field for title
-	contentField   string   // Field for content
-	idField        string   // Field for ID
+	dataPath     string // JSON path to documents array
+	titleField   string // Field for title
+	contentField string // Field for content
+	idField      string // Field for ID
 }
 
 // APIAuth authentication config
@@ -34,7 +34,7 @@ type APIAuth struct {
 	Type   string // "bearer", "basic", "api_key", "oauth2"
 	Token  string // Bearer token or API key
 	Header string // Header name for API key
-	
+
 	// Basic auth
 	Username string
 	Password string
@@ -105,12 +105,12 @@ func (s *APIDataSource) Name() string {
 }
 
 // GetMetadata возвращает метаданные
-func (s *APIDataSource) GetMetadata() map[string]interface{} {
-	return map[string]interface{}{
-		"type":    string(s.Type()),
-		"name":    s.name,
+func (s *APIDataSource) GetMetadata() map[string]any {
+	return map[string]any{
+		"type":     string(s.Type()),
+		"name":     s.name,
 		"base_url": s.baseURL,
-		"method":  s.method,
+		"method":   s.method,
 	}
 }
 
@@ -153,7 +153,7 @@ func (s *APIDataSource) TestConnection(ctx context.Context) (*ConnectionTestResu
 			Success: true,
 			Message: fmt.Sprintf("Connection successful (HTTP %d)", resp.StatusCode),
 			Latency: latency,
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"status_code": resp.StatusCode,
 			},
 		}, nil
@@ -163,7 +163,7 @@ func (s *APIDataSource) TestConnection(ctx context.Context) (*ConnectionTestResu
 		Success: false,
 		Message: fmt.Sprintf("HTTP error: %d", resp.StatusCode),
 		Latency: latency,
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"status_code": resp.StatusCode,
 		},
 	}, nil
@@ -202,7 +202,7 @@ func (s *APIDataSource) Fetch(ctx context.Context) ([]Document, error) {
 	}
 
 	// Parse JSON response
-	var responseData interface{}
+	var responseData any
 	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -276,10 +276,10 @@ func (s *APIDataSource) applyAuth(req *http.Request) {
 }
 
 // extractDocuments извлекает документы из JSON response по dataPath
-func (s *APIDataSource) extractDocuments(data interface{}) ([]interface{}, error) {
+func (s *APIDataSource) extractDocuments(data any) ([]any, error) {
 	if s.dataPath == "" {
 		// Если path не указан, ожидаем что data - это массив
-		if arr, ok := data.([]interface{}); ok {
+		if arr, ok := data.([]any); ok {
 			return arr, nil
 		}
 		return nil, fmt.Errorf("expected array at root")
@@ -290,8 +290,8 @@ func (s *APIDataSource) extractDocuments(data interface{}) ([]interface{}, error
 	current := data
 	// Заглушка - пока не реализовано полностью
 	// TODO: implement proper JSON path extraction
-	
-	if arr, ok := current.([]interface{}); ok {
+
+	if arr, ok := current.([]any); ok {
 		return arr, nil
 	}
 
@@ -299,8 +299,8 @@ func (s *APIDataSource) extractDocuments(data interface{}) ([]interface{}, error
 }
 
 // parseDocument парсит один document из JSON
-func (s *APIDataSource) parseDocument(data interface{}) (Document, error) {
-	docMap, ok := data.(map[string]interface{})
+func (s *APIDataSource) parseDocument(data any) (Document, error) {
+	docMap, ok := data.(map[string]any)
 	if !ok {
 		return Document{}, fmt.Errorf("document must be an object")
 	}
@@ -330,7 +330,7 @@ func (s *APIDataSource) parseDocument(data interface{}) (Document, error) {
 }
 
 // getString извлекает строку из map
-func (s *APIDataSource) getString(m map[string]interface{}, key string) string {
+func (s *APIDataSource) getString(m map[string]any, key string) string {
 	if val, ok := m[key]; ok {
 		if str, ok := val.(string); ok {
 			return str
@@ -342,5 +342,3 @@ func (s *APIDataSource) getString(m map[string]interface{}, key string) string {
 
 // Ensure APIDataSource implements DataSource interface
 var _ DataSource = (*APIDataSource)(nil)
-
-

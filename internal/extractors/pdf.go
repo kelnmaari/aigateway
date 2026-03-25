@@ -119,7 +119,7 @@ func (e *PDFExtractor) extractWithPDFToText(ctx context.Context, reader io.Reade
 // extractMetadataWithPDFInfo использует pdfinfo для получения метаданных
 func (e *PDFExtractor) extractMetadataWithPDFInfo(ctx context.Context, filename string) DocumentMetadata {
 	metadata := DocumentMetadata{
-		Custom: make(map[string]interface{}),
+		Custom: make(map[string]any),
 	}
 
 	// Запускаем pdfinfo
@@ -131,8 +131,8 @@ func (e *PDFExtractor) extractMetadataWithPDFInfo(ctx context.Context, filename 
 	}
 
 	// Парсим вывод pdfinfo
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
 			continue
@@ -246,7 +246,7 @@ func (e *PDFExtractor) extractWithGoPDF(ctx context.Context, reader io.Reader, o
 	// Создаем метаданные
 	metadata := DocumentMetadata{
 		PageCount: totalPages,
-		Custom: map[string]interface{}{
+		Custom: map[string]any{
 			"extraction_method": "go-pdf",
 			"extracted_pages":   maxPages,
 		},
@@ -298,4 +298,3 @@ func (e *PDFExtractor) MaxFileSize() int64 {
 	// PDF может быть большим
 	return 100 * 1024 * 1024 // 100MB
 }
-

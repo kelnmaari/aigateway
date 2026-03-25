@@ -15,10 +15,7 @@ func applyScroll(content string, scrollOffset int, visibleHeight int) string {
 	}
 
 	// Ограничиваем offset
-	maxOffset := len(lines) - visibleHeight
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
+	maxOffset := max(len(lines)-visibleHeight, 0)
 	if scrollOffset > maxOffset {
 		scrollOffset = maxOffset
 	}
@@ -61,7 +58,7 @@ func splitIntoColumns(content string, columns int, columnWidth int) string {
 
 	// Разделяем на колонки
 	cols := make([][]string, columns)
-	for i := 0; i < columns; i++ {
+	for i := range columns {
 		start := i * linesPerColumn
 		end := start + linesPerColumn
 		if end > len(lines) {
@@ -83,7 +80,7 @@ func splitIntoColumns(content string, columns int, columnWidth int) string {
 	result := make([]string, maxRows)
 	for row := 0; row < maxRows; row++ {
 		rowParts := make([]string, columns)
-		for col := 0; col < columns; col++ {
+		for col := range columns {
 			if row < len(cols[col]) {
 				// Обрезаем строку до ширины колонки
 				line := cols[col][row]
@@ -101,4 +98,3 @@ func splitIntoColumns(content string, columns int, columnWidth int) string {
 
 	return strings.Join(result, "\n")
 }
-

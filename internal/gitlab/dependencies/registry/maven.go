@@ -57,8 +57,8 @@ type mavenMetadata struct {
 	GroupID    string   `xml:"groupId"`
 	ArtifactID string   `xml:"artifactId"`
 	Versioning struct {
-		Latest   string   `xml:"latest"`
-		Release  string   `xml:"release"`
+		Latest   string `xml:"latest"`
+		Release  string `xml:"release"`
 		Versions struct {
 			Version []string `xml:"version"`
 		} `xml:"versions"`
@@ -251,16 +251,16 @@ func (c *MavenClient) parseVersion(v string) [3]int {
 
 	for i := 0; i < len(parts) && i < 3; i++ {
 		// Extract numeric part
-		numStr := ""
+		var numStr strings.Builder
 		for _, r := range parts[i] {
 			if r >= '0' && r <= '9' {
-				numStr += string(r)
+				numStr.WriteString(string(r))
 			} else {
 				break
 			}
 		}
-		if numStr != "" {
-			if num, err := strconv.Atoi(numStr); err == nil {
+		if numStr.String() != "" {
+			if num, err := strconv.Atoi(numStr.String()); err == nil {
 				result[i] = num
 			}
 		}
@@ -279,7 +279,7 @@ func (c *MavenClient) findLatestStable(versions []string) string {
 		iParts := c.parseVersion(sorted[i])
 		jParts := c.parseVersion(sorted[j])
 
-		for k := 0; k < 3; k++ {
+		for k := range 3 {
 			if iParts[k] != jParts[k] {
 				return iParts[k] > jParts[k]
 			}
@@ -306,4 +306,3 @@ func (c *MavenClient) findLatestStable(versions []string) string {
 
 	return ""
 }
-

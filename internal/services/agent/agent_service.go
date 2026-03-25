@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -41,9 +42,9 @@ func NewAgentService(logger *logrus.Logger) *AgentService {
 func registerDefaultTools(registry *tools.Registry) {
 	// System tools
 	registry.Register(tools.NewThinkTool()) // Pseudo-tool for non-reasoning models to pause and reflect
-	
+
 	// File tools
-	registry.Register(tools.NewFileReadTool(""))    // Empty baseDir = no restriction
+	registry.Register(tools.NewFileReadTool("")) // Empty baseDir = no restriction
 	registry.Register(tools.NewFileWriteTool(""))
 	registry.Register(tools.NewFileDeleteTool(""))
 	registry.Register(tools.NewFileListTool(""))
@@ -138,7 +139,8 @@ func (s *AgentService) CloseAgentSession(conversationID string) error {
 func (s *AgentService) GenerateSystemPrompt(workingDir string) string {
 	availableTools := s.toolRegistry.List()
 
-	prompt := `You are an AI agent operating in ReAct (Reasoning + Acting) mode.
+	var prompt strings.Builder
+	prompt.WriteString(`You are an AI agent operating in ReAct (Reasoning + Acting) mode.
 
 ## Your Task
 Analyze user requests, break them into steps, and use available tools to accomplish tasks.
@@ -146,7 +148,7 @@ Analyze user requests, break them into steps, and use available tools to accompl
 ## Available Tools
 You have access to the following tools (executed on client-side):
 
-`
+`)
 
 	for _, tool := range availableTools {
 		dangerous := ""
@@ -154,10 +156,10 @@ You have access to the following tools (executed on client-side):
 			dangerous = " [⚠️ REQUIRES APPROVAL]"
 		}
 
-		prompt += fmt.Sprintf("- **%s**%s: %s\n", tool.Name, dangerous, tool.Description)
+		prompt.WriteString(fmt.Sprintf("- **%s**%s: %s\n", tool.Name, dangerous, tool.Description))
 	}
 
-	prompt += `
+	prompt.WriteString(`
 ## ReAct Loop
 Follow this pattern:
 
@@ -218,12 +220,11 @@ Example:
   }
 }
 ` + "```" + `
-`
+`)
 
 	if workingDir != "" {
-		prompt += fmt.Sprintf("\n## Working Directory\nYou are operating in: `%s`\n", workingDir)
+		prompt.WriteString(fmt.Sprintf("\n## Working Directory\nYou are operating in: `%s`\n", workingDir))
 	}
 
-	return prompt
+	return prompt.String()
 }
-

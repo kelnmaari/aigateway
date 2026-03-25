@@ -86,7 +86,7 @@ func (e *CSVExtractor) Extract(ctx context.Context, reader io.Reader, opts Extra
 		Language:  "en", // CSV обычно англоязычный
 		Metadata: DocumentMetadata{
 			RowCount: len(rows),
-			Custom: map[string]interface{}{
+			Custom: map[string]any{
 				"columns":   len(headers),
 				"delimiter": string(delimiter),
 			},
@@ -166,4 +166,3 @@ func (e *CSVExtractor) MaxFileSize() int64 {
 	// CSV может быть большим, используем 100MB
 	return 100 * 1024 * 1024
 }
-

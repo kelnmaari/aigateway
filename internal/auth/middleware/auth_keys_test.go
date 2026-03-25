@@ -113,7 +113,7 @@ func TestAuthMiddleware_ValidAPIKey(t *testing.T) {
 	// Проверяем результат
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
@@ -138,11 +138,11 @@ func TestAuthMiddleware_MissingAPIKey(t *testing.T) {
 	// Проверяем результат
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
-	errorObj := response["error"].(map[string]interface{})
+	errorObj := response["error"].(map[string]any)
 	assert.Equal(t, "missing_api_key", errorObj["code"])
 }
 
@@ -163,11 +163,11 @@ func TestAuthMiddleware_InvalidAPIKey(t *testing.T) {
 	// Проверяем результат
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
-	errorObj := response["error"].(map[string]interface{})
+	errorObj := response["error"].(map[string]any)
 	assert.Equal(t, "invalid_api_key", errorObj["code"])
 }
 
@@ -206,11 +206,11 @@ func TestAuthMiddleware_DisabledAPIKey(t *testing.T) {
 	// Проверяем результат
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
-	errorObj := response["error"].(map[string]interface{})
+	errorObj := response["error"].(map[string]any)
 	assert.Equal(t, "invalid_api_key", errorObj["code"])
 }
 
@@ -265,11 +265,11 @@ func TestAuthMiddleware_ModelAuthorization(t *testing.T) {
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 
-		var response map[string]interface{}
+		var response map[string]any
 		err = json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		errorObj := response["error"].(map[string]interface{})
+		errorObj := response["error"].(map[string]any)
 		assert.Equal(t, "model_access_denied", errorObj["code"])
 	})
 
@@ -314,7 +314,7 @@ func TestAuthMiddleware_MultipleRequests(t *testing.T) {
 	require.NoError(t, err)
 
 	// Выполняем несколько запросов подряд
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		body := []byte(`{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello"}]}`)
 		httpReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -422,7 +422,7 @@ func TestAuthMiddleware_ConcurrentRequests(t *testing.T) {
 	// Запускаем 10 goroutines с параллельными запросами
 	done := make(chan bool, 10)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(id int) {
 			body := []byte(`{"model": "gpt-3.5-turbo", "messages": [{"role": "user", "content": "Hello"}]}`)
 			httpReq := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
@@ -438,7 +438,7 @@ func TestAuthMiddleware_ConcurrentRequests(t *testing.T) {
 	}
 
 	// Ждем завершения всех goroutines
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 }
@@ -485,4 +485,3 @@ func BenchmarkAuthMiddleware_ValidateAPIKey(b *testing.B) {
 		router.ServeHTTP(w, httpReq)
 	}
 }
-

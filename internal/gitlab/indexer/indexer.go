@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -98,8 +99,8 @@ type Indexer struct {
 	ragService *rag.RAGService
 	chunker    *chunker.CodeChunker
 	logger     *logrus.Logger
-	store      ProjectStore       // For persisting index status to DB
-	redisStore *RedisStatusStore  // For fast status updates via Redis
+	store      ProjectStore      // For persisting index status to DB
+	redisStore *RedisStatusStore // For fast status updates via Redis
 
 	// Track indexing status per project+branch (fallback when Redis unavailable)
 	statusMu sync.RWMutex
@@ -166,7 +167,7 @@ func (i *Indexer) GetStatus(projectID, branch string) *IndexInfo {
 	if i.redisStore != nil && i.redisStore.IsAvailable() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		
+
 		if info, err := i.redisStore.GetStatus(ctx, projectID, branch); err == nil && info != nil {
 			return info
 		}
@@ -230,7 +231,7 @@ func (i *Indexer) Shutdown(ctx context.Context) error {
 	i.statusMu.Lock()
 	inProgressCount := 0
 	now := time.Now()
-	
+
 	for key, info := range i.status {
 		if info.Status == IndexStatusInProgress {
 			info.Status = IndexStatusFailed
@@ -238,14 +239,14 @@ func (i *Indexer) Shutdown(ctx context.Context) error {
 			info.CompletedAt = &now
 			i.status[key] = info
 			inProgressCount++
-			
+
 			// Update Redis
 			if i.redisStore != nil && i.redisStore.IsAvailable() {
 				if err := i.redisStore.SetStatus(ctx, info); err != nil {
 					i.logger.WithError(err).WithField("project_id", info.ProjectID).Debug("Failed to update Redis on shutdown")
 				}
 			}
-			
+
 			// Update DB
 			if i.store != nil {
 				if err := i.store.UpdateProjectIndexStatus(ctx, info.ProjectID, string(info.Status), int64(info.ChunksTotal)); err != nil {
@@ -642,10 +643,8 @@ func (i *Indexer) shouldIndexFile(filePath string) bool {
 
 	// Check file extension
 	ext := strings.ToLower(filepath.Ext(filePath))
-	for _, supportedExt := range i.config.SupportedExts {
-		if ext == supportedExt {
-			return true
-		}
+	if slices.Contains(i.config.SupportedExts, ext) {
+		return true
 	}
 
 	// Also index files without standard extension that are common
@@ -666,13 +665,7 @@ func (i *Indexer) shouldIndexFile(filePath string) bool {
 		// Java/Gradle/Maven
 		"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
 	}
-	for _, name := range specialFiles {
-		if baseName == name {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(specialFiles, baseName)
 }
 
 // FileContent holds file content for processing
@@ -770,10 +763,7 @@ func (i *Indexer) indexChunks(ctx context.Context, req IndexRequest, chunks []ra
 	// Process in batches
 	batchSize := i.config.BatchSize
 	for start := 0; start < len(chunks); start += batchSize {
-		end := start + batchSize
-		if end > len(chunks) {
-			end = len(chunks)
-		}
+		end := min(start+batchSize, len(chunks))
 
 		batch := chunks[start:end]
 

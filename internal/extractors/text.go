@@ -61,7 +61,7 @@ func (e *TextExtractor) Extract(ctx context.Context, reader io.Reader, opts Extr
 		WordCount: wordCount,
 		Language:  language,
 		Metadata: DocumentMetadata{
-			Custom: map[string]interface{}{
+			Custom: map[string]any{
 				"encoding": detectedEncoding,
 			},
 		},
@@ -280,4 +280,3 @@ func normalizeText(text string) string {
 
 	return strings.TrimSpace(result.String())
 }
-

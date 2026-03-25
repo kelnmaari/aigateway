@@ -157,7 +157,7 @@ func BenchmarkRouter_Resolution(b *testing.B) {
 
 	// Pre-register specs
 	numSpecs := 100
-	for i := 0; i < numSpecs; i++ {
+	for i := range numSpecs {
 		spec := ModelSpec{
 			Alias:     fmt.Sprintf("preload-%d", i),
 			Provider:  ProviderVLLM,
@@ -229,11 +229,11 @@ func TestLoadTest_HighConcurrency(t *testing.T) {
 
 	start := time.Now()
 
-	for w := 0; w < numWorkers; w++ {
+	for w := range numWorkers {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			for m := 0; m < numModels; m++ {
+			for m := range numModels {
 				alias := fmt.Sprintf("load-model-%d", m) // Same models across workers
 				spec := ModelSpec{
 					Alias:     alias,
@@ -314,7 +314,7 @@ func TestLoadTest_RapidStartStop(t *testing.T) {
 	cycles := 100
 	start := time.Now()
 
-	for i := 0; i < cycles; i++ {
+	for i := range cycles {
 		alias := fmt.Sprintf("rapid-%d", i%5) // Cycle through 5 models
 		spec := ModelSpec{
 			Alias:     alias,
@@ -337,4 +337,3 @@ func TestLoadTest_RapidStartStop(t *testing.T) {
 	t.Logf("Completed %d start/stop cycles in %v", cycles, elapsed)
 	t.Logf("Average cycle time: %v", elapsed/time.Duration(cycles))
 }
-

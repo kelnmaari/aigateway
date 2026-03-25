@@ -68,11 +68,8 @@ type Result[T any] struct {
 func ChunkedIterator[T any](items []T, chunkSize int) iter.Seq[[]T] {
 	return func(yield func([]T) bool) {
 		for i := 0; i < len(items); i += chunkSize {
-			end := i + chunkSize
-			if end > len(items) {
-				end = len(items)
-			}
-			
+			end := min(i+chunkSize, len(items))
+
 			chunk := items[i:end]
 			if !yield(chunk) {
 				return // Consumer stopped iteration
@@ -185,7 +182,7 @@ func PairIterator[T any](items []T) iter.Seq[Pair[T]] {
 		if len(items) < 2 {
 			return
 		}
-		
+
 		for i := 0; i < len(items)-1; i++ {
 			pair := Pair[T]{
 				First:  items[i],
@@ -226,4 +223,3 @@ type Indexed[T any] struct {
 	Index int
 	Value T
 }
-

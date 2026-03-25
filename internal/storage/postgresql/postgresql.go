@@ -136,7 +136,7 @@ func (p *PostgreSQLDB) Ping(ctx context.Context) error {
 }
 
 // GetDB returns underlying *sql.DB connection (for internal use)
-func (p *PostgreSQLDB) GetDB() interface{} {
+func (p *PostgreSQLDB) GetDB() any {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.db

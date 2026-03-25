@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"aigateway/internal/gitlab/dependencies/schedule"
@@ -132,7 +133,7 @@ func (s *PostgresStore) GetSchedule(ctx context.Context, id string) (*schedule.S
 // ListSchedules lists schedules with filtering
 func (s *PostgresStore) ListSchedules(ctx context.Context, req *schedule.ListScheduledScansRequest) ([]schedule.ScheduledScan, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argIndex := 1
 
 	if req.ProjectID != "" {
@@ -253,7 +254,7 @@ func (s *PostgresStore) ListSchedules(ctx context.Context, req *schedule.ListSch
 // UpdateSchedule updates a schedule
 func (s *PostgresStore) UpdateSchedule(ctx context.Context, id string, req *schedule.UpdateScheduledScanRequest) error {
 	var updates []string
-	var args []interface{}
+	var args []any
 	argIndex := 1
 
 	if req.Frequency != nil {
@@ -336,7 +337,7 @@ func (s *PostgresStore) DeleteSchedule(ctx context.Context, id string) error {
 // UpdateScheduleExecution updates execution status after a run
 func (s *PostgresStore) UpdateScheduleExecution(ctx context.Context, id string, status string, errMsg string, durationMs int64, nextRun time.Time) error {
 	now := time.Now()
-	
+
 	// Determine success/failure increment
 	successInc := 0
 	failedInc := 0
@@ -580,10 +581,10 @@ func joinConditions(conditions []string, sep string) string {
 	if len(conditions) == 0 {
 		return ""
 	}
-	result := conditions[0]
+	var result strings.Builder
+	result.WriteString(conditions[0])
 	for i := 1; i < len(conditions); i++ {
-		result += sep + conditions[i]
+		result.WriteString(sep + conditions[i])
 	}
-	return result
+	return result.String()
 }
-

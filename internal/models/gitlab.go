@@ -56,7 +56,7 @@ type GitLabIntegrationSettings struct {
 }
 
 // Scan implements sql.Scanner for GitLabIntegrationSettings
-func (s *GitLabIntegrationSettings) Scan(value interface{}) error {
+func (s *GitLabIntegrationSettings) Scan(value any) error {
 	if value == nil {
 		*s = GitLabIntegrationSettings{}
 		return nil
@@ -200,7 +200,7 @@ type GitLabProjectSettings struct {
 }
 
 // Scan implements sql.Scanner for GitLabProjectSettings
-func (s *GitLabProjectSettings) Scan(value interface{}) error {
+func (s *GitLabProjectSettings) Scan(value any) error {
 	if value == nil {
 		*s = GitLabProjectSettings{}
 		return nil
@@ -318,7 +318,7 @@ type GitLabReviewResult struct {
 }
 
 // Scan implements sql.Scanner for GitLabReviewResult
-func (r *GitLabReviewResult) Scan(value interface{}) error {
+func (r *GitLabReviewResult) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -444,7 +444,7 @@ type GitLabJobConfig struct {
 }
 
 // Scan implements sql.Scanner for GitLabJobConfig
-func (c *GitLabJobConfig) Scan(value interface{}) error {
+func (c *GitLabJobConfig) Scan(value any) error {
 	if value == nil {
 		return nil
 	}
@@ -805,7 +805,7 @@ type GitLabScanResultsRequest struct {
 type UserJobType string
 
 const (
-	JobTypeSecretsScn     UserJobType = "secrets_scan"
+	JobTypeSecretsScn      UserJobType = "secrets_scan"
 	JobTypeDeepSecretsScan UserJobType = "deep_secrets_scan"
 	JobTypeSASTScan        UserJobType = "sast_scan"
 	JobTypeDependencyScan  UserJobType = "dependency_scan"
@@ -823,11 +823,11 @@ const (
 type UserJobStatus string
 
 const (
-	UserJobStatusPending    UserJobStatus = "pending"
-	UserJobStatusRunning    UserJobStatus = "running"
-	UserJobStatusCompleted  UserJobStatus = "completed"
-	UserJobStatusFailed     UserJobStatus = "failed"
-	UserJobStatusCancelled  UserJobStatus = "cancelled"
+	UserJobStatusPending   UserJobStatus = "pending"
+	UserJobStatusRunning   UserJobStatus = "running"
+	UserJobStatusCompleted UserJobStatus = "completed"
+	UserJobStatusFailed    UserJobStatus = "failed"
+	UserJobStatusCancelled UserJobStatus = "cancelled"
 )
 
 // UserJob represents a user-initiated background job
@@ -844,7 +844,7 @@ type UserJob struct {
 	Config string `json:"config,omitempty" db:"config"`
 
 	// Progress tracking
-	Progress    int    `json:"progress" db:"progress"`         // 0-100 percentage
+	Progress    int    `json:"progress" db:"progress"`                   // 0-100 percentage
 	ProgressMsg string `json:"progress_msg,omitempty" db:"progress_msg"` // Current step description
 
 	// Timing
@@ -853,10 +853,10 @@ type UserJob struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
 
 	// Results
-	ResultID    string `json:"result_id,omitempty" db:"result_id"`       // Reference to scan result or MR
-	ResultType  string `json:"result_type,omitempty" db:"result_type"`   // "scan_result", "merge_request", etc.
-	ResultURL   string `json:"result_url,omitempty" db:"result_url"`     // External URL (e.g., MR URL)
-	Error       string `json:"error,omitempty" db:"error"`
+	ResultID   string `json:"result_id,omitempty" db:"result_id"`     // Reference to scan result or MR
+	ResultType string `json:"result_type,omitempty" db:"result_type"` // "scan_result", "merge_request", etc.
+	ResultURL  string `json:"result_url,omitempty" db:"result_url"`   // External URL (e.g., MR URL)
+	Error      string `json:"error,omitempty" db:"error"`
 
 	// For display
 	ProjectName string `json:"project_name,omitempty" db:"-"`

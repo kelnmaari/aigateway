@@ -11,14 +11,14 @@ import (
 // Примечание: В текущей версии MoniGo (v1.1.0) custom metrics собираются
 // автоматически через middleware. Этот тип оставлен для будущих расширений.
 type CustomMonigoMetrics struct {
-	monigo interface{}
+	monigo any
 	db     storage.Database
 	config *config.Config
 	logger *logrus.Logger
 }
 
 // NewCustomMonigoMetrics создает новый collector для custom метрик
-func NewCustomMonigoMetrics(m interface{}, db storage.Database, cfg *config.Config, logger *logrus.Logger) *CustomMonigoMetrics {
+func NewCustomMonigoMetrics(m any, db storage.Database, cfg *config.Config, logger *logrus.Logger) *CustomMonigoMetrics {
 	return &CustomMonigoMetrics{
 		monigo: m,
 		db:     db,
@@ -47,4 +47,3 @@ func (c *CustomMonigoMetrics) Start() {
 func (c *CustomMonigoMetrics) Stop() {
 	c.logger.Info("Custom MoniGo metrics collector stopped")
 }
-

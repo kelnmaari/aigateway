@@ -265,11 +265,11 @@ func (r *Router) SetupGitLabWebhookRoute(webhookHandler handlers.WebhookHandler)
 // WebhookHandler interface for GitLab webhooks
 // Defined in handlers package, re-exported here for convenience
 type WebhookHandlerInterface interface {
-	HandleWebhook(c interface{})
+	HandleWebhook(c any)
 }
 
 // SetupGitLabSecretsRoutes registers GitLab secrets scanning routes
-func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabSecretsRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab secrets routes: Store is nil, skipping setup")
 		return
@@ -317,7 +317,7 @@ func (r *Router) registerSecretsRoutes(secretsHandler *handlers.GitLabSecretsHan
 }
 
 // SetupGitLabDependenciesRoutes registers GitLab dependencies scanning routes
-func (r *Router) SetupGitLabDependenciesRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabDependenciesRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab dependencies routes: Store is nil, skipping setup")
 		return
@@ -353,7 +353,7 @@ func (r *Router) SetupGitLabDependenciesRoutes(store storage.Store, vectorStore 
 }
 
 // SetupGitLabQualityRoutes registers GitLab code quality analysis routes
-func (r *Router) SetupGitLabQualityRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabQualityRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab quality routes: Store is nil, skipping setup")
 		return
@@ -387,7 +387,7 @@ func (r *Router) SetupGitLabQualityRoutes(store storage.Store, vectorStore inter
 }
 
 // SetupGitLabDeadCodeRoutes registers GitLab dead code detection routes
-func (r *Router) SetupGitLabDeadCodeRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabDeadCodeRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab dead code routes: Store is nil, skipping setup")
 		return
@@ -423,7 +423,7 @@ func (r *Router) SetupGitLabDeadCodeRoutes(store storage.Store, vectorStore inte
 }
 
 // SetupGitLabAutoDocRoutes registers GitLab auto-documentation routes
-func (r *Router) SetupGitLabAutoDocRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabAutoDocRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab autodoc routes: Store is nil, skipping setup")
 		return
@@ -459,7 +459,7 @@ func (r *Router) SetupGitLabAutoDocRoutes(store storage.Store, vectorStore inter
 }
 
 // SetupGitLabTestGenRoutes registers GitLab test generation routes
-func (r *Router) SetupGitLabTestGenRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabTestGenRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab testgen routes: Store is nil, skipping setup")
 		return
@@ -494,7 +494,7 @@ func (r *Router) SetupGitLabTestGenRoutes(store storage.Store, vectorStore inter
 }
 
 // SetupGitLabArchitectureRoutes registers GitLab architecture diagram routes
-func (r *Router) SetupGitLabArchitectureRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabArchitectureRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab architecture routes: Store is nil, skipping setup")
 		return
@@ -529,7 +529,7 @@ func (r *Router) SetupGitLabArchitectureRoutes(store storage.Store, vectorStore 
 }
 
 // SetupGitLabScheduleRoutes registers GitLab scheduled scan routes
-func (r *Router) SetupGitLabScheduleRoutes(store storage.Store, vectorStore interface{}, llmBaseURL, llmAPIKey string) {
+func (r *Router) SetupGitLabScheduleRoutes(store storage.Store, vectorStore any, llmBaseURL, llmAPIKey string) {
 	if store == nil {
 		r.logger.Warn("GitLab schedule routes: Store is nil, skipping setup")
 		return
@@ -589,7 +589,7 @@ func (r *Router) SetupGitLabScheduleRoutes(store storage.Store, vectorStore inte
 }
 
 // SetupGitLabAnalyticsRoutes registers GitLab analytics routes
-func (r *Router) SetupGitLabAnalyticsRoutes(store storage.Store, analyticsStore interface{}) {
+func (r *Router) SetupGitLabAnalyticsRoutes(store storage.Store, analyticsStore any) {
 	if store == nil {
 		r.logger.Warn("GitLab analytics routes: Store is nil, skipping setup")
 		return

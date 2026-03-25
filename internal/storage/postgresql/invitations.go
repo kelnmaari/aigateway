@@ -242,7 +242,7 @@ func (db *PostgreSQLDB) ListInvitations(ctx context.Context, filter models.Invit
 		WHERE 1=1
 	`
 
-	args := []interface{}{}
+	args := []any{}
 	paramIndex := 1 // PostgreSQL uses $1, $2, $3...
 
 	// Apply filters

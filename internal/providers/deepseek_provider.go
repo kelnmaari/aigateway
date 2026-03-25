@@ -104,7 +104,7 @@ func (p *DeepSeekProvider) ListModels(ctx context.Context) ([]*ProviderModel, er
 			Capabilities: capabilities,
 			Description:  fmt.Sprintf("DeepSeek model: %s", m.ID),
 			Tags:         []string{"deepseek"},
-			ProviderMeta: map[string]interface{}{
+			ProviderMeta: map[string]any{
 				"owned_by": m.OwnedBy,
 				"created":  m.Created,
 			},
@@ -150,7 +150,7 @@ func (p *DeepSeekProvider) GetModelInfo(ctx context.Context, modelID string) (*P
 		Capabilities: capabilities,
 		Description:  fmt.Sprintf("DeepSeek model: %s", m.ID),
 		Tags:         []string{"deepseek"},
-		ProviderMeta: map[string]interface{}{
+		ProviderMeta: map[string]any{
 			"owned_by": m.OwnedBy,
 			"created":  m.Created,
 		},

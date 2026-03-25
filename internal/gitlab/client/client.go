@@ -122,7 +122,7 @@ func (c *Client) doRequestWithQuery(ctx context.Context, method, path string, qu
 }
 
 // parseResponse parses the JSON response into the target struct
-func (c *Client) parseResponse(resp *http.Response, target interface{}) error {
+func (c *Client) parseResponse(resp *http.Response, target any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
@@ -156,7 +156,7 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body io.Rea
 }
 
 // ParseResponse parses the JSON response into the target struct (exported)
-func (c *Client) ParseResponse(resp *http.Response, target interface{}) error {
+func (c *Client) ParseResponse(resp *http.Response, target any) error {
 	return c.parseResponse(resp, target)
 }
 

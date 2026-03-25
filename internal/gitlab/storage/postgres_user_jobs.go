@@ -125,7 +125,7 @@ func (s *PostgresStore) GetUserJob(ctx context.Context, id string) (*models.User
 // ListUserJobs lists user jobs with filtering
 func (s *PostgresStore) ListUserJobs(ctx context.Context, req *models.UserJobsRequest) ([]models.UserJob, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argIndex := 1
 
 	if req.UserID != "" {
@@ -252,20 +252,20 @@ func (s *PostgresStore) ListUserJobs(ctx context.Context, req *models.UserJobsRe
 // UpdateUserJobStatus updates job status
 func (s *PostgresStore) UpdateUserJobStatus(ctx context.Context, id string, status models.UserJobStatus, errMsg string) error {
 	var query string
-	var args []interface{}
+	var args []any
 
 	now := time.Now()
 
 	switch status {
 	case models.UserJobStatusRunning:
 		query = `UPDATE user_jobs SET status = $1, started_at = $2 WHERE id = $3`
-		args = []interface{}{status, now, id}
+		args = []any{status, now, id}
 	case models.UserJobStatusCompleted, models.UserJobStatusFailed, models.UserJobStatusCancelled:
 		query = `UPDATE user_jobs SET status = $1, completed_at = $2, error = $3 WHERE id = $4`
-		args = []interface{}{status, now, errMsg, id}
+		args = []any{status, now, errMsg, id}
 	default:
 		query = `UPDATE user_jobs SET status = $1 WHERE id = $2`
-		args = []interface{}{status, id}
+		args = []any{status, id}
 	}
 
 	result, err := s.db.ExecContext(ctx, query, args...)

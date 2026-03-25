@@ -15,12 +15,12 @@ import (
 
 // QdrantConfig holds configuration for Qdrant vector database
 type QdrantConfig struct {
-	URL           string        `yaml:"url" json:"url"`
-	APIKey        string        `yaml:"api_key" json:"api_key"`
-	Collection    string        `yaml:"collection" json:"collection"`
-	VectorSize    int           `yaml:"vector_size" json:"vector_size"`
-	Timeout       time.Duration `yaml:"timeout" json:"timeout"`
-	Enabled       bool          `yaml:"enabled" json:"enabled"`
+	URL        string        `yaml:"url" json:"url"`
+	APIKey     string        `yaml:"api_key" json:"api_key"`
+	Collection string        `yaml:"collection" json:"collection"`
+	VectorSize int           `yaml:"vector_size" json:"vector_size"`
+	Timeout    time.Duration `yaml:"timeout" json:"timeout"`
+	Enabled    bool          `yaml:"enabled" json:"enabled"`
 }
 
 // DefaultQdrantConfig returns default Qdrant configuration
@@ -64,32 +64,32 @@ func NewQdrantClient(config QdrantConfig, logger *logrus.Logger) *QdrantClient {
 
 // Point represents a vector point in Qdrant
 type Point struct {
-	ID      string                 `json:"id"`
-	Vector  []float64              `json:"vector"` // Use float64 for JSON compatibility
-	Payload map[string]interface{} `json:"payload"`
+	ID      string         `json:"id"`
+	Vector  []float64      `json:"vector"` // Use float64 for JSON compatibility
+	Payload map[string]any `json:"payload"`
 }
 
 // SearchResult represents a search result from Qdrant
 type SearchResult struct {
-	ID      string                 `json:"id"`
-	Score   float32                `json:"score"`
-	Payload map[string]interface{} `json:"payload"`
+	ID      string         `json:"id"`
+	Score   float32        `json:"score"`
+	Payload map[string]any `json:"payload"`
 }
 
 // CodeChunkPayload represents metadata for a code chunk
 type CodeChunkPayload struct {
-	ProjectID     string `json:"project_id"`
-	FilePath      string `json:"file_path"`
-	ChunkIndex    int    `json:"chunk_index"`
-	Language      string `json:"language"`
-	Content       string `json:"content"`
-	StartLine     int    `json:"start_line"`
-	EndLine       int    `json:"end_line"`
-	FunctionName  string `json:"function_name,omitempty"`
-	ClassName     string `json:"class_name,omitempty"`
-	CommitSHA     string `json:"commit_sha,omitempty"`
-	BranchName    string `json:"branch_name,omitempty"`
-	LastUpdated   int64  `json:"last_updated"`
+	ProjectID    string `json:"project_id"`
+	FilePath     string `json:"file_path"`
+	ChunkIndex   int    `json:"chunk_index"`
+	Language     string `json:"language"`
+	Content      string `json:"content"`
+	StartLine    int    `json:"start_line"`
+	EndLine      int    `json:"end_line"`
+	FunctionName string `json:"function_name,omitempty"`
+	ClassName    string `json:"class_name,omitempty"`
+	CommitSHA    string `json:"commit_sha,omitempty"`
+	BranchName   string `json:"branch_name,omitempty"`
+	LastUpdated  int64  `json:"last_updated"`
 }
 
 // EnsureCollection creates the collection if it doesn't exist (uses default collection)
@@ -111,8 +111,8 @@ func (c *QdrantClient) EnsureCollectionNamed(ctx context.Context, collectionName
 	}
 
 	// Create collection
-	body := map[string]interface{}{
-		"vectors": map[string]interface{}{
+	body := map[string]any{
+		"vectors": map[string]any{
 			"size":     c.config.VectorSize,
 			"distance": "Cosine",
 		},
@@ -154,7 +154,7 @@ func (c *QdrantClient) UpsertPointsToCollection(ctx context.Context, collectionN
 		return nil
 	}
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"points": points,
 	}
 
@@ -171,12 +171,12 @@ func (c *QdrantClient) UpsertPointsToCollection(ctx context.Context, collectionN
 }
 
 // Search performs a vector similarity search in the default collection
-func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, filter map[string]interface{}) ([]SearchResult, error) {
+func (c *QdrantClient) Search(ctx context.Context, vector []float32, limit int, filter map[string]any) ([]SearchResult, error) {
 	return c.SearchInCollection(ctx, c.config.Collection, vector, limit, filter)
 }
 
 // SearchInCollection performs a vector similarity search in the specified collection
-func (c *QdrantClient) SearchInCollection(ctx context.Context, collectionName string, vector []float32, limit int, filter map[string]interface{}) ([]SearchResult, error) {
+func (c *QdrantClient) SearchInCollection(ctx context.Context, collectionName string, vector []float32, limit int, filter map[string]any) ([]SearchResult, error) {
 	// Validate input vector
 	if len(vector) == 0 {
 		c.logger.Warn("Qdrant search: empty vector provided, skipping")
@@ -198,7 +198,7 @@ func (c *QdrantClient) SearchInCollection(ctx context.Context, collectionName st
 
 	c.logger.WithField("output_vector_len", len(vector64)).Debug("Qdrant search: vector converted")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"vector":       vector64, // Use float64 for better JSON compatibility
 		"limit":        limit,
 		"with_payload": true,
@@ -233,11 +233,11 @@ func (c *QdrantClient) SearchByProject(ctx context.Context, vector []float32, pr
 
 // SearchByProjectInCollection searches for similar code chunks within a project in specified collection
 func (c *QdrantClient) SearchByProjectInCollection(ctx context.Context, collectionName string, vector []float32, projectID string, limit int) ([]SearchResult, error) {
-	filter := map[string]interface{}{
-		"must": []map[string]interface{}{
+	filter := map[string]any{
+		"must": []map[string]any{
 			{
 				"key":   "project_id",
-				"match": map[string]interface{}{"value": projectID},
+				"match": map[string]any{"value": projectID},
 			},
 		},
 	}
@@ -252,12 +252,12 @@ func (c *QdrantClient) DeleteByProject(ctx context.Context, projectID string) er
 
 // DeleteByProjectInCollection deletes all points for a project in specified collection
 func (c *QdrantClient) DeleteByProjectInCollection(ctx context.Context, collectionName, projectID string) error {
-	body := map[string]interface{}{
-		"filter": map[string]interface{}{
-			"must": []map[string]interface{}{
+	body := map[string]any{
+		"filter": map[string]any{
+			"must": []map[string]any{
 				{
 					"key":   "project_id",
-					"match": map[string]interface{}{"value": projectID},
+					"match": map[string]any{"value": projectID},
 				},
 			},
 		},
@@ -282,16 +282,16 @@ func (c *QdrantClient) DeleteByFile(ctx context.Context, projectID, filePath str
 
 // DeleteByFileInCollection deletes all points for a specific file in specified collection
 func (c *QdrantClient) DeleteByFileInCollection(ctx context.Context, collectionName, projectID, filePath string) error {
-	body := map[string]interface{}{
-		"filter": map[string]interface{}{
-			"must": []map[string]interface{}{
+	body := map[string]any{
+		"filter": map[string]any{
+			"must": []map[string]any{
 				{
 					"key":   "project_id",
-					"match": map[string]interface{}{"value": projectID},
+					"match": map[string]any{"value": projectID},
 				},
 				{
 					"key":   "file_path",
-					"match": map[string]interface{}{"value": filePath},
+					"match": map[string]any{"value": filePath},
 				},
 			},
 		},
@@ -307,16 +307,16 @@ func (c *QdrantClient) DeleteByFileInCollection(ctx context.Context, collectionN
 
 // DeleteByProjectBranch deletes all points for a specific project+branch combination
 func (c *QdrantClient) DeleteByProjectBranch(ctx context.Context, projectID, branch string) error {
-	body := map[string]interface{}{
-		"filter": map[string]interface{}{
-			"must": []map[string]interface{}{
+	body := map[string]any{
+		"filter": map[string]any{
+			"must": []map[string]any{
 				{
 					"key":   "project_id",
-					"match": map[string]interface{}{"value": projectID},
+					"match": map[string]any{"value": projectID},
 				},
 				{
 					"key":   "branch_name",
-					"match": map[string]interface{}{"value": branch},
+					"match": map[string]any{"value": branch},
 				},
 			},
 		},
@@ -335,18 +335,18 @@ func (c *QdrantClient) DeleteByProjectBranch(ctx context.Context, projectID, bra
 }
 
 // GetCollectionInfo returns information about the default collection
-func (c *QdrantClient) GetCollectionInfo(ctx context.Context) (map[string]interface{}, error) {
+func (c *QdrantClient) GetCollectionInfo(ctx context.Context) (map[string]any, error) {
 	return c.GetCollectionInfoNamed(ctx, c.config.Collection)
 }
 
 // GetCollectionInfoNamed returns information about a specific collection
-func (c *QdrantClient) GetCollectionInfoNamed(ctx context.Context, collectionName string) (map[string]interface{}, error) {
+func (c *QdrantClient) GetCollectionInfoNamed(ctx context.Context, collectionName string) (map[string]any, error) {
 	resp, err := c.request(ctx, "GET", fmt.Sprintf("/collections/%s", collectionName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("get collection info: %w", err)
 	}
 
-	var info map[string]interface{}
+	var info map[string]any
 	if err := json.Unmarshal(resp, &info); err != nil {
 		return nil, fmt.Errorf("parse collection info: %w", err)
 	}
@@ -356,9 +356,9 @@ func (c *QdrantClient) GetCollectionInfoNamed(ctx context.Context, collectionNam
 
 // CollectionStats holds collection statistics
 type CollectionStats struct {
-	PointsCount   int64 `json:"points_count"`
-	VectorsCount  int64 `json:"vectors_count"`
-	SegmentsCount int   `json:"segments_count"`
+	PointsCount   int64  `json:"points_count"`
+	VectorsCount  int64  `json:"vectors_count"`
+	SegmentsCount int    `json:"segments_count"`
 	Status        string `json:"status"`
 }
 
@@ -370,9 +370,9 @@ func (c *QdrantClient) GetCollectionStats(ctx context.Context, collectionName st
 	}
 
 	stats := &CollectionStats{}
-	
+
 	// Parse result.points_count, result.vectors_count, etc.
-	if result, ok := info["result"].(map[string]interface{}); ok {
+	if result, ok := info["result"].(map[string]any); ok {
 		if pc, ok := result["points_count"].(float64); ok {
 			stats.PointsCount = int64(pc)
 		}
@@ -400,7 +400,7 @@ func (c *QdrantClient) HealthCheck(ctx context.Context) error {
 }
 
 // request makes an HTTP request to Qdrant
-func (c *QdrantClient) request(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
+func (c *QdrantClient) request(ctx context.Context, method, path string, body any) ([]byte, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
@@ -453,4 +453,3 @@ func Float32ToFloat64(f32 []float32) []float64 {
 	}
 	return f64
 }
-

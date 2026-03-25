@@ -27,23 +27,22 @@ type Provider interface {
 
 // ProviderModel представляет информацию о модели из provider
 type ProviderModel struct {
-	ID             string                   // "llama2:7b", "gpt-4"
-	Name           string                   // Display name
-	Capabilities   []models.ModelCapability // ["chat", "embeddings"]
-	Parameters     map[string]interface{}   // Model-specific parameters
-	RequiresGPU    bool
-	MinVRAMGB      *int
-	ContextLength  *int
-	Description    string
-	Tags           []string
-	ProviderMeta   map[string]interface{} // Provider-specific metadata
+	ID            string                   // "llama2:7b", "gpt-4"
+	Name          string                   // Display name
+	Capabilities  []models.ModelCapability // ["chat", "embeddings"]
+	Parameters    map[string]any           // Model-specific parameters
+	RequiresGPU   bool
+	MinVRAMGB     *int
+	ContextLength *int
+	Description   string
+	Tags          []string
+	ProviderMeta  map[string]any // Provider-specific metadata
 }
 
 // ProviderHealth представляет результат health check
 type ProviderHealth struct {
-	Status      models.ModelHealthStatus
-	Latency     time.Duration
-	ErrorMsg    string
-	CheckedAt   time.Time
+	Status    models.ModelHealthStatus
+	Latency   time.Duration
+	ErrorMsg  string
+	CheckedAt time.Time
 }
-

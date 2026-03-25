@@ -32,9 +32,9 @@ type MockGitLabServer struct {
 	currentUser *client.User
 
 	// Tracking
-	RequestLog     []RequestLogEntry
-	WebhooksSent   []WebhookPayload
-	NotesCreated   []*client.Note
+	RequestLog      []RequestLogEntry
+	WebhooksSent    []WebhookPayload
+	NotesCreated    []*client.Note
 	DiscussionsMade []*client.Discussion
 
 	// Configuration
@@ -77,9 +77,9 @@ func NewMockGitLabServer() *MockGitLabServer {
 			Email:    "test@example.com",
 			IsAdmin:  true,
 		},
-		RequestLog:     make([]RequestLogEntry, 0),
-		WebhooksSent:   make([]WebhookPayload, 0),
-		NotesCreated:   make([]*client.Note, 0),
+		RequestLog:      make([]RequestLogEntry, 0),
+		WebhooksSent:    make([]WebhookPayload, 0),
+		NotesCreated:    make([]*client.Note, 0),
 		DiscussionsMade: make([]*client.Discussion, 0),
 	}
 
@@ -116,7 +116,7 @@ func (m *MockGitLabServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Route request
 	path := r.URL.Path
-	
+
 	switch {
 	case path == "/api/v4/user" && r.Method == "GET":
 		m.handleGetCurrentUser(w, r)
@@ -145,7 +145,7 @@ func (m *MockGitLabServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (m *MockGitLabServer) handleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(m.currentUser)
 }
@@ -324,7 +324,7 @@ func (m *MockGitLabServer) handleMRDiscussions(w http.ResponseWriter, r *http.Re
 	key := fmt.Sprintf("%d:%d", projectID, mrIID)
 
 	if r.Method == "POST" {
-		var body map[string]interface{}
+		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 
 		discussion := &client.Discussion{
@@ -399,7 +399,7 @@ func (m *MockGitLabServer) handleWebhooks(w http.ResponseWriter, r *http.Request
 	case "DELETE":
 		// Extract webhook ID from path
 		hookID, _ := strconv.ParseInt(parts[len(parts)-1], 10, 64)
-		
+
 		m.mu.Lock()
 		hooks := m.webhooks[projectID]
 		for i, h := range hooks {
@@ -487,7 +487,7 @@ func (m *MockGitLabServer) SetCurrentUser(user *client.User) {
 func (m *MockGitLabServer) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.RequestLog = make([]RequestLogEntry, 0)
 	m.NotesCreated = make([]*client.Note, 0)
 	m.DiscussionsMade = make([]*client.Discussion, 0)
@@ -507,4 +507,3 @@ func (m *MockGitLabServer) GetNotesCreated() []*client.Note {
 	defer m.mu.RUnlock()
 	return m.NotesCreated
 }
-

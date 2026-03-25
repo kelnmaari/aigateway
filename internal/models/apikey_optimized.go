@@ -2,6 +2,7 @@
 package models
 
 import (
+	"slices"
 	"sync/atomic"
 	"time"
 )
@@ -61,7 +62,7 @@ type APIKeyCold struct {
 	RevokedReason string
 
 	// Metadata
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // APIKeyUsageHot - cache-friendly счетчики использования
@@ -146,22 +147,10 @@ type APIKeyUsageSnapshot struct {
 // ConvertToHotCold конвертирует legacy APIKey в hot/cold структуры
 func ConvertToHotCold(key *APIKey) (*APIKeyHot, *APIKeyCold) {
 	// Проверяем модели
-	modelsAll := false
-	for _, m := range key.Models {
-		if m == "*" {
-			modelsAll = true
-			break
-		}
-	}
+	modelsAll := slices.Contains(key.Models, "*")
 
 	// Проверяем permissions
-	permsAll := false
-	for _, p := range key.Permissions {
-		if p == "*" {
-			permsAll = true
-			break
-		}
-	}
+	permsAll := slices.Contains(key.Permissions, "*")
 
 	// Hot usage counters
 	usageHot := &APIKeyUsageHot{
@@ -219,12 +208,7 @@ func (h *APIKeyHot) HasModelAccess(model string) bool {
 	}
 
 	// Fallback на cold data
-	for _, allowedModel := range h.Cold.Models {
-		if allowedModel == model {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(h.Cold.Models, model)
 }
 
 // HasPermission быстрая проверка разрешения
@@ -234,16 +218,10 @@ func (h *APIKeyHot) HasPermission(permission string) bool {
 	}
 
 	// Fallback на cold data
-	for _, perm := range h.Cold.Permissions {
-		if perm == permission {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(h.Cold.Permissions, permission)
 }
 
 // IsActive быстрая проверка активности
 func (h *APIKeyHot) IsActive() bool {
 	return h.Status == APIKeyStatusActive && !h.IsExpired
 }
-

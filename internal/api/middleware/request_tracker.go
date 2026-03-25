@@ -23,7 +23,7 @@ func RequestTracker(storage *request.Storage, broadcaster *websocket.EventBroadc
 		path := c.Request.URL.Path
 		if path == "/health" || path == "/healthz" || path == "/ready" ||
 			path == "/api/stats" || path == "/api/config" || path == "/metrics" ||
-			path == "/ws" || 
+			path == "/ws" ||
 			// Пропускаем UI эндпоинты для уменьшения спама в логах (v3.0.6+)
 			strings.HasPrefix(path, "/api/ui/") {
 			c.Next()
@@ -144,7 +144,7 @@ func extractRequestInfo(c *gin.Context, reqInfo *request.RequestInfo) {
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	// Парсим JSON
-	var body map[string]interface{}
+	var body map[string]any
 	if err := json.Unmarshal(bodyBytes, &body); err != nil {
 		return
 	}
@@ -155,12 +155,12 @@ func extractRequestInfo(c *gin.Context, reqInfo *request.RequestInfo) {
 	}
 
 	// Извлекаем messages (для chat/completions)
-	if messages, ok := body["messages"].([]interface{}); ok {
+	if messages, ok := body["messages"].([]any); ok {
 		reqInfo.Messages = len(messages)
 	}
 
 	// Извлекаем tools
-	if tools, ok := body["tools"].([]interface{}); ok {
+	if tools, ok := body["tools"].([]any); ok {
 		reqInfo.Tools = len(tools)
 	}
 
@@ -198,8 +198,8 @@ func generateRequestID() string {
 }
 
 // requestInfoToMap конвертирует RequestInfo в map для WebSocket
-func requestInfoToMap(req *request.RequestInfo) map[string]interface{} {
-	data := map[string]interface{}{
+func requestInfoToMap(req *request.RequestInfo) map[string]any {
+	data := map[string]any{
 		"id":          req.ID,
 		"timestamp":   req.Timestamp,
 		"method":      req.Method,
@@ -243,4 +243,3 @@ func requestInfoToMap(req *request.RequestInfo) map[string]interface{} {
 
 	return data
 }
-

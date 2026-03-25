@@ -193,7 +193,7 @@ func WithError(logger *logrus.Logger, err error) *logrus.Entry {
 }
 
 // WithFields добавляет дополнительные поля к logger
-func WithFields(logger *logrus.Logger, fields map[string]interface{}) *logrus.Entry {
+func WithFields(logger *logrus.Logger, fields map[string]any) *logrus.Entry {
 	return logger.WithFields(logrus.Fields(fields))
 }
 

@@ -47,9 +47,9 @@ func (e *OpenAIEmbedder) GetDefaultModel() string {
 func (e *OpenAIEmbedder) GetDimensions(model string) (int, error) {
 	// Known model dimensions
 	knownDimensions := map[string]int{
-		"text-embedding-3-small":  1536,
-		"text-embedding-3-large":  3072,
-		"text-embedding-ada-002":  1536,
+		"text-embedding-3-small": 1536,
+		"text-embedding-3-large": 3072,
+		"text-embedding-ada-002": 1536,
 		"mxbai-embed-large":      1024,
 		"nomic-embed-text":       768,
 		"all-minilm":             384,
@@ -66,9 +66,9 @@ func (e *OpenAIEmbedder) GetDimensions(model string) (int, error) {
 
 // openaiEmbeddingRequest is the request body for POST /v1/embeddings.
 type openaiEmbeddingRequest struct {
-	Input          interface{} `json:"input"`                     // string or []string
-	Model          string      `json:"model"`
-	EncodingFormat string      `json:"encoding_format,omitempty"` // "float" (default)
+	Input          any    `json:"input"` // string or []string
+	Model          string `json:"model"`
+	EncodingFormat string `json:"encoding_format,omitempty"` // "float" (default)
 }
 
 // openaiEmbeddingResponse is the response from POST /v1/embeddings.
@@ -144,10 +144,7 @@ func (e *OpenAIEmbedder) EmbedBatch(ctx context.Context, req BatchEmbeddingReque
 	}
 
 	for i := 0; i < len(req.Texts); i += batchSize {
-		end := i + batchSize
-		if end > len(req.Texts) {
-			end = len(req.Texts)
-		}
+		end := min(i+batchSize, len(req.Texts))
 
 		batch := req.Texts[i:end]
 

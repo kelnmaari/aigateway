@@ -129,7 +129,7 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 			// For JWT auth, use user_id as identifier
 			apiKeyIDForMetrics = "jwt:" + usage.UserID
 		}
-		
+
 		metrics.RecordAPIUsage(
 			apiKeyIDForMetrics,
 			model,
@@ -137,12 +137,12 @@ func UsageTracking(db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 			completionTokens,
 			success,
 		)
-		
+
 		// Also record model request duration
 		if model != "" && model != "unknown" {
 			metrics.RecordModelRequest(model, time.Duration(duration)*time.Millisecond)
 		}
-		
+
 		// Record model errors if any
 		if !success && model != "" {
 			errorType := "unknown"
@@ -228,8 +228,8 @@ func extractConversationID(c *gin.Context) *string {
 }
 
 // extractMetadata извлекает дополнительные метаданные
-func extractMetadata(c *gin.Context) map[string]interface{} {
-	metadata := make(map[string]interface{})
+func extractMetadata(c *gin.Context) map[string]any {
+	metadata := make(map[string]any)
 
 	// Добавляем auth type
 	if authType, exists := c.Get("auth_type"); exists {
@@ -248,4 +248,3 @@ func extractIntFromContext(c *gin.Context, key string) int {
 	}
 	return 0
 }
-

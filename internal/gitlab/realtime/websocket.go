@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -14,15 +15,15 @@ import (
 
 // Hub manages WebSocket connections and broadcasts
 type Hub struct {
-	mu          sync.RWMutex
-	clients     map[*Client]bool
-	broadcast   chan *Message
-	register    chan *Client
-	unregister  chan *Client
-	upgrader    websocket.Upgrader
-	logger      *logrus.Logger
-	ctx         context.Context
-	cancel      context.CancelFunc
+	mu         sync.RWMutex
+	clients    map[*Client]bool
+	broadcast  chan *Message
+	register   chan *Client
+	unregister chan *Client
+	upgrader   websocket.Upgrader
+	logger     *logrus.Logger
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 // Client represents a WebSocket client connection
@@ -44,11 +45,11 @@ type SubscriptionFilters struct {
 
 // Message represents a WebSocket message
 type Message struct {
-	Type      MessageType            `json:"type"`
-	Event     string                 `json:"event"`
-	Data      interface{}            `json:"data"`
-	Timestamp time.Time              `json:"timestamp"`
-	Meta      map[string]interface{} `json:"meta,omitempty"`
+	Type      MessageType    `json:"type"`
+	Event     string         `json:"event"`
+	Data      any            `json:"data"`
+	Timestamp time.Time      `json:"timestamp"`
+	Meta      map[string]any `json:"meta,omitempty"`
 }
 
 // MessageType defines message types
@@ -70,7 +71,7 @@ const (
 // NewHub creates a new WebSocket hub
 func NewHub(logger *logrus.Logger) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &Hub{
 		clients:    make(map[*Client]bool),
 		broadcast:  make(chan *Message, 256),
@@ -202,7 +203,7 @@ func (h *Hub) BroadcastJobFailed(job *JobEvent, err string) {
 		Event:     "job_failed",
 		Data:      job,
 		Timestamp: time.Now(),
-		Meta:      map[string]interface{}{"error": err},
+		Meta:      map[string]any{"error": err},
 	}
 }
 
@@ -238,8 +239,8 @@ type JobEvent struct {
 	Status        string    `json:"status"`
 	Priority      int       `json:"priority"`
 	WorkerID      string    `json:"worker_id,omitempty"`
-	StartedAt     time.Time `json:"started_at,omitempty"`
-	CompletedAt   time.Time `json:"completed_at,omitempty"`
+	StartedAt     time.Time `json:"started_at"`
+	CompletedAt   time.Time `json:"completed_at"`
 	Duration      int64     `json:"duration_ms,omitempty"`
 	TokensUsed    int       `json:"tokens_used,omitempty"`
 	IssuesFound   int       `json:"issues_found,omitempty"`
@@ -248,22 +249,22 @@ type JobEvent struct {
 
 // QueueStats represents queue statistics
 type QueueStats struct {
-	Pending    int            `json:"pending"`
-	Processing int            `json:"processing"`
-	Completed  int            `json:"completed"`
-	Failed     int            `json:"failed"`
-	ByPriority map[int]int    `json:"by_priority,omitempty"`
-	AvgWaitMs  int64          `json:"avg_wait_ms"`
-	AvgProcMs  int64          `json:"avg_proc_ms"`
+	Pending    int         `json:"pending"`
+	Processing int         `json:"processing"`
+	Completed  int         `json:"completed"`
+	Failed     int         `json:"failed"`
+	ByPriority map[int]int `json:"by_priority,omitempty"`
+	AvgWaitMs  int64       `json:"avg_wait_ms"`
+	AvgProcMs  int64       `json:"avg_proc_ms"`
 }
 
 // WorkerStatus represents worker status
 type WorkerStatus struct {
-	WorkerID   string    `json:"worker_id"`
-	Status     string    `json:"status"` // idle, busy, stopped
-	CurrentJob string    `json:"current_job,omitempty"`
-	StartedAt  time.Time `json:"started_at,omitempty"`
-	JobsProcessed int    `json:"jobs_processed"`
+	WorkerID      string    `json:"worker_id"`
+	Status        string    `json:"status"` // idle, busy, stopped
+	CurrentJob    string    `json:"current_job,omitempty"`
+	StartedAt     time.Time `json:"started_at"`
+	JobsProcessed int       `json:"jobs_processed"`
 }
 
 // ServeWS handles WebSocket connection requests
@@ -327,13 +328,7 @@ func (c *Client) matchesFilters(msg *Message) bool {
 	// Check project filter
 	if len(c.filters.ProjectIDs) > 0 {
 		if job, ok := msg.Data.(*JobEvent); ok {
-			matched := false
-			for _, pid := range c.filters.ProjectIDs {
-				if pid == job.ProjectID {
-					matched = true
-					break
-				}
-			}
+			matched := slices.Contains(c.filters.ProjectIDs, job.ProjectID)
 			if !matched {
 				return false
 			}
@@ -402,7 +397,7 @@ func (c *Client) writePump() {
 
 			// Write queued messages
 			n := len(c.send)
-			for i := 0; i < n; i++ {
+			for range n {
 				w.Write([]byte{'\n'})
 				w.Write(<-c.send)
 			}
@@ -422,7 +417,7 @@ func (c *Client) writePump() {
 
 // ClientMessage represents a message from the client
 type ClientMessage struct {
-	Type    string              `json:"type"`
+	Type    string               `json:"type"`
 	Filters *SubscriptionFilters `json:"filters,omitempty"`
 }
 
@@ -439,7 +434,7 @@ func (c *Client) handleMessage(msg *ClientMessage) {
 	}
 }
 
-func mustJSON(v interface{}) []byte {
+func mustJSON(v any) []byte {
 	data, _ := json.Marshal(v)
 	return data
 }
@@ -450,4 +445,3 @@ func (h *Hub) GetClientCount() int {
 	defer h.mu.RUnlock()
 	return len(h.clients)
 }
-

@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"math"
+	"slices"
 	"sort"
 	"sync"
 )
@@ -165,9 +166,7 @@ func (a *Aggregator) AggregateByInterval(data []DataPoint, intervalSeconds int) 
 	for ts := range grouped {
 		timestamps = append(timestamps, ts)
 	}
-	sort.Slice(timestamps, func(i, j int) bool {
-		return timestamps[i] < timestamps[j]
-	})
+	slices.Sort(timestamps)
 
 	// Вычисляем статистику для каждого интервала
 	result := make([]TimeSeriesPoint, 0, len(timestamps))
@@ -191,4 +190,3 @@ type TimeSeriesPoint struct {
 	Stats     AggregatedStats `json:"stats"`
 	Count     int             `json:"count"`
 }
-

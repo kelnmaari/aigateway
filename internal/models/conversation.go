@@ -26,8 +26,8 @@ type Conversation struct {
 	IsPinned   bool               `json:"is_pinned" db:"is_pinned"`     // Закреплен ли
 
 	// Agent Mode (v2.5.1+: Conversational Agent)
-	AgentMode    bool          `json:"agent_mode" db:"agent_mode"`                       // Включен ли режим агента
-	AgentContext *AgentContext `json:"agent_context,omitempty" db:"agent_context"`       // Контекст агента (JSON)
+	AgentMode    bool          `json:"agent_mode" db:"agent_mode"`                 // Включен ли режим агента
+	AgentContext *AgentContext `json:"agent_context,omitempty" db:"agent_context"` // Контекст агента (JSON)
 
 	// Временные метки
 	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
@@ -39,7 +39,7 @@ type Conversation struct {
 	TotalTokens  int64 `json:"total_tokens" db:"total_tokens"`   // Общее количество токенов
 
 	// Metadata
-	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+	Metadata map[string]any `json:"metadata,omitempty" db:"metadata"`
 }
 
 // ConversationStatus представляет статус диалога
@@ -78,7 +78,7 @@ type Message struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 
 	// Metadata
-	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+	Metadata map[string]any `json:"metadata,omitempty" db:"metadata"`
 
 	// Attached files (FILE-STORAGE-01: Phase 4, v1.10.0+)
 	FileIDs []string `json:"file_ids,omitempty" db:"-"` // Not stored in messages table, loaded from junction
@@ -127,4 +127,3 @@ type ConversationWithMessages struct {
 	*Conversation
 	Messages []*Message `json:"messages"`
 }
-

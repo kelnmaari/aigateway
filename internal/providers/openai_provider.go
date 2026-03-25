@@ -114,7 +114,7 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]*ProviderModel, erro
 			Capabilities: capabilities,
 			Description:  fmt.Sprintf("OpenAI model: %s", m.ID),
 			Tags:         []string{"openai"},
-			ProviderMeta: map[string]interface{}{
+			ProviderMeta: map[string]any{
 				"owned_by": m.OwnedBy,
 				"created":  m.Created,
 			},
@@ -160,7 +160,7 @@ func (p *OpenAIProvider) GetModelInfo(ctx context.Context, modelID string) (*Pro
 		Capabilities: capabilities,
 		Description:  fmt.Sprintf("OpenAI model: %s", m.ID),
 		Tags:         []string{"openai"},
-		ProviderMeta: map[string]interface{}{
+		ProviderMeta: map[string]any{
 			"owned_by": m.OwnedBy,
 			"created":  m.Created,
 		},

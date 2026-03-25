@@ -769,11 +769,9 @@ func (m Model) View() string {
 	// Вычисляем доступную высоту для контента
 	headerHeight := strings.Count(header, "\n") + strings.Count(errorBanner, "\n") + strings.Count(nav, "\n") + 3
 	footerHeight := 2
-	availableHeight := m.height - headerHeight - footerHeight
-
-	if availableHeight < 5 {
-		availableHeight = 5 // Минимум 5 строк
-	}
+	availableHeight := max(m.height-headerHeight-footerHeight,
+		// Минимум 5 строк
+		5)
 
 	// Применяем прокрутку
 	content = applyScroll(content, m.scrollOffset, availableHeight)
@@ -1126,24 +1124,25 @@ func (m Model) renderRequestDetail() string {
 
 // renderModels отрисовывает экран управления моделями
 func (m Model) renderModels() string {
-	content := "🤖 УПРАВЛЕНИЕ МОДЕЛЯМИ\n\n"
+	var content strings.Builder
+	content.WriteString("🤖 УПРАВЛЕНИЕ МОДЕЛЯМИ\n\n")
 
 	if m.stats.Ollama.Connected {
-		content += fmt.Sprintf("📋 Доступно моделей: %d\n\n", m.stats.Ollama.ModelsCount)
+		content.WriteString(fmt.Sprintf("📋 Доступно моделей: %d\n\n", m.stats.Ollama.ModelsCount))
 
 		if len(m.stats.Ollama.Models) > 0 {
 			for i, model := range m.stats.Ollama.Models {
-				content += fmt.Sprintf("%d. %s\n", i+1, model)
+				content.WriteString(fmt.Sprintf("%d. %s\n", i+1, model))
 			}
 		} else {
-			content += helpStyle.Render("Нет загруженных моделей")
+			content.WriteString(helpStyle.Render("Нет загруженных моделей"))
 		}
 	} else {
-		content += errorStyle.Render("⚠️  Ollama не подключен\n\n")
-		content += helpStyle.Render("Список моделей будет доступен после подключения к Ollama серверу")
+		content.WriteString(errorStyle.Render("⚠️  Ollama не подключен\n\n"))
+		content.WriteString(helpStyle.Render("Список моделей будет доступен после подключения к Ollama серверу"))
 	}
 
-	return borderStyle.Render(content)
+	return borderStyle.Render(content.String())
 }
 
 // renderAPIKeys отрисовывает экран управления API ключами
@@ -1786,7 +1785,7 @@ func (m Model) exportToJSON(filename string) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 
-	exportData := map[string]interface{}{
+	exportData := map[string]any{
 		"exported_at": time.Now().Format(time.RFC3339),
 		"total":       len(m.requestsState.requests),
 		"filter":      m.requestsState.statusFilter,
@@ -2014,7 +2013,7 @@ func createAPIKeyCmd(serverURL string, adminToken string, form CreateKeyForm) te
 		}
 
 		// Формируем тело запроса
-		requestBody := map[string]interface{}{
+		requestBody := map[string]any{
 			"name":        form.Name,
 			"description": form.Description,
 			"models":      models,
@@ -2070,7 +2069,7 @@ func createAPIKeyCmd(serverURL string, adminToken string, form CreateKeyForm) te
 // splitAndTrim разбивает строку по запятой и убирает пробелы
 func splitAndTrim(s string) []string {
 	parts := []string{}
-	for _, p := range strings.Split(s, ",") {
+	for p := range strings.SplitSeq(s, ",") {
 		trimmed := strings.TrimSpace(p)
 		if trimmed != "" {
 			parts = append(parts, trimmed)
@@ -2277,7 +2276,7 @@ func (m Model) saveEditedKey() tea.Cmd {
 		// Подготавливаем данные
 		models := []string{}
 		if m.editForm.Models != "" && m.editForm.Models != "*" {
-			for _, model := range strings.Split(m.editForm.Models, ",") {
+			for model := range strings.SplitSeq(m.editForm.Models, ",") {
 				models = append(models, strings.TrimSpace(model))
 			}
 		} else {
@@ -2286,13 +2285,13 @@ func (m Model) saveEditedKey() tea.Cmd {
 
 		permissions := []string{}
 		if m.editForm.Permissions != "" {
-			for _, perm := range strings.Split(m.editForm.Permissions, ",") {
+			for perm := range strings.SplitSeq(m.editForm.Permissions, ",") {
 				permissions = append(permissions, strings.TrimSpace(perm))
 			}
 		}
 
 		// Отправляем PATCH запрос
-		reqBody := map[string]interface{}{
+		reqBody := map[string]any{
 			"name":        m.editForm.Name,
 			"description": m.editForm.Description,
 			"models":      models,
@@ -2342,16 +2341,16 @@ func (m Model) executeConfirmedAction() tea.Cmd {
 
 	return func() tea.Msg {
 		var endpoint string
-		var reqBody map[string]interface{}
+		var reqBody map[string]any
 
 		if action == "revoke" {
 			endpoint = m.serverURL + "/api/admin/keys/" + key.ID + "/revoke"
-			reqBody = map[string]interface{}{
+			reqBody = map[string]any{
 				"reason": "Revoked via TUI",
 			}
 		} else if action == "enable" {
 			endpoint = m.serverURL + "/api/admin/keys/" + key.ID + "/enable"
-			reqBody = map[string]interface{}{}
+			reqBody = map[string]any{}
 		} else {
 			return errMsg(fmt.Errorf("unknown action: %s", action))
 		}
@@ -2507,4 +2506,3 @@ func (m Model) renderConfirmDialog() string {
 
 	return content.String()
 }
-

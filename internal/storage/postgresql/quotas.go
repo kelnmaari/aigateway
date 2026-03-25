@@ -150,7 +150,7 @@ func (db *PostgreSQLDB) ListQuotas(ctx context.Context, scope *models.QuotaScope
 		FROM quotas
 	`
 
-	var args []interface{}
+	var args []any
 	if scope != nil {
 		query += " WHERE scope = ?"
 		args = append(args, *scope)

@@ -15,7 +15,6 @@ import (
 	"aigateway/internal/imageproc"
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
-	"aigateway/internal/utils"
 	"aigateway/internal/vision"
 )
 
@@ -119,7 +118,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 		Public:                false,
 		Extract:               false, // Для изображений используем OCR, не text extraction
 		SkipContentValidation: true,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"description": description,
 			"width":       imageInfo.Width,
 			"height":      imageInfo.Height,
@@ -200,7 +199,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 			// WebSocket: processing complete
 			if h.wsBroadcaster != nil {
 				tempFileID := fmt.Sprintf("img_%d", time.Now().UnixNano())
-				result := map[string]interface{}{
+				result := map[string]any{
 					"text_length": len(ocrResult.Text),
 					"language":    ocrResult.Language,
 					"confidence":  ocrResult.Confidence,
@@ -232,7 +231,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 		StorageBackend:   uploadResp.StorageType,
 		StoragePath:      uploadResp.Path,
 		ExtractedText:    ocrText,
-		ExtractionStatus: utils.Ptr("completed"),
+		ExtractionStatus: new("completed"),
 		Language:         ocrLanguage,
 		Metadata: &models.FileMetadata{
 			PageCount: 0, // Для изображений не применимо
@@ -393,4 +392,3 @@ func getThumbnailURL(fileID string, thumbnailPath *string) *string {
 	url := fmt.Sprintf("/api/images/%s/thumbnail", fileID)
 	return &url
 }
-

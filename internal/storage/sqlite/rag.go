@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
 )
@@ -198,7 +197,7 @@ func (s *SQLiteDB) ListRAGDataSources(ctx context.Context, filter *storage.RAGDa
 
 	// Build WHERE clause
 	var whereClauses []string
-	var args []interface{}
+	var args []any
 
 	if filter.UserID != nil {
 		whereClauses = append(whereClauses, "user_id = ?")
@@ -467,7 +466,7 @@ func (s *SQLiteDB) ListRAGDocuments(ctx context.Context, filter *storage.RAGDocu
 	}
 
 	var whereClauses []string
-	var args []interface{}
+	var args []any
 
 	if filter.SourceID != nil {
 		whereClauses = append(whereClauses, "source_id = ?")
@@ -995,7 +994,7 @@ func (s *SQLiteDB) GetNextPendingRAGJob(ctx context.Context) (*models.RAGJob, er
 // CountRAGJobsByStatus подсчитывает задачи по статусу
 func (s *SQLiteDB) CountRAGJobsByStatus(ctx context.Context, status string) (int, error) {
 	query := "SELECT COUNT(*) FROM rag_jobs WHERE status = ?"
-	
+
 	var count int
 	err := s.db.QueryRowContext(ctx, query, status).Scan(&count)
 	if err != nil {
@@ -1017,7 +1016,7 @@ func (s *SQLiteDB) DeleteOldRAGJobs(ctx context.Context, cutoffTime time.Time, s
 		WHERE created_at < ? AND status IN (%s)
 	`, placeholders)
 
-	args := []interface{}{cutoffTime}
+	args := []any{cutoffTime}
 	for _, status := range statuses {
 		args = append(args, status)
 	}
@@ -1247,5 +1246,3 @@ func boolToInt(b bool) int {
 func intToBool(i int) bool {
 	return i != 0
 }
-
-

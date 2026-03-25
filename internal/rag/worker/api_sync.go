@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"aigateway/internal/models"
 	"aigateway/internal/rag/embeddings"
 	"aigateway/internal/rag/vector"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // executeAPISync выполняет синхронизацию данных из REST API
@@ -61,7 +61,7 @@ func (w *RAGWorker) executeAPISync(ctx context.Context, sourceID string) error {
 	}
 
 	// 4. Добавить headers из config
-	if headers, ok := source.Config["headers"].(map[string]interface{}); ok {
+	if headers, ok := source.Config["headers"].(map[string]any); ok {
 		for key, value := range headers {
 			if strValue, ok := value.(string); ok {
 				req.Header.Set(key, strValue)
@@ -98,7 +98,7 @@ func (w *RAGWorker) executeAPISync(ctx context.Context, sourceID string) error {
 	}).Debug("API response received")
 
 	// 7. Парсить JSON response
-	var data interface{}
+	var data any
 	if err := json.Unmarshal(body, &data); err != nil {
 		// Если не JSON, сохраняем как plain text
 		w.logger.WithField("source_id", sourceID).Warn("Response is not JSON, treating as plain text")
@@ -136,12 +136,12 @@ func (w *RAGWorker) processTextResponse(ctx context.Context, source *models.RAGD
 
 	// Создаем chunks из текста
 	chunks, totalTokens := w.createChunksFromText(source, document.ID, text)
-	
+
 	// Генерируем embeddings если embedder доступен (Version 1.14.0+)
 	if err := w.generateAndStoreEmbeddings(ctx, chunks); err != nil {
 		w.logger.WithError(err).Warn("Failed to generate embeddings, continuing without them")
 	}
-	
+
 	// Сохраняем chunks в БД
 	for _, chunk := range chunks {
 		if err := w.db.CreateRAGChunk(ctx, chunk); err != nil {
@@ -171,18 +171,18 @@ func (w *RAGWorker) processTextResponse(ctx context.Context, source *models.RAGD
 	}
 
 	w.logger.WithFields(logrus.Fields{
-		"source_id":     source.ID,
-		"total_chunks":  len(chunks),
-		"total_tokens":  totalTokens,
+		"source_id":    source.ID,
+		"total_chunks": len(chunks),
+		"total_tokens": totalTokens,
 	}).Info("API sync completed successfully (text)")
 
 	return nil
 }
 
 // processJSONResponse обрабатывает JSON ответ
-func (w *RAGWorker) processJSONResponse(ctx context.Context, source *models.RAGDataSource, data interface{}) error {
+func (w *RAGWorker) processJSONResponse(ctx context.Context, source *models.RAGDataSource, data any) error {
 	now := time.Now()
-	
+
 	// Определяем data_path для извлечения массива данных
 	dataPath, ok := source.Config["data_path"].(string)
 	if ok && dataPath != "" {
@@ -191,10 +191,10 @@ func (w *RAGWorker) processJSONResponse(ctx context.Context, source *models.RAGD
 	}
 
 	// Проверяем является ли результат массивом
-	items, ok := data.([]interface{})
+	items, ok := data.([]any)
 	if !ok {
 		// Если не массив, оборачиваем в массив
-		items = []interface{}{data}
+		items = []any{data}
 	}
 
 	w.logger.WithFields(logrus.Fields{
@@ -238,12 +238,12 @@ func (w *RAGWorker) processJSONResponse(ctx context.Context, source *models.RAGD
 
 		// Создаем chunks
 		chunks, tokensAdded := w.createChunksFromText(source, document.ID, itemText)
-		
+
 		// Генерируем embeddings если embedder доступен (Version 1.14.0+)
 		if err := w.generateAndStoreEmbeddings(ctx, chunks); err != nil {
 			w.logger.WithError(err).Warn("Failed to generate embeddings for item, continuing")
 		}
-		
+
 		// Сохраняем chunks в БД
 		for _, chunk := range chunks {
 			if err := w.db.CreateRAGChunk(ctx, chunk); err != nil {
@@ -277,10 +277,10 @@ func (w *RAGWorker) processJSONResponse(ctx context.Context, source *models.RAGD
 	}
 
 	w.logger.WithFields(logrus.Fields{
-		"source_id":     source.ID,
-		"items_count":   len(items),
-		"total_chunks":  totalChunks,
-		"total_tokens":  totalTokens,
+		"source_id":    source.ID,
+		"items_count":  len(items),
+		"total_chunks": totalChunks,
+		"total_tokens": totalTokens,
 	}).Info("API sync completed successfully (JSON)")
 
 	return nil
@@ -348,10 +348,7 @@ func (w *RAGWorker) createChunksFromText(source *models.RAGDataSource, documentI
 // createChunk создает RAGChunk
 func (w *RAGWorker) createChunk(sourceID, documentID, text string, index int) *models.RAGChunk {
 	// Простой подсчет токенов (примерно 4 символа = 1 токен)
-	tokens := len(text) / 4
-	if tokens < 1 {
-		tokens = 1
-	}
+	tokens := max(len(text)/4, 1)
 
 	return &models.RAGChunk{
 		ID:          w.generateChunkID(),
@@ -366,12 +363,12 @@ func (w *RAGWorker) createChunk(sourceID, documentID, text string, index int) *m
 }
 
 // convertItemToText конвертирует JSON item в текст
-func convertItemToText(item interface{}, config models.SourceConfig) string {
+func convertItemToText(item any, config models.SourceConfig) string {
 	// Если указаны text_fields, используем только их
 	if textFieldsRaw, ok := config["text_fields"]; ok {
-		if textFields, ok := textFieldsRaw.([]interface{}); ok {
+		if textFields, ok := textFieldsRaw.([]any); ok {
 			var parts []string
-			if itemMap, ok := item.(map[string]interface{}); ok {
+			if itemMap, ok := item.(map[string]any); ok {
 				for _, fieldRaw := range textFields {
 					if field, ok := fieldRaw.(string); ok {
 						if value, exists := itemMap[field]; exists {
@@ -392,12 +389,12 @@ func convertItemToText(item interface{}, config models.SourceConfig) string {
 }
 
 // extractByPath извлекает данные по пути (например "data.items")
-func extractByPath(data interface{}, path string) interface{} {
+func extractByPath(data any, path string) any {
 	parts := strings.Split(path, ".")
 	current := data
 
 	for _, part := range parts {
-		if m, ok := current.(map[string]interface{}); ok {
+		if m, ok := current.(map[string]any); ok {
 			current = m[part]
 		} else {
 			return data // Path not found, return original
@@ -442,13 +439,13 @@ func (w *RAGWorker) generateAndStoreEmbeddings(ctx context.Context, chunks []*mo
 	// Сохраняем vectors в vector store
 	for i, chunk := range chunks {
 		embedding := batchResp.Embeddings[i]
-		
+
 		// Создаем vector document
 		vectorDoc := vector.VectorDocument{
-			ID:        chunk.ID,
-			Text:      chunk.ChunkText,
-			Vector:    embedding.Vector,
-			Metadata: map[string]interface{}{
+			ID:     chunk.ID,
+			Text:   chunk.ChunkText,
+			Vector: embedding.Vector,
+			Metadata: map[string]any{
 				"chunk_id":    chunk.ID,
 				"document_id": chunk.DocumentID,
 				"source_id":   chunk.SourceID,
@@ -466,7 +463,7 @@ func (w *RAGWorker) generateAndStoreEmbeddings(ctx context.Context, chunks []*mo
 		}
 	}
 
-	w.logger.WithFields(map[string]interface{}{
+	w.logger.WithFields(map[string]any{
 		"chunks_count":     len(chunks),
 		"embeddings_model": batchResp.Model,
 		"total_tokens":     batchResp.TotalTokens,
@@ -484,4 +481,3 @@ func (w *RAGWorker) generateDocumentID() string {
 func (w *RAGWorker) generateChunkID() string {
 	return uuid.New().String()
 }
-

@@ -116,11 +116,11 @@ func (s *SQLiteDB) GetInvitationWithUsers(ctx context.Context, id string) (*mode
 	`
 
 	inv := &models.InvitationWithUsers{}
-	
+
 	var (
-		creatorID, creatorUsername, creatorEmail, creatorDisplayName             sql.NullString
-		usedByID, usedByUsername, usedByEmail, usedByDisplayName                 sql.NullString
-		revokedByID, revokedByUsername, revokedByEmail, revokedByDisplayName     sql.NullString
+		creatorID, creatorUsername, creatorEmail, creatorDisplayName         sql.NullString
+		usedByID, usedByUsername, usedByEmail, usedByDisplayName             sql.NullString
+		revokedByID, revokedByUsername, revokedByEmail, revokedByDisplayName sql.NullString
 	)
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
@@ -242,7 +242,7 @@ func (s *SQLiteDB) ListInvitations(ctx context.Context, filter models.Invitation
 		WHERE 1=1
 	`
 
-	args := []interface{}{}
+	args := []any{}
 
 	// Apply filters
 	if filter.CreatedByUserID != nil {
@@ -443,4 +443,3 @@ func (s *SQLiteDB) GetInvitationStats(ctx context.Context) (*models.InvitationSt
 
 	return stats, nil
 }
-

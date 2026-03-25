@@ -14,14 +14,14 @@ import (
 
 // Tool definitions for OpenAI-compatible function calling
 type ToolDefinition struct {
-	Type     string       `json:"type"`
-	Function FunctionDef  `json:"function"`
+	Type     string      `json:"type"`
+	Function FunctionDef `json:"function"`
 }
 
 type FunctionDef struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters"`
 }
 
 type ToolCall struct {
@@ -63,14 +63,14 @@ func (t *ReviewTools) GetToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "search_codebase",
 				Description: "Search the project codebase for relevant code using semantic search. Use this to find related functions, implementations, or patterns.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"query": map[string]interface{}{
+					"properties": map[string]any{
+						"query": map[string]any{
 							"type":        "string",
 							"description": "Natural language query describing what you're looking for (e.g., 'authentication middleware', 'database connection handling', 'error handling patterns')",
 						},
-						"limit": map[string]interface{}{
+						"limit": map[string]any{
 							"type":        "integer",
 							"description": "Maximum number of results to return (default: 3, max: 10)",
 							"default":     3,
@@ -85,14 +85,14 @@ func (t *ReviewTools) GetToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "get_function_definition",
 				Description: "Get the full definition of a specific function or method by name. Use this when you see a function call and need to understand what it does.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"function_name": map[string]interface{}{
+					"properties": map[string]any{
+						"function_name": map[string]any{
 							"type":        "string",
 							"description": "Name of the function to find (e.g., 'handleRequest', 'ValidateToken', 'NewService')",
 						},
-						"file_hint": map[string]interface{}{
+						"file_hint": map[string]any{
 							"type":        "string",
 							"description": "Optional: partial file path to narrow search (e.g., 'auth/', 'handlers/')",
 						},
@@ -106,10 +106,10 @@ func (t *ReviewTools) GetToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "get_type_definition",
 				Description: "Get the definition of a struct, interface, or type. Use this when you need to understand a data structure.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"type_name": map[string]interface{}{
+					"properties": map[string]any{
+						"type_name": map[string]any{
 							"type":        "string",
 							"description": "Name of the type/struct/interface to find (e.g., 'User', 'Config', 'Handler')",
 						},
@@ -131,36 +131,36 @@ func GetOutputToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "report_issue",
 				Description: "Report a code issue found during review. Call this for each issue you find.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"file_path": map[string]interface{}{
+					"properties": map[string]any{
+						"file_path": map[string]any{
 							"type":        "string",
 							"description": "Path to the file containing the issue",
 						},
-						"line": map[string]interface{}{
+						"line": map[string]any{
 							"type":        "integer",
 							"description": "Line number where the issue starts (from diff @@ markers)",
 						},
-						"end_line": map[string]interface{}{
+						"end_line": map[string]any{
 							"type":        "integer",
 							"description": "End line number for multi-line issues (optional)",
 						},
-						"severity": map[string]interface{}{
+						"severity": map[string]any{
 							"type":        "string",
 							"enum":        []string{"critical", "warning", "info", "suggestion"},
 							"description": "Issue severity level",
 						},
-						"category": map[string]interface{}{
+						"category": map[string]any{
 							"type":        "string",
 							"enum":        []string{"security", "bugs", "style", "performance", "best_practice"},
 							"description": "Issue category",
 						},
-						"message": map[string]interface{}{
+						"message": map[string]any{
 							"type":        "string",
 							"description": "Clear description of what the issue is",
 						},
-						"suggestion": map[string]interface{}{
+						"suggestion": map[string]any{
 							"type":        "string",
 							"description": "How to fix the issue (optional)",
 						},
@@ -174,31 +174,31 @@ func GetOutputToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "report_suggestion",
 				Description: "Report an improvement suggestion for the code. Call this for general recommendations.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"title": map[string]interface{}{
+					"properties": map[string]any{
+						"title": map[string]any{
 							"type":        "string",
 							"description": "Short title for the suggestion",
 						},
-						"description": map[string]interface{}{
+						"description": map[string]any{
 							"type":        "string",
 							"description": "Detailed description of the improvement",
 						},
-						"priority": map[string]interface{}{
+						"priority": map[string]any{
 							"type":        "string",
 							"enum":        []string{"high", "medium", "low"},
 							"description": "Suggestion priority",
 						},
-						"file_path": map[string]interface{}{
+						"file_path": map[string]any{
 							"type":        "string",
 							"description": "File this suggestion relates to (optional)",
 						},
-						"line": map[string]interface{}{
+						"line": map[string]any{
 							"type":        "integer",
 							"description": "Line number if applicable (optional)",
 						},
-						"category": map[string]interface{}{
+						"category": map[string]any{
 							"type":        "string",
 							"enum":        []string{"security", "bugs", "style", "performance", "best_practice"},
 							"description": "Suggestion category (optional)",
@@ -213,14 +213,14 @@ func GetOutputToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "set_review_summary",
 				Description: "Set the overall review summary and score. Call this once after reviewing all files.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"summary": map[string]interface{}{
+					"properties": map[string]any{
+						"summary": map[string]any{
 							"type":        "string",
 							"description": "Brief overall assessment of the code changes in 1-3 sentences",
 						},
-						"overall_score": map[string]interface{}{
+						"overall_score": map[string]any{
 							"type":        "integer",
 							"description": "Overall code quality score from 0 to 100 (higher is better)",
 							"minimum":     0,
@@ -236,9 +236,9 @@ func GetOutputToolDefinitions() []ToolDefinition {
 			Function: FunctionDef{
 				Name:        "finish_review",
 				Description: "Signal that the review is complete. Call this as the last tool after reporting all issues and setting the summary.",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type":       "object",
-					"properties": map[string]interface{}{},
+					"properties": map[string]any{},
 				},
 			},
 		},
@@ -308,7 +308,7 @@ func (t *ReviewTools) searchCodebase(ctx context.Context, argsJSON string) (stri
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Found %d relevant code sections:\n\n", len(chunks)))
-	
+
 	for i, chunk := range chunks {
 		sb.WriteString(fmt.Sprintf("### Result %d: %s (score: %.2f)\n", i+1, chunk.FilePath, chunk.Score))
 		sb.WriteString(fmt.Sprintf("```%s\n", chunk.Language))
@@ -355,4 +355,3 @@ func (t *ReviewTools) getTypeDefinition(ctx context.Context, argsJSON string) (s
 
 	return t.searchCodebase(ctx, fmt.Sprintf(`{"query": %q, "limit": 3}`, query))
 }
-

@@ -57,9 +57,9 @@ type PaginationMeta struct {
 //	response := NewError("User not found", "USER_NOT_FOUND")
 //	c.JSON(http.StatusNotFound, response)
 type ErrorResponse struct {
-	Success bool                   `json:"success"` // Always false
-	Error   ErrorDetail            `json:"error"`
-	Details map[string]interface{} `json:"details,omitempty"`
+	Success bool           `json:"success"` // Always false
+	Error   ErrorDetail    `json:"error"`
+	Details map[string]any `json:"details,omitempty"`
 }
 
 // ErrorDetail contains error information.
@@ -147,7 +147,7 @@ func NewError(message, code string) ErrorResponse {
 //	    "field": "email",
 //	    "reason": "invalid format",
 //	})
-func NewErrorWithDetails(message, code string, details map[string]interface{}) ErrorResponse {
+func NewErrorWithDetails(message, code string, details map[string]any) ErrorResponse {
 	return ErrorResponse{
 		Success: false,
 		Error: ErrorDetail{
@@ -191,7 +191,7 @@ func RespondError(c *gin.Context, statusCode int, message, code string) {
 }
 
 // RespondErrorWithDetails sends an error response with additional details.
-func RespondErrorWithDetails(c *gin.Context, statusCode int, message, code string, details map[string]interface{}) {
+func RespondErrorWithDetails(c *gin.Context, statusCode int, message, code string, details map[string]any) {
 	c.JSON(statusCode, NewErrorWithDetails(message, code, details))
 }
 
@@ -202,10 +202,7 @@ func RespondErrorWithDetails(c *gin.Context, statusCode int, message, code strin
 //	pagination := CalculatePagination(150, 1, 20)
 //	// PaginationMeta{Page: 1, PageSize: 20, TotalItems: 150, TotalPages: 8}
 func CalculatePagination(totalItems, page, pageSize int) PaginationMeta {
-	totalPages := (totalItems + pageSize - 1) / pageSize
-	if totalPages < 1 {
-		totalPages = 1
-	}
+	totalPages := max((totalItems+pageSize-1)/pageSize, 1)
 
 	return PaginationMeta{
 		Page:       page,

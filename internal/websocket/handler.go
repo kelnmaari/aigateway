@@ -87,7 +87,7 @@ type Handler struct {
 // ChatHandlerInterface интерфейс для обработки chat requests
 type ChatHandlerInterface interface {
 	HandleChatRequest(client *Client, message []byte)
-	
+
 	// v2.5.4+: Tool RPC methods
 	HandleToolExecutionResponse(client *Client, message []byte)
 	CleanupToolRPCClient(clientID string)
@@ -255,24 +255,24 @@ func extractKeyIDFromPlainKey(plainKey string) string {
 	if !strings.HasPrefix(plainKey, "sk-") {
 		return ""
 	}
-	
+
 	parts := strings.Split(plainKey, "-")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	// Новый формат: sk-proj-<keyid>-<random>
 	// parts[0] = "sk", parts[1] = "proj", parts[2] = keyid, parts[3+] = random
 	if parts[1] == "proj" && len(parts) >= 4 {
 		return parts[2]
 	}
-	
+
 	// Device API key: sk-existing-<keyid>
 	// parts[0] = "sk", parts[1] = "existing", parts[2] = keyid (ak_xxx)
 	if parts[1] == "existing" && len(parts) == 3 {
 		return parts[2]
 	}
-	
+
 	// Старый формат с random: sk-<keyid>-<random>
 	// parts[0] = "sk", parts[1] = keyid, parts[2+] = random
 	if len(parts) >= 3 {
@@ -280,12 +280,12 @@ func extractKeyIDFromPlainKey(plainKey string) string {
 		// но НЕ содержит дефисы (поэтому это parts[1])
 		return parts[1]
 	}
-	
+
 	// Fallback: просто второй элемент
 	if len(parts) >= 2 {
 		return parts[1]
 	}
-	
+
 	return ""
 }
 
@@ -319,7 +319,7 @@ func (h *Handler) readPump(client *Client) {
 		if h.chatHandler != nil {
 			h.chatHandler.CleanupToolRPCClient(client.ID)
 		}
-		
+
 		h.hub.unregister <- client
 		client.Conn.Close()
 	}()
@@ -419,7 +419,7 @@ func (h *Handler) handleClientMessage(client *Client, message []byte) {
 	case MessageTypePing:
 		// Respond with pong
 		h.sendPong(client)
-	
+
 	case models.WSMessageTypeToolExecutionResponse:
 		// Handle tool execution response (v2.5.4+: RPC Tools)
 		if h.chatHandler != nil {
@@ -435,7 +435,7 @@ func (h *Handler) handleClientMessage(client *Client, message []byte) {
 
 // sendPong отправляет pong response
 func (h *Handler) sendPong(client *Client) {
-	pong := map[string]interface{}{
+	pong := map[string]any{
 		"type":      MessageTypePong,
 		"timestamp": time.Now(),
 	}
@@ -458,4 +458,3 @@ func (h *Handler) sendPong(client *Client) {
 func generateClientID() string {
 	return fmt.Sprintf("client_%d", time.Now().UnixNano())
 }
-

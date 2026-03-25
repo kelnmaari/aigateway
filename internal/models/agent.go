@@ -7,20 +7,20 @@ import (
 
 // AgentSession represents a single agent session with task planning and execution
 type AgentSession struct {
-	ID          string           `json:"id" db:"id"`
-	UserID      string           `json:"user_id" db:"user_id"`
-	TenantID    *string          `json:"tenant_id,omitempty" db:"tenant_id"`
-	Task        string           `json:"task" db:"task"`                   // Original user task
-	Context     map[string]interface{} `json:"context,omitempty" db:"context"` // Additional context (files, project info, etc.)
-	Status      AgentStatus      `json:"status" db:"status"`               // pending, planning, executing, completed, failed, cancelled
-	Plan        *AgentPlan       `json:"plan,omitempty" db:"plan"`         // Task decomposition plan
-	CurrentStep int              `json:"current_step" db:"current_step"`   // Current step being executed (0-indexed)
-	TotalSteps  int              `json:"total_steps" db:"total_steps"`     // Total number of steps in plan
-	StartedAt   time.Time        `json:"started_at" db:"started_at"`
-	CompletedAt *time.Time       `json:"completed_at,omitempty" db:"completed_at"`
-	Error       *string          `json:"error,omitempty" db:"error"`       // Error message if failed
-	CreatedAt   time.Time        `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at" db:"updated_at"`
+	ID          string         `json:"id" db:"id"`
+	UserID      string         `json:"user_id" db:"user_id"`
+	TenantID    *string        `json:"tenant_id,omitempty" db:"tenant_id"`
+	Task        string         `json:"task" db:"task"`                 // Original user task
+	Context     map[string]any `json:"context,omitempty" db:"context"` // Additional context (files, project info, etc.)
+	Status      AgentStatus    `json:"status" db:"status"`             // pending, planning, executing, completed, failed, cancelled
+	Plan        *AgentPlan     `json:"plan,omitempty" db:"plan"`       // Task decomposition plan
+	CurrentStep int            `json:"current_step" db:"current_step"` // Current step being executed (0-indexed)
+	TotalSteps  int            `json:"total_steps" db:"total_steps"`   // Total number of steps in plan
+	StartedAt   time.Time      `json:"started_at" db:"started_at"`
+	CompletedAt *time.Time     `json:"completed_at,omitempty" db:"completed_at"`
+	Error       *string        `json:"error,omitempty" db:"error"` // Error message if failed
+	CreatedAt   time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at" db:"updated_at"`
 }
 
 // AgentStatus represents the current state of an agent session
@@ -46,17 +46,17 @@ type AgentPlan struct {
 
 // AgentStep represents a single step in the agent plan
 type AgentStep struct {
-	ID          string                 `json:"id"`
-	StepNumber  int                    `json:"step_number"` // 1-indexed
-	Description string                 `json:"description"` // Human-readable description
-	Action      AgentAction            `json:"action"`      // file_read, file_write, terminal_execute, mcp_invoke, etc.
-	Tool        string                 `json:"tool"`        // Tool identifier (e.g., "file.read", "terminal.execute")
-	Parameters  map[string]interface{} `json:"parameters"`  // Tool-specific parameters
-	Status      AgentStepStatus        `json:"status"`      // pending, running, completed, failed, skipped
-	Result      *AgentStepResult       `json:"result,omitempty"`
-	StartedAt   *time.Time             `json:"started_at,omitempty"`
-	CompletedAt *time.Time             `json:"completed_at,omitempty"`
-	Error       *string                `json:"error,omitempty"`
+	ID          string           `json:"id"`
+	StepNumber  int              `json:"step_number"` // 1-indexed
+	Description string           `json:"description"` // Human-readable description
+	Action      AgentAction      `json:"action"`      // file_read, file_write, terminal_execute, mcp_invoke, etc.
+	Tool        string           `json:"tool"`        // Tool identifier (e.g., "file.read", "terminal.execute")
+	Parameters  map[string]any   `json:"parameters"`  // Tool-specific parameters
+	Status      AgentStepStatus  `json:"status"`      // pending, running, completed, failed, skipped
+	Result      *AgentStepResult `json:"result,omitempty"`
+	StartedAt   *time.Time       `json:"started_at,omitempty"`
+	CompletedAt *time.Time       `json:"completed_at,omitempty"`
+	Error       *string          `json:"error,omitempty"`
 }
 
 // AgentAction represents the type of action to perform
@@ -87,24 +87,24 @@ const (
 
 // AgentStepResult represents the result of executing a step
 type AgentStepResult struct {
-	Success      bool                   `json:"success"`
-	Output       interface{}            `json:"output,omitempty"`       // Tool-specific output
-	Error        *string                `json:"error,omitempty"`        // Error message if failed
-	Duration     int                    `json:"duration"`               // Execution time in milliseconds
-	RequiresApproval bool               `json:"requires_approval"`      // If this step needs user approval
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`     // Additional metadata
+	Success          bool           `json:"success"`
+	Output           any            `json:"output,omitempty"`   // Tool-specific output
+	Error            *string        `json:"error,omitempty"`    // Error message if failed
+	Duration         int            `json:"duration"`           // Execution time in milliseconds
+	RequiresApproval bool           `json:"requires_approval"`  // If this step needs user approval
+	Metadata         map[string]any `json:"metadata,omitempty"` // Additional metadata
 }
 
 // AgentTool represents a tool that agent can use
 type AgentTool struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`        // e.g., "file.read"
-	Category    AgentToolCategory      `json:"category"`    // file, terminal, mcp
-	Description string                 `json:"description"` // Human-readable description
-	Parameters  map[string]interface{} `json:"parameters"`  // JSON Schema for parameters
-	Dangerous   bool                   `json:"dangerous"`   // If true, requires approval
-	Available   bool                   `json:"available"`   // If tool is currently available
-	Version     string                 `json:"version"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`        // e.g., "file.read"
+	Category    AgentToolCategory `json:"category"`    // file, terminal, mcp
+	Description string            `json:"description"` // Human-readable description
+	Parameters  map[string]any    `json:"parameters"`  // JSON Schema for parameters
+	Dangerous   bool              `json:"dangerous"`   // If true, requires approval
+	Available   bool              `json:"available"`   // If tool is currently available
+	Version     string            `json:"version"`
 }
 
 // AgentToolCategory represents the category of a tool
@@ -119,10 +119,10 @@ const (
 
 // AgentEvent represents a real-time event for WebSocket streaming
 type AgentEvent struct {
-	Type      AgentEventType         `json:"type"`
-	SessionID string                 `json:"session_id"`
-	Timestamp time.Time              `json:"timestamp"`
-	Data      map[string]interface{} `json:"data"`
+	Type      AgentEventType `json:"type"`
+	SessionID string         `json:"session_id"`
+	Timestamp time.Time      `json:"timestamp"`
+	Data      map[string]any `json:"data"`
 }
 
 // AgentEventType represents the type of agent event
@@ -130,27 +130,27 @@ type AgentEventType string
 
 const (
 	// Session lifecycle events
-	AgentEventSessionCreated   AgentEventType = "agent_session_created"  // Session created
-	AgentEventPlanningStarted  AgentEventType = "agent_planning_started" // Planning started
+	AgentEventSessionCreated    AgentEventType = "agent_session_created"    // Session created
+	AgentEventPlanningStarted   AgentEventType = "agent_planning_started"   // Planning started
 	AgentEventPlanningCompleted AgentEventType = "agent_planning_completed" // Plan ready
-	AgentEventExecutionStarted AgentEventType = "agent_execution_started" // Execution started
-	AgentEventSessionCompleted AgentEventType = "agent_session_completed" // Session completed
-	AgentEventSessionFailed    AgentEventType = "agent_session_failed"   // Session failed
-	AgentEventSessionCancelled AgentEventType = "agent_session_cancelled" // Session cancelled
-	
+	AgentEventExecutionStarted  AgentEventType = "agent_execution_started"  // Execution started
+	AgentEventSessionCompleted  AgentEventType = "agent_session_completed"  // Session completed
+	AgentEventSessionFailed     AgentEventType = "agent_session_failed"     // Session failed
+	AgentEventSessionCancelled  AgentEventType = "agent_session_cancelled"  // Session cancelled
+
 	// Step events
 	AgentEventStepStarted   AgentEventType = "agent_step_started"   // Step started
 	AgentEventStepCompleted AgentEventType = "agent_step_completed" // Step completed
 	AgentEventStepFailed    AgentEventType = "agent_step_failed"    // Step failed
 	AgentEventStepSkipped   AgentEventType = "agent_step_skipped"   // Step skipped due to rejection
-	
+
 	// Approval events
 	AgentEventApprovalNeeded    AgentEventType = "agent_approval_needed"    // User approval required
 	AgentEventApprovalResponded AgentEventType = "agent_approval_responded" // User responded to approval
-	
+
 	// Progress events
 	AgentEventProgressUpdate AgentEventType = "agent_progress_update" // Progress update
-	
+
 	// Legacy/compatibility events
 	AgentEventThinking     AgentEventType = "agent_thinking"      // AI is analyzing/planning (legacy)
 	AgentEventPlanCreated  AgentEventType = "agent_plan_created"  // Plan generated (legacy)
@@ -168,10 +168,10 @@ const (
 
 // CreateAgentSessionRequest represents the request to create a new agent session
 type CreateAgentSessionRequest struct {
-	Task     string                 `json:"task" binding:"required,min=1,max=5000"`
-	Model    string                 `json:"model,omitempty"`     // Model to use for planning (optional, defaults to config)
-	Context  map[string]interface{} `json:"context,omitempty"`
-	MaxSteps *int                   `json:"max_steps,omitempty"` // Max steps to plan (default: 50)
+	Task     string         `json:"task" binding:"required,min=1,max=5000"`
+	Model    string         `json:"model,omitempty"` // Model to use for planning (optional, defaults to config)
+	Context  map[string]any `json:"context,omitempty"`
+	MaxSteps *int           `json:"max_steps,omitempty"` // Max steps to plan (default: 50)
 }
 
 // AgentSessionResponse represents the response for agent session
@@ -192,18 +192,18 @@ type AgentToolsResponse struct {
 
 // ApprovalRequest represents a pending approval for dangerous operation
 type ApprovalRequest struct {
-	ID          string                 `json:"id"`
-	SessionID   string                 `json:"session_id"`
-	StepNumber  int                    `json:"step_number"`
-	Description string                 `json:"description"`
-	Action      AgentAction            `json:"action"`
-	Tool        string                 `json:"tool"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Reason      string                 `json:"reason"`      // Why approval is needed
-	Status      ApprovalStatus         `json:"status"`      // pending, approved, rejected
-	CreatedAt   time.Time              `json:"created_at"`
-	RespondedAt *time.Time             `json:"responded_at,omitempty"`
-	Decision    *ApprovalDecision      `json:"decision,omitempty"`
+	ID          string            `json:"id"`
+	SessionID   string            `json:"session_id"`
+	StepNumber  int               `json:"step_number"`
+	Description string            `json:"description"`
+	Action      AgentAction       `json:"action"`
+	Tool        string            `json:"tool"`
+	Parameters  map[string]any    `json:"parameters"`
+	Reason      string            `json:"reason"` // Why approval is needed
+	Status      ApprovalStatus    `json:"status"` // pending, approved, rejected
+	CreatedAt   time.Time         `json:"created_at"`
+	RespondedAt *time.Time        `json:"responded_at,omitempty"`
+	Decision    *ApprovalDecision `json:"decision,omitempty"`
 }
 
 // ApprovalStatus represents approval request status
@@ -234,4 +234,3 @@ type RollbackRequest struct {
 	StepNumber int    `json:"step_number"`
 	Reason     string `json:"reason,omitempty"`
 }
-

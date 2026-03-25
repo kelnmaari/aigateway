@@ -109,7 +109,7 @@ func TestIntegration_FullMRReviewFlow(t *testing.T) {
 	// Test 4: Post Review Comment
 	t.Run("CreateMRNote", func(t *testing.T) {
 		reviewComment := "## AI Code Review\n\n**Summary:** Found 2 issues\n\n1. Consider error handling in main.go"
-		
+
 		note, err := gitlabClient.CreateMRNote(ctx, 123, 1, reviewComment)
 		require.NoError(t, err)
 		assert.Equal(t, reviewComment, note.Body)
@@ -171,7 +171,7 @@ func TestIntegration_RateLimiting(t *testing.T) {
 	ctx := context.Background()
 
 	// First 3 requests should succeed
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := gitlabClient.GetCurrentUser(ctx)
 		require.NoError(t, err)
 	}
@@ -351,8 +351,8 @@ func TestIntegration_FileChangesAnalysis(t *testing.T) {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr || 
-		   len(s) > len(substr) && containsInner(s, substr)
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		len(s) > len(substr) && containsInner(s, substr)
 }
 
 func containsInner(s, substr string) bool {
@@ -363,4 +363,3 @@ func containsInner(s, substr string) bool {
 	}
 	return false
 }
-

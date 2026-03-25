@@ -24,8 +24,8 @@ type ShardedCache struct {
 
 // CacheBackend interface for Redis cache operations
 type CacheBackend interface {
-	GetJSON(ctx context.Context, key string, dest interface{}) error
-	SetJSON(ctx context.Context, key string, value interface{}, ttl time.Duration) error
+	GetJSON(ctx context.Context, key string, dest any) error
+	SetJSON(ctx context.Context, key string, value any, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 }
 
@@ -38,10 +38,10 @@ type CacheShard struct {
 
 // CacheEntry represents a cached value with expiration
 type CacheEntry struct {
-	Value      []byte    // JSON-encoded value
-	ExpiresAt  time.Time
+	Value       []byte // JSON-encoded value
+	ExpiresAt   time.Time
 	AccessCount int64
-	_pad       [40]byte  // Cache line padding
+	_pad        [40]byte // Cache line padding
 }
 
 // ShardedCacheConfig configuration for sharded cache
@@ -59,14 +59,14 @@ func NewShardedCache(redis CacheBackend, config ShardedCacheConfig, logger *logr
 	if config.TTL == 0 {
 		config.TTL = 1 * time.Minute // Default: 1 minute in-memory
 	}
-	
+
 	shards := make([]*CacheShard, config.ShardCount)
 	for i := range shards {
 		shards[i] = &CacheShard{
 			data: make(map[string]*CacheEntry),
 		}
 	}
-	
+
 	sc := &ShardedCache{
 		shards:     shards,
 		shardCount: config.ShardCount,
@@ -75,18 +75,18 @@ func NewShardedCache(redis CacheBackend, config ShardedCacheConfig, logger *logr
 		enabled:    config.Enabled,
 		ttl:        config.TTL,
 	}
-	
+
 	// Start cleanup goroutine
 	if config.Enabled {
 		go sc.cleanupExpired()
 	}
-	
+
 	logger.WithFields(logrus.Fields{
 		"shard_count": config.ShardCount,
 		"ttl":         config.TTL,
 		"enabled":     config.Enabled,
 	}).Info("✅ Sharded cache layer initialized")
-	
+
 	return sc
 }
 
@@ -99,7 +99,7 @@ func (sc *ShardedCache) getShard(key string) *CacheShard {
 }
 
 // Get retrieves a value from cache (memory → Redis fallback)
-func (sc *ShardedCache) Get(ctx context.Context, key string, dest interface{}) error {
+func (sc *ShardedCache) Get(ctx context.Context, key string, dest any) error {
 	// Try in-memory cache first if enabled
 	if sc.enabled {
 		if data, found := sc.getFromMemory(key); found {
@@ -114,37 +114,37 @@ func (sc *ShardedCache) Get(ctx context.Context, key string, dest interface{}) e
 			}
 		}
 	}
-	
+
 	// Fallback to Redis
 	if err := sc.redis.GetJSON(ctx, key, dest); err != nil {
 		return err
 	}
-	
+
 	// Populate memory cache on Redis hit
 	if sc.enabled {
 		if data, err := json.Marshal(dest); err == nil {
 			sc.setToMemory(key, data)
 		}
 	}
-	
+
 	sc.logger.WithField("key", key).Debug("Redis cache hit (populating memory)")
 	return nil
 }
 
 // Set stores a value in both memory and Redis
-func (sc *ShardedCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (sc *ShardedCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	// Store in Redis first (source of truth)
 	if err := sc.redis.SetJSON(ctx, key, value, ttl); err != nil {
 		return err
 	}
-	
+
 	// Populate memory cache
 	if sc.enabled {
 		if data, err := json.Marshal(value); err == nil {
 			sc.setToMemory(key, data)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -157,7 +157,7 @@ func (sc *ShardedCache) Delete(ctx context.Context, key string) error {
 		delete(shard.data, key)
 		shard.mu.Unlock()
 	}
-	
+
 	// Delete from Redis
 	return sc.redis.Delete(ctx, key)
 }
@@ -167,20 +167,20 @@ func (sc *ShardedCache) getFromMemory(key string) ([]byte, bool) {
 	shard := sc.getShard(key)
 	shard.mu.RLock()
 	defer shard.mu.RUnlock()
-	
+
 	entry, exists := shard.data[key]
 	if !exists {
 		return nil, false
 	}
-	
+
 	// Check expiration
 	if time.Now().After(entry.ExpiresAt) {
 		return nil, false
 	}
-	
+
 	// Update access count (atomic-like, protected by RLock)
 	entry.AccessCount++
-	
+
 	return entry.Value, true
 }
 
@@ -189,10 +189,10 @@ func (sc *ShardedCache) setToMemory(key string, data []byte) {
 	shard := sc.getShard(key)
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-	
+
 	shard.data[key] = &CacheEntry{
-		Value:      data,
-		ExpiresAt:  time.Now().Add(sc.ttl),
+		Value:       data,
+		ExpiresAt:   time.Now().Add(sc.ttl),
 		AccessCount: 0,
 	}
 }
@@ -201,11 +201,11 @@ func (sc *ShardedCache) setToMemory(key string, data []byte) {
 func (sc *ShardedCache) cleanupExpired() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		now := time.Now()
 		totalCleaned := 0
-		
+
 		for _, shard := range sc.shards {
 			shard.mu.Lock()
 			for key, entry := range shard.data {
@@ -216,7 +216,7 @@ func (sc *ShardedCache) cleanupExpired() {
 			}
 			shard.mu.Unlock()
 		}
-		
+
 		if totalCleaned > 0 {
 			sc.logger.WithField("cleaned", totalCleaned).Debug("Cleaned expired cache entries")
 		}
@@ -224,16 +224,16 @@ func (sc *ShardedCache) cleanupExpired() {
 }
 
 // GetStats returns cache statistics
-func (sc *ShardedCache) GetStats() map[string]interface{} {
+func (sc *ShardedCache) GetStats() map[string]any {
 	if !sc.enabled {
-		return map[string]interface{}{
+		return map[string]any{
 			"enabled": false,
 		}
 	}
-	
+
 	totalEntries := 0
 	totalAccessCount := int64(0)
-	
+
 	for _, shard := range sc.shards {
 		shard.mu.RLock()
 		totalEntries += len(shard.data)
@@ -242,14 +242,14 @@ func (sc *ShardedCache) GetStats() map[string]interface{} {
 		}
 		shard.mu.RUnlock()
 	}
-	
-	return map[string]interface{}{
-		"enabled":           true,
-		"shard_count":       sc.shardCount,
-		"total_entries":     totalEntries,
+
+	return map[string]any{
+		"enabled":            true,
+		"shard_count":        sc.shardCount,
+		"total_entries":      totalEntries,
 		"total_access_count": totalAccessCount,
-		"ttl_seconds":       sc.ttl.Seconds(),
-		"avg_per_shard":     float64(totalEntries) / float64(sc.shardCount),
+		"ttl_seconds":        sc.ttl.Seconds(),
+		"avg_per_shard":      float64(totalEntries) / float64(sc.shardCount),
 	}
 }
 
@@ -258,13 +258,12 @@ func (sc *ShardedCache) Clear() {
 	if !sc.enabled {
 		return
 	}
-	
+
 	for _, shard := range sc.shards {
 		shard.mu.Lock()
 		shard.data = make(map[string]*CacheEntry)
 		shard.mu.Unlock()
 	}
-	
+
 	sc.logger.Info("✅ Memory cache cleared")
 }
-

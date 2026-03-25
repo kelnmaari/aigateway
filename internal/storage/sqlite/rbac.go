@@ -280,7 +280,7 @@ func (s *SQLiteDB) ListRoles(ctx context.Context, tenantID *string) ([]*models.R
 	}
 
 	var query string
-	var args []interface{}
+	var args []any
 
 	if tenantID == nil {
 		// Get only global roles
@@ -615,5 +615,3 @@ func (s *SQLiteDB) GetRoleUsers(ctx context.Context, roleID string) ([]*models.U
 
 	return users, nil
 }
-
-

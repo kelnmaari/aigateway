@@ -25,7 +25,7 @@ const (
 	CategoryTLS           SettingCategory = "tls"
 	CategoryRAG           SettingCategory = "rag"
 	CategoryHuggingFace   SettingCategory = "huggingface"
-	CategoryObservability SettingCategory = "observability" // v3.0.9+: Tracing & Performance
+	CategoryObservability SettingCategory = "observability"  // v3.0.9+: Tracing & Performance
 	CategoryModelRegistry SettingCategory = "model_registry" // v3.0.9+: Model Registry
 	CategoryDevelopment   SettingCategory = "development"    // v3.0.9+: Development settings
 )
@@ -45,20 +45,20 @@ const (
 
 // Setting represents a single configuration setting
 type Setting struct {
-	ID             string          `json:"id" db:"id"`                                     // Unique key (e.g., "server.port")
-	Category       SettingCategory `json:"category" db:"category"`                         // Configuration category
-	Key            string          `json:"key" db:"key"`                                   // Setting key within category
-	Value          string          `json:"value" db:"value"`                               // Current value (as string)
-	Type           SettingType     `json:"type" db:"type"`                                 // Data type
-	DefaultValue   string          `json:"default_value" db:"default_value"`               // Default from YAML
-	Description    string          `json:"description" db:"description"`                   // Human-readable description
-	IsEditable     bool            `json:"is_editable" db:"is_editable"`                   // Can be changed via UI
-	IsRequired     bool            `json:"is_required" db:"is_required"`                   // Required for system operation
-	IsMigrated     bool            `json:"is_migrated" db:"is_migrated"`                   // Migrated from YAML to DB
-	RequiresRestart bool           `json:"requires_restart" db:"requires_restart"`         // Requires server restart (Phase 4)
-	ValidationRule string          `json:"validation_rule,omitempty" db:"validation_rule"` // Validation pattern/rule
-	UpdatedAt      time.Time       `json:"updated_at" db:"updated_at"`
-	UpdatedBy      string          `json:"updated_by,omitempty" db:"updated_by"` // User who updated
+	ID              string          `json:"id" db:"id"`                                     // Unique key (e.g., "server.port")
+	Category        SettingCategory `json:"category" db:"category"`                         // Configuration category
+	Key             string          `json:"key" db:"key"`                                   // Setting key within category
+	Value           string          `json:"value" db:"value"`                               // Current value (as string)
+	Type            SettingType     `json:"type" db:"type"`                                 // Data type
+	DefaultValue    string          `json:"default_value" db:"default_value"`               // Default from YAML
+	Description     string          `json:"description" db:"description"`                   // Human-readable description
+	IsEditable      bool            `json:"is_editable" db:"is_editable"`                   // Can be changed via UI
+	IsRequired      bool            `json:"is_required" db:"is_required"`                   // Required for system operation
+	IsMigrated      bool            `json:"is_migrated" db:"is_migrated"`                   // Migrated from YAML to DB
+	RequiresRestart bool            `json:"requires_restart" db:"requires_restart"`         // Requires server restart (Phase 4)
+	ValidationRule  string          `json:"validation_rule,omitempty" db:"validation_rule"` // Validation pattern/rule
+	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
+	UpdatedBy       string          `json:"updated_by,omitempty" db:"updated_by"` // User who updated
 }
 
 // SettingValue represents a parsed setting value with type safety
@@ -74,10 +74,10 @@ type SettingValue struct {
 
 // Manager manages configuration settings in database
 type Manager struct {
-	storage       Storage
-	cache         map[string]*Setting // In-memory cache
-	mu            sync.RWMutex
-	logger        *logrus.Logger
+	storage        Storage
+	cache          map[string]*Setting // In-memory cache
+	mu             sync.RWMutex
+	logger         *logrus.Logger
 	reloadHandlers map[string]ReloadHandler // Live reload callbacks by setting ID
 }
 
@@ -190,7 +190,7 @@ func (m *Manager) GetDuration(ctx context.Context, id string) (time.Duration, er
 }
 
 // GetJSON retrieves a JSON setting value
-func (m *Manager) GetJSON(ctx context.Context, id string, dest interface{}) error {
+func (m *Manager) GetJSON(ctx context.Context, id string, dest any) error {
 	setting, err := m.GetSetting(ctx, id)
 	if err != nil {
 		return err
@@ -224,21 +224,21 @@ func (m *Manager) updateValue(ctx context.Context, id, value, updatedBy string) 
 	if err != nil {
 		return fmt.Errorf("setting not found: %w", err)
 	}
-	
+
 	if !setting.IsEditable {
 		return fmt.Errorf("setting '%s' is not editable (requires server restart)", id)
 	}
-	
+
 	// Update through storage
 	if err := m.storage.UpdateSettingValue(ctx, id, value, updatedBy); err != nil {
 		return fmt.Errorf("failed to update setting: %w", err)
 	}
-	
+
 	// Invalidate cache for this setting
 	m.mu.Lock()
 	delete(m.cache, id)
 	m.mu.Unlock()
-	
+
 	// Phase 4: Trigger live reload hooks for hot-reloadable settings
 	if !setting.RequiresRestart {
 		// Create updated setting object with new value
@@ -246,12 +246,12 @@ func (m *Manager) updateValue(ctx context.Context, id, value, updatedBy string) 
 		updatedSetting.Value = value
 		updatedSetting.UpdatedAt = time.Now()
 		updatedSetting.UpdatedBy = updatedBy
-		
+
 		// Call registered reload handler
 		m.mu.RLock()
 		handler, exists := m.reloadHandlers[id]
 		m.mu.RUnlock()
-		
+
 		if exists {
 			if err := handler(ctx, &updatedSetting); err != nil {
 				m.logger.WithError(err).
@@ -263,7 +263,7 @@ func (m *Manager) updateValue(ctx context.Context, id, value, updatedBy string) 
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -313,15 +313,15 @@ func (m *Manager) DeleteSetting(ctx context.Context, id string) error {
 	if err := m.storage.DeleteSetting(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete setting: %w", err)
 	}
-	
+
 	// Remove from cache
 	m.mu.Lock()
 	delete(m.cache, id)
 	m.mu.Unlock()
-	
+
 	// Unregister reload handler if exists
 	m.UnregisterReloadHandler(id)
-	
+
 	m.logger.WithField("setting_id", id).Info("Setting deleted successfully")
 	return nil
 }

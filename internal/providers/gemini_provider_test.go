@@ -60,8 +60,8 @@ func TestGeminiProvider_HealthCheck_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"models": []map[string]interface{}{
+		resp := map[string]any{
+			"models": []map[string]any{
 				{
 					"name":                       "models/gemini-1.5-pro",
 					"displayName":                "Gemini 1.5 Pro",
@@ -86,8 +86,8 @@ func TestGeminiProvider_HealthCheck_Success(t *testing.T) {
 func TestGeminiProvider_HealthCheck_Unauthorized(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"error": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"error": map[string]any{
 				"code":    403,
 				"message": "API key not valid. Please pass a valid API key.",
 				"status":  "PERMISSION_DENIED",
@@ -110,8 +110,8 @@ func TestGeminiProvider_ListModels(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"models": []map[string]interface{}{
+		resp := map[string]any{
+			"models": []map[string]any{
 				{
 					"name":                       "models/gemini-1.5-pro",
 					"displayName":                "Gemini 1.5 Pro",
@@ -187,8 +187,8 @@ func TestGeminiProvider_APIKeyInQuery(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"models": []interface{}{},
+		resp := map[string]any{
+			"models": []any{},
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -212,8 +212,8 @@ func TestGeminiProvider_ListModels_Empty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"models": []interface{}{},
+		resp := map[string]any{
+			"models": []any{},
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))

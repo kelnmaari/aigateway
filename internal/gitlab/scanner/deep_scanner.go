@@ -139,7 +139,7 @@ func (s *DeepScanner) DeepScanWithProgress(ctx context.Context, req DeepScanRequ
 	// Skip test files and documentation to reduce false positives
 	var allChunks []chunkData
 	var skippedTestFiles, skippedDocFiles int
-	err := s.vectorStore.ScrollAll(ctx, req.CollectionName, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, req.CollectionName, map[string]any{
 		"project_id": req.ProjectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -220,10 +220,7 @@ func (s *DeepScanner) DeepScanWithProgress(ctx context.Context, req DeepScanRequ
 		default:
 		}
 
-		end := i + batchSize
-		if end > len(allChunks) {
-			end = len(allChunks)
-		}
+		end := min(i+batchSize, len(allChunks))
 		batch := allChunks[i:end]
 		chunksScanned += len(batch)
 		currentBatch++
@@ -325,7 +322,7 @@ func (s *DeepScanner) analyzeBatch(ctx context.Context, modelID string, chunks [
 
 	systemPrompt := s.getSystemPrompt(language)
 
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemPrompt},
@@ -660,8 +657,8 @@ func (s *DeepScanner) isHallucination(content string) bool {
 	}
 
 	// Pattern 3: Very long strings without spaces (likely binary/encoded garbage)
-	words := strings.Fields(content)
-	for _, word := range words {
+	words := strings.FieldsSeq(content)
+	for word := range words {
 		if len(word) > 200 && !strings.HasPrefix(word, "{") && !strings.HasPrefix(word, "\"") {
 			return true
 		}

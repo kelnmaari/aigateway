@@ -25,7 +25,7 @@ func (s *PostgresStore) CreateReview(ctx context.Context, review *models.GitLabM
 
 	review.CreatedAt = time.Now()
 
-	var resultJSON interface{} = nil
+	var resultJSON any = nil
 	if review.ReviewResult != nil {
 		data, err := json.Marshal(review.ReviewResult)
 		if err != nil {
@@ -265,7 +265,7 @@ func (s *PostgresStore) ListReviewsByIntegration(ctx context.Context, integratio
 
 func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabReviewListRequest) ([]models.GitLabMRReview, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.ProjectID != nil {
@@ -320,10 +320,7 @@ func (s *PostgresStore) ListReviews(ctx context.Context, req *models.GitLabRevie
 	if limit <= 0 {
 		limit = 20
 	}
-	offset := req.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(req.Offset, 0)
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -421,7 +418,7 @@ func (s *PostgresStore) UpdateReviewStatus(ctx context.Context, id string, statu
 }
 
 func (s *PostgresStore) UpdateReviewResult(ctx context.Context, id string, result *models.GitLabReviewResult, noteID int64, discussionID string) error {
-	var resultJSON interface{} = nil
+	var resultJSON any = nil
 	if result != nil {
 		data, _ := json.Marshal(result)
 		resultJSON = data
@@ -474,7 +471,7 @@ func (s *PostgresStore) CreateJob(ctx context.Context, job *models.GitLabAnalysi
 	job.CreatedAt = now
 	job.UpdatedAt = now
 
-	var configJSON interface{} = nil
+	var configJSON any = nil
 	if job.Config != nil {
 		data, err := json.Marshal(job.Config)
 		if err != nil {
@@ -824,7 +821,7 @@ func (s *PostgresStore) GetNextPendingJob(ctx context.Context) (*models.GitLabAn
 
 func (s *PostgresStore) ListJobs(ctx context.Context, status *models.GitLabJobStatus, limit, offset int) ([]models.GitLabAnalysisJob, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if status != nil {
@@ -986,7 +983,7 @@ func (s *PostgresStore) FailJob(ctx context.Context, jobID string, errStr string
 	return err
 }
 
-func (s *PostgresStore) RetryJob(ctx context.Context, jobID string, nextRetryAt interface{}) error {
+func (s *PostgresStore) RetryJob(ctx context.Context, jobID string, nextRetryAt any) error {
 	query := "UPDATE gitlab_analysis_jobs SET status = $1, retry_count = retry_count + 1, next_retry_at = $2, updated_at = $3 WHERE id = $4"
 	_, err := s.db.ExecContext(ctx, query, models.GitLabJobStatusPending, nextRetryAt, time.Now(), jobID)
 	return err
@@ -1091,7 +1088,7 @@ func (s *PostgresStore) CreateWebhookEvent(ctx context.Context, event *models.Gi
 	event.ReceivedAt = time.Now()
 
 	// Payload is already a JSON string, pass it directly or nil if empty
-	var payloadJSON interface{} = nil
+	var payloadJSON any = nil
 	if event.Payload != "" {
 		// Validate it's valid JSON before storing
 		if json.Valid([]byte(event.Payload)) {
@@ -1235,7 +1232,7 @@ func (s *PostgresStore) CreateFeedback(ctx context.Context, feedback *models.Git
 
 func (s *PostgresStore) ListFeedback(ctx context.Context, req *models.GitLabFeedbackListRequest) ([]models.GitLabReviewFeedback, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.ReviewID != nil {
@@ -1279,10 +1276,7 @@ func (s *PostgresStore) ListFeedback(ctx context.Context, req *models.GitLabFeed
 	if limit <= 0 {
 		limit = 20
 	}
-	offset := req.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(req.Offset, 0)
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)

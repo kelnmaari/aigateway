@@ -77,10 +77,10 @@ func (mb *MetricsBroadcaster) broadcastMetrics() {
 	allStats := mb.storage.GetAllStats()
 
 	// Конвертируем в map[string]interface{} для события
-	metricsData := make(map[string]interface{})
+	metricsData := make(map[string]any)
 
 	for metricType, stats := range allStats {
-		metricsData[string(metricType)] = map[string]interface{}{
+		metricsData[string(metricType)] = map[string]any{
 			"count":   stats.Count,
 			"sum":     stats.Sum,
 			"min":     stats.Min,
@@ -95,10 +95,10 @@ func (mb *MetricsBroadcaster) broadcastMetrics() {
 
 	// Добавляем информацию о buffers
 	bufferInfo := mb.storage.GetBufferInfo()
-	buffersData := make(map[string]interface{})
+	buffersData := make(map[string]any)
 
 	for metricType, info := range bufferInfo {
-		buffersData[string(metricType)] = map[string]interface{}{
+		buffersData[string(metricType)] = map[string]any{
 			"size":     info.Size,
 			"capacity": info.Capacity,
 			"is_full":  info.IsFull,
@@ -118,4 +118,3 @@ func (mb *MetricsBroadcaster) broadcastMetrics() {
 func (mb *MetricsBroadcaster) BroadcastImmediate() {
 	mb.broadcastMetrics()
 }
-

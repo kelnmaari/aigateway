@@ -91,11 +91,11 @@ func (s *Scanner) Scan(ctx context.Context, req ScanRequest) (*ScanResult, error
 	result.Duration = time.Since(startTime).String()
 
 	s.logger.WithFields(logrus.Fields{
-		"project_id":       req.ProjectID,
-		"scan_id":          scanID,
-		"undocumented":     len(result.Symbols),
-		"files_scanned":    result.FilesScanned,
-		"duration":         result.Duration,
+		"project_id":    req.ProjectID,
+		"scan_id":       scanID,
+		"undocumented":  len(result.Symbols),
+		"files_scanned": result.FilesScanned,
+		"duration":      result.Duration,
 	}).Info("Documentation scan completed")
 
 	return result, nil
@@ -113,7 +113,7 @@ func (s *Scanner) collectCodeFiles(ctx context.Context, collection, projectID st
 	var files []codeFile
 	seen := make(map[string]bool)
 
-	err := s.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -176,7 +176,7 @@ func (s *Scanner) scanGoFile(file codeFile, exportedOnly bool) []UndocumentedSym
 	var symbols []UndocumentedSymbol
 
 	lines := strings.Split(file.Content, "\n")
-	
+
 	// Pattern for func declarations
 	funcPattern := regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?(\w+)\s*\([^)]*\)`)
 	// Pattern for type declarations
@@ -186,7 +186,7 @@ func (s *Scanner) scanGoFile(file codeFile, exportedOnly bool) []UndocumentedSym
 
 	for i, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
-		
+
 		// Check for func
 		if matches := funcPattern.FindStringSubmatch(trimmedLine); len(matches) > 1 {
 			name := matches[1]
@@ -263,7 +263,7 @@ func (s *Scanner) scanJSFile(file codeFile, exportedOnly bool) []UndocumentedSym
 	var symbols []UndocumentedSymbol
 
 	lines := strings.Split(file.Content, "\n")
-	
+
 	// Patterns
 	funcPattern := regexp.MustCompile(`^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(`)
 	classPattern := regexp.MustCompile(`^(?:export\s+)?class\s+(\w+)`)
@@ -344,7 +344,7 @@ func (s *Scanner) scanPythonFile(file codeFile, exportedOnly bool) []Undocumente
 	var symbols []UndocumentedSymbol
 
 	lines := strings.Split(file.Content, "\n")
-	
+
 	funcPattern := regexp.MustCompile(`^def\s+(\w+)\s*\(`)
 	classPattern := regexp.MustCompile(`^class\s+(\w+)`)
 	docstringPattern := regexp.MustCompile(`^\s*("""|\''')`)
@@ -407,7 +407,7 @@ func (s *Scanner) buildSummary(result *ScanResult) {
 		result.Summary.ByType[sym.Type]++
 		result.Summary.ByLanguage[sym.Language]++
 		result.Summary.ByImportance[sym.Importance]++
-		
+
 		if sym.IsExported {
 			result.Summary.ExportedCount++
 		}
@@ -463,11 +463,3 @@ func detectLanguage(path string) string {
 		return "unknown"
 	}
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-

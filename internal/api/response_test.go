@@ -124,7 +124,7 @@ func TestNewError(t *testing.T) {
 func TestNewErrorWithDetails(t *testing.T) {
 	message := "Validation failed"
 	code := "VALIDATION_ERROR"
-	details := map[string]interface{}{
+	details := map[string]any{
 		"field":  "email",
 		"reason": "invalid format",
 	}

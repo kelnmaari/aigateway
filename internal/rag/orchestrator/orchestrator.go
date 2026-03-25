@@ -18,11 +18,11 @@ import (
 
 // RAGOrchestrator координирует все компоненты RAG системы
 type RAGOrchestrator struct {
-	db           storage.Database
-	embedder     embeddings.Embedder
-	vectorStore  vector.VectorStore
-	logger       *logrus.Logger
-	
+	db          storage.Database
+	embedder    embeddings.Embedder
+	vectorStore vector.VectorStore
+	logger      *logrus.Logger
+
 	// Configuration
 	defaultTopK     int
 	defaultMinScore float64
@@ -53,33 +53,33 @@ func NewRAGOrchestrator(
 
 // RAGRequest запрос для RAG
 type RAGRequest struct {
-	Query      string   // User query
-	SourceIDs  []string // Фильтр по источникам (optional)
-	TopK       int      // Количество chunks для retrieval
-	MinScore   float64  // Минимальный similarity score
-	UserID     string   // ID пользователя для логирования
-	ConvID     string   // ID разговора
-	Rerank     bool     // Применять reranking
+	Query     string   // User query
+	SourceIDs []string // Фильтр по источникам (optional)
+	TopK      int      // Количество chunks для retrieval
+	MinScore  float64  // Минимальный similarity score
+	UserID    string   // ID пользователя для логирования
+	ConvID    string   // ID разговора
+	Rerank    bool     // Применять reranking
 }
 
 // RAGResponse результат RAG
 type RAGResponse struct {
-	Context        string                 // Собранный context для LLM
-	SourceChunks   []RetrievedChunk       // Использованные chunks
-	TotalChunks    int                    // Всего найденных chunks
-	SearchTime     time.Duration          // Время поиска
-	ContextTokens  int                    // Токенов в context
-	Metadata       map[string]interface{} // Дополнительные метаданные
+	Context       string           // Собранный context для LLM
+	SourceChunks  []RetrievedChunk // Использованные chunks
+	TotalChunks   int              // Всего найденных chunks
+	SearchTime    time.Duration    // Время поиска
+	ContextTokens int              // Токенов в context
+	Metadata      map[string]any   // Дополнительные метаданные
 }
 
 // RetrievedChunk информация об одном chunk
 type RetrievedChunk struct {
-	ChunkID    string                 // ID chunk
-	SourceID   string                 // ID источника
-	DocumentID string                 // ID документа
-	Text       string                 // Текст chunk
-	Score      float64                // Similarity score
-	Metadata   map[string]interface{} // Метаданные
+	ChunkID    string         // ID chunk
+	SourceID   string         // ID источника
+	DocumentID string         // ID документа
+	Text       string         // Текст chunk
+	Score      float64        // Similarity score
+	Metadata   map[string]any // Метаданные
 }
 
 // Query выполняет RAG запрос
@@ -123,7 +123,7 @@ func (o *RAGOrchestrator) Query(ctx context.Context, req RAGRequest) (*RAGRespon
 		Query:    queryEmbedding.Vector,
 		TopK:     req.TopK * 2, // Получаем больше для reranking
 		MinScore: req.MinScore,
-		Filters:  make(map[string]interface{}),
+		Filters:  make(map[string]any),
 	}
 
 	// Add source filters
@@ -167,7 +167,7 @@ func (o *RAGOrchestrator) Query(ctx context.Context, req RAGRequest) (*RAGRespon
 		TotalChunks:   len(retrievedChunks),
 		SearchTime:    time.Since(startTime),
 		ContextTokens: contextTokens,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"query_embedding_dims": len(queryEmbedding.Vector),
 			"rerank_enabled":       req.Rerank,
 		},
@@ -364,7 +364,7 @@ func (o *RAGOrchestrator) logQuery(
 func (o *RAGOrchestrator) simpleQuery(ctx context.Context, req RAGRequest, startTime time.Time) (*RAGResponse, error) {
 	// Получаем все chunks из указанных sources
 	var allChunks []*models.RAGChunk
-	
+
 	for _, sourceID := range req.SourceIDs {
 		chunks, err := o.db.ListRAGChunksBySource(ctx, sourceID, req.TopK, 0)
 		if err != nil {
@@ -384,7 +384,7 @@ func (o *RAGOrchestrator) simpleQuery(ctx context.Context, req RAGRequest, start
 			TotalChunks:   0,
 			SearchTime:    time.Since(startTime),
 			ContextTokens: 0,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"method": "simple_query_no_embeddings",
 			},
 		}, nil
@@ -429,10 +429,9 @@ func (o *RAGOrchestrator) simpleQuery(ctx context.Context, req RAGRequest, start
 		TotalChunks:   len(retrievedChunks),
 		SearchTime:    searchTime,
 		ContextTokens: totalTokens,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"method": "simple_query_no_embeddings",
 			"note":   "This is a simplified RAG without vector search. For production use, implement embeddings.",
 		},
 	}, nil
 }
-

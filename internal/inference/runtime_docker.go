@@ -846,8 +846,8 @@ func (r *DockerRuntime) discoverContainersCLI(ctx context.Context) ([]Discovered
 	}
 
 	var discovered []DiscoveredContainer
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(string(out)), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
@@ -878,7 +878,7 @@ func (r *DockerRuntime) discoverContainersCLI(ctx context.Context) ([]Discovered
 		// Parse port mapping: "0.0.0.0:12345->8080/tcp" or "127.0.0.1:12345->8080/tcp"
 		endpoint := ""
 		if portsStr != "" {
-			for _, portMap := range strings.Split(portsStr, ", ") {
+			for portMap := range strings.SplitSeq(portsStr, ", ") {
 				if idx := strings.Index(portMap, "->"); idx > 0 {
 					hostPart := portMap[:idx]
 					if colonIdx := strings.LastIndex(hostPart, ":"); colonIdx >= 0 {

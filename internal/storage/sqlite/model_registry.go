@@ -663,7 +663,8 @@ func (s *SQLiteDB) DeleteModelRegistryByProviderID(ctx context.Context, provider
 
 // ListModelRegistry возвращает список моделей с фильтрацией
 func (s *SQLiteDB) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
-	query := `
+	var query strings.Builder
+	query.WriteString(`
 		SELECT m.id, m.model_id, m.model_name, m.provider_id,
 		       m.capabilities, m.parameters,
 		       m.requires_gpu, m.min_vram_gb, m.context_length,
@@ -673,66 +674,66 @@ func (s *SQLiteDB) ListModelRegistry(ctx context.Context, filter *models.ModelRe
 		       m.created_at, m.updated_at
 		FROM model_registry m
 		WHERE 1=1
-	`
+	`)
 
-	args := []interface{}{}
+	args := []any{}
 
 	// Apply filters
 	if filter != nil {
 		if filter.ProviderID != "" {
-			query += " AND m.provider_id = ?"
+			query.WriteString(" AND m.provider_id = ?")
 			args = append(args, filter.ProviderID)
 		}
 
 		if filter.ProviderType != "" {
-			query += " AND EXISTS (SELECT 1 FROM model_providers mp WHERE mp.id = m.provider_id AND mp.provider_type = ?)"
+			query.WriteString(" AND EXISTS (SELECT 1 FROM model_providers mp WHERE mp.id = m.provider_id AND mp.provider_type = ?)")
 			args = append(args, filter.ProviderType)
 		}
 
 		if filter.Status != "" {
-			query += " AND m.status = ?"
+			query.WriteString(" AND m.status = ?")
 			args = append(args, filter.Status)
 		}
 
 		if filter.HealthStatus != "" {
-			query += " AND m.health_status = ?"
+			query.WriteString(" AND m.health_status = ?")
 			args = append(args, filter.HealthStatus)
 		}
 
 		if filter.RequiresGPU != nil {
-			query += " AND m.requires_gpu = ?"
+			query.WriteString(" AND m.requires_gpu = ?")
 			args = append(args, *filter.RequiresGPU)
 		}
 
 		if filter.Tag != "" {
-			query += " AND m.tags LIKE ?"
+			query.WriteString(" AND m.tags LIKE ?")
 			args = append(args, "%"+filter.Tag+"%")
 		}
 
 		// Capabilities filter (check if JSON contains capability)
 		if len(filter.Capabilities) > 0 {
 			for _, cap := range filter.Capabilities {
-				query += " AND m.capabilities LIKE ?"
+				query.WriteString(" AND m.capabilities LIKE ?")
 				args = append(args, "%"+string(cap)+"%")
 			}
 		}
 	}
 
-	query += " ORDER BY m.model_name ASC"
+	query.WriteString(" ORDER BY m.model_name ASC")
 
 	// Pagination
 	if filter != nil {
 		if filter.Limit > 0 {
-			query += " LIMIT ?"
+			query.WriteString(" LIMIT ?")
 			args = append(args, filter.Limit)
 		}
 		if filter.Offset > 0 {
-			query += " OFFSET ?"
+			query.WriteString(" OFFSET ?")
 			args = append(args, filter.Offset)
 		}
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	rows, err := s.db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
@@ -988,4 +989,3 @@ func (s *SQLiteDB) GetModelRegistryStats(ctx context.Context) (*models.ModelRegi
 
 	return stats, nil
 }
-

@@ -150,7 +150,7 @@ func (s *SQLiteDB) ListQuotas(ctx context.Context, scope *models.QuotaScope) ([]
 		FROM quotas
 	`
 
-	var args []interface{}
+	var args []any
 	if scope != nil {
 		query += " WHERE scope = ?"
 		args = append(args, *scope)
@@ -401,5 +401,3 @@ func (s *SQLiteDB) GetQuotaWithUsage(ctx context.Context, scope models.QuotaScop
 
 	return quota, usage, nil
 }
-
-

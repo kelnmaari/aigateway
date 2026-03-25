@@ -88,7 +88,7 @@ func (m *mockVectorStore) Delete(ctx context.Context, id string) error {
 	return m.err
 }
 
-func (m *mockVectorStore) DeleteByMetadata(ctx context.Context, filters map[string]interface{}) (int, error) {
+func (m *mockVectorStore) DeleteByMetadata(ctx context.Context, filters map[string]any) (int, error) {
 	return 0, m.err
 }
 
@@ -100,7 +100,7 @@ func (m *mockVectorStore) GetByID(ctx context.Context, id string) (*vector.Vecto
 	return nil, m.err
 }
 
-func (m *mockVectorStore) CreateIndex(ctx context.Context, indexType string, params map[string]interface{}) error {
+func (m *mockVectorStore) CreateIndex(ctx context.Context, indexType string, params map[string]any) error {
 	return m.err
 }
 
@@ -169,7 +169,7 @@ func TestRAGOrchestrator_Query_Success(t *testing.T) {
 			ID:    "doc1",
 			Text:  "This is the first document",
 			Score: 0.9,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"source_id":   "source1",
 				"document_id": "doc1",
 			},
@@ -179,7 +179,7 @@ func TestRAGOrchestrator_Query_Success(t *testing.T) {
 			ID:    "doc2",
 			Text:  "This is the second document",
 			Score: 0.8,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"source_id":   "source1",
 				"document_id": "doc2",
 			},
@@ -236,7 +236,7 @@ func TestRAGOrchestrator_Query_WithSourceFilter(t *testing.T) {
 			ID:    "doc1",
 			Text:  "Document from source1",
 			Score: 0.9,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"source_id": "source1",
 			},
 			CreatedAt: time.Now(),
@@ -245,7 +245,7 @@ func TestRAGOrchestrator_Query_WithSourceFilter(t *testing.T) {
 			ID:    "doc2",
 			Text:  "Document from source2",
 			Score: 0.85,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"source_id": "source2",
 			},
 			CreatedAt: time.Now(),
@@ -291,14 +291,14 @@ func TestRAGOrchestrator_Query_WithReranking(t *testing.T) {
 			ID:        "doc1",
 			Text:      "Document about cats",
 			Score:     0.8,
-			Metadata:  map[string]interface{}{"source_id": "source1"},
+			Metadata:  map[string]any{"source_id": "source1"},
 			CreatedAt: time.Now(),
 		},
 		{
 			ID:        "doc2",
 			Text:      "Document about dogs",
 			Score:     0.75,
-			Metadata:  map[string]interface{}{"source_id": "source1"},
+			Metadata:  map[string]any{"source_id": "source1"},
 			CreatedAt: time.Now(),
 		},
 	}
@@ -447,15 +447,15 @@ func TestRAGOrchestrator_FilterBySourceIDs(t *testing.T) {
 	docs := []vector.VectorDocument{
 		{
 			ID:       "doc1",
-			Metadata: map[string]interface{}{"source_id": "source1"},
+			Metadata: map[string]any{"source_id": "source1"},
 		},
 		{
 			ID:       "doc2",
-			Metadata: map[string]interface{}{"source_id": "source2"},
+			Metadata: map[string]any{"source_id": "source2"},
 		},
 		{
 			ID:       "doc3",
-			Metadata: map[string]interface{}{"source_id": "source1"},
+			Metadata: map[string]any{"source_id": "source1"},
 		},
 	}
 
@@ -490,12 +490,12 @@ func BenchmarkRAGOrchestrator_Query(b *testing.B) {
 
 	// Create 100 mock documents
 	docs := make([]vector.VectorDocument, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		docs[i] = vector.VectorDocument{
 			ID:        "doc" + string(rune(i)),
 			Text:      "Document text number " + string(rune(i)),
 			Score:     0.8,
-			Metadata:  map[string]interface{}{"source_id": "source1"},
+			Metadata:  map[string]any{"source_id": "source1"},
 			CreatedAt: time.Now(),
 		}
 	}
@@ -521,9 +521,9 @@ func BenchmarkRAGOrchestrator_Query(b *testing.B) {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 findSubstring(s, substr)))
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			findSubstring(s, substr)))
 }
 
 func findSubstring(s, substr string) bool {
@@ -534,5 +534,3 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
-
-

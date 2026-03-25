@@ -299,7 +299,7 @@ func TestE2E_RetryMechanism(t *testing.T) {
 	}
 
 	// Simulate failures and retries
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		job.RetryCount++
 		job.Status = models.GitLabJobStatusProcessing
 
@@ -360,7 +360,7 @@ func TestE2E_ConcurrentWebhooks(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		select {
 		case <-done:
 			// Success

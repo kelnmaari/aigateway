@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,13 +36,13 @@ func NewUsersUIHandler(db storage.Database, renderer *templates.Renderer, logger
 // GET /api/ui/users
 func (h *UsersUIHandler) GetUsersList(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	// Get all users with details (roles, tenants)
 	filters := models.UserFilters{
 		Limit:  100, // Default limit
 		Offset: 0,
 	}
-	
+
 	// Parse optional filters from query
 	if status := c.Query("status"); status != "" {
 		s := models.UserStatus(status)
@@ -50,7 +51,7 @@ func (h *UsersUIHandler) GetUsersList(c *gin.Context) {
 	if search := c.Query("search"); search != "" {
 		filters.Search = search
 	}
-	
+
 	usersWithDetails, err := h.db.GetUsersWithDetails(ctx, filters)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list users")
@@ -63,7 +64,7 @@ func (h *UsersUIHandler) GetUsersList(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Check if no users
 	if len(usersWithDetails) == 0 {
 		c.Header("Content-Type", "text/html")
@@ -75,38 +76,38 @@ func (h *UsersUIHandler) GetUsersList(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Render rows
 	c.Header("Content-Type", "text/html")
-	html := ""
-	
+	var html strings.Builder
+
 	for _, userDetail := range usersWithDetails {
 		user := &userDetail.User // Get underlying User
-		
+
 		// Format auth provider
 		provider := user.AuthProvider
 		if provider == "" {
 			provider = "local"
 		}
-		
+
 		// Format RBAC roles
 		rolesDisplay := "-"
 		if len(userDetail.Roles) > 0 {
 			rolesDisplay = fmt.Sprintf(`<span class="badge">%d roles</span>`, len(userDetail.Roles))
 		}
-		
+
 		// Format tenants count
 		tenantsDisplay := "-"
 		if len(userDetail.Tenants) > 0 {
 			tenantsDisplay = fmt.Sprintf(`<span class="badge">%d tenants</span>`, len(userDetail.Tenants))
 		}
-		
+
 		// Format admin badge
 		adminBadge := ""
 		if user.IsAdmin {
 			adminBadge = `<span class="badge badge-admin">Admin</span>`
 		}
-		
+
 		// Format status badge
 		statusClass := "badge-active"
 		statusText := "Active"
@@ -117,8 +118,8 @@ func (h *UsersUIHandler) GetUsersList(c *gin.Context) {
 			statusClass = "badge-suspended"
 			statusText = "Suspended"
 		}
-		
-		html += fmt.Sprintf(`
+
+		html.WriteString(fmt.Sprintf(`
 <tr class="user-row" data-user-id="%s">
 	<td>
 		<div class="user-info">
@@ -163,10 +164,10 @@ func (h *UsersUIHandler) GetUsersList(c *gin.Context) {
 			formatTimeAgo(user.CreatedAt),
 			user.ID,
 			user.ID,
-		)
+		))
 	}
-	
-	c.String(http.StatusOK, html)
+
+	c.String(http.StatusOK, html.String())
 }
 
 // GetCreateUserForm returns HTML form for creating a new user
@@ -253,7 +254,7 @@ func (h *UsersUIHandler) GetCreateUserForm(c *gin.Context) {
 func (h *UsersUIHandler) GetEditUserForm(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.Param("id")
-	
+
 	// Get user
 	user, err := h.db.GetUser(ctx, userID)
 	if err != nil {
@@ -265,7 +266,7 @@ func (h *UsersUIHandler) GetEditUserForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	if user == nil {
 		c.Header("Content-Type", "text/html")
 		c.String(http.StatusNotFound, `
@@ -274,12 +275,12 @@ func (h *UsersUIHandler) GetEditUserForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	adminChecked := ""
 	if user.IsAdmin {
 		adminChecked = "checked"
 	}
-	
+
 	statusActive := ""
 	statusInactive := ""
 	statusSuspended := ""
@@ -291,7 +292,7 @@ func (h *UsersUIHandler) GetEditUserForm(c *gin.Context) {
 	case models.UserStatusSuspended:
 		statusSuspended = "selected"
 	}
-	
+
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
 <div class="modal-header">
@@ -387,7 +388,7 @@ func (h *UsersUIHandler) GetEditUserForm(c *gin.Context) {
 func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.Param("id")
-	
+
 	// Get user
 	user, err := h.db.GetUser(ctx, userID)
 	if err != nil {
@@ -399,7 +400,7 @@ func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	if user == nil {
 		c.Header("Content-Type", "text/html")
 		c.String(http.StatusNotFound, `
@@ -408,20 +409,20 @@ func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	// Get user's current roles
 	userRoles, err := h.db.GetUserRoles(ctx, userID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get user roles")
 		userRoles = []*models.UserRole{}
 	}
-	
+
 	// Build map of assigned roles
 	assignedRoles := make(map[string]bool)
 	for _, ur := range userRoles {
 		assignedRoles[ur.RoleID] = true
 	}
-	
+
 	// Get all available roles (global roles only for simplicity)
 	var tenantIDFilter *string = nil
 	roles, err := h.db.ListRoles(ctx, tenantIDFilter)
@@ -429,7 +430,7 @@ func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 		h.logger.WithError(err).Error("Failed to list roles")
 		roles = []*models.Role{} // Empty list on error
 	}
-	
+
 	// Build roles checkboxes
 	rolesHTML := ""
 	for _, role := range roles {
@@ -437,7 +438,7 @@ func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 		if assignedRoles[role.ID] {
 			checked = "checked"
 		}
-		
+
 		rolesHTML += fmt.Sprintf(`
 		<div class="form-group">
 			<label class="checkbox-label">
@@ -451,11 +452,11 @@ func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 			template.HTMLEscapeString(role.Name),
 			template.HTMLEscapeString(role.Description))
 	}
-	
+
 	if rolesHTML == "" {
 		rolesHTML = `<p class="text-muted">No roles available</p>`
 	}
-	
+
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
 <div class="modal-header">
@@ -493,7 +494,7 @@ func (h *UsersUIHandler) GetUserRolesForm(c *gin.Context) {
 func formatTimeAgo(t time.Time) string {
 	now := time.Now()
 	diff := now.Sub(t)
-	
+
 	if diff < time.Minute {
 		return "just now"
 	} else if diff < time.Hour {
@@ -515,7 +516,6 @@ func formatTimeAgo(t time.Time) string {
 		}
 		return fmt.Sprintf("%d days ago", days)
 	}
-	
+
 	return t.Format("2006-01-02")
 }
-

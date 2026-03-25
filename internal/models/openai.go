@@ -20,34 +20,34 @@ type ChatCompletionRequest struct {
 	LogitBias        map[string]float64 `json:"logit_bias,omitempty"`
 	User             string             `json:"user,omitempty"`
 	Tools            []Tool             `json:"tools,omitempty"`
-	ToolChoice       interface{}        `json:"tool_choice,omitempty"`
+	ToolChoice       any                `json:"tool_choice,omitempty"`
 	ResponseFormat   *ResponseFormat    `json:"response_format,omitempty"`
 	Seed             *int               `json:"seed,omitempty"`
 	// Provider-specific options
-	Options map[string]interface{} `json:"options,omitempty"`
+	Options map[string]any `json:"options,omitempty"`
 	// Дополнительные поля для функций
-	Functions    []Function  `json:"functions,omitempty"`     // Deprecated
-	FunctionCall interface{} `json:"function_call,omitempty"` // Deprecated
-	
+	Functions    []Function `json:"functions,omitempty"`     // Deprecated
+	FunctionCall any        `json:"function_call,omitempty"` // Deprecated
+
 	// RAG System (v1.13.0+)
-	RAGEnabled  bool     `json:"rag_enabled,omitempty"`  // Включить RAG
+	RAGEnabled   bool     `json:"rag_enabled,omitempty"`    // Включить RAG
 	RAGSourceIDs []string `json:"rag_source_ids,omitempty"` // Фильтр по источникам
-	RAGTopK     int      `json:"rag_top_k,omitempty"`    // Количество chunks для retrieval
-	RAGMinScore float64  `json:"rag_min_score,omitempty"` // Минимальный similarity score
-	RAGRerank   bool     `json:"rag_rerank,omitempty"`   // Применять reranking
+	RAGTopK      int      `json:"rag_top_k,omitempty"`      // Количество chunks для retrieval
+	RAGMinScore  float64  `json:"rag_min_score,omitempty"`  // Минимальный similarity score
+	RAGRerank    bool     `json:"rag_rerank,omitempty"`     // Применять reranking
 
 	// Conversational Agent (v2.5.1+)
-	AgentMode            bool   `json:"agent_mode,omitempty"`             // Включить режим conversational agent
-	AgentMaxIter         int    `json:"agent_max_iter,omitempty"`         // Максимальное количество ReAct итераций
-	AgentModel           string `json:"agent_model,omitempty"`            // Модель для reasoning (по умолчанию из config)
+	AgentMode             bool   `json:"agent_mode,omitempty"`              // Включить режим conversational agent
+	AgentMaxIter          int    `json:"agent_max_iter,omitempty"`          // Максимальное количество ReAct итераций
+	AgentModel            string `json:"agent_model,omitempty"`             // Модель для reasoning (по умолчанию из config)
 	AgentWorkingDirectory string `json:"agent_working_directory,omitempty"` // Рабочая директория для file operations
-	ConversationID       string `json:"conversation_id,omitempty"`        // ID conversation для context continuity
+	ConversationID        string `json:"conversation_id,omitempty"`         // ID conversation для context continuity
 }
 
 // ChatMessage представляет сообщение в чате
 type ChatMessage struct {
 	Role         string        `json:"role" binding:"required"` // system, user, assistant, tool
-	Content      interface{}   `json:"content"`                 // string или array для multi-modal
+	Content      any           `json:"content"`                 // string или array для multi-modal
 	Name         string        `json:"name,omitempty"`
 	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`
 	ToolCallID   string        `json:"tool_call_id,omitempty"`
@@ -57,14 +57,14 @@ type ChatMessage struct {
 
 // ContentPart represents a part of multimodal content (v3.0.4+: VLM support)
 type ContentPart struct {
-	Type     string       `json:"type"` // "text" or "image_url"
-	Text     string       `json:"text,omitempty"`
-	ImageURL *ImageURL    `json:"image_url,omitempty"`
+	Type     string    `json:"type"` // "text" or "image_url"
+	Text     string    `json:"text,omitempty"`
+	ImageURL *ImageURL `json:"image_url,omitempty"`
 }
 
 // ImageURL represents an image URL or data URI (v3.0.4+: VLM support)
 type ImageURL struct {
-	URL    string `json:"url"`    // data:image/jpeg;base64,... or https://...
+	URL    string `json:"url"`              // data:image/jpeg;base64,... or https://...
 	Detail string `json:"detail,omitempty"` // "auto", "low", "high"
 }
 
@@ -76,9 +76,9 @@ type Tool struct {
 
 // Function представляет функцию доступную для вызова
 type Function struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty"`
-	Parameters  interface{} `json:"parameters,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Parameters  any    `json:"parameters,omitempty"`
 }
 
 // ToolCall представляет вызов инструмента
@@ -111,7 +111,7 @@ type ChatCompletionResponse struct {
 	Usage             Usage                  `json:"usage"`
 
 	// Agent mode (v2.5.1+): Full agent conversation trace
-	AgentMessages []map[string]interface{} `json:"agent_messages,omitempty"`
+	AgentMessages []map[string]any `json:"agent_messages,omitempty"`
 }
 
 // ChatCompletionChoice представляет выбор в ответе
@@ -157,9 +157,9 @@ type Model struct {
 	Permission []Permission `json:"permission"`
 
 	// Extended fields (optional, won't break OpenAI compatibility)
-	Size              *int64  `json:"size,omitempty"`               // Model size in bytes
-	Family            *string `json:"family,omitempty"`             // Model family (e.g., "llama", "qwen")
-	ParameterSize     *string `json:"parameter_size,omitempty"`     // Parameter size (e.g., "7B", "30B")
+	Size          *int64  `json:"size,omitempty"`           // Model size in bytes
+	Family        *string `json:"family,omitempty"`         // Model family (e.g., "llama", "qwen")
+	ParameterSize *string `json:"parameter_size,omitempty"` // Parameter size (e.g., "7B", "30B")
 }
 
 // Permission представляет разрешение для модели
@@ -183,7 +183,7 @@ type Permission struct {
 // CompletionRequest представляет запрос text completion
 type CompletionRequest struct {
 	Model            string             `json:"model" binding:"required"`
-	Prompt           interface{}        `json:"prompt"` // string, array of strings, array of tokens, or array of token arrays
+	Prompt           any                `json:"prompt"` // string, array of strings, array of tokens, or array of token arrays
 	Suffix           string             `json:"suffix,omitempty"`
 	MaxTokens        *int               `json:"max_tokens,omitempty"`
 	Temperature      *float64           `json:"temperature,omitempty"`
@@ -238,11 +238,11 @@ type CompletionStreamChoice struct {
 
 // EmbeddingRequest представляет запрос на создание embeddings
 type EmbeddingRequest struct {
-	Input          interface{} `json:"input" binding:"required"` // string, array of strings, array of integers, or array of arrays
-	Model          string      `json:"model" binding:"required"`
-	EncodingFormat string      `json:"encoding_format,omitempty"` // "float" или "base64"
-	Dimensions     *int        `json:"dimensions,omitempty"`
-	User           string      `json:"user,omitempty"`
+	Input          any    `json:"input" binding:"required"` // string, array of strings, array of integers, or array of arrays
+	Model          string `json:"model" binding:"required"`
+	EncodingFormat string `json:"encoding_format,omitempty"` // "float" или "base64"
+	Dimensions     *int   `json:"dimensions,omitempty"`
+	User           string `json:"user,omitempty"`
 }
 
 // EmbeddingResponse представляет ответ с embeddings
@@ -283,7 +283,7 @@ type RerankResponse struct {
 // RerankResult представляет один результат reranking
 type RerankResult struct {
 	Index          int             `json:"index"`
-	RelevanceScore float64        `json:"relevance_score"`
+	RelevanceScore float64         `json:"relevance_score"`
 	Document       *RerankDocument `json:"document,omitempty"`
 }
 
@@ -311,10 +311,10 @@ type LogProbs struct {
 
 // Error представляет ошибку в OpenAI API формате
 type Error struct {
-	Message string      `json:"message"`
-	Type    string      `json:"type"`
-	Param   *string     `json:"param,omitempty"`
-	Code    interface{} `json:"code,omitempty"` // string или int
+	Message string  `json:"message"`
+	Type    string  `json:"type"`
+	Param   *string `json:"param,omitempty"`
+	Code    any     `json:"code,omitempty"` // string или int
 }
 
 // ErrorResponse представляет ответ с ошибкой
@@ -379,4 +379,3 @@ func NewChatCompletionChunk(id, model string) *ChatCompletionChunk {
 		Choices: make([]ChatCompletionChunkChoice, 0),
 	}
 }
-

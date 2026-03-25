@@ -125,7 +125,7 @@ func Recovery(logger *logrus.Logger) gin.HandlerFunc {
 		logger = logrus.StandardLogger()
 	}
 
-	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
+	return gin.CustomRecovery(func(c *gin.Context, recovered any) {
 		logger.WithFields(logrus.Fields{
 			"panic":     recovered,
 			"method":    c.Request.Method,
@@ -136,4 +136,3 @@ func Recovery(logger *logrus.Logger) gin.HandlerFunc {
 		c.AbortWithStatus(500)
 	})
 }
-

@@ -52,19 +52,19 @@ const (
 	EventTypeNotification EventType = "notification" // General system notification
 
 	// Agent events (AGENT-05, v2.5.0+)
-	EventTypeAgentSessionCreated      EventType = "agent_session_created"       // Session created
-	EventTypeAgentPlanningStarted     EventType = "agent_planning_started"      // Planning started
-	EventTypeAgentPlanningCompleted   EventType = "agent_planning_completed"    // Plan ready
-	EventTypeAgentExecutionStarted    EventType = "agent_execution_started"     // Execution started
-	EventTypeAgentStepStarted         EventType = "agent_step_started"          // Step started
-	EventTypeAgentStepCompleted       EventType = "agent_step_completed"        // Step completed
-	EventTypeAgentStepFailed          EventType = "agent_step_failed"           // Step failed
-	EventTypeAgentApprovalNeeded      EventType = "agent_approval_needed"       // Approval required
-	EventTypeAgentApprovalResponded   EventType = "agent_approval_responded"    // Approval decision
-	EventTypeAgentSessionCompleted    EventType = "agent_session_completed"     // Session completed
-	EventTypeAgentSessionFailed       EventType = "agent_session_failed"        // Session failed
-	EventTypeAgentSessionCancelled    EventType = "agent_session_cancelled"     // Session cancelled
-	EventTypeAgentProgressUpdate      EventType = "agent_progress_update"       // Progress update
+	EventTypeAgentSessionCreated    EventType = "agent_session_created"    // Session created
+	EventTypeAgentPlanningStarted   EventType = "agent_planning_started"   // Planning started
+	EventTypeAgentPlanningCompleted EventType = "agent_planning_completed" // Plan ready
+	EventTypeAgentExecutionStarted  EventType = "agent_execution_started"  // Execution started
+	EventTypeAgentStepStarted       EventType = "agent_step_started"       // Step started
+	EventTypeAgentStepCompleted     EventType = "agent_step_completed"     // Step completed
+	EventTypeAgentStepFailed        EventType = "agent_step_failed"        // Step failed
+	EventTypeAgentApprovalNeeded    EventType = "agent_approval_needed"    // Approval required
+	EventTypeAgentApprovalResponded EventType = "agent_approval_responded" // Approval decision
+	EventTypeAgentSessionCompleted  EventType = "agent_session_completed"  // Session completed
+	EventTypeAgentSessionFailed     EventType = "agent_session_failed"     // Session failed
+	EventTypeAgentSessionCancelled  EventType = "agent_session_cancelled"  // Session cancelled
+	EventTypeAgentProgressUpdate    EventType = "agent_progress_update"    // Progress update
 
 	// System events
 	EventTypeHeartbeat EventType = "heartbeat"
@@ -73,13 +73,13 @@ const (
 
 // Event представляет WebSocket событие
 type Event struct {
-	Type      EventType              `json:"type"`
-	Timestamp int64                  `json:"timestamp"`
-	Data      map[string]interface{} `json:"data"`
+	Type      EventType      `json:"type"`
+	Timestamp int64          `json:"timestamp"`
+	Data      map[string]any `json:"data"`
 }
 
 // NewEvent создает новое событие
-func NewEvent(eventType EventType, data map[string]interface{}) *Event {
+func NewEvent(eventType EventType, data map[string]any) *Event {
 	return &Event{
 		Type:      eventType,
 		Timestamp: time.Now().Unix(),
@@ -116,73 +116,73 @@ func (eb *EventBroadcaster) BroadcastEvent(event *Event) error {
 }
 
 // BroadcastServerStats отправляет обновление server stats
-func (eb *EventBroadcaster) BroadcastServerStats(stats map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastServerStats(stats map[string]any) error {
 	event := NewEvent(EventTypeServerStats, stats)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastMetricsUpdate отправляет обновление метрик
-func (eb *EventBroadcaster) BroadcastMetricsUpdate(metrics map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastMetricsUpdate(metrics map[string]any) error {
 	event := NewEvent(EventTypeMetricsUpdate, metrics)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastRequestStart уведомляет о начале запроса (TUI-04)
-func (eb *EventBroadcaster) BroadcastRequestStart(requestData map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastRequestStart(requestData map[string]any) error {
 	event := NewEvent(EventTypeRequestStart, requestData)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastRequestComplete уведомляет о завершении запроса (TUI-04)
-func (eb *EventBroadcaster) BroadcastRequestComplete(requestData map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastRequestComplete(requestData map[string]any) error {
 	event := NewEvent(EventTypeRequestComplete, requestData)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastRequestError уведомляет об ошибке запроса (TUI-04)
-func (eb *EventBroadcaster) BroadcastRequestError(requestData map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastRequestError(requestData map[string]any) error {
 	event := NewEvent(EventTypeRequestError, requestData)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastRequestUpdate уведомляет об обновлении запроса (TUI-04)
-func (eb *EventBroadcaster) BroadcastRequestUpdate(requestData map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastRequestUpdate(requestData map[string]any) error {
 	event := NewEvent(EventTypeRequestUpdate, requestData)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastAPIKeyCreated уведомляет о создании API ключа
-func (eb *EventBroadcaster) BroadcastAPIKeyCreated(keyData map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastAPIKeyCreated(keyData map[string]any) error {
 	event := NewEvent(EventTypeAPIKeyCreated, keyData)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastAPIKeyDeleted уведомляет об удалении API ключа
 func (eb *EventBroadcaster) BroadcastAPIKeyDeleted(keyID string) error {
-	event := NewEvent(EventTypeAPIKeyDeleted, map[string]interface{}{
+	event := NewEvent(EventTypeAPIKeyDeleted, map[string]any{
 		"key_id": keyID,
 	})
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastNewLog отправляет новую запись лога
-func (eb *EventBroadcaster) BroadcastNewLog(logData map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastNewLog(logData map[string]any) error {
 	event := NewEvent(EventTypeNewLog, logData)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastHeartbeat отправляет heartbeat для проверки соединения
 func (eb *EventBroadcaster) BroadcastHeartbeat() error {
-	event := NewEvent(EventTypeHeartbeat, map[string]interface{}{
+	event := NewEvent(EventTypeHeartbeat, map[string]any{
 		"status": "alive",
 	})
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastError отправляет сообщение об ошибке
-func (eb *EventBroadcaster) BroadcastError(errorMsg string, details map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastError(errorMsg string, details map[string]any) error {
 	if details == nil {
-		details = make(map[string]interface{})
+		details = make(map[string]any)
 	}
 	details["error"] = errorMsg
 
@@ -196,7 +196,7 @@ func (eb *EventBroadcaster) BroadcastError(errorMsg string, details map[string]i
 
 // BroadcastChatStreamStart уведомляет о начале chat streaming
 func (eb *EventBroadcaster) BroadcastChatStreamStart(conversationID, requestID string, model string) error {
-	event := NewEvent(EventTypeChatStreamStart, map[string]interface{}{
+	event := NewEvent(EventTypeChatStreamStart, map[string]any{
 		"conversation_id": conversationID,
 		"request_id":      requestID,
 		"model":           model,
@@ -205,8 +205,8 @@ func (eb *EventBroadcaster) BroadcastChatStreamStart(conversationID, requestID s
 }
 
 // BroadcastChatStreamChunk отправляет chunk streaming response
-func (eb *EventBroadcaster) BroadcastChatStreamChunk(conversationID, requestID string, chunk map[string]interface{}) error {
-	data := map[string]interface{}{
+func (eb *EventBroadcaster) BroadcastChatStreamChunk(conversationID, requestID string, chunk map[string]any) error {
+	data := map[string]any{
 		"conversation_id": conversationID,
 		"request_id":      requestID,
 		"chunk":           chunk,
@@ -218,7 +218,7 @@ func (eb *EventBroadcaster) BroadcastChatStreamChunk(conversationID, requestID s
 
 // BroadcastChatStreamEnd уведомляет о завершении streaming
 func (eb *EventBroadcaster) BroadcastChatStreamEnd(conversationID, requestID string, messageID string, totalTokens int) error {
-	event := NewEvent(EventTypeChatStreamEnd, map[string]interface{}{
+	event := NewEvent(EventTypeChatStreamEnd, map[string]any{
 		"conversation_id": conversationID,
 		"request_id":      requestID,
 		"message_id":      messageID,
@@ -229,7 +229,7 @@ func (eb *EventBroadcaster) BroadcastChatStreamEnd(conversationID, requestID str
 
 // BroadcastChatStreamError уведомляет об ошибке streaming
 func (eb *EventBroadcaster) BroadcastChatStreamError(conversationID, requestID string, errorMsg string) error {
-	event := NewEvent(EventTypeChatStreamError, map[string]interface{}{
+	event := NewEvent(EventTypeChatStreamError, map[string]any{
 		"conversation_id": conversationID,
 		"request_id":      requestID,
 		"error":           errorMsg,
@@ -243,7 +243,7 @@ func (eb *EventBroadcaster) BroadcastChatStreamError(conversationID, requestID s
 
 // BroadcastFileUploadStart уведомляет о начале загрузки файла
 func (eb *EventBroadcaster) BroadcastFileUploadStart(fileID, filename string, size int64) error {
-	event := NewEvent(EventTypeFileUploadStart, map[string]interface{}{
+	event := NewEvent(EventTypeFileUploadStart, map[string]any{
 		"file_id":  fileID,
 		"filename": filename,
 		"size":     size,
@@ -253,7 +253,7 @@ func (eb *EventBroadcaster) BroadcastFileUploadStart(fileID, filename string, si
 
 // BroadcastFileUploadProgress отправляет progress bar updates
 func (eb *EventBroadcaster) BroadcastFileUploadProgress(fileID string, bytesUploaded, totalBytes int64, percent float64) error {
-	event := NewEvent(EventTypeFileUploadProgress, map[string]interface{}{
+	event := NewEvent(EventTypeFileUploadProgress, map[string]any{
 		"file_id":        fileID,
 		"bytes_uploaded": bytesUploaded,
 		"total_bytes":    totalBytes,
@@ -264,7 +264,7 @@ func (eb *EventBroadcaster) BroadcastFileUploadProgress(fileID string, bytesUplo
 
 // BroadcastFileUploadComplete уведомляет о завершении загрузки
 func (eb *EventBroadcaster) BroadcastFileUploadComplete(fileID, filename string, downloadURL string) error {
-	event := NewEvent(EventTypeFileUploadComplete, map[string]interface{}{
+	event := NewEvent(EventTypeFileUploadComplete, map[string]any{
 		"file_id":      fileID,
 		"filename":     filename,
 		"download_url": downloadURL,
@@ -274,7 +274,7 @@ func (eb *EventBroadcaster) BroadcastFileUploadComplete(fileID, filename string,
 
 // BroadcastFileUploadError уведомляет об ошибке загрузки
 func (eb *EventBroadcaster) BroadcastFileUploadError(fileID, filename string, errorMsg string) error {
-	event := NewEvent(EventTypeFileUploadError, map[string]interface{}{
+	event := NewEvent(EventTypeFileUploadError, map[string]any{
 		"file_id":  fileID,
 		"filename": filename,
 		"error":    errorMsg,
@@ -284,7 +284,7 @@ func (eb *EventBroadcaster) BroadcastFileUploadError(fileID, filename string, er
 
 // BroadcastFileProcessingStart уведомляет о начале обработки файла
 func (eb *EventBroadcaster) BroadcastFileProcessingStart(fileID, filename string, processingType string) error {
-	event := NewEvent(EventTypeFileProcessingStart, map[string]interface{}{
+	event := NewEvent(EventTypeFileProcessingStart, map[string]any{
 		"file_id":         fileID,
 		"filename":        filename,
 		"processing_type": processingType, // "pdf_extract", "ocr", "csv_parse", etc.
@@ -294,7 +294,7 @@ func (eb *EventBroadcaster) BroadcastFileProcessingStart(fileID, filename string
 
 // BroadcastFileProcessingProgress отправляет progress updates для обработки
 func (eb *EventBroadcaster) BroadcastFileProcessingProgress(fileID string, stage string, percent float64) error {
-	event := NewEvent(EventTypeFileProcessingProgress, map[string]interface{}{
+	event := NewEvent(EventTypeFileProcessingProgress, map[string]any{
 		"file_id": fileID,
 		"stage":   stage, // "extracting", "parsing", "analyzing", etc.
 		"percent": percent,
@@ -303,8 +303,8 @@ func (eb *EventBroadcaster) BroadcastFileProcessingProgress(fileID string, stage
 }
 
 // BroadcastFileProcessingComplete уведомляет о завершении обработки
-func (eb *EventBroadcaster) BroadcastFileProcessingComplete(fileID string, result map[string]interface{}) error {
-	data := map[string]interface{}{
+func (eb *EventBroadcaster) BroadcastFileProcessingComplete(fileID string, result map[string]any) error {
+	data := map[string]any{
 		"file_id": fileID,
 		"result":  result,
 	}
@@ -315,7 +315,7 @@ func (eb *EventBroadcaster) BroadcastFileProcessingComplete(fileID string, resul
 
 // BroadcastFileProcessingError уведомляет об ошибке обработки
 func (eb *EventBroadcaster) BroadcastFileProcessingError(fileID string, errorMsg string) error {
-	event := NewEvent(EventTypeFileProcessingError, map[string]interface{}{
+	event := NewEvent(EventTypeFileProcessingError, map[string]any{
 		"file_id": fileID,
 		"error":   errorMsg,
 	})
@@ -337,8 +337,8 @@ const (
 )
 
 // BroadcastNotification отправляет system notification
-func (eb *EventBroadcaster) BroadcastNotification(level NotificationLevel, title, message string, action map[string]interface{}) error {
-	data := map[string]interface{}{
+func (eb *EventBroadcaster) BroadcastNotification(level NotificationLevel, title, message string, action map[string]any) error {
+	data := map[string]any{
 		"level":   level,
 		"title":   title,
 		"message": message,
@@ -357,14 +357,14 @@ func (eb *EventBroadcaster) BroadcastNotification(level NotificationLevel, title
 // ========================================
 
 // BroadcastAgentEvent отправляет событие от Agent системы
-func (eb *EventBroadcaster) BroadcastAgentEvent(eventType EventType, data map[string]interface{}) error {
+func (eb *EventBroadcaster) BroadcastAgentEvent(eventType EventType, data map[string]any) error {
 	event := NewEvent(eventType, data)
 	return eb.BroadcastEvent(event)
 }
 
 // BroadcastAgentSessionCreated уведомляет о создании Agent session
 func (eb *EventBroadcaster) BroadcastAgentSessionCreated(sessionID, task string) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentSessionCreated, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentSessionCreated, map[string]any{
 		"session_id": sessionID,
 		"task":       task,
 	})
@@ -372,14 +372,14 @@ func (eb *EventBroadcaster) BroadcastAgentSessionCreated(sessionID, task string)
 
 // BroadcastAgentPlanningStarted уведомляет о начале планирования
 func (eb *EventBroadcaster) BroadcastAgentPlanningStarted(sessionID string) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentPlanningStarted, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentPlanningStarted, map[string]any{
 		"session_id": sessionID,
 	})
 }
 
 // BroadcastAgentPlanningCompleted уведомляет о завершении планирования
 func (eb *EventBroadcaster) BroadcastAgentPlanningCompleted(sessionID string, totalSteps int) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentPlanningCompleted, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentPlanningCompleted, map[string]any{
 		"session_id":  sessionID,
 		"total_steps": totalSteps,
 	})
@@ -387,14 +387,14 @@ func (eb *EventBroadcaster) BroadcastAgentPlanningCompleted(sessionID string, to
 
 // BroadcastAgentExecutionStarted уведомляет о начале выполнения
 func (eb *EventBroadcaster) BroadcastAgentExecutionStarted(sessionID string) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentExecutionStarted, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentExecutionStarted, map[string]any{
 		"session_id": sessionID,
 	})
 }
 
 // BroadcastAgentStepStarted уведомляет о начале step
 func (eb *EventBroadcaster) BroadcastAgentStepStarted(sessionID string, stepNumber int, description string) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentStepStarted, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentStepStarted, map[string]any{
 		"session_id":  sessionID,
 		"step_number": stepNumber,
 		"description": description,
@@ -402,8 +402,8 @@ func (eb *EventBroadcaster) BroadcastAgentStepStarted(sessionID string, stepNumb
 }
 
 // BroadcastAgentStepCompleted уведомляет о завершении step
-func (eb *EventBroadcaster) BroadcastAgentStepCompleted(sessionID string, stepNumber int, result map[string]interface{}) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentStepCompleted, map[string]interface{}{
+func (eb *EventBroadcaster) BroadcastAgentStepCompleted(sessionID string, stepNumber int, result map[string]any) error {
+	return eb.BroadcastAgentEvent(EventTypeAgentStepCompleted, map[string]any{
 		"session_id":  sessionID,
 		"step_number": stepNumber,
 		"result":      result,
@@ -412,7 +412,7 @@ func (eb *EventBroadcaster) BroadcastAgentStepCompleted(sessionID string, stepNu
 
 // BroadcastAgentStepFailed уведомляет об ошибке step
 func (eb *EventBroadcaster) BroadcastAgentStepFailed(sessionID string, stepNumber int, errorMsg string) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentStepFailed, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentStepFailed, map[string]any{
 		"session_id":  sessionID,
 		"step_number": stepNumber,
 		"error":       errorMsg,
@@ -421,7 +421,7 @@ func (eb *EventBroadcaster) BroadcastAgentStepFailed(sessionID string, stepNumbe
 
 // BroadcastAgentApprovalNeeded уведомляет о необходимости approval
 func (eb *EventBroadcaster) BroadcastAgentApprovalNeeded(approvalID, sessionID string, stepNumber int, reason string) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentApprovalNeeded, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentApprovalNeeded, map[string]any{
 		"approval_id": approvalID,
 		"session_id":  sessionID,
 		"step_number": stepNumber,
@@ -431,11 +431,10 @@ func (eb *EventBroadcaster) BroadcastAgentApprovalNeeded(approvalID, sessionID s
 
 // BroadcastAgentProgressUpdate уведомляет об изменении прогресса
 func (eb *EventBroadcaster) BroadcastAgentProgressUpdate(sessionID string, currentStep, totalSteps int, percent int) error {
-	return eb.BroadcastAgentEvent(EventTypeAgentProgressUpdate, map[string]interface{}{
+	return eb.BroadcastAgentEvent(EventTypeAgentProgressUpdate, map[string]any{
 		"session_id":   sessionID,
 		"current_step": currentStep,
 		"total_steps":  totalSteps,
 		"percent":      percent,
 	})
 }
-

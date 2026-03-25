@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -24,8 +25,8 @@ type Handler struct {
 	logger *logrus.Logger
 
 	// Debounce mechanism for webhook events
-	debounce    *Debouncer
-	debounceMs  int
+	debounce   *Debouncer
+	debounceMs int
 
 	// Rate limiter for webhook flood protection
 	rateLimiter WebhookRateLimiter
@@ -247,7 +248,7 @@ func (h *Handler) handleMergeRequestEvent(ctx context.Context, w http.ResponseWr
 
 	// Use debounce to avoid processing multiple events for the same MR
 	debounceKey := fmt.Sprintf("%s:%d:%d", integration.ID, event.Project.ID, event.ObjectAttributes.IID)
-	
+
 	h.debounce.Debounce(debounceKey, func() {
 		// Process in background after debounce
 		h.processReview(context.Background(), integration, project, &event, webhookEvent.ID)
@@ -349,10 +350,8 @@ func (h *Handler) determinePriority(project *models.GitLabProject, event *client
 	}
 
 	// Check project target branches for priority
-	for _, branch := range project.Settings.TargetBranches {
-		if branch == targetBranch {
-			return models.GitLabReviewPriorityHigh
-		}
+	if slices.Contains(project.Settings.TargetBranches, targetBranch) {
+		return models.GitLabReviewPriorityHigh
 	}
 
 	// Check for release branches
@@ -455,7 +454,7 @@ func (d *Debouncer) Debounce(key string, fn func()) {
 		d.mu.Lock()
 		delete(d.pending, key)
 		d.mu.Unlock()
-		
+
 		// Execute the function
 		fn()
 	})
@@ -489,4 +488,3 @@ func (d *Debouncer) Stop() {
 		delete(d.pending, key)
 	}
 }
-

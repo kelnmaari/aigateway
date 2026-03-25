@@ -18,17 +18,17 @@ import (
 func TestWorkerPoolBasic(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
-	
+
 	pool := NewWorkerPool(PoolConfig{
 		Workers:   5,
 		QueueSize: 10,
 		Logger:    logger,
 	})
 	defer pool.Shutdown(5 * time.Second)
-	
+
 	// Submit tasks
 	var counter int64
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		err := pool.Submit(Task{
 			ID: "test-task-" + string(rune(i)),
 			Execute: func(ctx context.Context) error {
@@ -39,16 +39,16 @@ func TestWorkerPoolBasic(t *testing.T) {
 		})
 		require.NoError(t, err)
 	}
-	
+
 	// Wait and verify
 	time.Sleep(500 * time.Millisecond)
-	
+
 	metrics := pool.GetMetrics()
 	assert.Equal(t, int64(20), metrics.TotalTasks)
 	assert.Equal(t, int64(20), metrics.CompletedTasks)
 	assert.Equal(t, int64(0), metrics.FailedTasks)
 	assert.Equal(t, int64(20), atomic.LoadInt64(&counter))
-	
+
 	t.Logf("✅ Metrics: %+v", metrics)
 }
 
@@ -56,17 +56,17 @@ func TestWorkerPoolBasic(t *testing.T) {
 func TestWorkerPoolError(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
-	
+
 	pool := NewWorkerPool(PoolConfig{
 		Workers:   3,
 		QueueSize: 5,
 		Logger:    logger,
 	})
 	defer pool.Shutdown(5 * time.Second)
-	
+
 	// Submit failing task
 	var errorCount int64
-	
+
 	err := pool.Submit(Task{
 		ID: "failing-task",
 		Execute: func(ctx context.Context) error {
@@ -77,14 +77,14 @@ func TestWorkerPoolError(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	
+
 	// Wait for processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	metrics := pool.GetMetrics()
 	assert.Equal(t, int64(1), metrics.FailedTasks)
 	assert.Equal(t, int64(1), atomic.LoadInt64(&errorCount))
-	
+
 	t.Log("✅ Error handling works")
 }
 
@@ -92,15 +92,15 @@ func TestWorkerPoolError(t *testing.T) {
 func TestWorkerPoolShutdown(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
-	
+
 	pool := NewWorkerPool(PoolConfig{
 		Workers:   2,
 		QueueSize: 5,
 		Logger:    logger,
 	})
-	
+
 	// Submit long-running tasks
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = pool.Submit(Task{
 			ID: "long-task-" + string(rune(i)),
 			Execute: func(ctx context.Context) error {
@@ -109,14 +109,14 @@ func TestWorkerPoolShutdown(t *testing.T) {
 			},
 		})
 	}
-	
+
 	// Shutdown with timeout
 	err := pool.Shutdown(2 * time.Second)
 	require.NoError(t, err)
-	
+
 	metrics := pool.GetMetrics()
 	assert.Equal(t, int64(5), metrics.CompletedTasks)
-	
+
 	t.Log("✅ Graceful shutdown works")
 }
 
@@ -124,38 +124,38 @@ func TestWorkerPoolShutdown(t *testing.T) {
 func TestBatchProcessor(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
-	
+
 	pool := NewWorkerPool(PoolConfig{
 		Workers:   4,
 		QueueSize: 20,
 		Logger:    logger,
 	})
 	defer pool.Shutdown(5 * time.Second)
-	
+
 	bp := NewBatchProcessor[int](5, pool)
-	
+
 	// Process items
 	items := make([]int, 50)
 	for i := range items {
 		items[i] = i
 	}
-	
+
 	var counter int64
 	err := bp.Process(context.Background(), items, func(item int) error {
 		atomic.AddInt64(&counter, 1)
 		return nil
 	})
-	
+
 	require.NoError(t, err)
 	assert.Equal(t, int64(50), atomic.LoadInt64(&counter))
-	
+
 	t.Log("✅ Batch processing completed")
 }
 
 // TestParallelMap tests parallel map function
 func TestParallelMap(t *testing.T) {
 	items := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	
+
 	results, err := ParallelMap(
 		context.Background(),
 		items,
@@ -164,20 +164,20 @@ func TestParallelMap(t *testing.T) {
 		},
 		4,
 	)
-	
+
 	require.NoError(t, err)
 	require.Len(t, results, 10)
-	
+
 	expected := []int{2, 4, 6, 8, 10, 12, 14, 16, 18, 20}
 	assert.Equal(t, expected, results)
-	
+
 	t.Log("✅ ParallelMap works correctly")
 }
 
 // TestParallelMapError tests parallel map error handling
 func TestParallelMapError(t *testing.T) {
 	items := []int{1, 2, 3, 4, 5}
-	
+
 	_, err := ParallelMap(
 		context.Background(),
 		items,
@@ -189,10 +189,10 @@ func TestParallelMapError(t *testing.T) {
 		},
 		2,
 	)
-	
+
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error at 3")
-	
+
 	t.Log("✅ ParallelMap error handling works")
 }
 
@@ -200,16 +200,16 @@ func TestParallelMapError(t *testing.T) {
 func BenchmarkWorkerPoolThroughput(b *testing.B) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
-	
+
 	pool := NewWorkerPool(PoolConfig{
 		Workers:   10,
 		QueueSize: 1000,
 		Logger:    logger,
 	})
 	defer pool.Shutdown(5 * time.Second)
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = pool.Submit(Task{
 			ID: "bench-task",
@@ -227,9 +227,9 @@ func BenchmarkParallelMap(b *testing.B) {
 	for i := range items {
 		items[i] = i
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, _ = ParallelMap(
 			context.Background(),
@@ -241,4 +241,3 @@ func BenchmarkParallelMap(b *testing.B) {
 		)
 	}
 }
-

@@ -19,10 +19,10 @@ import (
 
 // AdminHandler обрабатывает административные эндпоинты
 type AdminHandler struct {
-	config       *config.Config
-	logger       *logrus.Logger
-	keyManager   *apikey.Manager  // Legacy JSON storage (deprecated)
-	db           storage.Database // Database for API keys (Version 1.3.0+)
+	config     *config.Config
+	logger     *logrus.Logger
+	keyManager *apikey.Manager  // Legacy JSON storage (deprecated)
+	db         storage.Database // Database for API keys (Version 1.3.0+)
 }
 
 // NewAdminHandler создает новый admin handler
@@ -45,7 +45,6 @@ func NewAdminHandlerWithoutKeys(cfg *config.Config, logger *logrus.Logger, db st
 		db:         db,  // Database для API ключей (Version 1.3.0+)
 	}
 }
-
 
 // ListAPIKeys обрабатывает GET /admin/api-keys
 func (h *AdminHandler) ListAPIKeys(c *gin.Context) {
@@ -162,7 +161,7 @@ func (h *AdminHandler) listAPIKeysFromDB(c *gin.Context) {
 		// Get owner username if available
 		if pagedKeys[i].UserID != nil && *pagedKeys[i].UserID != "" {
 			if user, err := h.db.GetUser(ctx, *pagedKeys[i].UserID); err == nil {
-				pagedKeys[i].Metadata = map[string]interface{}{
+				pagedKeys[i].Metadata = map[string]any{
 					"owner_username": user.Username,
 				}
 			}
@@ -172,7 +171,7 @@ func (h *AdminHandler) listAPIKeysFromDB(c *gin.Context) {
 		if pagedKeys[i].TenantID != nil && *pagedKeys[i].TenantID != "" {
 			if tenant, err := h.db.GetTenant(ctx, *pagedKeys[i].TenantID); err == nil {
 				if pagedKeys[i].Metadata == nil {
-					pagedKeys[i].Metadata = make(map[string]interface{})
+					pagedKeys[i].Metadata = make(map[string]any)
 				}
 				pagedKeys[i].Metadata["tenant_name"] = tenant.Name
 			}
@@ -826,8 +825,8 @@ func isPermissionError(err error) bool {
 }
 
 // parseModelParameters парсит строку параметров модели в map
-func parseModelParameters(paramsStr string) map[string]interface{} {
-	params := make(map[string]interface{})
+func parseModelParameters(paramsStr string) map[string]any {
+	params := make(map[string]any)
 	if paramsStr == "" {
 		return params
 	}
@@ -853,7 +852,7 @@ func parseModelParameters(paramsStr string) map[string]interface{} {
 }
 
 // getStringValue извлекает строковое значение из map
-func getStringValue(m map[string]interface{}, key string) string {
+func getStringValue(m map[string]any, key string) string {
 	if val, ok := m[key]; ok {
 		if strVal, ok := val.(string); ok {
 			return strVal
@@ -863,7 +862,7 @@ func getStringValue(m map[string]interface{}, key string) string {
 }
 
 // getIntValue извлекает числовое значение из map
-func getIntValue(m map[string]interface{}, key string) int {
+func getIntValue(m map[string]any, key string) int {
 	if val, ok := m[key]; ok {
 		switch v := val.(type) {
 		case int:
@@ -925,4 +924,3 @@ func trimSpace(s string) string {
 
 	return s[start:end]
 }
-

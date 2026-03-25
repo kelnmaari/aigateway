@@ -172,7 +172,7 @@ func (h *AdminUserHandler) CreateUser(c *gin.Context) {
 			Theme:    "dark",
 			Language: "en",
 		},
-		Metadata: make(map[string]interface{}), // Empty map for JSONB
+		Metadata: make(map[string]any), // Empty map for JSONB
 	}
 
 	// Save to database
@@ -199,7 +199,7 @@ func (h *AdminUserHandler) CreateUser(c *gin.Context) {
 			ChatEnabled:      true,
 			APIAccessEnabled: true,
 		},
-		Metadata: make(map[string]interface{}), // Empty map for JSONB
+		Metadata: make(map[string]any), // Empty map for JSONB
 	}
 
 	if err := h.db.CreateTenant(c.Request.Context(), tenant); err != nil {
@@ -212,7 +212,7 @@ func (h *AdminUserHandler) CreateUser(c *gin.Context) {
 			UserID:   user.ID,
 			Role:     models.TenantRoleOwner, // Role is TenantRole (not pointer)
 			JoinedAt: now,
-			Metadata: make(map[string]interface{}), // Empty map for JSONB
+			Metadata: make(map[string]any), // Empty map for JSONB
 		}
 		if err := h.db.AddTenantMember(c.Request.Context(), member); err != nil {
 			h.logger.WithError(err).Warn("Failed to add user to personal tenant")
@@ -520,4 +520,3 @@ func toPublicUser(user *models.User) gin.H {
 		"updated_at": user.UpdatedAt,
 	}
 }
-

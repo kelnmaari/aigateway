@@ -41,12 +41,12 @@ func DefaultOCROptions() OCROptions {
 
 // OCRResult contains the result of an OCR operation.
 type OCRResult struct {
-	Text          string                 // Extracted text
-	Confidence    float64                // Overall confidence (0-1)
-	Language      string                 // Detected language
-	BoundingBoxes []TextBoundingBox      // Text regions (optional)
-	Tables        []TableStructure       // Detected tables (optional)
-	Metadata      map[string]interface{} // Additional info
+	Text          string            // Extracted text
+	Confidence    float64           // Overall confidence (0-1)
+	Language      string            // Detected language
+	BoundingBoxes []TextBoundingBox // Text regions (optional)
+	Tables        []TableStructure  // Detected tables (optional)
+	Metadata      map[string]any    // Additional info
 }
 
 // TextBoundingBox represents a bounding box for detected text.
@@ -72,4 +72,3 @@ type TableStructure struct {
 	Data    [][]string
 	BBox    BoundingBox
 }
-

@@ -323,7 +323,7 @@ func (h *GitLabJobsHandler) StreamJobUpdates(c *gin.Context) {
 
 			// Send update if changed
 			if job.Progress != lastProgress || job.Status != lastStatus {
-				h.sendJobSSEEvent(c.Writer, flusher, "progress", map[string]interface{}{
+				h.sendJobSSEEvent(c.Writer, flusher, "progress", map[string]any{
 					"job_id":       job.ID,
 					"status":       job.Status,
 					"progress":     job.Progress,
@@ -348,7 +348,7 @@ func (h *GitLabJobsHandler) StreamJobUpdates(c *gin.Context) {
 }
 
 // sendJobSSEEvent sends a Server-Sent Event
-func (h *GitLabJobsHandler) sendJobSSEEvent(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
+func (h *GitLabJobsHandler) sendJobSSEEvent(w http.ResponseWriter, flusher http.Flusher, event string, data any) {
 	if data != nil {
 		jsonData, err := json.Marshal(data)
 		if err != nil {

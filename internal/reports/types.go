@@ -25,11 +25,11 @@ type ReportSchedule struct {
 
 // Report represents a generated report.
 type Report struct {
-	Type        ReportType  // Report type
-	Period      string      // Time period covered
-	GeneratedAt time.Time   // Generation timestamp
-	Data        interface{} // Report-specific data
-	HTML        string      // Rendered HTML content
+	Type        ReportType // Report type
+	Period      string     // Time period covered
+	GeneratedAt time.Time  // Generation timestamp
+	Data        any        // Report-specific data
+	HTML        string     // Rendered HTML content
 }
 
 // EmailReport represents an email to be sent.
@@ -76,19 +76,19 @@ type HourlyUsage struct {
 
 // PerformanceReportData contains performance metrics.
 type PerformanceReportData struct {
-	Period              string
-	TotalRequests       int64
-	AvgLatencyMS        float64
-	P50LatencyMS        float64
-	P95LatencyMS        float64
-	P99LatencyMS        float64
-	SlowRequestsCount   int
+	Period               string
+	TotalRequests        int64
+	AvgLatencyMS         float64
+	P50LatencyMS         float64
+	P95LatencyMS         float64
+	P99LatencyMS         float64
+	SlowRequestsCount    int
 	SlowRequestThreshold time.Duration
-	ErrorCount          int
-	ErrorRate           float64
-	RequestsPerSecond   float64
-	FastestRequest      float64
-	SlowestRequest      float64
+	ErrorCount           int
+	ErrorRate            float64
+	RequestsPerSecond    float64
+	FastestRequest       float64
+	SlowestRequest       float64
 }
 
 // SystemHealthReportData contains system health information.
@@ -109,5 +109,3 @@ type SystemHealthReportData struct {
 	InferenceVersion  string
 	LastBackup        *time.Time
 }
-
-

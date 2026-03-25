@@ -1,6 +1,7 @@
 package inference
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -26,11 +27,11 @@ func TestBuildVLLMRequest(t *testing.T) {
 	}
 
 	// Check command contains expected flags
-	cmdStr := ""
+	var cmdStr strings.Builder
 	for _, c := range req.Command {
-		cmdStr += c + " "
+		cmdStr.WriteString(c + " ")
 	}
-	if cmdStr == "" {
+	if cmdStr.String() == "" {
 		t.Error("Command is empty")
 	}
 
@@ -301,4 +302,3 @@ func TestBuildLlamaCPPRequest_ExtraArgs(t *testing.T) {
 		t.Error("Command missing --verbose from extra_args")
 	}
 }
-

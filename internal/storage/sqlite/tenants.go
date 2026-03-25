@@ -29,7 +29,7 @@ func (s *SQLiteDB) CreateTenant(ctx context.Context, tenant *models.Tenant) erro
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataValue interface{}
+	var metadataValue any
 	if tenant.Metadata != nil {
 		metadataJSON, err := json.Marshal(tenant.Metadata)
 		if err != nil {
@@ -37,7 +37,7 @@ func (s *SQLiteDB) CreateTenant(ctx context.Context, tenant *models.Tenant) erro
 		}
 		metadataValue = metadataJSON
 	} else {
-		metadataValue = nil  // SQLite NULL
+		metadataValue = nil // SQLite NULL
 	}
 
 	query := `
@@ -309,14 +309,14 @@ func (s *SQLiteDB) AddTenantMember(ctx context.Context, member *models.TenantMem
 		return fmt.Errorf("database not connected")
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 		"role":      member.Role,
 	}).Debug("Adding tenant member")
 
 	// Serialize metadata to JSON if present
-	var metadataValue interface{}
+	var metadataValue any
 	if member.Metadata != nil {
 		metadataJSON, err := json.Marshal(member.Metadata)
 		if err != nil {
@@ -324,7 +324,7 @@ func (s *SQLiteDB) AddTenantMember(ctx context.Context, member *models.TenantMem
 		}
 		metadataValue = metadataJSON
 	} else {
-		metadataValue = nil  // SQLite NULL
+		metadataValue = nil // SQLite NULL
 	}
 
 	query := `
@@ -350,7 +350,7 @@ func (s *SQLiteDB) AddTenantMember(ctx context.Context, member *models.TenantMem
 		return fmt.Errorf("failed to insert tenant member: %w", err)
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 	}).Info("Tenant member added successfully")
@@ -390,7 +390,7 @@ func (s *SQLiteDB) UpdateTenantMember(ctx context.Context, member *models.Tenant
 		return fmt.Errorf("database not connected")
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 	}).Debug("Updating tenant member")
@@ -436,7 +436,7 @@ func (s *SQLiteDB) UpdateTenantMember(ctx context.Context, member *models.Tenant
 		return fmt.Errorf("tenant member not found: tenant=%s, user=%s", member.TenantID, member.UserID)
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 	}).Info("Tenant member updated successfully")
@@ -450,7 +450,7 @@ func (s *SQLiteDB) RemoveTenantMember(ctx context.Context, tenantID, userID stri
 		return fmt.Errorf("database not connected")
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id": tenantID,
 		"user_id":   userID,
 	}).Debug("Removing tenant member")
@@ -471,7 +471,7 @@ func (s *SQLiteDB) RemoveTenantMember(ctx context.Context, tenantID, userID stri
 		return fmt.Errorf("tenant member not found: tenant=%s, user=%s", tenantID, userID)
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id": tenantID,
 		"user_id":   userID,
 	}).Info("Tenant member removed successfully")

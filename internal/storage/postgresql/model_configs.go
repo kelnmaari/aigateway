@@ -107,7 +107,7 @@ func (db *PostgreSQLDB) GetModelConfig(ctx context.Context, id string) (*models.
 // GetModelConfigByScope получает конфигурацию модели по scope и ID
 func (db *PostgreSQLDB) GetModelConfigByScope(ctx context.Context, modelName, scope string, scopeID *string) (*models.ModelConfig, error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	switch scope {
 	case "global":
@@ -116,7 +116,7 @@ func (db *PostgreSQLDB) GetModelConfigByScope(ctx context.Context, modelName, sc
 			FROM model_configs
 			WHERE model_name = $1 AND scope = 'global'
 		`
-		args = []interface{}{modelName}
+		args = []any{modelName}
 
 	case "tenant":
 		if scopeID == nil {
@@ -127,7 +127,7 @@ func (db *PostgreSQLDB) GetModelConfigByScope(ctx context.Context, modelName, sc
 			FROM model_configs
 			WHERE model_name = $1 AND scope = 'tenant' AND tenant_id = $2
 		`
-		args = []interface{}{modelName, *scopeID}
+		args = []any{modelName, *scopeID}
 
 	case "user":
 		if scopeID == nil {
@@ -138,7 +138,7 @@ func (db *PostgreSQLDB) GetModelConfigByScope(ctx context.Context, modelName, sc
 			FROM model_configs
 			WHERE model_name = $1 AND scope = 'user' AND user_id = $2
 		`
-		args = []interface{}{modelName, *scopeID}
+		args = []any{modelName, *scopeID}
 
 	default:
 		return nil, fmt.Errorf("invalid scope: %s", scope)
@@ -185,7 +185,7 @@ func (db *PostgreSQLDB) GetModelConfigByScope(ctx context.Context, modelName, sc
 // ListModelConfigs возвращает список конфигураций по фильтру
 func (db *PostgreSQLDB) ListModelConfigs(ctx context.Context, scope string, scopeID *string) ([]*models.ModelConfig, error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	if scope == "" {
 		// List all configs
@@ -214,7 +214,7 @@ func (db *PostgreSQLDB) ListModelConfigs(ctx context.Context, scope string, scop
 				WHERE scope = 'tenant' AND tenant_id = $1
 				ORDER BY created_at DESC
 			`
-			args = []interface{}{*scopeID}
+			args = []any{*scopeID}
 
 		case "user":
 			if scopeID == nil {
@@ -226,7 +226,7 @@ func (db *PostgreSQLDB) ListModelConfigs(ctx context.Context, scope string, scop
 				WHERE scope = 'user' AND user_id = $1
 				ORDER BY created_at DESC
 			`
-			args = []interface{}{*scopeID}
+			args = []any{*scopeID}
 
 		default:
 			return nil, fmt.Errorf("invalid scope: %s", scope)

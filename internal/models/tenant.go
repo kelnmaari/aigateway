@@ -30,7 +30,7 @@ type Tenant struct {
 	Settings TenantSettings `json:"settings" db:"settings"` // Настройки (JSONB)
 
 	// Metadata
-	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+	Metadata map[string]any `json:"metadata,omitempty" db:"metadata"`
 
 	// User's Role in this tenant (populated only in ListUserTenants)
 	Role string `json:"role,omitempty" db:"-"`
@@ -90,8 +90,8 @@ type TenantMember struct {
 	LeftAt    *time.Time `json:"left_at,omitempty" db:"left_at"` // Дата выхода (для истории)
 
 	// Metadata
-	InvitedBy string                 `json:"invited_by,omitempty" db:"invited_by"` // Кто пригласил
-	Metadata  map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+	InvitedBy string         `json:"invited_by,omitempty" db:"invited_by"` // Кто пригласил
+	Metadata  map[string]any `json:"metadata,omitempty" db:"metadata"`
 }
 
 // TenantRole представляет роль участника в tenant

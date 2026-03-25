@@ -54,8 +54,8 @@ func TestAnthropicProvider_HealthCheck_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"data": []map[string]interface{}{
+		resp := map[string]any{
+			"data": []map[string]any{
 				{
 					"id":           "claude-3-5-sonnet-20241022",
 					"display_name": "Claude 3.5 Sonnet",
@@ -80,7 +80,7 @@ func TestAnthropicProvider_HealthCheck_Success(t *testing.T) {
 func TestAnthropicProvider_HealthCheck_InvalidKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"type": "authentication_error",
 			"error": map[string]string{
 				"type":    "authentication_error",
@@ -105,8 +105,8 @@ func TestAnthropicProvider_ListModels(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"data": []map[string]interface{}{
+		resp := map[string]any{
+			"data": []map[string]any{
 				{
 					"id":           "claude-3-5-sonnet-20241022",
 					"display_name": "Claude 3.5 Sonnet",
@@ -170,8 +170,8 @@ func TestAnthropicProvider_HeaderVerification(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
-			"data":     []interface{}{},
+		resp := map[string]any{
+			"data":     []any{},
 			"has_more": false,
 		}
 		json.NewEncoder(w).Encode(resp)

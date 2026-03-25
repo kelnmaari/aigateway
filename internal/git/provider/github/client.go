@@ -83,7 +83,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 }
 
 // GetPullRequest fetches a pull request
-func (c *Client) GetPullRequest(ctx context.Context, projectID interface{}, prNumber int) (*provider.PullRequest, error) {
+func (c *Client) GetPullRequest(ctx context.Context, projectID any, prNumber int) (*provider.PullRequest, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/pulls/%d", repo, prNumber)
 
@@ -107,7 +107,7 @@ func (c *Client) GetPullRequest(ctx context.Context, projectID interface{}, prNu
 }
 
 // GetPullRequestChanges fetches PR changes/diff
-func (c *Client) GetPullRequestChanges(ctx context.Context, projectID interface{}, prNumber int) (*provider.PullRequestChanges, error) {
+func (c *Client) GetPullRequestChanges(ctx context.Context, projectID any, prNumber int) (*provider.PullRequestChanges, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/pulls/%d/files", repo, prNumber)
 
@@ -168,7 +168,7 @@ func (c *Client) GetPullRequestChanges(ctx context.Context, projectID interface{
 }
 
 // CreateComment creates a comment on a PR
-func (c *Client) CreateComment(ctx context.Context, projectID interface{}, prNumber int, body string) (*provider.Comment, error) {
+func (c *Client) CreateComment(ctx context.Context, projectID any, prNumber int, body string) (*provider.Comment, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/issues/%d/comments", repo, prNumber)
 
@@ -195,15 +195,15 @@ func (c *Client) CreateComment(ctx context.Context, projectID interface{}, prNum
 }
 
 // CreateInlineComment creates an inline comment on a PR
-func (c *Client) CreateInlineComment(ctx context.Context, projectID interface{}, prNumber int, comment *provider.InlineComment) (*provider.Comment, error) {
+func (c *Client) CreateInlineComment(ctx context.Context, projectID any, prNumber int, comment *provider.InlineComment) (*provider.Comment, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/pulls/%d/comments", repo, prNumber)
 
-	payload := map[string]interface{}{
-		"body":      comment.Body,
-		"path":      comment.Path,
-		"line":      comment.Line,
-		"side":      "RIGHT",
+	payload := map[string]any{
+		"body": comment.Body,
+		"path": comment.Path,
+		"line": comment.Line,
+		"side": "RIGHT",
 	}
 	if comment.CommitID != "" {
 		payload["commit_id"] = comment.CommitID
@@ -231,7 +231,7 @@ func (c *Client) CreateInlineComment(ctx context.Context, projectID interface{},
 }
 
 // GetProject fetches repository details
-func (c *Client) GetProject(ctx context.Context, projectID interface{}) (*provider.Project, error) {
+func (c *Client) GetProject(ctx context.Context, projectID any) (*provider.Project, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s", repo)
 
@@ -276,7 +276,7 @@ func (c *Client) GetCurrentUser(ctx context.Context) (*provider.User, error) {
 }
 
 // CreateWebhook creates a repository webhook
-func (c *Client) CreateWebhook(ctx context.Context, projectID interface{}, config *provider.WebhookConfig) (*provider.Webhook, error) {
+func (c *Client) CreateWebhook(ctx context.Context, projectID any, config *provider.WebhookConfig) (*provider.Webhook, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/hooks", repo)
 
@@ -285,11 +285,11 @@ func (c *Client) CreateWebhook(ctx context.Context, projectID interface{}, confi
 		events = []string{"pull_request", "pull_request_review"}
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"name":   "web",
 		"active": config.Active,
 		"events": events,
-		"config": map[string]interface{}{
+		"config": map[string]any{
 			"url":          config.URL,
 			"content_type": "json",
 			"secret":       config.Secret,
@@ -325,7 +325,7 @@ func (c *Client) CreateWebhook(ctx context.Context, projectID interface{}, confi
 }
 
 // DeleteWebhook deletes a webhook
-func (c *Client) DeleteWebhook(ctx context.Context, projectID interface{}, webhookID int64) error {
+func (c *Client) DeleteWebhook(ctx context.Context, projectID any, webhookID int64) error {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/hooks/%d", repo, webhookID)
 
@@ -344,7 +344,7 @@ func (c *Client) DeleteWebhook(ctx context.Context, projectID interface{}, webho
 }
 
 // GetFile fetches file content
-func (c *Client) GetFile(ctx context.Context, projectID interface{}, filePath, ref string) (*provider.File, error) {
+func (c *Client) GetFile(ctx context.Context, projectID any, filePath, ref string) (*provider.File, error) {
 	repo := c.parseProjectID(projectID)
 	path := fmt.Sprintf("/repos/%s/contents/%s", repo, filePath)
 	if ref != "" {
@@ -397,7 +397,7 @@ func (c *Client) ValidateWebhook(payload []byte, signature string, secret string
 
 // Helper functions
 
-func (c *Client) parseProjectID(projectID interface{}) string {
+func (c *Client) parseProjectID(projectID any) string {
 	switch v := projectID.(type) {
 	case string:
 		return v
@@ -481,4 +481,3 @@ func (c *Client) convertComment(gh *GitHubComment) *provider.Comment {
 	}
 	return comment
 }
-

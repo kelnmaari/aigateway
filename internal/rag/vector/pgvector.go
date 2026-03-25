@@ -117,7 +117,7 @@ func (s *PgVectorStore) initialize() error {
 		}
 
 		// HNSW parameters
-		m := 16 // default
+		m := 16              // default
 		efConstruction := 64 // default
 		if s.config.HNSWParams != nil {
 			if mVal, ok := s.config.HNSWParams["m"].(int); ok {
@@ -263,21 +263,22 @@ func (s *PgVectorStore) Search(ctx context.Context, req SearchRequest) (*SearchR
 		distanceOp = "<=>" // Default cosine
 	}
 
-	querySQL := fmt.Sprintf(`
+	var querySQL strings.Builder
+	querySQL.WriteString(fmt.Sprintf(`
 		SELECT 
 			id, chunk_id, text, metadata, created_at,
 			1 - (embedding %s $1::vector) AS score
 		FROM %s
 		WHERE 1=1
-	`, distanceOp, s.config.TableName)
+	`, distanceOp, s.config.TableName))
 
-	args := []interface{}{vectorToString(req.Query)}
+	args := []any{vectorToString(req.Query)}
 	argIndex := 2
 
 	// Add filters
 	if len(req.Filters) > 0 {
 		for key, value := range req.Filters {
-			querySQL += fmt.Sprintf(" AND metadata->>'%s' = $%d", key, argIndex)
+			querySQL.WriteString(fmt.Sprintf(" AND metadata->>'%s' = $%d", key, argIndex))
 			args = append(args, fmt.Sprintf("%v", value))
 			argIndex++
 		}
@@ -285,18 +286,18 @@ func (s *PgVectorStore) Search(ctx context.Context, req SearchRequest) (*SearchR
 
 	// Add min score filter
 	if req.MinScore > 0 {
-		querySQL += fmt.Sprintf(" AND 1 - (embedding %s $1::vector) >= $%d", distanceOp, argIndex)
+		querySQL.WriteString(fmt.Sprintf(" AND 1 - (embedding %s $1::vector) >= $%d", distanceOp, argIndex))
 		args = append(args, req.MinScore)
 		argIndex++
 	}
 
 	// Order by similarity и limit
-	querySQL += fmt.Sprintf(" ORDER BY embedding %s $1::vector LIMIT $%d", distanceOp, argIndex)
+	querySQL.WriteString(fmt.Sprintf(" ORDER BY embedding %s $1::vector LIMIT $%d", distanceOp, argIndex))
 	args = append(args, req.TopK)
 
 	startTime := time.Now()
 
-	rows, err := s.db.QueryContext(ctx, querySQL, args...)
+	rows, err := s.db.QueryContext(ctx, querySQL.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute search: %w", err)
 	}
@@ -324,7 +325,7 @@ func (s *PgVectorStore) Search(ctx context.Context, req SearchRequest) (*SearchR
 
 		// Parse metadata
 		if err := json.Unmarshal([]byte(metadataJSON), &doc.Metadata); err != nil {
-			doc.Metadata = make(map[string]interface{})
+			doc.Metadata = make(map[string]any)
 		}
 
 		documents = append(documents, doc)
@@ -353,22 +354,23 @@ func (s *PgVectorStore) Delete(ctx context.Context, id string) error {
 }
 
 // DeleteByMetadata удаляет vectors по метаданным
-func (s *PgVectorStore) DeleteByMetadata(ctx context.Context, filters map[string]interface{}) (int, error) {
+func (s *PgVectorStore) DeleteByMetadata(ctx context.Context, filters map[string]any) (int, error) {
 	if len(filters) == 0 {
 		return 0, fmt.Errorf("filters are required")
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s WHERE 1=1", s.config.TableName)
-	var args []interface{}
+	var query strings.Builder
+	query.WriteString(fmt.Sprintf("DELETE FROM %s WHERE 1=1", s.config.TableName))
+	var args []any
 	argIndex := 1
 
 	for key, value := range filters {
-		query += fmt.Sprintf(" AND metadata->>'%s' = $%d", key, argIndex)
+		query.WriteString(fmt.Sprintf(" AND metadata->>'%s' = $%d", key, argIndex))
 		args = append(args, fmt.Sprintf("%v", value))
 		argIndex++
 	}
 
-	result, err := s.db.ExecContext(ctx, query, args...)
+	result, err := s.db.ExecContext(ctx, query.String(), args...)
 	if err != nil {
 		return 0, fmt.Errorf("failed to delete by metadata: %w", err)
 	}
@@ -432,7 +434,7 @@ func (s *PgVectorStore) GetByID(ctx context.Context, id string) (*VectorDocument
 }
 
 // CreateIndex создает HNSW индекс для быстрого поиска
-func (s *PgVectorStore) CreateIndex(ctx context.Context, indexType string, params map[string]interface{}) error {
+func (s *PgVectorStore) CreateIndex(ctx context.Context, indexType string, params map[string]any) error {
 	indexName := fmt.Sprintf("%s_embedding_idx", s.config.TableName)
 
 	if indexType == "hnsw" {
@@ -458,8 +460,8 @@ func (s *PgVectorStore) CreateIndex(ctx context.Context, indexType string, param
 		}
 
 		s.logger.WithFields(logrus.Fields{
-			"index":          indexName,
-			"m":              m,
+			"index":           indexName,
+			"m":               m,
 			"ef_construction": efConstruction,
 		}).Info("HNSW index created")
 
@@ -482,7 +484,7 @@ func (s *PgVectorStore) CreateIndex(ctx context.Context, indexType string, param
 // GetIndexStats возвращает статистику индекса
 func (s *PgVectorStore) GetIndexStats(ctx context.Context) (*IndexStats, error) {
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", s.config.TableName)
-	
+
 	var totalVectors int64
 	err := s.db.QueryRowContext(ctx, query).Scan(&totalVectors)
 	if err != nil {
@@ -547,5 +549,3 @@ func stringToVector(s string) ([]float64, error) {
 
 // Ensure PgVectorStore implements VectorStore interface
 var _ VectorStore = (*PgVectorStore)(nil)
-
-

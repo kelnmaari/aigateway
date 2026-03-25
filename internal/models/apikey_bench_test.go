@@ -71,7 +71,7 @@ func BenchmarkAPIKey_HasModelAccess_Original(b *testing.B) {
 	key, _, _ := NewAPIKey(CreateAPIKeyRequest{
 		Name:   "test",
 		Models: []string{"gpt-4", "gpt-3.5-turbo", "claude-3"},
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"description": "Test key with lots of metadata",
 			"tags":        []string{"production", "team-alpha", "high-priority"},
 			"created_by":  "admin@example.com",
@@ -146,7 +146,7 @@ func BenchmarkConvertToHotCold(b *testing.B) {
 		Name:        "test",
 		Models:      []string{"gpt-4", "gpt-3.5-turbo"},
 		Permissions: []string{"chat", "models"},
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"description": "Test key",
 		},
 	})
@@ -265,4 +265,3 @@ Memory:
 
 Trade-off: +200 bytes per key для 3-18x speedup на hot path
 */
-

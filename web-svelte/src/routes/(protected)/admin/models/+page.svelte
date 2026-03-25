@@ -18,7 +18,7 @@
 	import { api } from '$lib/api/client';
 	import { downloadsApi } from '$lib/api/downloads';
 	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
-	import { faMagnifyingGlass, faDownload, faArrowUpRightFromSquare, faSpinner, faFont, faBolt, faRocket, faFaceSmile, faHorse, faLink, faChartBar, faShuffle, faGear, faArrowsRotate, faPause, faPlay, faXmark, faCircleCheck, faTriangleExclamation, faCircleXmark, faHourglass, faFolder, faTrashCan, faLightbulb, faArrowRight, faClipboard, faBan, faArrowDown } from '@fortawesome/free-solid-svg-icons';
+	import { faMagnifyingGlass, faDownload, faArrowUpRightFromSquare, faSpinner, faFont, faBolt, faRocket, faFaceSmile, faHorse, faLink, faChartBar, faShuffle, faGear, faArrowsRotate, faPause, faPlay, faXmark, faCircleCheck, faTriangleExclamation, faCircleXmark, faHourglass, faFolder, faTrashCan, faLightbulb, faArrowRight, faBan, faArrowDown } from '@fortawesome/free-solid-svg-icons';
 	import { faHeart } from '@fortawesome/free-regular-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 

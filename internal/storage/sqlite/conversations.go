@@ -214,7 +214,7 @@ func (s *SQLiteDB) ListUserConversations(ctx context.Context, userID string, fil
 		WHERE user_id = ?
 	`
 
-	var args []interface{}
+	var args []any
 	args = append(args, userID)
 
 	// Apply filters
@@ -508,7 +508,7 @@ func (s *SQLiteDB) DeleteConversationMessages(ctx context.Context, convID string
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"conversation_id": convID,
 		"deleted_count":   rowsAffected,
 	}).Info("Conversation messages deleted successfully")
@@ -637,4 +637,3 @@ func (s *SQLiteDB) scanMessage(row scanner) (*models.Message, error) {
 
 	return &msg, nil
 }
-

@@ -10,7 +10,7 @@ stages:
 
 variables:
   # Go configuration
-  GO_VERSION: "1.25.5"
+  GO_VERSION: "1.26.1"
   GOPROXY: "https://proxy.golang.org,direct"
   CGO_ENABLED: "0"
   

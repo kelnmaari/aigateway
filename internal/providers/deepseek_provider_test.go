@@ -81,7 +81,7 @@ func TestDeepSeekProvider_HealthCheck_Success(t *testing.T) {
 func TestDeepSeekProvider_HealthCheck_Unauthorized(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"error": map[string]string{
 				"message": "Invalid API key",
 				"type":    "invalid_request_error",
@@ -104,9 +104,9 @@ func TestDeepSeekProvider_ListModels(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"object": "list",
-			"data": []map[string]interface{}{
+			"data": []map[string]any{
 				{
 					"id":       "deepseek-chat",
 					"object":   "model",
@@ -148,9 +148,9 @@ func TestDeepSeekProvider_ListModels_Empty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"object": "list",
-			"data":   []interface{}{},
+			"data":   []any{},
 		}
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -170,7 +170,7 @@ func TestDeepSeekProvider_GetModelInfo(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"id":       "deepseek-chat",
 			"object":   "model",
 			"created":  1700000000,

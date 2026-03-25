@@ -19,15 +19,13 @@ func TestAPIKeyUsage_RaceCondition(t *testing.T) {
 
 	// Запускаем 100 goroutines которые конкурентно обновляют счетчики
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 1000; j++ {
+	for range 100 {
+		wg.Go(func() {
+			for range 1000 {
 				// Эта функция НЕ thread-safe!
 				key.IncrementUsage("gpt-4", "/v1/chat/completions", 1000, true)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -53,15 +51,13 @@ func TestAPIKeyUsageHot_NoRaceCondition(t *testing.T) {
 
 	// Запускаем 100 goroutines которые конкурентно обновляют счетчики
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 1000; j++ {
+	for range 100 {
+		wg.Go(func() {
+			for range 1000 {
 				// Thread-safe благодаря atomic operations
 				usage.IncrementUsage(1000, true)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -113,13 +109,11 @@ func TestAPIKeyUsage_Correctness(t *testing.T) {
 
 			var wg sync.WaitGroup
 			for i := 0; i < tt.goroutines; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					for j := 0; j < tt.iterations; j++ {
 						usage.IncrementUsage(1000, tt.success)
 					}
-				}()
+				})
 			}
 
 			wg.Wait()
@@ -231,4 +225,3 @@ Benchmark:
   Optimized_Sequential: ~8ns/op   (only atomic ops)
   Optimized_Parallel:   ~15ns/op  (with padding, no false sharing)
 */
-

@@ -21,31 +21,31 @@ type Provider interface {
 	Type() ProviderType
 
 	// GetPullRequest fetches pull/merge request details
-	GetPullRequest(ctx context.Context, projectID interface{}, prNumber int) (*PullRequest, error)
+	GetPullRequest(ctx context.Context, projectID any, prNumber int) (*PullRequest, error)
 
 	// GetPullRequestChanges fetches the diff/changes of a PR
-	GetPullRequestChanges(ctx context.Context, projectID interface{}, prNumber int) (*PullRequestChanges, error)
+	GetPullRequestChanges(ctx context.Context, projectID any, prNumber int) (*PullRequestChanges, error)
 
 	// CreateComment posts a comment on a PR
-	CreateComment(ctx context.Context, projectID interface{}, prNumber int, body string) (*Comment, error)
+	CreateComment(ctx context.Context, projectID any, prNumber int, body string) (*Comment, error)
 
 	// CreateInlineComment posts an inline comment on specific lines
-	CreateInlineComment(ctx context.Context, projectID interface{}, prNumber int, comment *InlineComment) (*Comment, error)
+	CreateInlineComment(ctx context.Context, projectID any, prNumber int, comment *InlineComment) (*Comment, error)
 
 	// GetProject fetches project/repository details
-	GetProject(ctx context.Context, projectID interface{}) (*Project, error)
+	GetProject(ctx context.Context, projectID any) (*Project, error)
 
 	// GetCurrentUser returns the authenticated user
 	GetCurrentUser(ctx context.Context) (*User, error)
 
 	// CreateWebhook creates a webhook for a project
-	CreateWebhook(ctx context.Context, projectID interface{}, config *WebhookConfig) (*Webhook, error)
+	CreateWebhook(ctx context.Context, projectID any, config *WebhookConfig) (*Webhook, error)
 
 	// DeleteWebhook deletes a webhook
-	DeleteWebhook(ctx context.Context, projectID interface{}, webhookID int64) error
+	DeleteWebhook(ctx context.Context, projectID any, webhookID int64) error
 
 	// GetFile fetches file content from repository
-	GetFile(ctx context.Context, projectID interface{}, path, ref string) (*File, error)
+	GetFile(ctx context.Context, projectID any, path, ref string) (*File, error)
 
 	// ValidateWebhook validates webhook signature
 	ValidateWebhook(payload []byte, signature string, secret string) bool
@@ -54,7 +54,7 @@ type Provider interface {
 // PullRequest represents a unified pull/merge request across providers
 type PullRequest struct {
 	ID           int64      `json:"id"`
-	Number       int        `json:"number"`       // IID in GitLab, number in GitHub/Bitbucket
+	Number       int        `json:"number"` // IID in GitLab, number in GitHub/Bitbucket
 	Title        string     `json:"title"`
 	Description  string     `json:"description"`
 	State        PRState    `json:"state"`
@@ -69,7 +69,7 @@ type PullRequest struct {
 	ClosedAt     *time.Time `json:"closed_at,omitempty"`
 
 	// Provider-specific data
-	ProviderData map[string]interface{} `json:"provider_data,omitempty"`
+	ProviderData map[string]any `json:"provider_data,omitempty"`
 }
 
 // PRState represents pull request state
@@ -134,17 +134,17 @@ type InlineComment struct {
 
 // Project represents a repository/project
 type Project struct {
-	ID                int64    `json:"id"`
-	Name              string   `json:"name"`
-	FullName          string   `json:"full_name"` // owner/repo format
-	Description       string   `json:"description"`
-	DefaultBranch     string   `json:"default_branch"`
-	WebURL            string   `json:"web_url"`
-	CloneURL          string   `json:"clone_url"`
-	Private           bool     `json:"private"`
-	Archived          bool     `json:"archived"`
-	Language          string   `json:"language"`
-	Languages         []string `json:"languages,omitempty"`
+	ID            int64    `json:"id"`
+	Name          string   `json:"name"`
+	FullName      string   `json:"full_name"` // owner/repo format
+	Description   string   `json:"description"`
+	DefaultBranch string   `json:"default_branch"`
+	WebURL        string   `json:"web_url"`
+	CloneURL      string   `json:"clone_url"`
+	Private       bool     `json:"private"`
+	Archived      bool     `json:"archived"`
+	Language      string   `json:"language"`
+	Languages     []string `json:"languages,omitempty"`
 }
 
 // User represents a user on the platform
@@ -159,11 +159,11 @@ type User struct {
 
 // WebhookConfig contains webhook creation configuration
 type WebhookConfig struct {
-	URL         string   `json:"url"`
-	Secret      string   `json:"secret"`
-	Events      []string `json:"events"`
-	Active      bool     `json:"active"`
-	SSLVerify   bool     `json:"ssl_verify"`
+	URL       string   `json:"url"`
+	Secret    string   `json:"secret"`
+	Events    []string `json:"events"`
+	Active    bool     `json:"active"`
+	SSLVerify bool     `json:"ssl_verify"`
 }
 
 // Webhook represents a configured webhook
@@ -186,14 +186,14 @@ type File struct {
 
 // WebhookEvent represents a parsed webhook event
 type WebhookEvent struct {
-	Type       WebhookEventType       `json:"type"`
-	Action     string                 `json:"action"`
-	Provider   ProviderType           `json:"provider"`
-	ProjectID  interface{}            `json:"project_id"`
-	PRNumber   int                    `json:"pr_number"`
-	PR         *PullRequest           `json:"pull_request,omitempty"`
-	User       *User                  `json:"user,omitempty"`
-	RawPayload map[string]interface{} `json:"raw_payload,omitempty"`
+	Type       WebhookEventType `json:"type"`
+	Action     string           `json:"action"`
+	Provider   ProviderType     `json:"provider"`
+	ProjectID  any              `json:"project_id"`
+	PRNumber   int              `json:"pr_number"`
+	PR         *PullRequest     `json:"pull_request,omitempty"`
+	User       *User            `json:"user,omitempty"`
+	RawPayload map[string]any   `json:"raw_payload,omitempty"`
 }
 
 // WebhookEventType represents the type of webhook event
@@ -214,4 +214,3 @@ type ProviderConfig struct {
 	WebhookSecret   string       `json:"webhook_secret"`
 	RateLimitPerSec int          `json:"rate_limit_per_sec"`
 }
-

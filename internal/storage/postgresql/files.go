@@ -169,7 +169,7 @@ func (db *PostgreSQLDB) ListFilesWithUserInfo(ctx context.Context, req models.Li
 		WHERE f.deleted_at IS NULL
 	`
 
-	args := []interface{}{}
+	args := []any{}
 	paramIndex := 1 // PostgreSQL uses $1, $2, $3...
 
 	// Фильтры
@@ -279,7 +279,7 @@ func (db *PostgreSQLDB) ListFiles(ctx context.Context, req models.ListFilesReque
 		WHERE deleted_at IS NULL
 	`
 
-	args := []interface{}{}
+	args := []any{}
 	paramIndex := 1 // PostgreSQL uses $1, $2, $3...
 
 	// Фильтры

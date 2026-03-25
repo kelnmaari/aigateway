@@ -201,7 +201,7 @@ func (s *Scanner) findDependencyFile(ctx context.Context, collection, projectID,
 	chunks := make(map[string][]chunkInfo)
 	var finalFilePath string
 
-	err := s.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -500,7 +500,7 @@ func (s *Scanner) findAllDependencyFiles(ctx context.Context, collection, projec
 		fileSpecMap[spec.filename] = spec
 	}
 
-	err := s.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {

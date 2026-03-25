@@ -119,7 +119,7 @@ func (h *SettingsHandler) UpdateSetting(c *gin.Context) {
 		return
 	}
 
-	h.logger.WithFields(map[string]interface{}{
+	h.logger.WithFields(map[string]any{
 		"id":        settingID,
 		"old_value": setting.Value,
 		"new_value": req.Value,

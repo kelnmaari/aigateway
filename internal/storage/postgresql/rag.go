@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
 )
@@ -195,7 +194,7 @@ func (db *PostgreSQLDB) ListRAGDataSources(ctx context.Context, filter *storage.
 
 	// Build WHERE clause
 	var whereClauses []string
-	var args []interface{}
+	var args []any
 	paramIndex := 1
 
 	if filter.UserID != nil {
@@ -471,7 +470,7 @@ func (db *PostgreSQLDB) ListRAGDocuments(ctx context.Context, filter *storage.RA
 	}
 
 	var whereClauses []string
-	var args []interface{}
+	var args []any
 	paramIndex := 1
 
 	if filter.SourceID != nil {
@@ -711,7 +710,7 @@ func (db *PostgreSQLDB) ListRAGChunksBySource(ctx context.Context, sourceID stri
 		limit = 100
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"source_id": sourceID,
 		"limit":     limit,
 		"offset":    offset,
@@ -774,7 +773,7 @@ func (db *PostgreSQLDB) ListRAGChunksBySource(ctx context.Context, sourceID stri
 		chunks = append(chunks, &chunk)
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"source_id":       sourceID,
 		"rows_scanned":    rowCount,
 		"chunks_returned": len(chunks),

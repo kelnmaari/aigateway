@@ -29,13 +29,13 @@ type ModelDownloader struct {
 
 // ModelDownloaderConfig contains initialization parameters.
 type ModelDownloaderConfig struct {
-	HFToken        string
-	HFCacheDir     string
-	GGUFCacheDir   string
-	MaxConcurrent  int
-	AutoResume     bool
-	HTTPTimeout    time.Duration
-	Logger         *logrus.Logger
+	HFToken       string
+	HFCacheDir    string
+	GGUFCacheDir  string
+	MaxConcurrent int
+	AutoResume    bool
+	HTTPTimeout   time.Duration
+	Logger        *logrus.Logger
 }
 
 // NewModelDownloader constructs a downloader with HF and generic HTTP support.
@@ -111,7 +111,7 @@ func (d *ModelDownloader) EnsureGGUF(ctx context.Context, url, expectedSHA strin
 	}
 
 	var lastErr error
-	for attempt := 0; attempt < maxDownloadRetries; attempt++ {
+	for attempt := range maxDownloadRetries {
 		if attempt > 0 {
 			backoff := retryBackoff(attempt)
 			d.logger.WithFields(logrus.Fields{
@@ -153,7 +153,7 @@ const maxDownloadRetries = 3
 func retryBackoff(attempt int) time.Duration {
 	// 1s, 2s, 4s, 8s, ...
 	base := time.Second
-	for i := 0; i < attempt; i++ {
+	for range attempt {
 		base *= 2
 	}
 	if base > 30*time.Second {
@@ -402,4 +402,3 @@ func fileOK(path, expectedSHA string) bool {
 	}
 	return hex.EncodeToString(hash.Sum(nil)) == expectedSHA
 }
-

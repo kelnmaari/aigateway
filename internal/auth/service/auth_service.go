@@ -37,10 +37,10 @@ func NewAuthService(db storage.Database, jwtManager *jwt.Manager, cfg *config.Co
 
 // RegisterRequest запрос на регистрацию
 type RegisterRequest struct {
-	Username       string `json:"username" binding:"required"`
-	Email          string `json:"email" binding:"required"`
-	Password       string `json:"password" binding:"required"`
-	DisplayName    string `json:"display_name,omitempty"`
+	Username        string `json:"username" binding:"required"`
+	Email           string `json:"email" binding:"required"`
+	Password        string `json:"password" binding:"required"`
+	DisplayName     string `json:"display_name,omitempty"`
 	InvitationToken string `json:"invitation_token,omitempty"` // AUTH-03: Invitation system (v2.2.0)
 }
 
@@ -182,7 +182,7 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Regis
 			ChatEnabled:      true,
 			APIAccessEnabled: true,
 		},
-		Metadata: make(map[string]interface{}), // Empty map for JSONB
+		Metadata: make(map[string]any), // Empty map for JSONB
 	}
 
 	if err := tx.CreateTenant(ctx, tenant); err != nil {
@@ -196,7 +196,7 @@ func (s *AuthService) Register(ctx context.Context, req RegisterRequest) (*Regis
 		Role:      models.TenantRoleOwner,
 		JoinedAt:  time.Now(),
 		UpdatedAt: time.Now(),
-		Metadata:  make(map[string]interface{}), // Empty map for JSONB
+		Metadata:  make(map[string]any), // Empty map for JSONB
 	}
 
 	if err := tx.AddTenantMember(ctx, member); err != nil {
@@ -529,4 +529,3 @@ func generateSlug(username string) string {
 
 	return slug
 }
-

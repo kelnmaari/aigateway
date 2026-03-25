@@ -29,22 +29,22 @@ type Job struct {
 	Priority     Priority
 	CreatedAt    time.Time
 	ScheduledAt  time.Time
-	
+
 	// Internal priority heap index
 	index int
 }
 
 // PriorityQueue implements a priority queue with branch-based prioritization
 type PriorityQueue struct {
-	mu           sync.RWMutex
-	items        jobHeap
-	branchRules  []BranchRule
-	defaultPrio  Priority
+	mu          sync.RWMutex
+	items       jobHeap
+	branchRules []BranchRule
+	defaultPrio Priority
 }
 
 // BranchRule defines priority rules for branches
 type BranchRule struct {
-	Pattern  string   // Branch name pattern (glob-like)
+	Pattern  string // Branch name pattern (glob-like)
 	Priority Priority
 	Branches []string // Exact branch names
 }
@@ -56,12 +56,12 @@ func NewPriorityQueue(rules []BranchRule) *PriorityQueue {
 		branchRules: rules,
 		defaultPrio: PriorityNormal,
 	}
-	
+
 	// Add default rules if none provided
 	if len(pq.branchRules) == 0 {
 		pq.branchRules = DefaultBranchRules()
 	}
-	
+
 	heap.Init(&pq.items)
 	return pq
 }
@@ -98,12 +98,12 @@ func DefaultBranchRules() []BranchRule {
 func (pq *PriorityQueue) Push(job *Job) {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	// Determine priority based on target branch
 	if job.Priority == 0 {
 		job.Priority = pq.determinePriority(job.TargetBranch)
 	}
-	
+
 	// Set timestamps
 	if job.CreatedAt.IsZero() {
 		job.CreatedAt = time.Now()
@@ -111,7 +111,7 @@ func (pq *PriorityQueue) Push(job *Job) {
 	if job.ScheduledAt.IsZero() {
 		job.ScheduledAt = time.Now()
 	}
-	
+
 	heap.Push(&pq.items, job)
 }
 
@@ -119,11 +119,11 @@ func (pq *PriorityQueue) Push(job *Job) {
 func (pq *PriorityQueue) Pop() *Job {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	if pq.items.Len() == 0 {
 		return nil
 	}
-	
+
 	item := heap.Pop(&pq.items).(*Job)
 	return item
 }
@@ -132,11 +132,11 @@ func (pq *PriorityQueue) Pop() *Job {
 func (pq *PriorityQueue) Peek() *Job {
 	pq.mu.RLock()
 	defer pq.mu.RUnlock()
-	
+
 	if pq.items.Len() == 0 {
 		return nil
 	}
-	
+
 	return pq.items[0]
 }
 
@@ -151,7 +151,7 @@ func (pq *PriorityQueue) Len() int {
 func (pq *PriorityQueue) Remove(jobID string) bool {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	for i, job := range pq.items {
 		if job.ID == jobID {
 			heap.Remove(&pq.items, i)
@@ -165,7 +165,7 @@ func (pq *PriorityQueue) Remove(jobID string) bool {
 func (pq *PriorityQueue) UpdatePriority(jobID string, priority Priority) bool {
 	pq.mu.Lock()
 	defer pq.mu.Unlock()
-	
+
 	for i, job := range pq.items {
 		if job.ID == jobID {
 			job.Priority = priority
@@ -180,26 +180,26 @@ func (pq *PriorityQueue) UpdatePriority(jobID string, priority Priority) bool {
 func (pq *PriorityQueue) GetStats() QueueStats {
 	pq.mu.RLock()
 	defer pq.mu.RUnlock()
-	
+
 	stats := QueueStats{
-		Total:    pq.items.Len(),
+		Total:      pq.items.Len(),
 		ByPriority: make(map[Priority]int),
 	}
-	
+
 	for _, job := range pq.items {
 		stats.ByPriority[job.Priority]++
-		
+
 		waitTime := time.Since(job.ScheduledAt)
 		stats.TotalWaitTime += waitTime
 		if waitTime > stats.MaxWaitTime {
 			stats.MaxWaitTime = waitTime
 		}
 	}
-	
+
 	if stats.Total > 0 {
 		stats.AvgWaitTime = stats.TotalWaitTime / time.Duration(stats.Total)
 	}
-	
+
 	return stats
 }
 
@@ -215,7 +215,7 @@ type QueueStats struct {
 // determinePriority determines job priority based on target branch
 func (pq *PriorityQueue) determinePriority(branch string) Priority {
 	branch = strings.ToLower(branch)
-	
+
 	for _, rule := range pq.branchRules {
 		// Check exact matches
 		for _, b := range rule.Branches {
@@ -223,13 +223,13 @@ func (pq *PriorityQueue) determinePriority(branch string) Priority {
 				return rule.Priority
 			}
 		}
-		
+
 		// Check pattern match
 		if rule.Pattern != "" && matchPattern(rule.Pattern, branch) {
 			return rule.Priority
 		}
 	}
-	
+
 	return pq.defaultPrio
 }
 
@@ -237,25 +237,25 @@ func (pq *PriorityQueue) determinePriority(branch string) Priority {
 func matchPattern(pattern, value string) bool {
 	pattern = strings.ToLower(pattern)
 	value = strings.ToLower(value)
-	
+
 	// Handle wildcard at end: "release/*"
-	if strings.HasSuffix(pattern, "/*") {
-		prefix := strings.TrimSuffix(pattern, "/*")
+	if before, ok := strings.CutSuffix(pattern, "/*"); ok {
+		prefix := before
 		return strings.HasPrefix(value, prefix+"/")
 	}
-	
+
 	// Handle wildcard at start: "*/release"
-	if strings.HasPrefix(pattern, "*/") {
-		suffix := strings.TrimPrefix(pattern, "*/")
+	if after, ok := strings.CutPrefix(pattern, "*/"); ok {
+		suffix := after
 		return strings.HasSuffix(value, "/"+suffix) || value == suffix
 	}
-	
+
 	// Handle wildcard in middle: "feature/*/main"
 	if strings.Contains(pattern, "/*/") {
 		parts := strings.Split(pattern, "/*/")
 		return strings.HasPrefix(value, parts[0]+"/") && strings.HasSuffix(value, "/"+parts[1])
 	}
-	
+
 	return pattern == value
 }
 
@@ -279,14 +279,14 @@ func (h jobHeap) Swap(i, j int) {
 	h[j].index = j
 }
 
-func (h *jobHeap) Push(x interface{}) {
+func (h *jobHeap) Push(x any) {
 	n := len(*h)
 	job := x.(*Job)
 	job.index = n
 	*h = append(*h, job)
 }
 
-func (h *jobHeap) Pop() interface{} {
+func (h *jobHeap) Pop() any {
 	old := *h
 	n := len(old)
 	job := old[n-1]
@@ -298,8 +298,8 @@ func (h *jobHeap) Pop() interface{} {
 
 // PriorityConfig configuration for priority queue
 type PriorityConfig struct {
-	Rules        []BranchRule `json:"rules" yaml:"rules"`
-	DefaultPrio  Priority     `json:"default_priority" yaml:"default_priority"`
+	Rules       []BranchRule `json:"rules" yaml:"rules"`
+	DefaultPrio Priority     `json:"default_priority" yaml:"default_priority"`
 }
 
 // ParsePriorityConfig parses priority configuration
@@ -308,12 +308,11 @@ func ParsePriorityConfig(config PriorityConfig) *PriorityQueue {
 	if len(rules) == 0 {
 		rules = DefaultBranchRules()
 	}
-	
+
 	pq := NewPriorityQueue(rules)
 	if config.DefaultPrio > 0 {
 		pq.defaultPrio = config.DefaultPrio
 	}
-	
+
 	return pq
 }
-

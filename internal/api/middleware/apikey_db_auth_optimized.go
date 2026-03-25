@@ -35,8 +35,8 @@ func APIKeyDBAuthOptimized(cfg *config.Config, db storage.Database, keyCache *ca
 		if apiKey == "" {
 			// Также проверяем Authorization: Bearer <api-key>
 			authHeader := c.GetHeader("Authorization")
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				apiKey = strings.TrimPrefix(authHeader, "Bearer ")
+			if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+				apiKey = after
 			}
 		}
 
@@ -236,4 +236,3 @@ func isKeyValidFastPath(keyHot *models.APIKeyHot, plainKey string, logger *logru
 
 	return true
 }
-

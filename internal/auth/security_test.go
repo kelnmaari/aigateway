@@ -49,7 +49,7 @@ func TestSecurity_TimingAttackResistance(t *testing.T) {
 	t.Attr("category", "security")
 	t.Attr("type", "integration")
 	t.Attr("go_version", "1.25+")
-	
+
 	t.Run("bcrypt constant time comparison", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -68,7 +68,7 @@ func TestSecurity_TimingAttackResistance(t *testing.T) {
 		invalidDurations := make([]time.Duration, 10)
 
 		// Тестируем валидный ключ 10 раз
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			start := time.Now()
 			result, err := manager.ValidateAPIKey(ctx, validKey.PlainKey)
 			validDurations[i] = time.Since(start)
@@ -78,7 +78,7 @@ func TestSecurity_TimingAttackResistance(t *testing.T) {
 
 		// Тестируем невалидный ключ 10 раз
 		invalidKey := "sk-proj-invalid1234567890123456789012345678901234567890123456789012"
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			start := time.Now()
 			result, err := manager.ValidateAPIKey(ctx, invalidKey)
 			invalidDurations[i] = time.Since(start)
@@ -142,7 +142,7 @@ func TestSecurity_BruteForceProtection(t *testing.T) {
 	t.Attr("category", "security")
 	t.Attr("type", "integration")
 	t.Attr("go_version", "1.25+")
-	
+
 	t.Run("multiple failed attempts", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -151,7 +151,7 @@ func TestSecurity_BruteForceProtection(t *testing.T) {
 		maxAttempts := 100
 
 		start := time.Now()
-		for i := 0; i < maxAttempts; i++ {
+		for range maxAttempts {
 			invalidKey := generateRandomInvalidKey()
 			result, err := manager.ValidateAPIKey(ctx, invalidKey)
 			require.NoError(t, err)
@@ -187,16 +187,14 @@ func TestSecurity_BruteForceProtection(t *testing.T) {
 		totalAttempts := goroutines * attemptsPerGoroutine
 
 		start := time.Now()
-		for g := 0; g < goroutines; g++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for i := 0; i < attemptsPerGoroutine; i++ {
+		for range goroutines {
+			wg.Go(func() {
+				for range attemptsPerGoroutine {
 					invalidKey := generateRandomInvalidKey()
 					result, _ := manager.ValidateAPIKey(ctx, invalidKey)
 					assert.False(t, result.Valid)
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		duration := time.Since(start)
@@ -214,7 +212,7 @@ func TestSecurity_TokenManipulation(t *testing.T) {
 	t.Attr("category", "security")
 	t.Attr("type", "unit")
 	t.Attr("go_version", "1.25+")
-	
+
 	t.Run("modified token structure", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -313,7 +311,7 @@ func TestSecurity_InvalidKeyFormats(t *testing.T) {
 	t.Attr("category", "security")
 	t.Attr("type", "unit")
 	t.Attr("go_version", "1.25+")
-	
+
 	manager, ctx := setupSecurityTestManager(t)
 
 	testCases := []struct {
@@ -365,7 +363,7 @@ func TestSecurity_ConcurrentAccessSafety(t *testing.T) {
 	t.Attr("category", "security")
 	t.Attr("type", "integration")
 	t.Attr("go_version", "1.25+")
-	
+
 	t.Run("concurrent key creation", func(t *testing.T) {
 		manager, ctx := setupSecurityTestManager(t)
 
@@ -375,7 +373,7 @@ func TestSecurity_ConcurrentAccessSafety(t *testing.T) {
 		errors := make(chan error, goroutines)
 
 		// Создаем ключи параллельно
-		for i := 0; i < goroutines; i++ {
+		for i := range goroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -429,10 +427,8 @@ func TestSecurity_ConcurrentAccessSafety(t *testing.T) {
 		var mu sync.Mutex
 
 		// Валидируем один и тот же ключ параллельно
-		for i := 0; i < goroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range goroutines {
+			wg.Go(func() {
 				result, err := manager.ValidateAPIKey(ctx, key.PlainKey)
 				require.NoError(t, err)
 				if result.Valid {
@@ -440,7 +436,7 @@ func TestSecurity_ConcurrentAccessSafety(t *testing.T) {
 					successCount++
 					mu.Unlock()
 				}
-			}()
+			})
 		}
 		wg.Wait()
 
@@ -454,7 +450,7 @@ func TestSecurity_MemoryLeaks(t *testing.T) {
 	t.Attr("category", "security")
 	t.Attr("type", "performance")
 	t.Attr("go_version", "1.25+")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping memory leak test in short mode")
 	}
@@ -474,7 +470,7 @@ func TestSecurity_MemoryLeaks(t *testing.T) {
 
 		// Выполняем множество валидаций
 		iterations := 1000
-		for i := 0; i < iterations; i++ {
+		for i := range iterations {
 			_, err := manager.ValidateAPIKey(ctx, key.PlainKey)
 			require.NoError(t, err)
 
@@ -571,4 +567,3 @@ func BenchmarkSecurity_ValidationUnderLoad(b *testing.B) {
 		}
 	})
 }
-

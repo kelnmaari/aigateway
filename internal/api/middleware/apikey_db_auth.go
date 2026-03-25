@@ -25,8 +25,8 @@ func APIKeyDBAuth(cfg *config.Config, db storage.Database, logger *logrus.Logger
 		if apiKey == "" {
 			// Также проверяем Authorization: Bearer <api-key>
 			authHeader := c.GetHeader("Authorization")
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				apiKey = strings.TrimPrefix(authHeader, "Bearer ")
+			if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+				apiKey = after
 			}
 		}
 

@@ -71,7 +71,7 @@ func (db *PostgreSQLDB) RecordAPIUsage(ctx context.Context, usage *models.APIUsa
 	}
 
 	// DEBUG: Log successful insert
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"id":                usage.ID,
 		"user_id":           usage.UserID,
 		"api_key_id":        usage.APIKeyID,
@@ -331,7 +331,7 @@ func (db *PostgreSQLDB) GetUserUsageStats(ctx context.Context, userID string, pe
 	stats.StartDate = startTime
 	stats.EndDate = time.Now()
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"user_id":        userID,
 		"total_requests": stats.TotalRequests,
 		"total_tokens":   stats.TotalTokens,
@@ -526,7 +526,7 @@ func (db *PostgreSQLDB) GetTenantUsageStats(ctx context.Context, tenantID string
 	stats.StartDate = startTime
 	stats.EndDate = time.Now()
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id":      tenantID,
 		"total_requests": stats.TotalRequests,
 		"total_tokens":   stats.TotalTokens,
@@ -762,10 +762,7 @@ func percentile(sorted []float64, p float64) float64 {
 	if len(sorted) == 0 {
 		return 0
 	}
-	idx := int(float64(len(sorted)-1) * p)
-	if idx < 0 {
-		idx = 0
-	}
+	idx := max(int(float64(len(sorted)-1)*p), 0)
 	if idx >= len(sorted) {
 		idx = len(sorted) - 1
 	}

@@ -65,7 +65,7 @@ func (p *TEIEmbeddingProvider) GenerateEmbeddings(ctx context.Context, texts []s
 	}
 
 	// TEI uses OpenAI-compatible API format
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"input": texts,
 		"model": "default", // TEI ignores model name but requires it
 	}
@@ -255,7 +255,7 @@ func (p *DynamicEmbeddingProvider) GenerateEmbeddings(ctx context.Context, texts
 	}
 
 	// Use OpenAI-compatible API format
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"input": texts,
 		"model": "default", // TEI ignores model name but requires it
 	}
@@ -429,7 +429,7 @@ func (p *DynamicEmbeddingProvider) GenerateEmbeddingsWithModel(ctx context.Conte
 	}
 
 	// Use OpenAI-compatible API format - use filtered texts
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"input": filteredTexts,
 		"model": "default",
 	}
@@ -511,4 +511,3 @@ func (p *DynamicEmbeddingProvider) GenerateEmbeddingsWithModel(ctx context.Conte
 
 	return embeddings, nil
 }
-

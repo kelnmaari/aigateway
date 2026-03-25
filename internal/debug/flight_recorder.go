@@ -191,7 +191,7 @@ func (m *FlightRecorderManager) SaveTrace(ctx context.Context, filename, reason 
 //	        panic(r) // Re-panic after saving
 //	    }
 //	}()
-func (m *FlightRecorderManager) SaveTraceOnPanic(ctx context.Context, panicValue interface{}) {
+func (m *FlightRecorderManager) SaveTraceOnPanic(ctx context.Context, panicValue any) {
 	if !m.config.AutoSaveOnPanic {
 		return
 	}
@@ -268,4 +268,3 @@ func DefaultConfig() FlightRecorderConfig {
 		AutoSaveOnCriticalError: false, // Opt-in for critical errors
 	}
 }
-

@@ -169,7 +169,7 @@ func (f *Fetcher) FetchBatch(ctx context.Context, urls []string, opts FetchOptio
 	pages := make([]*WebPage, 0, len(urls))
 	var errors []error
 
-	for i := 0; i < len(urls); i++ {
+	for range urls {
 		res := <-results
 		if res.err != nil {
 			f.logger.WithFields(logrus.Fields{
@@ -281,4 +281,3 @@ func (f *Fetcher) isAllowedContentType(contentType string) bool {
 
 	return false
 }
-

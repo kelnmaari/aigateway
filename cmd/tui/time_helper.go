@@ -31,12 +31,3 @@ func parseDuration(s string) time.Duration {
 	// Возвращаем 0 если не смогли распарсить
 	return 0
 }
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-

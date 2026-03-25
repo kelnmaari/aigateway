@@ -18,6 +18,7 @@ package benchmarks
 import (
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"testing"
 )
 
@@ -174,7 +175,7 @@ func BenchmarkGC_PointerHeavy(b *testing.B) {
 		head := &Node{Value: 1, Data: make([]byte, 64)}
 		current := head
 
-		for j := 0; j < 100; j++ {
+		for j := range 100 {
 			node := &Node{Value: j, Data: make([]byte, 64)}
 			current.Next = node
 			node.Prev = current
@@ -196,9 +197,9 @@ func BenchmarkGC_MapOperations(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		m := make(map[string]interface{}, 100)
+		m := make(map[string]any, 100)
 
-		for j := 0; j < 100; j++ {
+		for j := range 100 {
 			m[string(rune('a'+j))] = make([]byte, 128)
 		}
 
@@ -221,11 +222,12 @@ func BenchmarkGC_StringConcatenation(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		s := base
-		for j := 0; j < 10; j++ {
-			s += base // Creates new string each time
+		var s strings.Builder
+		s.WriteString(base)
+		for range 10 {
+			s.WriteString(base) // Creates new string each time
 		}
-		_ = s
+		_ = s.String()
 	}
 }
 
@@ -301,12 +303,12 @@ func BenchmarkGC_RealisticAPIGateway(b *testing.B) {
 
 // GCStats captures GC statistics before and after benchmark
 type GCStats struct {
-	NumGC        uint32
-	PauseTotal   uint64 // nanoseconds
-	PauseAvg     uint64 // nanoseconds
-	HeapAlloc    uint64
-	HeapSys      uint64
-	HeapObjects  uint64
+	NumGC       uint32
+	PauseTotal  uint64 // nanoseconds
+	PauseAvg    uint64 // nanoseconds
+	HeapAlloc   uint64
+	HeapSys     uint64
+	HeapObjects uint64
 }
 
 // GetGCStats returns current GC statistics
@@ -354,4 +356,3 @@ func TestGCStats_Baseline(t *testing.T) {
 	t.Logf("Heap System: %.2f MB", float64(stats.HeapSys)/(1024*1024))
 	t.Logf("Heap Objects: %d", stats.HeapObjects)
 }
-

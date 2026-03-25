@@ -22,11 +22,11 @@ type Client struct {
 
 // Config Redis client configuration
 type Config struct {
-	URL       string
-	KeyPrefix string
-	DB        int
+	URL        string
+	KeyPrefix  string
+	DB         int
 	MaxRetries int
-	PoolSize  int
+	PoolSize   int
 }
 
 // NewClient creates a new Redis client
@@ -94,7 +94,7 @@ func (c *Client) makeKey(key string) string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Set sets a key-value pair with expiration
-func (c *Client) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+func (c *Client) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal value: %w", err)
@@ -104,7 +104,7 @@ func (c *Client) Set(ctx context.Context, key string, value interface{}, expirat
 }
 
 // Get gets a value by key
-func (c *Client) Get(ctx context.Context, key string, dest interface{}) error {
+func (c *Client) Get(ctx context.Context, key string, dest any) error {
 	data, err := c.client.Get(ctx, c.makeKey(key)).Bytes()
 	if err != nil {
 		return err
@@ -177,7 +177,7 @@ func (c *Client) GetCounter(ctx context.Context, key string) (int64, error) {
 }
 
 // SetNX sets a key only if it doesn't exist (returns true if set)
-func (c *Client) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error) {
+func (c *Client) SetNX(ctx context.Context, key string, value any, expiration time.Duration) (bool, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return false, fmt.Errorf("failed to marshal value: %w", err)
@@ -191,12 +191,12 @@ func (c *Client) SetNX(ctx context.Context, key string, value interface{}, expir
 // ─────────────────────────────────────────────────────────────────────────────
 
 // LPush pushes value to the left of a list
-func (c *Client) LPush(ctx context.Context, key string, values ...interface{}) error {
+func (c *Client) LPush(ctx context.Context, key string, values ...any) error {
 	return c.client.LPush(ctx, c.makeKey(key), values...).Err()
 }
 
 // RPush pushes value to the right of a list
-func (c *Client) RPush(ctx context.Context, key string, values ...interface{}) error {
+func (c *Client) RPush(ctx context.Context, key string, values ...any) error {
 	return c.client.RPush(ctx, c.makeKey(key), values...).Err()
 }
 
@@ -220,12 +220,12 @@ func (c *Client) LTrim(ctx context.Context, key string, start, stop int64) error
 // ─────────────────────────────────────────────────────────────────────────────
 
 // SAdd adds members to a set
-func (c *Client) SAdd(ctx context.Context, key string, members ...interface{}) error {
+func (c *Client) SAdd(ctx context.Context, key string, members ...any) error {
 	return c.client.SAdd(ctx, c.makeKey(key), members...).Err()
 }
 
 // SRem removes members from a set
-func (c *Client) SRem(ctx context.Context, key string, members ...interface{}) error {
+func (c *Client) SRem(ctx context.Context, key string, members ...any) error {
 	return c.client.SRem(ctx, c.makeKey(key), members...).Err()
 }
 
@@ -235,7 +235,7 @@ func (c *Client) SMembers(ctx context.Context, key string) ([]string, error) {
 }
 
 // SIsMember checks if member exists in a set
-func (c *Client) SIsMember(ctx context.Context, key string, member interface{}) (bool, error) {
+func (c *Client) SIsMember(ctx context.Context, key string, member any) (bool, error) {
 	return c.client.SIsMember(ctx, c.makeKey(key), member).Result()
 }
 
@@ -249,7 +249,7 @@ func (c *Client) SCard(ctx context.Context, key string) (int64, error) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // HSet sets field in a hash
-func (c *Client) HSet(ctx context.Context, key string, field string, value interface{}) error {
+func (c *Client) HSet(ctx context.Context, key string, field string, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal value: %w", err)
@@ -258,7 +258,7 @@ func (c *Client) HSet(ctx context.Context, key string, field string, value inter
 }
 
 // HGet gets field from a hash
-func (c *Client) HGet(ctx context.Context, key string, field string, dest interface{}) error {
+func (c *Client) HGet(ctx context.Context, key string, field string, dest any) error {
 	data, err := c.client.HGet(ctx, c.makeKey(key), field).Bytes()
 	if err != nil {
 		return err
@@ -313,7 +313,7 @@ func (c *Client) ZCard(ctx context.Context, key string) (int64, error) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Publish publishes a message to a channel
-func (c *Client) Publish(ctx context.Context, channel string, message interface{}) error {
+func (c *Client) Publish(ctx context.Context, channel string, message any) error {
 	data, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
@@ -374,4 +374,3 @@ func (c *Client) FlushDB(ctx context.Context) error {
 func (c *Client) Keys(ctx context.Context, pattern string) ([]string, error) {
 	return c.client.Keys(ctx, c.makeKey(pattern)).Result()
 }
-

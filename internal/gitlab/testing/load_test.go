@@ -52,12 +52,12 @@ func TestLoad_ConcurrentWebhooks(t *testing.T) {
 
 	start := time.Now()
 
-	for i := 0; i < concurrency; i++ {
+	for i := range concurrency {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			for j := 0; j < requestsPerGoroutine; j++ {
-				projectID := int64((workerID%10) + 1)
+			for j := range requestsPerGoroutine {
+				projectID := int64((workerID % 10) + 1)
 				mrIID := (j % 10) + 1
 
 				_, err := gitlabClient.GetMergeRequest(ctx, projectID, mrIID)
@@ -108,7 +108,7 @@ func TestLoad_QueueProcessing(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Start workers
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
@@ -125,7 +125,7 @@ func TestLoad_QueueProcessing(t *testing.T) {
 	start := time.Now()
 
 	go func() {
-		for i := 0; i < numJobs; i++ {
+		for i := range numJobs {
 			jobQueue <- i
 		}
 		close(jobQueue)
@@ -244,15 +244,13 @@ func TestLoad_APIRateLimiting(t *testing.T) {
 
 	start := time.Now()
 
-	for i := 0; i < numRequests; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range numRequests {
+		wg.Go(func() {
 			_, err := gitlabClient.GetCurrentUser(ctx)
 			if err == nil {
 				atomic.AddInt64(&successCount, 1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -310,7 +308,7 @@ func TestLoad_MemoryStability(t *testing.T) {
 
 	// Run many iterations
 	iterations := 1000
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		_, _ = gitlabClient.GetMergeRequest(ctx, 1, 1)
 		_, _ = gitlabClient.GetMergeRequestChanges(ctx, 1, 1)
 
@@ -423,4 +421,3 @@ func BenchmarkLoad_ParallelComments(b *testing.B) {
 		}
 	})
 }
-

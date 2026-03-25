@@ -32,12 +32,12 @@ func NewPubSubService(client *Client, logger *logrus.Logger) *PubSubService {
 
 // Message represents a pub/sub message
 type Message struct {
-	Channel   string                 `json:"channel"`
-	Type      string                 `json:"type"`
-	Payload   interface{}            `json:"payload"`
-	Timestamp time.Time              `json:"timestamp"`
-	Source    string                 `json:"source,omitempty"` // instance ID
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Channel   string         `json:"channel"`
+	Type      string         `json:"type"`
+	Payload   any            `json:"payload"`
+	Timestamp time.Time      `json:"timestamp"`
+	Source    string         `json:"source,omitempty"` // instance ID
+	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 
 // Subscription represents an active subscription
@@ -55,35 +55,35 @@ type Subscription struct {
 type MessageHandler func(msg *Message) error
 
 // Publish publishes a message to a channel
-func (s *PubSubService) Publish(ctx context.Context, channel string, msgType string, payload interface{}) error {
+func (s *PubSubService) Publish(ctx context.Context, channel string, msgType string, payload any) error {
 	msg := &Message{
 		Channel:   channel,
 		Type:      msgType,
 		Payload:   payload,
 		Timestamp: time.Now(),
 	}
-	
+
 	if err := s.client.Publish(ctx, channel, msg); err != nil {
 		return fmt.Errorf("failed to publish message: %w", err)
 	}
-	
+
 	s.logger.WithFields(logrus.Fields{
 		"channel": channel,
 		"type":    msgType,
 	}).Debug("Message published")
-	
+
 	return nil
 }
 
 // Subscribe subscribes to a channel with a handler
 func (s *PubSubService) Subscribe(ctx context.Context, channel string, handler MessageHandler) (*Subscription, error) {
 	pubsub := s.client.Subscribe(ctx, channel)
-	
+
 	// Test subscription
 	if _, err := pubsub.Receive(ctx); err != nil {
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
 	}
-	
+
 	subscription := &Subscription{
 		ID:       fmt.Sprintf("sub_%d", time.Now().UnixNano()),
 		Channel:  channel,
@@ -91,27 +91,27 @@ func (s *PubSubService) Subscribe(ctx context.Context, channel string, handler M
 		pubsub:   pubsub,
 		stopChan: make(chan struct{}),
 	}
-	
+
 	// Register subscription
 	s.mu.Lock()
 	s.subscribers[channel] = append(s.subscribers[channel], subscription)
 	s.mu.Unlock()
-	
+
 	// Start listening in background
 	go s.listen(subscription)
-	
+
 	s.logger.WithFields(logrus.Fields{
 		"subscription_id": subscription.ID,
 		"channel":         channel,
 	}).Info("✅ Subscribed to channel")
-	
+
 	return subscription, nil
 }
 
 // listen listens for messages on a subscription
 func (s *PubSubService) listen(sub *Subscription) {
 	ch := sub.pubsub.Channel()
-	
+
 	for {
 		select {
 		case <-sub.stopChan:
@@ -120,19 +120,19 @@ func (s *PubSubService) listen(sub *Subscription) {
 				"channel":         sub.Channel,
 			}).Info("Subscription stopped")
 			return
-			
+
 		case redisMsg := <-ch:
 			if redisMsg == nil {
 				continue
 			}
-			
+
 			// Parse message
 			var msg Message
 			if err := json.Unmarshal([]byte(redisMsg.Payload), &msg); err != nil {
 				s.logger.WithError(err).Warn("Failed to parse message")
 				continue
 			}
-			
+
 			// Handle message
 			if err := sub.Handler(&msg); err != nil {
 				s.logger.WithError(err).WithFields(logrus.Fields{
@@ -148,24 +148,24 @@ func (s *PubSubService) listen(sub *Subscription) {
 func (s *PubSubService) Unsubscribe(sub *Subscription) error {
 	sub.mu.Lock()
 	defer sub.mu.Unlock()
-	
+
 	if sub.stopped {
 		return nil
 	}
-	
+
 	// Signal stop
 	close(sub.stopChan)
 	sub.stopped = true
-	
+
 	// Close pubsub
 	if err := sub.pubsub.Close(); err != nil {
 		return err
 	}
-	
+
 	// Unregister subscription
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	subs := s.subscribers[sub.Channel]
 	for i, sub := range subs {
 		if sub.ID == sub.ID {
@@ -173,12 +173,12 @@ func (s *PubSubService) Unsubscribe(sub *Subscription) error {
 			break
 		}
 	}
-	
+
 	s.logger.WithFields(logrus.Fields{
 		"subscription_id": sub.ID,
 		"channel":         sub.Channel,
 	}).Info("Unsubscribed from channel")
-	
+
 	return nil
 }
 
@@ -186,14 +186,14 @@ func (s *PubSubService) Unsubscribe(sub *Subscription) error {
 func (s *PubSubService) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	for channel, subs := range s.subscribers {
 		for _, sub := range subs {
 			s.Unsubscribe(sub)
 		}
 		delete(s.subscribers, channel)
 	}
-	
+
 	return nil
 }
 
@@ -244,7 +244,7 @@ func (s *PubSubService) PublishModelLoaded(ctx context.Context, modelID, modelPa
 		Instance:  instance,
 		Timestamp: time.Now(),
 	}
-	
+
 	return s.Publish(ctx, "models", EventModelLoaded, event)
 }
 
@@ -255,7 +255,7 @@ func (s *PubSubService) PublishModelUnloaded(ctx context.Context, modelID, insta
 		Instance:  instance,
 		Timestamp: time.Now(),
 	}
-	
+
 	return s.Publish(ctx, "models", EventModelUnloaded, event)
 }
 
@@ -267,7 +267,7 @@ func (s *PubSubService) PublishCacheInvalidate(ctx context.Context, cacheKey, ca
 		Instance:  instance,
 		Timestamp: time.Now(),
 	}
-	
+
 	return s.Publish(ctx, "cache", EventCacheInvalidate, event)
 }
 
@@ -289,10 +289,10 @@ type InstanceInfo struct {
 // RegisterInstance registers this instance for discovery
 func (s *PubSubService) RegisterInstance(ctx context.Context, info *InstanceInfo) error {
 	key := fmt.Sprintf("instance:%s", info.InstanceID)
-	
+
 	info.LastSeen = time.Now()
 	info.Status = "online"
-	
+
 	// Store instance info with 30s TTL (requires heartbeat)
 	return s.client.Set(ctx, key, info, 30*time.Second)
 }
@@ -300,15 +300,15 @@ func (s *PubSubService) RegisterInstance(ctx context.Context, info *InstanceInfo
 // Heartbeat updates instance last seen timestamp
 func (s *PubSubService) Heartbeat(ctx context.Context, instanceID string) error {
 	key := fmt.Sprintf("instance:%s", instanceID)
-	
+
 	// Get current info
 	var info InstanceInfo
 	if err := s.client.Get(ctx, key, &info); err != nil {
 		return err
 	}
-	
+
 	info.LastSeen = time.Now()
-	
+
 	// Update with 30s TTL
 	return s.client.Set(ctx, key, &info, 30*time.Second)
 }
@@ -320,7 +320,7 @@ func (s *PubSubService) ListInstances(ctx context.Context) ([]*InstanceInfo, err
 	if err != nil {
 		return nil, err
 	}
-	
+
 	instances := make([]*InstanceInfo, 0, len(keys))
 	for _, key := range keys {
 		var info InstanceInfo
@@ -328,7 +328,7 @@ func (s *PubSubService) ListInstances(ctx context.Context) ([]*InstanceInfo, err
 			instances = append(instances, &info)
 		}
 	}
-	
+
 	return instances, nil
 }
 
@@ -337,4 +337,3 @@ func (s *PubSubService) UnregisterInstance(ctx context.Context, instanceID strin
 	key := fmt.Sprintf("instance:%s", instanceID)
 	return s.client.Delete(ctx, key)
 }
-

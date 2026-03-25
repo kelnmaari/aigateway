@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -13,7 +14,7 @@ import (
 // Router resolves specs by alias or capability and ensures model is prepared/launched.
 type Router struct {
 	mgr *Manager
-	
+
 	// Per-alias locks to prevent concurrent container starts for same model
 	aliasLocks   map[string]*sync.Mutex
 	aliasLocksMu sync.Mutex
@@ -31,7 +32,7 @@ func NewRouter(mgr *Manager) *Router {
 func (r *Router) getAliasLock(alias string) *sync.Mutex {
 	r.aliasLocksMu.Lock()
 	defer r.aliasLocksMu.Unlock()
-	
+
 	if lock, ok := r.aliasLocks[alias]; ok {
 		return lock
 	}
@@ -47,7 +48,7 @@ func (r *Router) EnsureBySpec(ctx context.Context, spec ModelSpec) (*ModelInstan
 	lock := r.getAliasLock(spec.Alias)
 	lock.Lock()
 	defer lock.Unlock()
-	
+
 	r.mgr.svc.RegisterSpec(spec)
 	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
@@ -63,12 +64,12 @@ func (r *Router) EnsureByAlias(ctx context.Context, alias string) (*ModelInstanc
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Serialize access per alias
 	lock := r.getAliasLock(alias)
 	lock.Lock()
 	defer lock.Unlock()
-	
+
 	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
 		r.mgr.touch(alias)
@@ -83,12 +84,12 @@ func (r *Router) EnsureByCapability(ctx context.Context, cap Capability) (*Model
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Serialize access per alias
 	lock := r.getAliasLock(spec.Alias)
 	lock.Lock()
 	defer lock.Unlock()
-	
+
 	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
 		r.mgr.touch(spec.Alias)
@@ -246,14 +247,12 @@ func (r *Router) GetRunningEmbeddingModel() (alias string, endpoint string, foun
 		if m.Status != StatusRunning || modelEndpoint == "" {
 			continue
 		}
-		for _, cap := range m.Spec.Capabilities {
-			if cap == "embeddings" {
-				logger.WithFields(logrus.Fields{
-					"alias":    m.Spec.Alias,
-					"endpoint": modelEndpoint,
-				}).Debug("Found model with embeddings capability")
-				return m.Spec.Alias, modelEndpoint, true
-			}
+		if slices.Contains(m.Spec.Capabilities, "embeddings") {
+			logger.WithFields(logrus.Fields{
+				"alias":    m.Spec.Alias,
+				"endpoint": modelEndpoint,
+			}).Debug("Found model with embeddings capability")
+			return m.Spec.Alias, modelEndpoint, true
 		}
 	}
 
@@ -373,4 +372,3 @@ func (r *Router) GetDownloader() *ModelDownloader {
 	}
 	return r.mgr.svc.downloader
 }
-

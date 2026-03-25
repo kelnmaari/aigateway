@@ -38,7 +38,7 @@ func NewRenderer(devMode bool) (*Renderer, error) {
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		// divf divides two numbers (supports int64, int, float64)
-		"divf": func(a, b interface{}) float64 {
+		"divf": func(a, b any) float64 {
 			aFloat := toFloat64(a)
 			bFloat := toFloat64(b)
 			if bFloat == 0 {
@@ -54,7 +54,7 @@ func templateFuncs() template.FuncMap {
 }
 
 // toFloat64 converts various numeric types to float64
-func toFloat64(v interface{}) float64 {
+func toFloat64(v any) float64 {
 	switch val := v.(type) {
 	case float64:
 		return val
@@ -103,7 +103,7 @@ func (r *Renderer) loadTemplates() error {
 }
 
 // RenderPartial renders a partial template (without layout)
-func (r *Renderer) RenderPartial(w io.Writer, name string, data interface{}) error {
+func (r *Renderer) RenderPartial(w io.Writer, name string, data any) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -124,7 +124,7 @@ func (r *Renderer) RenderPartial(w io.Writer, name string, data interface{}) err
 }
 
 // RenderPage renders a full page with layout
-func (r *Renderer) RenderPage(w io.Writer, contentTemplate string, data interface{}) error {
+func (r *Renderer) RenderPage(w io.Writer, contentTemplate string, data any) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -163,17 +163,17 @@ func (r *Renderer) RenderPage(w io.Writer, contentTemplate string, data interfac
 // Helper functions for common template patterns
 
 // RenderModelsTable renders the models table partial
-func (r *Renderer) RenderModelsTable(w io.Writer, data interface{}) error {
+func (r *Renderer) RenderModelsTable(w io.Writer, data any) error {
 	return r.RenderPartial(w, "partials/registry/models_table.html", data)
 }
 
 // RenderAPIKeysList renders API keys list partial
-func (r *Renderer) RenderAPIKeysList(w io.Writer, data interface{}) error {
+func (r *Renderer) RenderAPIKeysList(w io.Writer, data any) error {
 	return r.RenderPartial(w, "partials/apikeys/keys_list.html", data)
 }
 
 // RenderTenantsGrid renders tenants grid partial
-func (r *Renderer) RenderTenantsGrid(w io.Writer, data interface{}) error {
+func (r *Renderer) RenderTenantsGrid(w io.Writer, data any) error {
 	return r.RenderPartial(w, "partials/tenants/tenants_grid.html", data)
 }
 
@@ -184,7 +184,7 @@ func GetTemplatePath(category, name string) string {
 
 // RenderInlineTemplate renders a template by name directly
 // Useful for HTMX components that don't need full page layout
-func (r *Renderer) RenderInlineTemplate(w io.Writer, name string, data interface{}) error {
+func (r *Renderer) RenderInlineTemplate(w io.Writer, name string, data any) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -197,7 +197,7 @@ func (r *Renderer) RenderInlineTemplate(w io.Writer, name string, data interface
 
 	// Map template name to file path
 	templatePath := r.getInlineTemplatePath(name)
-	
+
 	// Parse and execute template with custom functions
 	tmpl, err := template.New(filepath.Base(templatePath)).Funcs(templateFuncs()).ParseFS(templatesFS, templatePath)
 	if err != nil {
@@ -237,4 +237,3 @@ func (r *Renderer) getInlineTemplatePath(name string) string {
 		return name
 	}
 }
-

@@ -152,7 +152,7 @@ func (e *DOCXExtractor) parseDocumentXML(data []byte) (string, error) {
 // extractMetadata извлекает метаданные из core.xml
 func (e *DOCXExtractor) extractMetadata(zipReader *zip.Reader) (DocumentMetadata, error) {
 	metadata := DocumentMetadata{
-		Custom: make(map[string]interface{}),
+		Custom: make(map[string]any),
 	}
 
 	// Ищем core.xml
@@ -239,4 +239,3 @@ func (e *DOCXExtractor) MaxFileSize() int64 {
 	// DOCX может быть довольно большим
 	return 50 * 1024 * 1024 // 50MB
 }
-

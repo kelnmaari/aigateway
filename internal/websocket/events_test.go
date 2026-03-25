@@ -19,7 +19,7 @@ func (m *MockHub) Broadcast(message []byte) {
 
 func TestNewEvent(t *testing.T) {
 	eventType := EventTypeChatStreamStart
-	data := map[string]interface{}{
+	data := map[string]any{
 		"conversation_id": "conv_123",
 		"model":           "llama2",
 	}
@@ -40,7 +40,7 @@ func TestNewEvent(t *testing.T) {
 }
 
 func TestEvent_ToJSON(t *testing.T) {
-	event := NewEvent(EventTypeNotification, map[string]interface{}{
+	event := NewEvent(EventTypeNotification, map[string]any{
 		"title":   "Test",
 		"message": "Test message",
 	})
@@ -66,7 +66,7 @@ func TestEventBroadcaster_BroadcastChatStreamStart(t *testing.T) {
 	requestID := "req_456"
 	model := "llama2"
 
-	event := NewEvent(EventTypeChatStreamStart, map[string]interface{}{
+	event := NewEvent(EventTypeChatStreamStart, map[string]any{
 		"conversation_id": conversationID,
 		"request_id":      requestID,
 		"model":           model,
@@ -101,7 +101,7 @@ func TestEventBroadcaster_BroadcastFileUploadProgress(t *testing.T) {
 	totalBytes := int64(10000)
 	percent := 50.0
 
-	event := NewEvent(EventTypeFileUploadProgress, map[string]interface{}{
+	event := NewEvent(EventTypeFileUploadProgress, map[string]any{
 		"file_id":        fileID,
 		"bytes_uploaded": bytesUploaded,
 		"total_bytes":    totalBytes,
@@ -133,7 +133,7 @@ func TestEventBroadcaster_BroadcastNotification(t *testing.T) {
 	title := "Upload Complete"
 	message := "Your file has been uploaded"
 
-	event := NewEvent(EventTypeNotification, map[string]interface{}{
+	event := NewEvent(EventTypeNotification, map[string]any{
 		"level":   level,
 		"title":   title,
 		"message": message,
@@ -163,7 +163,7 @@ func TestEventBroadcaster_BroadcastNotification(t *testing.T) {
 }
 
 func TestEventBroadcaster_BroadcastChatStreamChunk(t *testing.T) {
-	chunk := map[string]interface{}{
+	chunk := map[string]any{
 		"content":      "Hello world",
 		"role":         "assistant",
 		"done":         false,
@@ -171,7 +171,7 @@ func TestEventBroadcaster_BroadcastChatStreamChunk(t *testing.T) {
 		"chunk_tokens": 2,
 	}
 
-	event := NewEvent(EventTypeChatStreamChunk, map[string]interface{}{
+	event := NewEvent(EventTypeChatStreamChunk, map[string]any{
 		"conversation_id": "conv_123",
 		"request_id":      "req_456",
 		"chunk":           chunk,
@@ -191,7 +191,7 @@ func TestEventBroadcaster_BroadcastChatStreamChunk(t *testing.T) {
 		t.Error("Type mismatch")
 	}
 
-	chunkData := parsed.Data["chunk"].(map[string]interface{})
+	chunkData := parsed.Data["chunk"].(map[string]any)
 	if chunkData["content"] != "Hello world" {
 		t.Error("Content mismatch")
 	}
@@ -216,7 +216,7 @@ func TestNotificationLevels(t *testing.T) {
 
 func TestEventTimestamp(t *testing.T) {
 	before := time.Now().Unix()
-	event := NewEvent(EventTypeHeartbeat, map[string]interface{}{
+	event := NewEvent(EventTypeHeartbeat, map[string]any{
 		"status": "alive",
 	})
 	after := time.Now().Unix()
@@ -227,13 +227,13 @@ func TestEventTimestamp(t *testing.T) {
 }
 
 func TestBroadcastFileProcessingComplete(t *testing.T) {
-	result := map[string]interface{}{
+	result := map[string]any{
 		"extracted_text_length": 1234,
 		"word_count":            567,
 		"language":              "en",
 	}
 
-	event := NewEvent(EventTypeFileProcessingComplete, map[string]interface{}{
+	event := NewEvent(EventTypeFileProcessingComplete, map[string]any{
 		"file_id": "file_123",
 		"result":  result,
 	})
@@ -252,10 +252,9 @@ func TestBroadcastFileProcessingComplete(t *testing.T) {
 		t.Error("Type mismatch")
 	}
 
-	resultData := parsed.Data["result"].(map[string]interface{})
+	resultData := parsed.Data["result"].(map[string]any)
 	// JSON numbers parse as float64
 	if int(resultData["word_count"].(float64)) != 567 {
 		t.Error("Word count mismatch")
 	}
 }
-

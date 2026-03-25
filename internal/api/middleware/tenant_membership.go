@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -114,11 +115,9 @@ func RequireTenantRole(db storage.Database, logger *logrus.Logger, allowedRoles 
 		}
 
 		// Check if user's role is in allowed roles
-		for _, allowedRole := range allowedRoles {
-			if roleStr == allowedRole {
-				c.Next()
-				return
-			}
+		if slices.Contains(allowedRoles, roleStr) {
+			c.Next()
+			return
 		}
 
 		logger.WithFields(logrus.Fields{
@@ -132,4 +131,3 @@ func RequireTenantRole(db storage.Database, logger *logrus.Logger, allowedRoles 
 		c.Abort()
 	}
 }
-

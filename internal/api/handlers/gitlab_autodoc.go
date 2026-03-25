@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -80,10 +81,8 @@ func (h *GitLabAutoDocHandler) canAccessProject(c *gin.Context, project *models.
 	// Check tenant membership
 	if tids, exists := c.Get("tenant_ids"); exists {
 		if ids, ok := tids.([]string); ok {
-			for _, tid := range ids {
-				if integration.TenantID == tid {
-					return true
-				}
+			if slices.Contains(ids, integration.TenantID) {
+				return true
 			}
 		}
 	}
@@ -240,7 +239,7 @@ func (h *GitLabAutoDocHandler) GenerateDocs(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message":     "No undocumented symbols found",
 			"status":      "completed",
-			"docs":        []interface{}{},
+			"docs":        []any{},
 			"tokens_used": 0,
 		})
 		return
@@ -655,10 +654,10 @@ func applyDocumentationToFile(content string, docs []autodoc.GeneratedDoc) strin
 
 		// Get indentation from the target line
 		targetLine := lines[lineNum]
-		indent := ""
+		var indent strings.Builder
 		for _, ch := range targetLine {
 			if ch == ' ' || ch == '\t' {
-				indent += string(ch)
+				indent.WriteString(string(ch))
 			} else {
 				break
 			}
@@ -668,7 +667,7 @@ func applyDocumentationToFile(content string, docs []autodoc.GeneratedDoc) strin
 		docLines := strings.Split(strings.TrimSpace(doc.Documentation), "\n")
 		var formattedDoc []string
 		for _, docLine := range docLines {
-			formattedDoc = append(formattedDoc, indent+docLine)
+			formattedDoc = append(formattedDoc, indent.String()+docLine)
 		}
 
 		// Insert documentation before the symbol

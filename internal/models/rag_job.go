@@ -29,41 +29,41 @@ const (
 
 // RAGJob представляет задачу в queue
 type RAGJob struct {
-	ID          int64        `json:"id" db:"id"`
-	JobType     JobType      `json:"job_type" db:"job_type"`
-	Status      JobStatus    `json:"status" db:"status"`
-	
+	ID      int64     `json:"id" db:"id"`
+	JobType JobType   `json:"job_type" db:"job_type"`
+	Status  JobStatus `json:"status" db:"status"`
+
 	// Данные
-	Payload     JobPayload   `json:"payload" db:"payload"`
-	Result      *JobResult   `json:"result,omitempty" db:"result"`
-	
+	Payload JobPayload `json:"payload" db:"payload"`
+	Result  *JobResult `json:"result,omitempty" db:"result"`
+
 	// Приоритет и повторы
-	Priority    int          `json:"priority" db:"priority"`
-	Attempts    int          `json:"attempts" db:"attempts"`
-	MaxAttempts int          `json:"max_attempts" db:"max_attempts"`
-	
+	Priority    int `json:"priority" db:"priority"`
+	Attempts    int `json:"attempts" db:"attempts"`
+	MaxAttempts int `json:"max_attempts" db:"max_attempts"`
+
 	// Timestamps
-	CreatedAt   time.Time    `json:"created_at" db:"created_at"`
-	StartedAt   *time.Time   `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt *time.Time   `json:"completed_at,omitempty" db:"completed_at"`
-	
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+
 	// Ошибки
-	Error       string       `json:"error,omitempty" db:"error"`
-	
+	Error string `json:"error,omitempty" db:"error"`
+
 	// Для visibility timeout
-	LockedUntil *time.Time   `json:"locked_until,omitempty" db:"locked_until"`
+	LockedUntil *time.Time `json:"locked_until,omitempty" db:"locked_until"`
 }
 
 // JobPayload данные задачи (varies by job type)
-type JobPayload map[string]interface{}
+type JobPayload map[string]any
 
 // Scan реализует sql.Scanner для JobPayload
-func (p *JobPayload) Scan(value interface{}) error {
+func (p *JobPayload) Scan(value any) error {
 	if value == nil {
 		*p = make(JobPayload)
 		return nil
 	}
-	
+
 	var bytes []byte
 	switch v := value.(type) {
 	case []byte:
@@ -73,7 +73,7 @@ func (p *JobPayload) Scan(value interface{}) error {
 	default:
 		return fmt.Errorf("failed to scan JobPayload: expected []byte or string, got %T", value)
 	}
-	
+
 	return json.Unmarshal(bytes, p)
 }
 
@@ -86,15 +86,15 @@ func (p JobPayload) Value() (driver.Value, error) {
 }
 
 // JobResult результат выполнения задачи
-type JobResult map[string]interface{}
+type JobResult map[string]any
 
 // Scan реализует sql.Scanner для JobResult
-func (r *JobResult) Scan(value interface{}) error {
+func (r *JobResult) Scan(value any) error {
 	if value == nil {
 		*r = make(JobResult)
 		return nil
 	}
-	
+
 	var bytes []byte
 	switch v := value.(type) {
 	case []byte:
@@ -104,7 +104,7 @@ func (r *JobResult) Scan(value interface{}) error {
 	default:
 		return fmt.Errorf("failed to scan JobResult: expected []byte or string, got %T", value)
 	}
-	
+
 	return json.Unmarshal(bytes, r)
 }
 
@@ -118,10 +118,8 @@ func (r JobResult) Value() (driver.Value, error) {
 
 // CreateJobRequest запрос на создание задачи
 type CreateJobRequest struct {
-	JobType     JobType                `json:"job_type" binding:"required"`
-	Payload     map[string]interface{} `json:"payload" binding:"required"`
-	Priority    int                    `json:"priority,omitempty"`
-	MaxAttempts int                    `json:"max_attempts,omitempty"`
+	JobType     JobType        `json:"job_type" binding:"required"`
+	Payload     map[string]any `json:"payload" binding:"required"`
+	Priority    int            `json:"priority,omitempty"`
+	MaxAttempts int            `json:"max_attempts,omitempty"`
 }
-
-

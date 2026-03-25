@@ -81,10 +81,7 @@ func (o *PromptOptimizer) compressMessageHistory(messages []models.ChatMessage) 
 	}
 
 	// 2. Берём только последние 3 сообщения (обычно user-assistant-user)
-	startIdx := len(messages) - 3
-	if startIdx < 0 {
-		startIdx = 0
-	}
+	startIdx := max(len(messages)-3, 0)
 
 	for i := startIdx; i < len(messages); i++ {
 		msg := messages[i]
@@ -389,4 +386,3 @@ func extractKeywords(query string) []string {
 
 	return keywords
 }
-

@@ -521,12 +521,12 @@ func (s *JSONStorage) HealthCheck(ctx context.Context) error {
 }
 
 // GetStorageStats возвращает статистику storage
-func (s *JSONStorage) GetStorageStats(ctx context.Context) (map[string]interface{}, error) {
+func (s *JSONStorage) GetStorageStats(ctx context.Context) (map[string]any, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	// Подсчитываем статистику по статусам
-	stats := map[string]interface{}{
+	stats := map[string]any{
 		"type":       "json",
 		"file_path":  s.filePath,
 		"total_keys": len(s.cache),

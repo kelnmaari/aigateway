@@ -41,7 +41,7 @@ func ErrorHandling(logger *logrus.Logger) gin.HandlerFunc {
 func PanicRecovery(logger *logrus.Logger) gin.HandlerFunc {
 	errorHandler := errors.NewErrorHandler(logger)
 
-	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
+	return gin.CustomRecovery(func(c *gin.Context, recovered any) {
 		// Создаем ошибку из panic
 		var err error
 		if e, ok := recovered.(error); ok {
@@ -52,7 +52,7 @@ func PanicRecovery(logger *logrus.Logger) gin.HandlerFunc {
 				"Internal server error due to panic",
 				"panic_recovered",
 				500,
-				map[string]interface{}{
+				map[string]any{
 					"panic_value": recovered,
 				},
 				nil,
@@ -76,8 +76,7 @@ func AddError(c *gin.Context, err error) {
 }
 
 // AddApplicationError добавляет ApplicationError к контексту
-func AddApplicationError(c *gin.Context, errType errors.ErrorType, message, code string, statusCode int, metadata map[string]interface{}, cause error) {
+func AddApplicationError(c *gin.Context, errType errors.ErrorType, message, code string, statusCode int, metadata map[string]any, cause error) {
 	appErr := errors.NewApplicationError(errType, message, code, statusCode, metadata, cause)
 	c.Error(appErr)
 }
-

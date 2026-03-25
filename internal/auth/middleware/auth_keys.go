@@ -23,14 +23,14 @@ import (
 // APIKeyAuthenticator обрабатывает аутентификацию через API ключи
 // APIKeyWorker interface for Redis cache-through pattern (v3.0.6+)
 type APIKeyWorker interface {
-	GetAPIKey(ctx context.Context, keyID string) (interface{}, error)
+	GetAPIKey(ctx context.Context, keyID string) (any, error)
 }
 
 type APIKeyAuthenticator struct {
 	config       *config.Config
 	logger       *logrus.Logger
 	keyManager   *apikey.Manager
-	apiKeyWorker APIKeyWorker  // v3.0.6+: Redis cache-through
+	apiKeyWorker APIKeyWorker // v3.0.6+: Redis cache-through
 	enabled      bool
 }
 
@@ -60,53 +60,53 @@ func (a *APIKeyAuthenticator) AuthenticationMiddleware() gin.HandlerFunc {
 			return
 		}
 
-	// Извлекаем API ключ из заголовков
-	apiKey := a.extractAPIKey(c)
-	if apiKey == "" {
-		a.handleAuthenticationError(c, "missing_api_key", "API key is required")
-		return
-	}
+		// Извлекаем API ключ из заголовков
+		apiKey := a.extractAPIKey(c)
+		if apiKey == "" {
+			a.handleAuthenticationError(c, "missing_api_key", "API key is required")
+			return
+		}
 
-	// Валидируем API ключ
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
+		// Валидируем API ключ
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
 
-	// v3.0.6+: Try cache-through pattern via APIKeyWorker if available
-	var validation *models.APIKeyValidationResult
-	var err error
+		// v3.0.6+: Try cache-through pattern via APIKeyWorker if available
+		var validation *models.APIKeyValidationResult
+		var err error
 
-	if a.apiKeyWorker != nil {
-		// Cache-through: Redis first → DB fallback
-		validation, err = a.validateAPIKeyWithCache(ctx, apiKey)
-	} else {
-		// Fallback: Direct validation (slow - checks all keys!)
-		validation, err = a.keyManager.ValidateAPIKey(ctx, apiKey)
-	}
+		if a.apiKeyWorker != nil {
+			// Cache-through: Redis first → DB fallback
+			validation, err = a.validateAPIKeyWithCache(ctx, apiKey)
+		} else {
+			// Fallback: Direct validation (slow - checks all keys!)
+			validation, err = a.keyManager.ValidateAPIKey(ctx, apiKey)
+		}
 
-	if err != nil {
-		a.logger.WithError(err).Error("Failed to validate API key")
-		a.handleAuthenticationError(c, "validation_error", "Failed to validate API key")
-		return
-	}
+		if err != nil {
+			a.logger.WithError(err).Error("Failed to validate API key")
+			a.handleAuthenticationError(c, "validation_error", "Failed to validate API key")
+			return
+		}
 
-	if !validation.Valid {
-		a.logger.WithField("error", validation.Error).Warn("API key validation failed")
-		a.handleAuthenticationError(c, "invalid_api_key", validation.Error)
-		return
-	}
+		if !validation.Valid {
+			a.logger.WithField("error", validation.Error).Warn("API key validation failed")
+			a.handleAuthenticationError(c, "invalid_api_key", validation.Error)
+			return
+		}
 
-	// Записываем информацию об аутентификации в контекст
-	c.Set("authenticated", true)
-	c.Set("api_key_id", validation.APIKey.ID)
-	c.Set("api_key_info", validation.APIKey)
+		// Записываем информацию об аутентификации в контекст
+		c.Set("authenticated", true)
+		c.Set("api_key_id", validation.APIKey.ID)
+		c.Set("api_key_info", validation.APIKey)
 
-	a.logger.WithFields(logrus.Fields{
-		"key_id":   validation.APIKey.ID,
-		"key_name": validation.APIKey.Name,
-		"endpoint": c.Request.URL.Path,
-	}).Debug("API key authentication successful")
+		a.logger.WithFields(logrus.Fields{
+			"key_id":   validation.APIKey.ID,
+			"key_name": validation.APIKey.Name,
+			"endpoint": c.Request.URL.Path,
+		}).Debug("API key authentication successful")
 
-	c.Next()
+		c.Next()
 	}
 }
 
@@ -212,8 +212,8 @@ func (a *APIKeyAuthenticator) extractAPIKey(c *gin.Context) string {
 	// 1. Authorization header (Bearer token)
 	auth := c.GetHeader("Authorization")
 	if auth != "" {
-		if strings.HasPrefix(auth, "Bearer ") {
-			return strings.TrimPrefix(auth, "Bearer ")
+		if after, ok := strings.CutPrefix(auth, "Bearer "); ok {
+			return after
 		}
 	}
 
@@ -368,24 +368,24 @@ func extractKeyIDFromPlainKey(plainKey string) string {
 	if !strings.HasPrefix(plainKey, "sk-") {
 		return ""
 	}
-	
+
 	parts := strings.Split(plainKey, "-")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	// Новый формат: sk-proj-<keyid>-<random>
 	// parts[0] = "sk", parts[1] = "proj", parts[2] = keyid, parts[3+] = random
 	if parts[1] == "proj" && len(parts) >= 4 {
 		return parts[2]
 	}
-	
+
 	// Device API key: sk-existing-<keyid>
 	// parts[0] = "sk", parts[1] = "existing", parts[2] = keyid (ak_xxx)
 	if parts[1] == "existing" && len(parts) == 3 {
 		return parts[2]
 	}
-	
+
 	// Старый формат с random: sk-<keyid>-<random>
 	// parts[0] = "sk", parts[1] = keyid, parts[2+] = random
 	if len(parts) >= 3 {
@@ -393,12 +393,12 @@ func extractKeyIDFromPlainKey(plainKey string) string {
 		// но НЕ содержит дефисы (поэтому это parts[1])
 		return parts[1]
 	}
-	
+
 	// Fallback: просто второй элемент
 	if len(parts) >= 2 {
 		return parts[1]
 	}
-	
+
 	return ""
 }
 
@@ -542,4 +542,3 @@ func RequireAuthentication() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

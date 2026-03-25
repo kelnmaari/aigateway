@@ -85,15 +85,15 @@ func (a *AuditLogger) LogEvent(ctx context.Context, event *models.AuditEvent) er
 // LogLogin logs a login attempt (success or failure)
 func (a *AuditLogger) LogLogin(ctx context.Context, userID, ipAddress, userAgent string, success bool, errorMsg string) error {
 	event := &models.AuditEvent{
-		EventType:  models.EventLoginSuccess,
-		Severity:   string(models.AuditSeverityInfo),
-		ActorID:    userID,
-		ActorType:  models.ActorTypeUser,
-		Action:     "login",
-		Resource:   "authentication",
-		Status:     models.AuditStatusSuccess,
-		IPAddress:  ipAddress,
-		UserAgent:  &userAgent,
+		EventType: models.EventLoginSuccess,
+		Severity:  string(models.AuditSeverityInfo),
+		ActorID:   userID,
+		ActorType: models.ActorTypeUser,
+		Action:    "login",
+		Resource:  "authentication",
+		Status:    models.AuditStatusSuccess,
+		IPAddress: ipAddress,
+		UserAgent: &userAgent,
 	}
 
 	if !success {
@@ -110,20 +110,20 @@ func (a *AuditLogger) LogLogin(ctx context.Context, userID, ipAddress, userAgent
 
 // LogOIDCLogin logs an OIDC/Keycloak login
 func (a *AuditLogger) LogOIDCLogin(ctx context.Context, userID, issuer, ipAddress string, success bool, errorMsg string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"issuer": issuer,
 	}
 
 	event := &models.AuditEvent{
-		EventType:  models.EventOIDCLogin,
-		Severity:   string(models.AuditSeverityInfo),
-		ActorID:    userID,
-		ActorType:  models.ActorTypeUser,
-		Action:     "oidc_login",
-		Resource:   "authentication",
-		Status:     models.AuditStatusSuccess,
-		IPAddress:  ipAddress,
-		Metadata:   metadata,
+		EventType: models.EventOIDCLogin,
+		Severity:  string(models.AuditSeverityInfo),
+		ActorID:   userID,
+		ActorType: models.ActorTypeUser,
+		Action:    "oidc_login",
+		Resource:  "authentication",
+		Status:    models.AuditStatusSuccess,
+		IPAddress: ipAddress,
+		Metadata:  metadata,
 	}
 
 	if !success {
@@ -139,20 +139,20 @@ func (a *AuditLogger) LogOIDCLogin(ctx context.Context, userID, issuer, ipAddres
 
 // LogLDAPLogin logs an LDAP/AD login
 func (a *AuditLogger) LogLDAPLogin(ctx context.Context, userID, ldapDN, ipAddress string, success bool, errorMsg string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"ldap_dn": ldapDN,
 	}
 
 	event := &models.AuditEvent{
-		EventType:  models.EventLDAPLogin,
-		Severity:   string(models.AuditSeverityInfo),
-		ActorID:    userID,
-		ActorType:  models.ActorTypeUser,
-		Action:     "ldap_login",
-		Resource:   "authentication",
-		Status:     models.AuditStatusSuccess,
-		IPAddress:  ipAddress,
-		Metadata:   metadata,
+		EventType: models.EventLDAPLogin,
+		Severity:  string(models.AuditSeverityInfo),
+		ActorID:   userID,
+		ActorType: models.ActorTypeUser,
+		Action:    "ldap_login",
+		Resource:  "authentication",
+		Status:    models.AuditStatusSuccess,
+		IPAddress: ipAddress,
+		Metadata:  metadata,
 	}
 
 	if !success {
@@ -169,14 +169,14 @@ func (a *AuditLogger) LogLDAPLogin(ctx context.Context, userID, ldapDN, ipAddres
 // LogLogout logs a user logout
 func (a *AuditLogger) LogLogout(ctx context.Context, userID, ipAddress string) error {
 	event := &models.AuditEvent{
-		EventType:  models.EventLogout,
-		Severity:   string(models.AuditSeverityInfo),
-		ActorID:    userID,
-		ActorType:  models.ActorTypeUser,
-		Action:     "logout",
-		Resource:   "authentication",
-		Status:     models.AuditStatusSuccess,
-		IPAddress:  ipAddress,
+		EventType: models.EventLogout,
+		Severity:  string(models.AuditSeverityInfo),
+		ActorID:   userID,
+		ActorType: models.ActorTypeUser,
+		Action:    "logout",
+		Resource:  "authentication",
+		Status:    models.AuditStatusSuccess,
+		IPAddress: ipAddress,
 	}
 
 	return a.LogEvent(ctx, event)
@@ -206,20 +206,20 @@ func (a *AuditLogger) LogPasswordChanged(ctx context.Context, userID, ipAddress 
 
 // LogPermissionDenied logs an access denied event
 func (a *AuditLogger) LogPermissionDenied(ctx context.Context, userID, resource, action, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"attempted_action": action,
 	}
 
 	event := &models.AuditEvent{
-		EventType:  models.EventPermissionDenied,
-		Severity:   string(models.AuditSeverityCritical),
-		ActorID:    userID,
-		ActorType:  models.ActorTypeUser,
-		Action:     action,
-		Resource:   resource,
-		Status:     models.AuditStatusFailure,
-		IPAddress:  ipAddress,
-		Metadata:   metadata,
+		EventType: models.EventPermissionDenied,
+		Severity:  string(models.AuditSeverityCritical),
+		ActorID:   userID,
+		ActorType: models.ActorTypeUser,
+		Action:    action,
+		Resource:  resource,
+		Status:    models.AuditStatusFailure,
+		IPAddress: ipAddress,
+		Metadata:  metadata,
 	}
 
 	return a.LogEvent(ctx, event)
@@ -227,7 +227,7 @@ func (a *AuditLogger) LogPermissionDenied(ctx context.Context, userID, resource,
 
 // LogRoleChanged logs a user role change
 func (a *AuditLogger) LogRoleChanged(ctx context.Context, actorID, targetUserID, oldRole, newRole, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"old_role": oldRole,
 		"new_role": newRole,
 	}
@@ -255,7 +255,7 @@ func (a *AuditLogger) LogRoleChanged(ctx context.Context, actorID, targetUserID,
 
 // LogAPIKeyCreated logs API key creation
 func (a *AuditLogger) LogAPIKeyCreated(ctx context.Context, actorID, keyID, keyName, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"key_name": keyName,
 	}
 
@@ -300,7 +300,7 @@ func (a *AuditLogger) LogAPIKeyDeleted(ctx context.Context, actorID, keyID, ipAd
 
 // LogTenantCreated logs tenant creation
 func (a *AuditLogger) LogTenantCreated(ctx context.Context, actorID, tenantID, tenantName, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"tenant_name": tenantName,
 	}
 
@@ -341,7 +341,7 @@ func (a *AuditLogger) LogTenantDeleted(ctx context.Context, actorID, tenantID, i
 
 // LogTenantUpdated logs tenant information update
 func (a *AuditLogger) LogTenantUpdated(ctx context.Context, actorID, tenantID, changes, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"changes": changes,
 	}
 
@@ -364,7 +364,7 @@ func (a *AuditLogger) LogTenantUpdated(ctx context.Context, actorID, tenantID, c
 
 // LogTenantMemberAdded logs tenant member addition
 func (a *AuditLogger) LogTenantMemberAdded(ctx context.Context, actorID, tenantID, memberID, role, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"member_id": memberID,
 		"role":      role,
 	}
@@ -388,7 +388,7 @@ func (a *AuditLogger) LogTenantMemberAdded(ctx context.Context, actorID, tenantI
 
 // LogTenantMemberRemoved logs tenant member removal
 func (a *AuditLogger) LogTenantMemberRemoved(ctx context.Context, actorID, tenantID, memberID, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"member_id": memberID,
 	}
 
@@ -411,7 +411,7 @@ func (a *AuditLogger) LogTenantMemberRemoved(ctx context.Context, actorID, tenan
 
 // LogTenantRoleChanged logs tenant member role change
 func (a *AuditLogger) LogTenantRoleChanged(ctx context.Context, actorID, tenantID, memberID, oldRole, newRole, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"member_id": memberID,
 		"old_role":  oldRole,
 		"new_role":  newRole,
@@ -440,7 +440,7 @@ func (a *AuditLogger) LogTenantRoleChanged(ctx context.Context, actorID, tenantI
 
 // LogUserCreated logs user creation
 func (a *AuditLogger) LogUserCreated(ctx context.Context, actorID, targetUserID, username, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"username": username,
 	}
 
@@ -481,7 +481,7 @@ func (a *AuditLogger) LogUserDeleted(ctx context.Context, actorID, targetUserID,
 
 // LogUserUpdated logs user information update
 func (a *AuditLogger) LogUserUpdated(ctx context.Context, actorID, targetUserID, changes, ipAddress string) error {
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"changes": changes,
 	}
 
@@ -547,5 +547,3 @@ func (a *AuditLogger) LogBackupRestored(ctx context.Context, actorID, backupID, 
 // ========================================
 
 // stringPtr replaced with utils.Ptr[T] (Go 1.25 generics)
-
-

@@ -175,17 +175,11 @@ func (h *LogsHandler) GetLogFile(c *gin.Context) {
 		offset = 0
 	}
 
-	end := offset + limit
-	if end > totalLines {
-		end = totalLines
-	}
+	end := min(offset+limit, totalLines)
 
 	// Берем последние строки (обратный порядок для свежих логов)
 	if offset == 0 && limit > 0 {
-		start := totalLines - limit
-		if start < 0 {
-			start = 0
-		}
+		start := max(totalLines-limit, 0)
 		lines = lines[start:]
 	} else {
 		lines = lines[offset:end]
@@ -444,4 +438,3 @@ func (h *LogsHandler) DownloadLogFile(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.File(filePath)
 }
-

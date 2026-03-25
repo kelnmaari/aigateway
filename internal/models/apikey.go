@@ -41,10 +41,10 @@ type APIKey struct {
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 
 	// Статус и метаданные
-	Status        APIKeyStatus           `json:"status"`
-	RevokedAt     *time.Time             `json:"revoked_at,omitempty"`     // Когда был отозван
-	RevokedReason string                 `json:"revoked_reason,omitempty"` // Причина отзыва
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	Status        APIKeyStatus   `json:"status"`
+	RevokedAt     *time.Time     `json:"revoked_at,omitempty"`     // Когда был отозван
+	RevokedReason string         `json:"revoked_reason,omitempty"` // Причина отзыва
+	Metadata      map[string]any `json:"metadata,omitempty"`
 
 	// Device metadata (Version 2.4.0+: Desktop Client Support)
 	DeviceName        *string    `json:"device_name,omitempty" db:"device_name"`               // User-friendly device name
@@ -108,13 +108,13 @@ type DayUsage struct {
 
 // CreateAPIKeyRequest представляет запрос на создание API ключа
 type CreateAPIKeyRequest struct {
-	Name        string                 `json:"name" binding:"required"`
-	Description string                 `json:"description,omitempty"`
-	Models      []string               `json:"models,omitempty"`      // ["*"] для всех моделей
-	Permissions []string               `json:"permissions,omitempty"` // ["chat", "models"]
-	RateLimits  *RateLimits            `json:"rate_limits,omitempty"`
-	ExpiresAt   *time.Time             `json:"expires_at,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Name        string         `json:"name" binding:"required"`
+	Description string         `json:"description,omitempty"`
+	Models      []string       `json:"models,omitempty"`      // ["*"] для всех моделей
+	Permissions []string       `json:"permissions,omitempty"` // ["chat", "models"]
+	RateLimits  *RateLimits    `json:"rate_limits,omitempty"`
+	ExpiresAt   *time.Time     `json:"expires_at,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
 // CreateAPIKeyResponse представляет ответ на создание API ключа
@@ -126,25 +126,25 @@ type CreateAPIKeyResponse struct {
 
 // APIKeyPublic представляет публичную информацию об API ключе (без хеша)
 type APIKeyPublic struct {
-	ID            string                 `json:"id"`
-	Name          string                 `json:"name"`
-	Description   string                 `json:"description,omitempty"`
-	KeyPrefix     string                 `json:"key_prefix,omitempty"` // Prefix for display (first ~20 chars)
-	UserID        *string                `json:"user_id,omitempty"`   // Owner user ID (Version 1.3.0+)
-	TenantID      *string                `json:"tenant_id,omitempty"` // Tenant ID (Version 1.3.0+)
-	Scope         APIKeyScope            `json:"scope,omitempty"`     // personal or tenant (Version 1.3.0+)
-	Models        []string               `json:"models"`
-	Permissions   []string               `json:"permissions"`
-	RateLimits    RateLimits             `json:"rate_limits"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
-	ExpiresAt     *time.Time             `json:"expires_at,omitempty"`
-	LastUsedAt    *time.Time             `json:"last_used_at,omitempty"`
-	Status        APIKeyStatus           `json:"status"`
-	RevokedAt     *time.Time             `json:"revoked_at,omitempty"`
-	RevokedReason string                 `json:"revoked_reason,omitempty"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
-	Usage         APIKeyUsage            `json:"usage"`
+	ID            string         `json:"id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description,omitempty"`
+	KeyPrefix     string         `json:"key_prefix,omitempty"` // Prefix for display (first ~20 chars)
+	UserID        *string        `json:"user_id,omitempty"`    // Owner user ID (Version 1.3.0+)
+	TenantID      *string        `json:"tenant_id,omitempty"`  // Tenant ID (Version 1.3.0+)
+	Scope         APIKeyScope    `json:"scope,omitempty"`      // personal or tenant (Version 1.3.0+)
+	Models        []string       `json:"models"`
+	Permissions   []string       `json:"permissions"`
+	RateLimits    RateLimits     `json:"rate_limits"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	ExpiresAt     *time.Time     `json:"expires_at,omitempty"`
+	LastUsedAt    *time.Time     `json:"last_used_at,omitempty"`
+	Status        APIKeyStatus   `json:"status"`
+	RevokedAt     *time.Time     `json:"revoked_at,omitempty"`
+	RevokedReason string         `json:"revoked_reason,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
+	Usage         APIKeyUsage    `json:"usage"`
 
 	// Device metadata (Version 2.4.0+: Desktop Client Support)
 	DeviceName        *string    `json:"device_name,omitempty"`
@@ -162,14 +162,14 @@ type APIKeyPublic struct {
 
 // UpdateAPIKeyRequest представляет запрос на обновление API ключа
 type UpdateAPIKeyRequest struct {
-	Name        *string                 `json:"name,omitempty"`
-	Description *string                 `json:"description,omitempty"`
-	Models      *[]string               `json:"models,omitempty"`
-	Permissions *[]string               `json:"permissions,omitempty"`
-	RateLimits  *RateLimits             `json:"rate_limits,omitempty"`
-	Status      *APIKeyStatus           `json:"status,omitempty"`
-	ExpiresAt   *time.Time              `json:"expires_at,omitempty"`
-	Metadata    *map[string]interface{} `json:"metadata,omitempty"`
+	Name        *string         `json:"name,omitempty"`
+	Description *string         `json:"description,omitempty"`
+	Models      *[]string       `json:"models,omitempty"`
+	Permissions *[]string       `json:"permissions,omitempty"`
+	RateLimits  *RateLimits     `json:"rate_limits,omitempty"`
+	Status      *APIKeyStatus   `json:"status,omitempty"`
+	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
 }
 
 // ListAPIKeysRequest представляет запрос на получение списка ключей

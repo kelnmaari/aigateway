@@ -13,13 +13,13 @@ type ChunkStrategy string
 const (
 	// ChunkByFile chunks entire file as one chunk
 	ChunkByFile ChunkStrategy = "file"
-	
+
 	// ChunkByHunk chunks by diff hunks
 	ChunkByHunk ChunkStrategy = "hunk"
-	
+
 	// ChunkByFunction chunks by function/method boundaries
 	ChunkByFunction ChunkStrategy = "function"
-	
+
 	// ChunkByLines chunks by fixed line count with overlap
 	ChunkByLines ChunkStrategy = "lines"
 )
@@ -40,10 +40,10 @@ type Chunk struct {
 
 // ChunkerConfig configuration for chunker
 type ChunkerConfig struct {
-	Strategy      ChunkStrategy
-	MaxChunkSize  int // Max characters per chunk
-	ChunkOverlap  int // Characters of overlap between chunks
-	MaxChunks     int // Max chunks per file (0 = unlimited)
+	Strategy     ChunkStrategy
+	MaxChunkSize int // Max characters per chunk
+	ChunkOverlap int // Characters of overlap between chunks
+	MaxChunks    int // Max chunks per file (0 = unlimited)
 }
 
 // DefaultConfig returns default chunker configuration
@@ -74,7 +74,7 @@ func NewCodeChunker(config ChunkerConfig) *CodeChunker {
 // Chunk chunks content based on configured strategy
 func (c *CodeChunker) Chunk(filePath string, content string, changeType string) ([]Chunk, error) {
 	lang := DetectLanguage(filePath)
-	
+
 	switch c.config.Strategy {
 	case ChunkByFile:
 		return c.chunkByFile(filePath, content, lang, changeType)
@@ -101,7 +101,7 @@ func (c *CodeChunker) chunkByFile(filePath, content, lang, changeType string) ([
 	if len(content) > c.config.MaxChunkSize*2 {
 		return c.chunkByLines(filePath, content, lang, changeType)
 	}
-	
+
 	return []Chunk{{
 		ID:          fmt.Sprintf("%s:0", filePath),
 		FilePath:    filePath,
@@ -118,27 +118,27 @@ func (c *CodeChunker) chunkByFile(filePath, content, lang, changeType string) ([
 // chunkByHunk chunks by diff hunks
 func (c *CodeChunker) chunkByHunk(filePath, diff, lang, changeType string) ([]Chunk, error) {
 	hunks := parseDiffHunks(diff)
-	
+
 	if len(hunks) == 0 {
 		// Not a diff format, treat as regular content
 		return c.chunkByLines(filePath, diff, lang, changeType)
 	}
-	
+
 	chunks := make([]Chunk, 0, len(hunks))
-	
+
 	for i, hunk := range hunks {
 		// Skip if exceeds max chunks
 		if c.config.MaxChunks > 0 && i >= c.config.MaxChunks {
 			break
 		}
-		
+
 		// If hunk is too large, split it
 		if len(hunk.Content) > c.config.MaxChunkSize {
 			subChunks := c.splitLargeContent(filePath, hunk.Content, lang, changeType, i)
 			chunks = append(chunks, subChunks...)
 			continue
 		}
-		
+
 		chunks = append(chunks, Chunk{
 			ID:          fmt.Sprintf("%s:%d", filePath, i),
 			FilePath:    filePath,
@@ -151,31 +151,31 @@ func (c *CodeChunker) chunkByHunk(filePath, diff, lang, changeType string) ([]Ch
 			TotalChunks: len(hunks),
 		})
 	}
-	
+
 	// Update total chunks count
 	for i := range chunks {
 		chunks[i].TotalChunks = len(chunks)
 	}
-	
+
 	return chunks, nil
 }
 
 // chunkByFunction chunks by function boundaries
 func (c *CodeChunker) chunkByFunction(filePath, content, lang, changeType string) ([]Chunk, error) {
 	functions := parseFunctions(content, lang)
-	
+
 	if len(functions) == 0 {
 		// No functions found, fall back to line chunking
 		return c.chunkByLines(filePath, content, lang, changeType)
 	}
-	
+
 	chunks := make([]Chunk, 0, len(functions))
-	
+
 	for i, fn := range functions {
 		if c.config.MaxChunks > 0 && i >= c.config.MaxChunks {
 			break
 		}
-		
+
 		chunks = append(chunks, Chunk{
 			ID:          fmt.Sprintf("%s:%s", filePath, fn.Name),
 			FilePath:    filePath,
@@ -191,14 +191,14 @@ func (c *CodeChunker) chunkByFunction(filePath, content, lang, changeType string
 			},
 		})
 	}
-	
+
 	return chunks, nil
 }
 
 // chunkByLines chunks by fixed line count
 func (c *CodeChunker) chunkByLines(filePath, content, lang, changeType string) ([]Chunk, error) {
 	lines := strings.Split(content, "\n")
-	
+
 	// Calculate lines per chunk based on max chunk size
 	avgLineLen := len(content) / max(len(lines), 1)
 	linesPerChunk := c.config.MaxChunkSize / max(avgLineLen, 50)
@@ -208,66 +208,63 @@ func (c *CodeChunker) chunkByLines(filePath, content, lang, changeType string) (
 	if linesPerChunk > 100 {
 		linesPerChunk = 100
 	}
-	
+
 	overlapLines := c.config.ChunkOverlap / max(avgLineLen, 50)
 	if overlapLines < 2 {
 		overlapLines = 2
 	}
-	
+
 	var chunks []Chunk
 	chunkIndex := 0
-	
+
 	for i := 0; i < len(lines); {
 		if c.config.MaxChunks > 0 && chunkIndex >= c.config.MaxChunks {
 			break
 		}
-		
-		end := i + linesPerChunk
-		if end > len(lines) {
-			end = len(lines)
-		}
-		
+
+		end := min(i+linesPerChunk, len(lines))
+
 		chunkLines := lines[i:end]
 		chunkContent := strings.Join(chunkLines, "\n")
-		
+
 		chunks = append(chunks, Chunk{
-			ID:          fmt.Sprintf("%s:%d", filePath, chunkIndex),
-			FilePath:    filePath,
-			Language:    lang,
-			ChangeType:  changeType,
-			LineStart:   i + 1,
-			LineEnd:     end,
-			Content:     chunkContent,
-			ChunkIndex:  chunkIndex,
+			ID:         fmt.Sprintf("%s:%d", filePath, chunkIndex),
+			FilePath:   filePath,
+			Language:   lang,
+			ChangeType: changeType,
+			LineStart:  i + 1,
+			LineEnd:    end,
+			Content:    chunkContent,
+			ChunkIndex: chunkIndex,
 		})
-		
+
 		chunkIndex++
-		
+
 		// Move with overlap
 		i = end - overlapLines
 		if i <= chunks[len(chunks)-1].LineStart {
 			i = end // Prevent infinite loop
 		}
 	}
-	
+
 	// Set total chunks
 	for i := range chunks {
 		chunks[i].TotalChunks = len(chunks)
 	}
-	
+
 	return chunks, nil
 }
 
 // splitLargeContent splits content that exceeds max chunk size
 func (c *CodeChunker) splitLargeContent(filePath, content, lang, changeType string, baseIndex int) []Chunk {
 	subChunks, _ := c.chunkByLines(filePath, content, lang, changeType)
-	
+
 	// Adjust IDs and indices
 	for i := range subChunks {
 		subChunks[i].ID = fmt.Sprintf("%s:%d.%d", filePath, baseIndex, i)
 		subChunks[i].ChunkIndex = baseIndex*100 + i
 	}
-	
+
 	return subChunks
 }
 
@@ -282,43 +279,43 @@ type DiffHunk struct {
 func parseDiffHunks(diff string) []DiffHunk {
 	// Match hunk headers: @@ -start,count +start,count @@
 	hunkPattern := regexp.MustCompile(`@@\s*-\d+(?:,\d+)?\s*\+(\d+)(?:,(\d+))?\s*@@`)
-	
+
 	matches := hunkPattern.FindAllStringSubmatchIndex(diff, -1)
 	if len(matches) == 0 {
 		return nil
 	}
-	
+
 	hunks := make([]DiffHunk, 0, len(matches))
-	
+
 	for i, match := range matches {
 		hunkStart := match[0]
-		
+
 		// Find hunk end (next hunk start or end of diff)
 		hunkEnd := len(diff)
 		if i+1 < len(matches) {
 			hunkEnd = matches[i+1][0]
 		}
-		
+
 		// Extract line number from match
 		lineStart := 1
 		if match[2] != -1 && match[3] != -1 {
 			fmt.Sscanf(diff[match[2]:match[3]], "%d", &lineStart)
 		}
-		
+
 		lineCount := 1
 		if match[4] != -1 && match[5] != -1 {
 			fmt.Sscanf(diff[match[4]:match[5]], "%d", &lineCount)
 		}
-		
+
 		content := diff[hunkStart:hunkEnd]
-		
+
 		hunks = append(hunks, DiffHunk{
 			LineStart: lineStart,
 			LineEnd:   lineStart + lineCount - 1,
 			Content:   strings.TrimSpace(content),
 		})
 	}
-	
+
 	return hunks
 }
 
@@ -333,7 +330,7 @@ type FunctionInfo struct {
 // parseFunctions extracts functions from code (basic implementation)
 func parseFunctions(content, lang string) []FunctionInfo {
 	var pattern *regexp.Regexp
-	
+
 	switch lang {
 	case "go":
 		// func name(...) or func (receiver) name(...)
@@ -353,14 +350,14 @@ func parseFunctions(content, lang string) []FunctionInfo {
 	default:
 		return nil
 	}
-	
+
 	matches := pattern.FindAllStringSubmatchIndex(content, -1)
 	if len(matches) == 0 {
 		return nil
 	}
-	
+
 	functions := make([]FunctionInfo, 0, len(matches))
-	
+
 	for i, match := range matches {
 		// Find function name
 		var name string
@@ -373,23 +370,23 @@ func parseFunctions(content, lang string) []FunctionInfo {
 		if name == "" {
 			continue
 		}
-		
+
 		funcStart := match[0]
-		
+
 		// Find line number
 		lineStart := countLinesUntil(content, funcStart) + 1
-		
+
 		// Find function end (next function or end)
 		funcEnd := len(content)
 		if i+1 < len(matches) {
 			funcEnd = matches[i+1][0]
 		}
-		
+
 		// For better boundary detection, find closing brace
 		funcEnd = findFunctionEnd(content, funcStart, funcEnd, lang)
-		
+
 		lineEnd := countLinesUntil(content, funcEnd)
-		
+
 		functions = append(functions, FunctionInfo{
 			Name:      name,
 			LineStart: lineStart,
@@ -397,7 +394,7 @@ func parseFunctions(content, lang string) []FunctionInfo {
 			Content:   strings.TrimSpace(content[funcStart:funcEnd]),
 		})
 	}
-	
+
 	return functions
 }
 
@@ -413,11 +410,11 @@ func findFunctionEnd(content string, start, maxEnd int, lang string) int {
 		}
 		return maxEnd
 	}
-	
+
 	braceStart += start
 	braceCount := 1
 	i := braceStart + 1
-	
+
 	for i < len(content) && braceCount > 0 {
 		switch content[i] {
 		case '{':
@@ -437,7 +434,7 @@ func findFunctionEnd(content string, start, maxEnd int, lang string) int {
 		}
 		i++
 	}
-	
+
 	if i > maxEnd {
 		return maxEnd
 	}
@@ -452,13 +449,6 @@ func countLines(s string) int {
 
 func countLinesUntil(s string, pos int) int {
 	return strings.Count(s[:pos], "\n")
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 // DetectLanguage detects language from file path
@@ -495,14 +485,13 @@ func DetectLanguage(filepath string) string {
 		".vue":    "vue",
 		".svelte": "svelte",
 	}
-	
+
 	filepath = strings.ToLower(filepath)
 	for ext, lang := range extensions {
 		if strings.HasSuffix(filepath, ext) {
 			return lang
 		}
 	}
-	
+
 	return "text"
 }
-

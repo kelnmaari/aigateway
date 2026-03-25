@@ -10,7 +10,6 @@ import (
 
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
-
 )
 
 // Verify that SQLiteDB implements RAGDataSourceRepository
@@ -166,7 +165,7 @@ func (s *SQLiteDB) GetDataSourceByID(ctx context.Context, id string) (*models.RA
 func (s *SQLiteDB) ListDataSources(ctx context.Context, filter storage.DataSourceFilter) ([]models.RAGDataSource, int, error) {
 	// Build WHERE clause
 	var whereClauses []string
-	var args []interface{}
+	var args []any
 
 	if filter.UserID != nil {
 		whereClauses = append(whereClauses, "user_id = ?")
@@ -374,7 +373,7 @@ func (s *SQLiteDB) UpdateStatistics(ctx context.Context, id string, totalChunks 
 }
 
 // Helper functions
-func nullableString(s *string) interface{} {
+func nullableString(s *string) any {
 	if s == nil {
 		return nil
 	}
@@ -382,4 +381,3 @@ func nullableString(s *string) interface{} {
 }
 
 // boolToInt and intToBool helpers moved to rag.go to avoid redeclaration
-

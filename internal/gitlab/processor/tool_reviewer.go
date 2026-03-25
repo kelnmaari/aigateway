@@ -179,7 +179,7 @@ func (r *ToolBasedReviewer) Review(
 	// Combine read tools + output tools
 	allTools := append(r.readTools.GetToolDefinitions(), GetOutputToolDefinitions()...)
 
-	messages := []map[string]interface{}{
+	messages := []map[string]any{
 		{"role": "system", "content": r.getSystemPrompt()},
 		{"role": "user", "content": prompt},
 	}
@@ -188,7 +188,7 @@ func (r *ToolBasedReviewer) Review(
 	totalTokens := 0
 	seenQueries := make(map[string]int)
 
-	for i := 0; i < DefaultMaxToolBasedIterations; i++ {
+	for i := range DefaultMaxToolBasedIterations {
 		response, toolCalls, tokens, err := r.callLLM(ctx, modelID, messages, allTools)
 		totalTokens += tokens
 
@@ -218,7 +218,7 @@ func (r *ToolBasedReviewer) Review(
 
 		if allRepeated {
 			r.logger.Warn("Detected tool call loop in tool-based review, forcing completion")
-			messages = append(messages, map[string]interface{}{
+			messages = append(messages, map[string]any{
 				"role":    "user",
 				"content": "You've repeated the same tool calls. Please call set_review_summary and finish_review now.",
 			})
@@ -231,7 +231,7 @@ func (r *ToolBasedReviewer) Review(
 		}).Debug("Processing tool calls")
 
 		// Add assistant message with tool calls
-		messages = append(messages, map[string]interface{}{
+		messages = append(messages, map[string]any{
 			"role":       "assistant",
 			"content":    response,
 			"tool_calls": toolCalls,
@@ -240,7 +240,7 @@ func (r *ToolBasedReviewer) Review(
 		// Execute each tool call
 		for _, tc := range toolCalls {
 			result := r.executeTool(ctx, tc, collector)
-			messages = append(messages, map[string]interface{}{
+			messages = append(messages, map[string]any{
 				"role":         "tool",
 				"tool_call_id": result.ToolCallID,
 				"content":      result.Content,
@@ -426,10 +426,10 @@ func (r *ToolBasedReviewer) handleTextFallback(
 func (r *ToolBasedReviewer) callLLM(
 	ctx context.Context,
 	modelID string,
-	messages []map[string]interface{},
+	messages []map[string]any,
 	tools []ToolDefinition,
 ) (string, []ToolCall, int, error) {
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"model":       modelID,
 		"messages":    messages,
 		"tools":       tools,

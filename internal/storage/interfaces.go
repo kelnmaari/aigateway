@@ -16,30 +16,30 @@ type APIKeyStorage interface {
 	GetAPIKeyByHash(ctx context.Context, keyHash string) (*models.APIKey, error)
 	UpdateAPIKey(ctx context.Context, apiKey *models.APIKey) error
 	DeleteAPIKey(ctx context.Context, id string) error
-	
+
 	// Поиск и фильтрация
 	ListAPIKeys(ctx context.Context, req models.ListAPIKeysRequest) ([]models.APIKey, int, error)
 	FindAPIKeysByStatus(ctx context.Context, status models.APIKeyStatus) ([]models.APIKey, error)
 	FindAPIKeysByModel(ctx context.Context, model string) ([]models.APIKey, error)
-	
+
 	// Статистика и мониторинг
 	GetAPIKeyUsageStats(ctx context.Context, id string) (*models.APIKeyUsage, error)
 	UpdateAPIKeyUsage(ctx context.Context, id string, usage models.APIKeyUsage) error
-	
+
 	// Административные операции
 	RevokeAPIKey(ctx context.Context, id string, reason string) error
 	EnableAPIKey(ctx context.Context, id string) error
 	ExpireAPIKey(ctx context.Context, id string) error
 	CleanupExpiredKeys(ctx context.Context) (int, error)
-	
+
 	// Backup и restore
 	ExportAPIKeys(ctx context.Context) ([]models.APIKey, error)
 	ImportAPIKeys(ctx context.Context, apiKeys []models.APIKey) error
-	
+
 	// Здоровье storage
 	HealthCheck(ctx context.Context) error
-	GetStorageStats(ctx context.Context) (map[string]interface{}, error)
-	
+	GetStorageStats(ctx context.Context) (map[string]any, error)
+
 	// Lifecycle
 	Initialize(ctx context.Context) error
 	Close() error
@@ -49,20 +49,20 @@ type APIKeyStorage interface {
 type StorageConfig struct {
 	Type string `json:"type"` // "json", "sqlite", "postgres"
 	Path string `json:"path"` // Путь к файлу или строка подключения
-	
+
 	// Опции для различных типов storage
-	Options map[string]interface{} `json:"options,omitempty"`
+	Options map[string]any `json:"options,omitempty"`
 }
 
 // StorageStats статистика storage
 type StorageStats struct {
-	Type               string `json:"type"`
-	TotalKeys          int    `json:"total_keys"`
-	ActiveKeys         int    `json:"active_keys"`
-	ExpiredKeys        int    `json:"expired_keys"`
-	RevokedKeys        int    `json:"revoked_keys"`
-	LastBackupTime     *int64 `json:"last_backup_time,omitempty"`
-	StorageSize        int64  `json:"storage_size_bytes"`
+	Type                string `json:"type"`
+	TotalKeys           int    `json:"total_keys"`
+	ActiveKeys          int    `json:"active_keys"`
+	ExpiredKeys         int    `json:"expired_keys"`
+	RevokedKeys         int    `json:"revoked_keys"`
+	LastBackupTime      *int64 `json:"last_backup_time,omitempty"`
+	StorageSize         int64  `json:"storage_size_bytes"`
 	LastMaintenanceTime *int64 `json:"last_maintenance_time,omitempty"`
 }
 
@@ -88,13 +88,13 @@ func (e *StorageError) Unwrap() error {
 
 // Storage error types
 const (
-	StorageErrorTypeNotFound     = "not_found"
+	StorageErrorTypeNotFound      = "not_found"
 	StorageErrorTypeAlreadyExists = "already_exists"
-	StorageErrorTypeInvalidData  = "invalid_data"
-	StorageErrorTypePermission   = "permission"
-	StorageErrorTypeConnection   = "connection"
-	StorageErrorTypeCorrupted    = "corrupted"
-	StorageErrorTypeInternal     = "internal"
+	StorageErrorTypeInvalidData   = "invalid_data"
+	StorageErrorTypePermission    = "permission"
+	StorageErrorTypeConnection    = "connection"
+	StorageErrorTypeCorrupted     = "corrupted"
+	StorageErrorTypeInternal      = "internal"
 )
 
 // NewStorageError создает новую ошибку storage
@@ -151,4 +151,3 @@ func ConnectionError(operation, message string, cause error) *StorageError {
 		cause,
 	)
 }
-

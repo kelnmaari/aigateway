@@ -68,7 +68,7 @@ type DocumentMetadata struct {
 	RowCount   int // Для CSV
 
 	// Дополнительные метаданные
-	Custom map[string]interface{} // Любые другие метаданные
+	Custom map[string]any // Любые другие метаданные
 }
 
 // DocumentStructure структура документа (для RAG)
@@ -106,4 +106,3 @@ type Table struct {
 	Rows    [][]string // Данные строк
 	Page    int        // Номер страницы (для PDF, DOCX)
 }
-

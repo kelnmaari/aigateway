@@ -125,7 +125,7 @@ func (p *AnthropicProvider) ListModels(ctx context.Context) ([]*ProviderModel, e
 			Capabilities: capabilities,
 			Description:  fmt.Sprintf("Anthropic model: %s", name),
 			Tags:         []string{"anthropic", "claude"},
-			ProviderMeta: map[string]interface{}{
+			ProviderMeta: map[string]any{
 				"created_at": m.CreatedAt,
 				"type":       m.Type,
 			},
@@ -175,7 +175,7 @@ func (p *AnthropicProvider) GetModelInfo(ctx context.Context, modelID string) (*
 		Capabilities: capabilities,
 		Description:  fmt.Sprintf("Anthropic model: %s", name),
 		Tags:         []string{"anthropic", "claude"},
-		ProviderMeta: map[string]interface{}{
+		ProviderMeta: map[string]any{
 			"created_at": m.CreatedAt,
 			"type":       m.Type,
 		},

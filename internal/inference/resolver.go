@@ -2,6 +2,7 @@ package inference
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 )
 
@@ -46,11 +47,8 @@ func (r *SpecRegistry) FindByCapability(cap Capability) []ModelSpec {
 	defer r.mu.RUnlock()
 	var out []ModelSpec
 	for _, spec := range r.specs {
-		for _, c := range spec.Capabilities {
-			if c == cap {
-				out = append(out, spec)
-				break
-			}
+		if slices.Contains(spec.Capabilities, cap) {
+			out = append(out, spec)
 		}
 	}
 	return out
@@ -63,4 +61,3 @@ func (r *SpecRegistry) Require(alias string) (ModelSpec, error) {
 	}
 	return ModelSpec{}, fmt.Errorf("model alias not registered: %s", alias)
 }
-

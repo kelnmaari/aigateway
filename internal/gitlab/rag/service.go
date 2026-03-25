@@ -16,7 +16,7 @@ import (
 type EmbeddingProvider interface {
 	// GenerateEmbedding creates a vector embedding for the given text
 	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
-	
+
 	// GenerateEmbeddings creates vector embeddings for multiple texts
 	GenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
 }
@@ -35,10 +35,10 @@ type EmbeddingProviderWithModelOverride interface {
 
 // RAGService provides RAG capabilities for code review
 type RAGService struct {
-	qdrant    *QdrantClient
-	embedder  EmbeddingProvider
-	logger    *logrus.Logger
-	enabled   bool
+	qdrant   *QdrantClient
+	embedder EmbeddingProvider
+	logger   *logrus.Logger
+	enabled  bool
 }
 
 // RAGConfig holds RAG service configuration
@@ -116,7 +116,7 @@ func (s *RAGService) WaitForEmbeddingModel(ctx context.Context, maxRetries int, 
 		return nil
 	}
 
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -162,7 +162,7 @@ func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error 
 	point := Point{
 		ID:     pointID,
 		Vector: Float32ToFloat64(embedding),
-		Payload: map[string]interface{}{
+		Payload: map[string]any{
 			"project_id":    chunk.ProjectID,
 			"file_path":     chunk.FilePath,
 			"chunk_index":   chunk.ChunkIndex,
@@ -184,7 +184,6 @@ func (s *RAGService) IndexCodeChunk(ctx context.Context, chunk CodeChunk) error 
 
 	return nil
 }
-
 
 // FindSimilarCode finds code chunks similar to the given query
 // FindSimilarCode finds code similar to the query
@@ -356,7 +355,7 @@ func (s *RAGService) IndexCodeChunksToCollection(ctx context.Context, collection
 		point := Point{
 			ID:     pointID,
 			Vector: Float32ToFloat64(embedding),
-			Payload: map[string]interface{}{
+			Payload: map[string]any{
 				"project_id":    chunk.ProjectID,
 				"file_path":     chunk.FilePath,
 				"chunk_index":   chunk.ChunkIndex,
@@ -477,7 +476,7 @@ type CodeChunk struct {
 	ClassName    string    `json:"class_name,omitempty"`
 	CommitSHA    string    `json:"commit_sha,omitempty"`
 	BranchName   string    `json:"branch_name,omitempty"`
-	LastUpdated  time.Time `json:"last_updated,omitempty"`
+	LastUpdated  time.Time `json:"last_updated"`
 	Score        float32   `json:"score,omitempty"` // Similarity score (for search results)
 }
 
@@ -495,7 +494,7 @@ func generatePointID(projectID, filePath string, chunkIndex int) string {
 	return hex.EncodeToString(hash[:16])
 }
 
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -504,7 +503,7 @@ func getString(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func getInt(m map[string]interface{}, key string) int {
+func getInt(m map[string]any, key string) int {
 	if v, ok := m[key]; ok {
 		switch n := v.(type) {
 		case int:
@@ -549,4 +548,3 @@ func (s *RAGService) GetCollectionStats(ctx context.Context, collectionName stri
 	}
 	return s.qdrant.GetCollectionStats(ctx, collectionName)
 }
-

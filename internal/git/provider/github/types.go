@@ -5,31 +5,31 @@ import "time"
 
 // GitHubPullRequest represents a GitHub PR
 type GitHubPullRequest struct {
-	ID        int64      `json:"id"`
-	Number    int        `json:"number"`
-	State     string     `json:"state"`
-	Title     string     `json:"title"`
-	Body      string     `json:"body"`
-	Draft     bool       `json:"draft"`
-	HTMLURL   string     `json:"html_url"`
-	User      *GitHubUser `json:"user"`
-	Head      GitHubRef  `json:"head"`
-	Base      GitHubRef  `json:"base"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	ClosedAt  *time.Time `json:"closed_at"`
-	MergedAt  *time.Time `json:"merged_at"`
-	MergeCommitSHA string `json:"merge_commit_sha"`
-	Mergeable *bool      `json:"mergeable"`
-	Additions int        `json:"additions"`
-	Deletions int        `json:"deletions"`
-	ChangedFiles int     `json:"changed_files"`
+	ID             int64       `json:"id"`
+	Number         int         `json:"number"`
+	State          string      `json:"state"`
+	Title          string      `json:"title"`
+	Body           string      `json:"body"`
+	Draft          bool        `json:"draft"`
+	HTMLURL        string      `json:"html_url"`
+	User           *GitHubUser `json:"user"`
+	Head           GitHubRef   `json:"head"`
+	Base           GitHubRef   `json:"base"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+	ClosedAt       *time.Time  `json:"closed_at"`
+	MergedAt       *time.Time  `json:"merged_at"`
+	MergeCommitSHA string      `json:"merge_commit_sha"`
+	Mergeable      *bool       `json:"mergeable"`
+	Additions      int         `json:"additions"`
+	Deletions      int         `json:"deletions"`
+	ChangedFiles   int         `json:"changed_files"`
 }
 
 // GitHubRef represents a Git reference
 type GitHubRef struct {
-	Ref  string           `json:"ref"`
-	SHA  string           `json:"sha"`
+	Ref  string            `json:"ref"`
+	SHA  string            `json:"sha"`
 	Repo *GitHubRepository `json:"repo,omitempty"`
 }
 
@@ -61,21 +61,21 @@ type GitHubUser struct {
 
 // GitHubRepository represents a GitHub repository
 type GitHubRepository struct {
-	ID            int64        `json:"id"`
-	Name          string       `json:"name"`
-	FullName      string       `json:"full_name"`
-	Description   string       `json:"description"`
-	DefaultBranch string       `json:"default_branch"`
-	HTMLURL       string       `json:"html_url"`
-	CloneURL      string       `json:"clone_url"`
-	SSHURL        string       `json:"ssh_url"`
-	Private       bool         `json:"private"`
-	Archived      bool         `json:"archived"`
-	Disabled      bool         `json:"disabled"`
-	Language      string       `json:"language"`
-	Owner         *GitHubUser  `json:"owner"`
-	CreatedAt     time.Time    `json:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at"`
+	ID            int64       `json:"id"`
+	Name          string      `json:"name"`
+	FullName      string      `json:"full_name"`
+	Description   string      `json:"description"`
+	DefaultBranch string      `json:"default_branch"`
+	HTMLURL       string      `json:"html_url"`
+	CloneURL      string      `json:"clone_url"`
+	SSHURL        string      `json:"ssh_url"`
+	Private       bool        `json:"private"`
+	Archived      bool        `json:"archived"`
+	Disabled      bool        `json:"disabled"`
+	Language      string      `json:"language"`
+	Owner         *GitHubUser `json:"owner"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
 // GitHubComment represents a comment
@@ -86,24 +86,24 @@ type GitHubComment struct {
 	HTMLURL   string      `json:"html_url"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
-	
+
 	// For PR review comments
-	Path        string `json:"path,omitempty"`
-	Line        int    `json:"line,omitempty"`
-	Side        string `json:"side,omitempty"`
-	CommitID    string `json:"commit_id,omitempty"`
-	DiffHunk    string `json:"diff_hunk,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Line     int    `json:"line,omitempty"`
+	Side     string `json:"side,omitempty"`
+	CommitID string `json:"commit_id,omitempty"`
+	DiffHunk string `json:"diff_hunk,omitempty"`
 }
 
 // GitHubWebhook represents a webhook
 type GitHubWebhook struct {
-	ID        int64              `json:"id"`
-	Name      string             `json:"name"`
-	Active    bool               `json:"active"`
-	Events    []string           `json:"events"`
+	ID        int64               `json:"id"`
+	Name      string              `json:"name"`
+	Active    bool                `json:"active"`
+	Events    []string            `json:"events"`
 	Config    GitHubWebhookConfig `json:"config"`
-	CreatedAt time.Time          `json:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at"`
+	CreatedAt time.Time           `json:"created_at"`
+	UpdatedAt time.Time           `json:"updated_at"`
 }
 
 // GitHubWebhookConfig represents webhook configuration
@@ -116,7 +116,7 @@ type GitHubWebhookConfig struct {
 
 // GitHubContent represents file content
 type GitHubContent struct {
-	Type        string `json:"type"` // file, dir, symlink, submodule
+	Type        string `json:"type"`     // file, dir, symlink, submodule
 	Encoding    string `json:"encoding"` // base64
 	Size        int64  `json:"size"`
 	Name        string `json:"name"`
@@ -142,18 +142,18 @@ type GitHubPullRequestEvent struct {
 type GitHubPRChanges struct {
 	Title struct {
 		From string `json:"from"`
-	} `json:"title,omitempty"`
+	} `json:"title"`
 	Body struct {
 		From string `json:"from"`
-	} `json:"body,omitempty"`
+	} `json:"body"`
 	Base struct {
 		Ref struct {
 			From string `json:"from"`
-		} `json:"ref,omitempty"`
+		} `json:"ref"`
 		SHA struct {
 			From string `json:"from"`
-		} `json:"sha,omitempty"`
-	} `json:"base,omitempty"`
+		} `json:"sha"`
+	} `json:"base"`
 }
 
 // GitHubPushEvent represents a push webhook event
@@ -183,4 +183,3 @@ type GitHubCommit struct {
 	Removed   []string    `json:"removed"`
 	Modified  []string    `json:"modified"`
 }
-

@@ -193,8 +193,8 @@ func parseMetricNameAndLabels(metricPart string) (string, map[string]string) {
 	labelsStr := metricPart[bracketIdx+1 : closeBracketIdx]
 
 	// Парсим labels: label1="value1",label2="value2"
-	labelPairs := strings.Split(labelsStr, ",")
-	for _, pair := range labelPairs {
+	labelPairs := strings.SplitSeq(labelsStr, ",")
+	for pair := range labelPairs {
 		parts := strings.SplitN(pair, "=", 2)
 		if len(parts) == 2 {
 			key := strings.TrimSpace(parts[0])
@@ -298,4 +298,3 @@ func (m *MetricsSnapshot) GetAverageOllamaDuration() float64 {
 	// Конвертируем в миллисекунды
 	return (totalDuration / totalRequests) * 1000
 }
-

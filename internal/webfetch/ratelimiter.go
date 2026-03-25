@@ -141,12 +141,3 @@ func matchDomain(domain, pattern string) bool {
 
 	return false
 }
-
-// max возвращает максимум из двух int
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 
@@ -97,7 +98,7 @@ func NewDownloader(client *Client, downloadsDir string, maxConcurrent int, autoR
 	}
 
 	// Start download workers
-	for i := 0; i < maxConcurrent; i++ {
+	for i := range maxConcurrent {
 		d.wg.Add(1)
 		go d.downloadWorker(i)
 	}
@@ -137,7 +138,7 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 		"dest_path":     destPath,
 		"dest_path_abs": absDestPath,
 	}).Info("📁 Preparing download destination")
-	
+
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
@@ -152,7 +153,7 @@ func (d *Downloader) StartDownload(modelID, filename string, totalSize int64, sh
 				"file_size":     existingSize,
 				"expected_size": totalSize,
 			}).Info("✅ File already exists and is complete, skipping download")
-			
+
 			now := time.Now()
 			return &Download{
 				ID:             downloadID,
@@ -643,21 +644,21 @@ func generateDownloadID(modelID, filename string) string {
 
 // RepoDownload represents a full repository download (multiple files)
 type RepoDownload struct {
-	ID            string         `json:"id"`
-	ModelID       string         `json:"model_id"`
-	Status        DownloadStatus `json:"status"`
-	TotalFiles    int            `json:"total_files"`
-	CompletedFiles int           `json:"completed_files"`
-	FailedFiles   int            `json:"failed_files"`
-	TotalSize     int64          `json:"total_size"`
-	DownloadedSize int64         `json:"downloaded_size"`
-	Progress      float64        `json:"progress"` // 0.0 to 100.0
-	Error         string         `json:"error,omitempty"`
-	Files         []*Download    `json:"files"`
-	StartedAt     *time.Time     `json:"started_at,omitempty"`
-	CompletedAt   *time.Time     `json:"completed_at,omitempty"`
-	LocalPath     string         `json:"local_path"` // Path where model is saved
-	
+	ID             string         `json:"id"`
+	ModelID        string         `json:"model_id"`
+	Status         DownloadStatus `json:"status"`
+	TotalFiles     int            `json:"total_files"`
+	CompletedFiles int            `json:"completed_files"`
+	FailedFiles    int            `json:"failed_files"`
+	TotalSize      int64          `json:"total_size"`
+	DownloadedSize int64          `json:"downloaded_size"`
+	Progress       float64        `json:"progress"` // 0.0 to 100.0
+	Error          string         `json:"error,omitempty"`
+	Files          []*Download    `json:"files"`
+	StartedAt      *time.Time     `json:"started_at,omitempty"`
+	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
+	LocalPath      string         `json:"local_path"` // Path where model is saved
+
 	mu sync.RWMutex
 }
 
@@ -788,7 +789,7 @@ func (d *Downloader) DownloadRepository(ctx context.Context, modelID string) (*R
 				return
 			case <-ticker.C:
 				completed, failed, downloaded := d.checkRepoProgress(repoDownload)
-				
+
 				repoDownload.mu.Lock()
 				repoDownload.CompletedFiles = completed
 				repoDownload.FailedFiles = failed
@@ -809,7 +810,7 @@ func (d *Downloader) DownloadRepository(ctx context.Context, modelID string) (*R
 						repoDownload.Progress = 100
 					}
 					repoDownload.mu.Unlock()
-					
+
 					d.logger.WithFields(logrus.Fields{
 						"model_id":   modelID,
 						"completed":  completed,
@@ -861,7 +862,7 @@ func (d *Downloader) GetRepoDownload(modelID string) (*RepoDownload, bool) {
 func (d *Downloader) ListRepoDownloads() []*RepoDownload {
 	repoDownloads.RLock()
 	defer repoDownloads.RUnlock()
-	
+
 	result := make([]*RepoDownload, 0, len(repoDownloads.m))
 	for _, repo := range repoDownloads.m {
 		result = append(result, repo)
@@ -1016,7 +1017,7 @@ func (d *Downloader) CancelRepoDownload(modelID string) error {
 		repoDownloads.Unlock()
 		return fmt.Errorf("repository download not found: %s", modelID)
 	}
-	
+
 	// Mark as cancelled
 	repo.mu.Lock()
 	repo.Status = DownloadStatusCancelled
@@ -1024,14 +1025,14 @@ func (d *Downloader) CancelRepoDownload(modelID string) error {
 	files := repo.Files
 	repo.mu.Unlock()
 	repoDownloads.Unlock()
-	
+
 	// Cancel all individual file downloads
 	for _, file := range files {
 		if file != nil && (file.Status == DownloadStatusDownloading || file.Status == DownloadStatusPending) {
 			_ = d.CancelDownload(file.ID)
 		}
 	}
-	
+
 	d.logger.WithField("model_id", modelID).Info("Repository download cancelled")
 	return nil
 }
@@ -1057,33 +1058,31 @@ func shouldDownloadFile(filename string) bool {
 		"generation_config.json",
 		"preprocessor_config.json",
 	}
-	
-	for _, ef := range essentialFiles {
-		if filename == ef {
-			return true
-		}
+
+	if slices.Contains(essentialFiles, filename) {
+		return true
 	}
-	
+
 	// Download model weight files
 	if hasAnySuffix(filename, ".safetensors", ".bin", ".pt", ".pth", ".gguf") {
 		return true
 	}
-	
+
 	// Download sentence-transformers specific files
 	if hasAnyPrefix(filename, "1_Pooling/", "2_Normalize/") {
 		return true
 	}
-	
+
 	// Skip README, license, git files, etc
 	if hasAnySuffix(filename, ".md", ".txt", ".gitattributes") {
 		return false
 	}
-	
+
 	// Skip model card data
 	if filename == "README.md" || filename == "LICENSE" {
 		return false
 	}
-	
+
 	return false
 }
 

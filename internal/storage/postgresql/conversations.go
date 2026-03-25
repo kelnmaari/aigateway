@@ -251,7 +251,7 @@ func (db *PostgreSQLDB) ListUserConversations(ctx context.Context, userID string
 		WHERE user_id = $1
 	`
 
-	var args []interface{}
+	var args []any
 	args = append(args, userID)
 	paramIndex := 2 // $1 is userID, start from $2
 
@@ -570,7 +570,7 @@ func (db *PostgreSQLDB) DeleteConversationMessages(ctx context.Context, convID s
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"conversation_id": convID,
 		"deleted_count":   rowsAffected,
 	}).Info("Conversation messages deleted successfully")

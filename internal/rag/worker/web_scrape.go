@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"aigateway/internal/models"
+	"github.com/sirupsen/logrus"
 )
 
 // executeWebScrape выполняет web scraping из URL
@@ -92,11 +92,11 @@ func (w *RAGWorker) executeWebScrape(ctx context.Context, sourceID string) error
 	}
 
 	w.logger.WithFields(logrus.Fields{
-		"source_id":     source.ID,
-		"urls_scraped":  len(urls),
-		"urls_failed":   len(errors),
-		"total_chunks":  totalChunks,
-		"total_tokens":  totalTokens,
+		"source_id":    source.ID,
+		"urls_scraped": len(urls),
+		"urls_failed":  len(errors),
+		"total_chunks": totalChunks,
+		"total_tokens": totalTokens,
 	}).Info("Web scrape completed")
 
 	return nil
@@ -164,8 +164,8 @@ func (w *RAGWorker) scrapeURL(ctx context.Context, source *models.RAGDataSource,
 		ProcessingStartedAt:   &now,
 		ProcessingCompletedAt: &now,
 		Metadata: models.DocumentMetadata{
-			"url":         url,
-			"status_code": resp.StatusCode,
+			"url":          url,
+			"status_code":  resp.StatusCode,
 			"content_type": resp.Header.Get("Content-Type"),
 		},
 		TotalChunks: 0,
@@ -184,12 +184,12 @@ func (w *RAGWorker) scrapeURL(ctx context.Context, source *models.RAGDataSource,
 	for _, chunk := range chunks {
 		chunk.Metadata["url"] = url
 	}
-	
+
 	// 6. Генерируем embeddings если embedder доступен (Version 1.14.0+)
 	if err := w.generateAndStoreEmbeddings(ctx, chunks); err != nil {
 		w.logger.WithError(err).Warn("Failed to generate embeddings, continuing without them")
 	}
-	
+
 	// 7. Сохраняем chunks в БД
 	for _, chunk := range chunks {
 		if err := w.db.CreateRAGChunk(ctx, chunk); err != nil {
@@ -226,7 +226,7 @@ func extractURLs(config models.SourceConfig) []string {
 	// Check for multiple URLs
 	if urlsRaw, ok := config["urls"]; ok {
 		switch v := urlsRaw.(type) {
-		case []interface{}:
+		case []any:
 			for _, urlRaw := range v {
 				if url, ok := urlRaw.(string); ok && url != "" {
 					urls = append(urls, url)
@@ -277,19 +277,19 @@ func removeHTMLTags(html string) string {
 func decodeHTMLEntities(text string) string {
 	// Common HTML entities
 	replacements := map[string]string{
-		"&nbsp;":  " ",
-		"&lt;":    "<",
-		"&gt;":    ">",
-		"&amp;":   "&",
-		"&quot;":  "\"",
-		"&apos;":  "'",
-		"&#39;":   "'",
-		"&mdash;": "—",
-		"&ndash;": "–",
-		"&hellip;":"...",
-		"&copy;":  "©",
-		"&reg;":   "®",
-		"&trade;": "™",
+		"&nbsp;":   " ",
+		"&lt;":     "<",
+		"&gt;":     ">",
+		"&amp;":    "&",
+		"&quot;":   "\"",
+		"&apos;":   "'",
+		"&#39;":    "'",
+		"&mdash;":  "—",
+		"&ndash;":  "–",
+		"&hellip;": "...",
+		"&copy;":   "©",
+		"&reg;":    "®",
+		"&trade;":  "™",
 	}
 
 	for entity, replacement := range replacements {
@@ -347,4 +347,3 @@ func sanitizeFilename(url string) string {
 
 	return name + ".html"
 }
-

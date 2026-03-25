@@ -12,15 +12,15 @@ import (
 
 // Manager coordinates all Redis services
 type Manager struct {
-	Client      *Client
-	RateLimit   *RateLimitService
-	Session     *SessionService
-	JWT         *JWTService
-	Cache       *CacheService
-	PubSub      *PubSubService
-	logger      *logrus.Logger
-	enabled     bool
-	
+	Client    *Client
+	RateLimit *RateLimitService
+	Session   *SessionService
+	JWT       *JWTService
+	Cache     *CacheService
+	PubSub    *PubSubService
+	logger    *logrus.Logger
+	enabled   bool
+
 	// Background workers (v3.0.6+: background sync)
 	BackgroundSync *BackgroundSyncManager
 }
@@ -49,12 +49,12 @@ func (m *Manager) StopBackgroundWorkers() {
 
 // ManagerConfig configuration for Redis manager
 type ManagerConfig struct {
-	URL       string
-	KeyPrefix string
-	DB        int
+	URL        string
+	KeyPrefix  string
+	DB         int
 	MaxRetries int
-	PoolSize  int
-	Enabled   bool
+	PoolSize   int
+	Enabled    bool
 }
 
 // NewManager creates a new Redis manager with all services
@@ -66,19 +66,19 @@ func NewManager(cfg ManagerConfig, logger *logrus.Logger) (*Manager, error) {
 			logger:  logger,
 		}, nil
 	}
-	
+
 	// Create Redis client
 	client, err := NewClient(Config{
-		URL:       cfg.URL,
-		KeyPrefix: cfg.KeyPrefix,
-		DB:        cfg.DB,
+		URL:        cfg.URL,
+		KeyPrefix:  cfg.KeyPrefix,
+		DB:         cfg.DB,
 		MaxRetries: cfg.MaxRetries,
-		PoolSize:  cfg.PoolSize,
+		PoolSize:   cfg.PoolSize,
 	}, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Redis client: %w", err)
 	}
-	
+
 	// Initialize all services
 	// Create manager first (needed for background sync init)
 	manager := &Manager{
@@ -91,7 +91,7 @@ func NewManager(cfg ManagerConfig, logger *logrus.Logger) (*Manager, error) {
 		logger:    logger,
 		enabled:   true,
 	}
-	
+
 	// Initialize background sync manager (v3.0.6+)
 	backgroundSync := NewBackgroundSyncManager(manager, logger, BackgroundWorkerConfig{
 		StatsInterval:     10 * time.Second,
@@ -100,13 +100,13 @@ func NewManager(cfg ManagerConfig, logger *logrus.Logger) (*Manager, error) {
 		Enabled:           true,
 	})
 	manager.BackgroundSync = backgroundSync
-	
+
 	logger.WithFields(logrus.Fields{
 		"url":        cfg.URL,
 		"db":         cfg.DB,
 		"key_prefix": cfg.KeyPrefix,
 	}).Info("🚀 Redis manager initialized")
-	
+
 	return manager, nil
 }
 
@@ -120,25 +120,25 @@ func (m *Manager) Close() error {
 	if !m.enabled {
 		return nil
 	}
-	
+
 	m.logger.Info("Closing Redis connections...")
-	
+
 	// Stop background workers first (v3.0.6+)
 	if m.BackgroundSync != nil {
 		m.BackgroundSync.Stop()
 		m.logger.Debug("Background workers stopped")
 	}
-	
+
 	// Close pub/sub
 	if err := m.PubSub.Close(); err != nil {
 		m.logger.WithError(err).Warn("Failed to close pub/sub")
 	}
-	
+
 	// Close client
 	if err := m.Client.Close(); err != nil {
 		return fmt.Errorf("failed to close Redis client: %w", err)
 	}
-	
+
 	m.logger.Info("✅ Redis connections closed")
 	return nil
 }
@@ -148,30 +148,30 @@ func (m *Manager) Ping(ctx context.Context) error {
 	if !m.enabled {
 		return nil
 	}
-	
+
 	return m.Client.Ping(ctx)
 }
 
 // GetStats returns comprehensive Redis statistics
-func (m *Manager) GetStats(ctx context.Context) (map[string]interface{}, error) {
+func (m *Manager) GetStats(ctx context.Context) (map[string]any, error) {
 	if !m.enabled {
-		return map[string]interface{}{
+		return map[string]any{
 			"enabled": false,
 		}, nil
 	}
-	
-	stats := make(map[string]interface{})
-	
+
+	stats := make(map[string]any)
+
 	// Basic info
 	stats["enabled"] = true
-	
+
 	// DB size
 	dbSize, _ := m.Client.DBSize(ctx)
 	stats["db_size"] = dbSize
-	
+
 	// Pool stats
 	poolStats := m.Client.Stats()
-	stats["pool"] = map[string]interface{}{
+	stats["pool"] = map[string]any{
 		"hits":        poolStats.Hits,
 		"misses":      poolStats.Misses,
 		"timeouts":    poolStats.Timeouts,
@@ -179,19 +179,19 @@ func (m *Manager) GetStats(ctx context.Context) (map[string]interface{}, error) 
 		"idle_conns":  poolStats.IdleConns,
 		"stale_conns": poolStats.StaleConns,
 	}
-	
+
 	// Cache stats
 	cacheStats, err := m.Cache.GetStats(ctx)
 	if err == nil {
 		stats["cache"] = cacheStats
 	}
-	
+
 	// Instances (if pub/sub enabled)
 	instances, err := m.PubSub.ListInstances(ctx)
 	if err == nil {
 		stats["instances"] = len(instances)
 	}
-	
+
 	return stats, nil
 }
 
@@ -200,12 +200,12 @@ func (m *Manager) WarmUp(ctx context.Context) error {
 	if !m.enabled {
 		return nil
 	}
-	
+
 	m.logger.Info("Warming up Redis cache...")
-	
+
 	// Warm up can be customized based on application needs
 	// For now, just log that we're ready
-	
+
 	m.logger.Info("✅ Redis cache ready")
 	return nil
 }
@@ -215,7 +215,7 @@ func (m *Manager) RegisterInstance(ctx context.Context, instanceID, hostname, ip
 	if !m.enabled {
 		return nil
 	}
-	
+
 	info := &InstanceInfo{
 		InstanceID: instanceID,
 		Hostname:   hostname,
@@ -223,21 +223,21 @@ func (m *Manager) RegisterInstance(ctx context.Context, instanceID, hostname, ip
 		Port:       port,
 		StartedAt:  time.Now(),
 	}
-	
+
 	if err := m.PubSub.RegisterInstance(ctx, info); err != nil {
 		return fmt.Errorf("failed to register instance: %w", err)
 	}
-	
+
 	// Start heartbeat goroutine
 	go m.heartbeatLoop(ctx, instanceID)
-	
+
 	m.logger.WithFields(logrus.Fields{
 		"instance_id": instanceID,
 		"hostname":    hostname,
 		"ip":          ip,
 		"port":        port,
 	}).Info("✅ Instance registered")
-	
+
 	return nil
 }
 
@@ -245,7 +245,7 @@ func (m *Manager) RegisterInstance(ctx context.Context, instanceID, hostname, ip
 func (m *Manager) heartbeatLoop(ctx context.Context, instanceID string) {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -268,7 +268,7 @@ func (m *Manager) CheckRateLimit(ctx context.Context, keyID string, limit int64,
 		// Fallback to in-memory (would need implementation)
 		return true, limit, time.Now().Add(window), nil
 	}
-	
+
 	return m.RateLimit.CheckLimit(ctx, keyID, limit, window)
 }
 
@@ -278,7 +278,7 @@ func (m *Manager) CreateSession(ctx context.Context, session *Session, ttl time.
 		// Fallback to in-memory (would need implementation)
 		return nil
 	}
-	
+
 	return m.Session.CreateSession(ctx, session, ttl)
 }
 
@@ -288,25 +288,24 @@ func (m *Manager) BlacklistToken(ctx context.Context, tokenID string, ttl time.D
 		// Fallback to in-memory (would need implementation)
 		return nil
 	}
-	
+
 	return m.JWT.BlacklistToken(ctx, tokenID, ttl)
 }
 
 // CacheSet convenience method for caching
-func (m *Manager) CacheSet(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (m *Manager) CacheSet(ctx context.Context, key string, value any, ttl time.Duration) error {
 	if !m.enabled {
 		return nil
 	}
-	
+
 	return m.Cache.SetWithTTL(ctx, key, value, ttl)
 }
 
 // CacheGet convenience method for caching
-func (m *Manager) CacheGet(ctx context.Context, key string, dest interface{}) error {
+func (m *Manager) CacheGet(ctx context.Context, key string, dest any) error {
 	if !m.enabled {
 		return fmt.Errorf("cache miss: Redis disabled")
 	}
-	
+
 	return m.Cache.Get(ctx, key, dest)
 }
-

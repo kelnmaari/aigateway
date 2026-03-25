@@ -82,7 +82,7 @@ type apiKeyDatabaseAdapter struct {
 }
 
 // GetAPIKey implements redis.APIKeyProvider by wrapping storage.Database
-func (a *apiKeyDatabaseAdapter) GetAPIKey(ctx context.Context, keyID string) (interface{}, error) {
+func (a *apiKeyDatabaseAdapter) GetAPIKey(ctx context.Context, keyID string) (any, error) {
 	apiKey, err := a.db.GetAPIKey(ctx, keyID)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ type Router struct {
 	inferenceRouter       *inference.Router
 	inferenceHandler      *handlers.InferenceHandler
 	inferenceProxyHandler *handlers.InferenceProxyHandler
-	chatToolsHandler      *handlers.ChatToolsHandler // Chat with tools support (v4.0.3+)
+	chatToolsHandler      *handlers.ChatToolsHandler     // Chat with tools support (v4.0.3+)
 	externalProxyHandler  *handlers.ExternalProxyHandler // External provider proxy (v4.11.0+)
 	inferenceModelStore   *inference.ModelStore
 
@@ -1328,7 +1328,7 @@ func (r *Router) setupSystemRoutes() {
 				c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
 				return
 			}
-			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []interface{}{}})
+			c.JSON(http.StatusOK, gin.H{"object": "list", "data": []any{}})
 		})
 
 		// Backend status endpoint (v3.3.x) - shows which inference backend is active
@@ -1792,7 +1792,6 @@ func (r *Router) setupOpenAIRoutes() {
 		}
 
 	}
-
 
 	// /v1/models endpoint - returns models from inference manager + model registry
 	v1.GET("/models", func(c *gin.Context) {
@@ -2885,7 +2884,7 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		// Create GitLab storage using main database
 		// Try to get underlying *sql.DB via type assertion
 		type sqlDBGetter interface {
-			GetDB() interface{}
+			GetDB() any
 		}
 		if getter, ok := r.db.(sqlDBGetter); ok {
 			dbInterface := getter.GetDB()
@@ -3678,7 +3677,7 @@ func (r *Router) setupGitLabRoutes() {
 	} else {
 		// Stub routes when GitLab not configured
 		adminGitlab.GET("/integrations", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.POST("/integrations", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized. Configure gitlab section in config."})
@@ -3698,7 +3697,7 @@ func (r *Router) setupGitLabRoutes() {
 
 		// Projects stub
 		adminGitlab.GET("/integrations/:id/projects", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.POST("/integrations/:id/projects", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
@@ -3718,7 +3717,7 @@ func (r *Router) setupGitLabRoutes() {
 
 		// Reviews stub
 		adminGitlab.GET("/reviews", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.GET("/reviews/:id", func(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
@@ -3738,7 +3737,7 @@ func (r *Router) setupGitLabRoutes() {
 			})
 		})
 		adminGitlab.GET("/queue/jobs", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.POST("/queue/jobs/:id/cancel", func(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GitLab storage not initialized"})
@@ -3749,13 +3748,13 @@ func (r *Router) setupGitLabRoutes() {
 
 		// Models stub
 		adminGitlab.GET("/models", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.GET("/models/analysis", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.GET("/models/embedding", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 
 		// Settings, Analytics, Feedback stubs
@@ -3778,19 +3777,19 @@ func (r *Router) setupGitLabRoutes() {
 				"total_reviews":        0,
 				"avg_processing_time":  0,
 				"issues_found":         0,
-				"reviews_by_day":       []interface{}{},
-				"reviews_by_project":   []interface{}{},
-				"top_issue_categories": []interface{}{},
+				"reviews_by_day":       []any{},
+				"reviews_by_project":   []any{},
+				"top_issue_categories": []any{},
 			})
 		})
 		adminGitlab.GET("/feedback", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"data": []any{}, "total": 0})
 		})
 		adminGitlab.POST("/feedback", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "Feedback submitted"})
 		})
 		adminGitlab.GET("/integrations/:id/available-projects", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"projects": []interface{}{}, "total": 0})
+			c.JSON(http.StatusOK, gin.H{"projects": []any{}, "total": 0})
 		})
 
 		r.logger.Info("✅ GitLab Integration stub routes configured (gitlab.enabled=false)")

@@ -29,7 +29,7 @@ func (p *PostgreSQLDB) CreateUser(ctx context.Context, user *models.User) error 
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataValue interface{}
+	var metadataValue any
 	if user.Metadata != nil {
 		metadataJSON, err := json.Marshal(user.Metadata)
 		if err != nil {
@@ -37,7 +37,7 @@ func (p *PostgreSQLDB) CreateUser(ctx context.Context, user *models.User) error 
 		}
 		metadataValue = metadataJSON
 	} else {
-		metadataValue = nil  // PostgreSQL NULL
+		metadataValue = nil // PostgreSQL NULL
 	}
 
 	query := `
@@ -346,7 +346,7 @@ func (p *PostgreSQLDB) ListUsers(ctx context.Context, filters models.UserFilters
 		WHERE 1=1
 	`
 
-	var args []interface{}
+	var args []any
 	paramIndex := 1
 
 	// Apply filters
@@ -420,7 +420,7 @@ func (p *PostgreSQLDB) ListUsers(ctx context.Context, filters models.UserFilters
 
 // scanner is an interface that matches both sql.Row and sql.Rows
 type scanner interface {
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }
 
 // scanUser сканирует строку БД в модель User
@@ -472,7 +472,7 @@ func (p *PostgreSQLDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	p.logger.WithFields(map[string]interface{}{
+	p.logger.WithFields(map[string]any{
 		"issuer":  issuer,
 		"subject": subject,
 	}).Debug("Getting user by OIDC subject")

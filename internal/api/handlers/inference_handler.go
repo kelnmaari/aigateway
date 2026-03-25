@@ -56,9 +56,9 @@ type LoadRequest struct {
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
 	LlamaTensorSplit string `json:"llama_tensor_split"`
 	LlamaNGPULayers  int    `json:"llama_n_gpu_layers"`
-	LlamaCtxSize     int    `json:"llama_ctx_size"`   // Context size (default: 2048)
-	LlamaNParallel   int    `json:"llama_n_parallel"` // Parallel slots (concurrent requests)
-	LlamaFlashAttn   bool   `json:"llama_flash_attn"`   // Enable Flash Attention
+	LlamaCtxSize     int    `json:"llama_ctx_size"`    // Context size (default: 2048)
+	LlamaNParallel   int    `json:"llama_n_parallel"`  // Parallel slots (concurrent requests)
+	LlamaFlashAttn   bool   `json:"llama_flash_attn"`  // Enable Flash Attention
 	LlamaJinja       bool   `json:"llama_jinja"`       // Enable Jinja template processing
 	LlamaCacheReuse  int    `json:"llama_cache_reuse"` // KV cache reuse (0=default, -1=disable for SWA models)
 	LlamaExtraArgs   string `json:"llama_extra_args"`  // Extra CLI args for llama-server
@@ -999,12 +999,12 @@ func (h *InferenceHandler) PostPullDockerImage(c *gin.Context) {
 		h.logger.WithField("image", image).Info("Starting Docker image pull")
 		startTime := time.Now()
 		if err := runtime.PullImage(image); err != nil {
-			h.logger.WithError(err).WithFields(map[string]interface{}{
+			h.logger.WithError(err).WithFields(map[string]any{
 				"image":    image,
 				"duration": time.Since(startTime).String(),
 			}).Error("Failed to pull Docker image")
 		} else {
-			h.logger.WithFields(map[string]interface{}{
+			h.logger.WithFields(map[string]any{
 				"image":    image,
 				"duration": time.Since(startTime).String(),
 			}).Info("Docker image pulled successfully")
@@ -1087,7 +1087,7 @@ func (h *InferenceHandler) PostDownloadRepository(c *gin.Context) {
 func (h *InferenceHandler) GetRepoDownloads(c *gin.Context) {
 	downloader := h.router.GetDownloader()
 	if downloader == nil {
-		c.JSON(http.StatusOK, []interface{}{})
+		c.JSON(http.StatusOK, []any{})
 		return
 	}
 

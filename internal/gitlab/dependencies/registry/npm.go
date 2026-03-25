@@ -125,7 +125,7 @@ func compareSemver(a, b string) int {
 	aParts := parseSemver(a)
 	bParts := parseSemver(b)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if aParts[i] > bParts[i] {
 			return 1
 		}
@@ -152,4 +152,3 @@ func parseSemver(version string) [3]int {
 
 	return result
 }
-

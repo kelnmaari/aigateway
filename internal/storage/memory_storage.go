@@ -307,7 +307,7 @@ func (s *MemoryStorage) HealthCheck(ctx context.Context) error {
 }
 
 // GetStorageStats получает статистику storage
-func (s *MemoryStorage) GetStorageStats(ctx context.Context) (map[string]interface{}, error) {
+func (s *MemoryStorage) GetStorageStats(ctx context.Context) (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -326,7 +326,7 @@ func (s *MemoryStorage) GetStorageStats(ctx context.Context) (map[string]interfa
 		}
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"type":         "memory",
 		"total_keys":   len(s.keys),
 		"active_keys":  activeCount,
@@ -436,7 +436,6 @@ func (s *ErrorStorage) HealthCheck(ctx context.Context) error {
 }
 
 // GetStorageStats возвращает ошибку
-func (s *ErrorStorage) GetStorageStats(ctx context.Context) (map[string]interface{}, error) {
+func (s *ErrorStorage) GetStorageStats(ctx context.Context) (map[string]any, error) {
 	return nil, s.Err
 }
-

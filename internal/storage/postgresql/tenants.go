@@ -29,7 +29,7 @@ func (db *PostgreSQLDB) CreateTenant(ctx context.Context, tenant *models.Tenant)
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataValue interface{}
+	var metadataValue any
 	if tenant.Metadata != nil {
 		metadataJSON, err := json.Marshal(tenant.Metadata)
 		if err != nil {
@@ -37,7 +37,7 @@ func (db *PostgreSQLDB) CreateTenant(ctx context.Context, tenant *models.Tenant)
 		}
 		metadataValue = metadataJSON
 	} else {
-		metadataValue = nil  // PostgreSQL NULL
+		metadataValue = nil // PostgreSQL NULL
 	}
 
 	query := `
@@ -309,14 +309,14 @@ func (db *PostgreSQLDB) AddTenantMember(ctx context.Context, member *models.Tena
 		return fmt.Errorf("database not connected")
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 		"role":      member.Role,
 	}).Debug("Adding tenant member")
 
 	// Serialize metadata to JSON if present
-	var metadataValue interface{}
+	var metadataValue any
 	if member.Metadata != nil {
 		metadataJSON, err := json.Marshal(member.Metadata)
 		if err != nil {
@@ -324,7 +324,7 @@ func (db *PostgreSQLDB) AddTenantMember(ctx context.Context, member *models.Tena
 		}
 		metadataValue = metadataJSON
 	} else {
-		metadataValue = nil  // PostgreSQL NULL
+		metadataValue = nil // PostgreSQL NULL
 	}
 
 	query := `
@@ -350,7 +350,7 @@ func (db *PostgreSQLDB) AddTenantMember(ctx context.Context, member *models.Tena
 		return fmt.Errorf("failed to insert tenant member: %w", err)
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 	}).Info("Tenant member added successfully")
@@ -390,7 +390,7 @@ func (db *PostgreSQLDB) UpdateTenantMember(ctx context.Context, member *models.T
 		return fmt.Errorf("database not connected")
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 	}).Debug("Updating tenant member")
@@ -436,7 +436,7 @@ func (db *PostgreSQLDB) UpdateTenantMember(ctx context.Context, member *models.T
 		return fmt.Errorf("tenant member not found: tenant=%s, user=%s", member.TenantID, member.UserID)
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 	}).Info("Tenant member updated successfully")
@@ -450,7 +450,7 @@ func (db *PostgreSQLDB) RemoveTenantMember(ctx context.Context, tenantID, userID
 		return fmt.Errorf("database not connected")
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id": tenantID,
 		"user_id":   userID,
 	}).Debug("Removing tenant member")
@@ -471,7 +471,7 @@ func (db *PostgreSQLDB) RemoveTenantMember(ctx context.Context, tenantID, userID
 		return fmt.Errorf("tenant member not found: tenant=%s, user=%s", tenantID, userID)
 	}
 
-	db.logger.WithFields(map[string]interface{}{
+	db.logger.WithFields(map[string]any{
 		"tenant_id": tenantID,
 		"user_id":   userID,
 	}).Info("Tenant member removed successfully")

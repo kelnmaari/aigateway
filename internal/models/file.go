@@ -51,16 +51,16 @@ type File struct {
 
 // FileMetadata метаданные файла (будет сериализована в JSON)
 type FileMetadata struct {
-	PageCount  int                    `json:"page_count,omitempty"`
-	SheetCount int                    `json:"sheet_count,omitempty"`
-	RowCount   int                    `json:"row_count,omitempty"`
-	Author     string                 `json:"author,omitempty"`
-	Title      string                 `json:"title,omitempty"`
-	Subject    string                 `json:"subject,omitempty"`
-	Keywords   []string               `json:"keywords,omitempty"`
-	CreatedAt  string                 `json:"created_at,omitempty"`
-	ModifiedAt string                 `json:"modified_at,omitempty"`
-	Custom     map[string]interface{} `json:"custom,omitempty"`
+	PageCount  int            `json:"page_count,omitempty"`
+	SheetCount int            `json:"sheet_count,omitempty"`
+	RowCount   int            `json:"row_count,omitempty"`
+	Author     string         `json:"author,omitempty"`
+	Title      string         `json:"title,omitempty"`
+	Subject    string         `json:"subject,omitempty"`
+	Keywords   []string       `json:"keywords,omitempty"`
+	CreatedAt  string         `json:"created_at,omitempty"`
+	ModifiedAt string         `json:"modified_at,omitempty"`
+	Custom     map[string]any `json:"custom,omitempty"`
 }
 
 // CreateFileRequest запрос на создание файла
@@ -124,4 +124,3 @@ type FileWithUser struct {
 	OwnerEmail    *string `json:"owner_email,omitempty"`
 	OwnerUsername *string `json:"owner_username,omitempty"`
 }
-

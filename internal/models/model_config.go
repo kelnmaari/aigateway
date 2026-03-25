@@ -96,14 +96,14 @@ func DefaultParameters() ModelParameters {
 		// Predict options defaults
 		Temperature:      Float32Ptr(0.7),
 		TopP:             Float32Ptr(0.9),
-		TopK:             IntPtr(40),
-		NumPredict:       IntPtr(-1), // unlimited
+		TopK:             new(40),
+		NumPredict:       new(-1), // unlimited
 		RepeatPenalty:    Float32Ptr(1.1),
 		PresencePenalty:  Float32Ptr(0.0),
 		FrequencyPenalty: Float32Ptr(0.0),
 
 		// Runner options defaults
-		NumCtx: IntPtr(4096),
+		NumCtx: new(4096),
 	}
 }
 
@@ -112,10 +112,10 @@ func PresetCreative() ModelParameters {
 	return ModelParameters{
 		Temperature:   Float32Ptr(1.2),
 		TopP:          Float32Ptr(0.95),
-		TopK:          IntPtr(50),
-		NumPredict:    IntPtr(-1),
+		TopK:          new(50),
+		NumPredict:    new(-1),
 		RepeatPenalty: Float32Ptr(1.0),
-		NumCtx:        IntPtr(4096),
+		NumCtx:        new(4096),
 	}
 }
 
@@ -129,10 +129,10 @@ func PresetPrecise() ModelParameters {
 	return ModelParameters{
 		Temperature:   Float32Ptr(0.3),
 		TopP:          Float32Ptr(0.8),
-		TopK:          IntPtr(20),
-		NumPredict:    IntPtr(2048),
+		TopK:          new(20),
+		NumPredict:    new(2048),
 		RepeatPenalty: Float32Ptr(1.15),
-		NumCtx:        IntPtr(2048),
+		NumCtx:        new(2048),
 	}
 }
 
@@ -141,10 +141,10 @@ func PresetCoding() ModelParameters {
 	return ModelParameters{
 		Temperature:   Float32Ptr(0.2),
 		TopP:          Float32Ptr(0.95),
-		TopK:          IntPtr(40),
-		NumPredict:    IntPtr(4096),
+		TopK:          new(40),
+		NumPredict:    new(4096),
 		RepeatPenalty: Float32Ptr(1.05),
-		NumCtx:        IntPtr(8192),
+		NumCtx:        new(8192),
 	}
 }
 
@@ -221,7 +221,7 @@ func (p *ModelParameters) MergeWith(override *ModelParameters) *ModelParameters 
 }
 
 // Scan реализует sql.Scanner для чтения JSON из БД
-func (p *ModelParameters) Scan(value interface{}) error {
+func (p *ModelParameters) Scan(value any) error {
 	if value == nil {
 		*p = DefaultParameters()
 		return nil
@@ -236,15 +236,18 @@ func (p *ModelParameters) Scan(value interface{}) error {
 }
 
 // Helper functions для создания указателей
+//
+//go:fix inline
 func IntPtr(v int) *int {
-	return &v
+	return new(v)
 }
 
+//go:fix inline
 func Float32Ptr(v float32) *float32 {
-	return &v
+	return new(v)
 }
 
+//go:fix inline
 func BoolPtr(v bool) *bool {
-	return &v
+	return new(v)
 }
-

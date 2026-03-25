@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -82,10 +83,8 @@ func (h *GitLabTestGenHandler) canAccessProject(c *gin.Context, project *models.
 	// Check tenant membership
 	if tids, exists := c.Get("tenant_ids"); exists {
 		if ids, ok := tids.([]string); ok {
-			for _, tid := range ids {
-				if integration.TenantID == tid {
-					return true
-				}
+			if slices.Contains(ids, integration.TenantID) {
+				return true
 			}
 		}
 	}
@@ -239,7 +238,7 @@ func (h *GitLabTestGenHandler) GenerateTests(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message":     "No testable functions found",
 			"status":      "completed",
-			"tests":       []interface{}{},
+			"tests":       []any{},
 			"tokens_used": 0,
 		})
 		return

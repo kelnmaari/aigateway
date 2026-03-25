@@ -198,7 +198,7 @@ func (g *Generator) buildPreview(sym UndocumentedSymbol, docText string) string 
 func (g *Generator) callLLM(ctx context.Context, modelID, prompt, language string) (string, int, error) {
 	systemPrompt := fmt.Sprintf("You are a technical documentation writer. Generate clear, concise documentation for %s code. Output ONLY the documentation comment, no explanations.", language)
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemPrompt},

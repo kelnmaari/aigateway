@@ -272,8 +272,6 @@ func (r *AdvancedRateLimiter) StartCleanupLoop(ctx context.Context) {
 }
 
 // GetStats возвращает статистику rate limiting
-func (r *AdvancedRateLimiter) GetStats() map[string]interface{} {
+func (r *AdvancedRateLimiter) GetStats() map[string]any {
 	return r.slidingWindow.GetCacheStats()
 }
-
-

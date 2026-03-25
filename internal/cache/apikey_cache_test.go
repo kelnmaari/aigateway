@@ -98,7 +98,7 @@ func TestAPIKeyCache_Eviction(t *testing.T) {
 	defer cache.Close()
 
 	// Fill cache beyond max size
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		hot := &models.APIKeyHot{
 			ID: string(rune('a' + i)),
 		}
@@ -120,11 +120,11 @@ func TestAPIKeyCache_Concurrent(t *testing.T) {
 	iterations := 1000
 
 	// Concurrent writes
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				hot := &models.APIKeyHot{
 					ID: string(rune('a' + id)),
 				}
@@ -134,11 +134,11 @@ func TestAPIKeyCache_Concurrent(t *testing.T) {
 	}
 
 	// Concurrent reads
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				cache.Get(string(rune('a' + id)))
 			}
 		}(i)
@@ -229,4 +229,3 @@ func BenchmarkAPIKeyCache_Parallel(b *testing.B) {
 		}
 	})
 }
-

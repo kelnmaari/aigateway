@@ -20,12 +20,12 @@ var templatesFS embed.FS
 
 // ReportGenerator generates various types of reports.
 type ReportGenerator struct {
-	db               storage.Database
-	perfMonitor      *observability.PerformanceMonitor
-	logger           *logrus.Logger
-	templates        *template.Template
-	startTime        time.Time
-	lastBackupTime   *time.Time
+	db             storage.Database
+	perfMonitor    *observability.PerformanceMonitor
+	logger         *logrus.Logger
+	templates      *template.Template
+	startTime      time.Time
+	lastBackupTime *time.Time
 }
 
 // NewReportGenerator creates a new ReportGenerator instance.
@@ -266,7 +266,7 @@ func (g *ReportGenerator) generateSystemHealthReport(ctx context.Context) (*Syst
 }
 
 // renderTemplate renders HTML template with data.
-func (g *ReportGenerator) renderTemplate(name string, data interface{}) (string, error) {
+func (g *ReportGenerator) renderTemplate(name string, data any) (string, error) {
 	var buf bytes.Buffer
 	err := g.templates.ExecuteTemplate(&buf, name, data)
 	if err != nil {
@@ -312,5 +312,3 @@ func convertToUserUsage(users []struct {
 func (g *ReportGenerator) SetLastBackupTime(t time.Time) {
 	g.lastBackupTime = &t
 }
-
-

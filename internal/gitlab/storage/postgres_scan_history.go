@@ -122,7 +122,7 @@ func (s *PostgresStore) GetScanResult(ctx context.Context, id string) (*models.G
 // ListScanResults lists scan results with filtering
 func (s *PostgresStore) ListScanResults(ctx context.Context, req *models.GitLabScanResultsRequest) ([]models.GitLabScanResult, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.ProjectID != "" {
@@ -246,7 +246,7 @@ func (s *PostgresStore) DeleteOldScanResults(ctx context.Context, olderThanDays 
 }
 
 // Helper to marshal results to JSON for storage
-func MarshalScanResults(v interface{}) (string, error) {
+func MarshalScanResults(v any) (string, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return "", err

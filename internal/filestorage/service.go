@@ -54,7 +54,7 @@ type UploadRequest struct {
 	UserID                string
 	TenantID              string
 	Public                bool
-	Metadata              map[string]interface{}
+	Metadata              map[string]any
 	Extract               bool // Извлекать ли текст (для Phase 2)
 	SkipContentValidation bool // Пропустить валидацию magic number (для HTTP uploads)
 }
@@ -182,4 +182,3 @@ func (s *Service) Exists(ctx context.Context, path string) (bool, error) {
 func (s *Service) GetSize(ctx context.Context, path string) (int64, error) {
 	return s.storage.GetSize(ctx, path)
 }
-

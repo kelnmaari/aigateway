@@ -20,10 +20,10 @@ import (
 
 // ChatToolsHandler handles chat completions with tool support.
 type ChatToolsHandler struct {
-	router    *inference.Router
-	toolsReg  *tools.Registry
-	logger    *logrus.Logger
-	client    *http.Client
+	router   *inference.Router
+	toolsReg *tools.Registry
+	logger   *logrus.Logger
+	client   *http.Client
 }
 
 // NewChatToolsHandler creates a new handler.
@@ -51,7 +51,7 @@ type ChatRequest struct {
 // ChatMessage represents a message in the conversation.
 type ChatMessage struct {
 	Role       string           `json:"role"`
-	Content    interface{}      `json:"content"` // string or []ContentPart for multimodal; must not use omitempty to preserve null for tool-calling messages
+	Content    any              `json:"content"` // string or []ContentPart for multimodal; must not use omitempty to preserve null for tool-calling messages
 	ToolCalls  []tools.ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
@@ -113,9 +113,9 @@ func (h *ChatToolsHandler) handleWithTools(c *gin.Context, endpoint, providerMod
 	messages := req.Messages
 	toolDefs := h.toolsReg.GetToolDefinitions()
 
-	for iteration := 0; iteration < 5; iteration++ { // Max 5 tool iterations
+	for range 5 { // Max 5 tool iterations
 		// Build LLM request with tools
-		llmReq := map[string]interface{}{
+		llmReq := map[string]any{
 			"model":    providerModel,
 			"messages": messages,
 			"stream":   false, // Non-streaming for tool detection
@@ -205,7 +205,7 @@ type llmResponse struct {
 	Choices []struct {
 		Message struct {
 			Role      string           `json:"role"`
-			Content   interface{}      `json:"content"`
+			Content   any              `json:"content"`
 			ToolCalls []tools.ToolCall `json:"tool_calls"`
 		} `json:"message"`
 	} `json:"choices"`
@@ -243,7 +243,7 @@ func (h *ChatToolsHandler) callLLM(ctx context.Context, endpoint string, body []
 
 func (h *ChatToolsHandler) streamFinalResponse(c *gin.Context, flusher http.Flusher, endpoint, providerModel string, messages []ChatMessage, origReq ChatRequest) {
 	// Build streaming request (without tools for final response)
-	llmReq := map[string]interface{}{
+	llmReq := map[string]any{
 		"model":    providerModel,
 		"messages": messages,
 		"stream":   true,
@@ -311,7 +311,7 @@ func (h *ChatToolsHandler) sendToolEvent(c *gin.Context, flusher http.Flusher, e
 
 func (h *ChatToolsHandler) forwardRequest(c *gin.Context, endpoint, providerModel string, req ChatRequest) {
 	// Forward as-is to the LLM
-	llmReq := map[string]interface{}{
+	llmReq := map[string]any{
 		"model":    providerModel,
 		"messages": req.Messages,
 		"stream":   req.Stream,
@@ -406,4 +406,3 @@ func (h *ChatToolsHandler) resolveProviderModelName(inst *inference.ModelInstanc
 		return inst.Spec.Alias
 	}
 }
-

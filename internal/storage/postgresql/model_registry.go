@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"aigateway/internal/models"
@@ -391,7 +392,7 @@ func (db *PostgreSQLDB) CreateModelRegistry(ctx context.Context, model *models.M
 
 	// Tags: for PostgreSQL, use TEXT[] array
 	// pq driver supports pq.Array(model.Tags)
-	var tagsArray interface{}
+	var tagsArray any
 	if model.Tags == nil || len(model.Tags) == 0 {
 		tagsArray = pq.Array([]string{}) // Empty array
 	} else {
@@ -502,7 +503,7 @@ func (db *PostgreSQLDB) GetModelRegistry(ctx context.Context, id string) (*model
 			return nil, fmt.Errorf("failed to unmarshal parameters: %w", err)
 		}
 	} else {
-		model.Parameters = make(map[string]interface{})
+		model.Parameters = make(map[string]any)
 	}
 
 	// Set tags
@@ -594,7 +595,7 @@ func (db *PostgreSQLDB) GetModelRegistryByModelID(ctx context.Context, modelID s
 			return nil, fmt.Errorf("failed to unmarshal parameters: %w", err)
 		}
 	} else {
-		model.Parameters = make(map[string]interface{})
+		model.Parameters = make(map[string]any)
 	}
 
 	// Set tags
@@ -649,7 +650,7 @@ func (db *PostgreSQLDB) UpdateModelRegistry(ctx context.Context, model *models.M
 	}
 
 	// Tags: for PostgreSQL, use TEXT[] array
-	var tagsArray interface{}
+	var tagsArray any
 	if model.Tags == nil || len(model.Tags) == 0 {
 		tagsArray = pq.Array([]string{})
 	} else {
@@ -730,7 +731,8 @@ func (db *PostgreSQLDB) DeleteModelRegistryByProviderID(ctx context.Context, pro
 
 // ListModelRegistry возвращает список моделей с фильтрацией
 func (db *PostgreSQLDB) ListModelRegistry(ctx context.Context, filter *models.ModelRegistryFilter) ([]*models.ModelRegistry, error) {
-	query := `
+	var query strings.Builder
+	query.WriteString(`
 		SELECT m.id, m.model_id, m.model_name, m.provider_id,
 		       m.capabilities, m.parameters,
 		       m.requires_gpu, m.min_vram_gb, m.context_length,
@@ -740,46 +742,46 @@ func (db *PostgreSQLDB) ListModelRegistry(ctx context.Context, filter *models.Mo
 		       m.created_at, m.updated_at
 		FROM model_registry m
 		WHERE 1=1
-	`
+	`)
 
-	args := []interface{}{}
+	args := []any{}
 	paramIndex := 1 // PostgreSQL uses $1, $2, $3, etc
 
 	// Apply filters
 	if filter != nil {
 		if filter.ProviderID != "" {
-			query += fmt.Sprintf(" AND m.provider_id = $%d", paramIndex)
+			query.WriteString(fmt.Sprintf(" AND m.provider_id = $%d", paramIndex))
 			args = append(args, filter.ProviderID)
 			paramIndex++
 		}
 
 		if filter.ProviderType != "" {
-			query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM model_providers mp WHERE mp.id = m.provider_id AND mp.provider_type = $%d)", paramIndex)
+			query.WriteString(fmt.Sprintf(" AND EXISTS (SELECT 1 FROM model_providers mp WHERE mp.id = m.provider_id AND mp.provider_type = $%d)", paramIndex))
 			args = append(args, filter.ProviderType)
 			paramIndex++
 		}
 
 		if filter.Status != "" {
-			query += fmt.Sprintf(" AND m.status = $%d", paramIndex)
+			query.WriteString(fmt.Sprintf(" AND m.status = $%d", paramIndex))
 			args = append(args, filter.Status)
 			paramIndex++
 		}
 
 		if filter.HealthStatus != "" {
-			query += fmt.Sprintf(" AND m.health_status = $%d", paramIndex)
+			query.WriteString(fmt.Sprintf(" AND m.health_status = $%d", paramIndex))
 			args = append(args, filter.HealthStatus)
 			paramIndex++
 		}
 
 		if filter.RequiresGPU != nil {
-			query += fmt.Sprintf(" AND m.requires_gpu = $%d", paramIndex)
+			query.WriteString(fmt.Sprintf(" AND m.requires_gpu = $%d", paramIndex))
 			args = append(args, *filter.RequiresGPU)
 			paramIndex++
 		}
 
 		if filter.Tag != "" {
 			// PostgreSQL: TEXT[] @> ARRAY['tag'] or 'tag' = ANY(tags)
-			query += fmt.Sprintf(" AND $%d = ANY(m.tags)", paramIndex)
+			query.WriteString(fmt.Sprintf(" AND $%d = ANY(m.tags)", paramIndex))
 			args = append(args, filter.Tag)
 			paramIndex++
 		}
@@ -788,30 +790,30 @@ func (db *PostgreSQLDB) ListModelRegistry(ctx context.Context, filter *models.Mo
 		if len(filter.Capabilities) > 0 {
 			for _, cap := range filter.Capabilities {
 				// PostgreSQL JSONB containment: capabilities @> '"chat"'::jsonb
-				query += fmt.Sprintf(" AND m.capabilities::jsonb @> $%d::jsonb", paramIndex)
+				query.WriteString(fmt.Sprintf(" AND m.capabilities::jsonb @> $%d::jsonb", paramIndex))
 				args = append(args, fmt.Sprintf(`"%s"`, string(cap)))
 				paramIndex++
 			}
 		}
 	}
 
-	query += " ORDER BY m.model_name ASC"
+	query.WriteString(" ORDER BY m.model_name ASC")
 
 	// Pagination
 	if filter != nil {
 		if filter.Limit > 0 {
-			query += fmt.Sprintf(" LIMIT $%d", paramIndex)
+			query.WriteString(fmt.Sprintf(" LIMIT $%d", paramIndex))
 			args = append(args, filter.Limit)
 			paramIndex++
 		}
 		if filter.Offset > 0 {
-			query += fmt.Sprintf(" OFFSET $%d", paramIndex)
+			query.WriteString(fmt.Sprintf(" OFFSET $%d", paramIndex))
 			args = append(args, filter.Offset)
 			paramIndex++
 		}
 	}
 
-	rows, err := db.db.QueryContext(ctx, query, args...)
+	rows, err := db.db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
@@ -865,7 +867,7 @@ func (db *PostgreSQLDB) ListModelRegistry(ctx context.Context, filter *models.Mo
 				return nil, fmt.Errorf("failed to unmarshal parameters: %w", err)
 			}
 		} else {
-			model.Parameters = make(map[string]interface{})
+			model.Parameters = make(map[string]any)
 		}
 
 		// Set tags

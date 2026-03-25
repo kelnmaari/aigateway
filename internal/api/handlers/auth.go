@@ -99,7 +99,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 		// Check if validation error
 		if valErr, ok := err.(password.ValidationError); ok {
-			h.logger.WithFields(map[string]interface{}{
+			h.logger.WithFields(map[string]any{
 				"field":   valErr.Field,
 				"message": valErr.Message,
 				"request": req.Username,

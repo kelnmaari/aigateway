@@ -15,14 +15,14 @@ type MCPTool struct {
 	toolName    string // Tool name from MCP
 	description string
 	dangerous   bool
-	schema      map[string]interface{} // JSON Schema for parameters
-	
+	schema      map[string]any // JSON Schema for parameters
+
 	// MCP connection
 	client *MCPClient
 }
 
 // NewMCPTool creates a new MCP tool wrapper
-func NewMCPTool(client *MCPClient, serverName, toolName, description string, schema map[string]interface{}, dangerous bool) *MCPTool {
+func NewMCPTool(client *MCPClient, serverName, toolName, description string, schema map[string]any, dangerous bool) *MCPTool {
 	return &MCPTool{
 		serverName:  serverName,
 		toolName:    toolName,
@@ -46,11 +46,11 @@ func (t *MCPTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *MCPTool) Validate(params map[string]interface{}) error {
+func (t *MCPTool) Validate(params map[string]any) error {
 	// TODO: Validate against JSON Schema
 	// For MVP: basic validation
 	if t.schema != nil {
-		if required, ok := t.schema["required"].([]interface{}); ok {
+		if required, ok := t.schema["required"].([]any); ok {
 			for _, req := range required {
 				if reqStr, ok := req.(string); ok {
 					if _, exists := params[reqStr]; !exists {
@@ -63,7 +63,7 @@ func (t *MCPTool) Validate(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *MCPTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *MCPTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	if t.client == nil {
 		errMsg := "MCP client not initialized"
 		return &models.AgentStepResult{
@@ -109,7 +109,7 @@ func (t *MCPTool) Execute(ctx context.Context, params map[string]interface{}) (*
 type MCPClient struct {
 	serverName string
 	connected  bool
-	
+
 	// TODO: Actual MCP protocol implementation
 	// For MVP: stub implementation
 }
@@ -153,14 +153,14 @@ func (c *MCPClient) ListTools(ctx context.Context) ([]MCPToolInfo, error) {
 }
 
 // CallTool invokes a tool on MCP server
-func (c *MCPClient) CallTool(ctx context.Context, toolName string, params map[string]interface{}) (interface{}, error) {
+func (c *MCPClient) CallTool(ctx context.Context, toolName string, params map[string]any) (any, error) {
 	if !c.connected {
 		return nil, fmt.Errorf("not connected to MCP server")
 	}
 
 	// TODO: Implement actual MCP protocol tool invocation
 	// For MVP: stub
-	return map[string]interface{}{
+	return map[string]any{
 		"status":  "success",
 		"message": "MCP tool execution not implemented yet (stub)",
 		"tool":    toolName,
@@ -172,7 +172,7 @@ func (c *MCPClient) CallTool(ctx context.Context, toolName string, params map[st
 type MCPToolInfo struct {
 	Name        string
 	Description string
-	Schema      map[string]interface{}
+	Schema      map[string]any
 	Dangerous   bool
 }
 
@@ -184,12 +184,12 @@ type MCPToolInfo struct {
 func RegisterMCPTools(registry *Registry, servers []string) error {
 	for _, serverName := range servers {
 		client := NewMCPClient(serverName)
-		
+
 		// Connect to server
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err := client.Connect(ctx)
 		cancel()
-		
+
 		if err != nil {
 			// Log but don't fail - continue with other servers
 			continue
@@ -199,7 +199,7 @@ func RegisterMCPTools(registry *Registry, servers []string) error {
 		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 		tools, err := client.ListTools(ctx)
 		cancel()
-		
+
 		if err != nil {
 			client.Disconnect()
 			continue
@@ -215,7 +215,7 @@ func RegisterMCPTools(registry *Registry, servers []string) error {
 				toolInfo.Schema,
 				toolInfo.Dangerous,
 			)
-			
+
 			if err := registry.Register(mcpTool); err != nil {
 				// Log but continue
 				continue
@@ -225,4 +225,3 @@ func RegisterMCPTools(registry *Registry, servers []string) error {
 
 	return nil
 }
-

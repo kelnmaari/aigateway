@@ -13,11 +13,11 @@ func TestAPIKeyUsageThreadSafe_Concurrent(t *testing.T) {
 	goroutines := 10
 
 	// Concurrent increments
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				usage.IncrementUsage("gpt-4", "/v1/chat/completions", 1000, true)
 			}
 		}(i)
@@ -60,28 +60,24 @@ func TestAPIKeyUsageThreadSafe_MixedOperations(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Writer goroutines
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 1000; j++ {
+	for range 5 {
+		wg.Go(func() {
+			for range 1000 {
 				usage.IncrementUsage("gpt-4", "/chat", 100, true)
 			}
-		}()
+		})
 	}
 
 	// Reader goroutines (concurrent with writers)
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 1000; j++ {
+	for range 5 {
+		wg.Go(func() {
+			for range 1000 {
 				_ = usage.GetSnapshot()
 				_ = usage.GetModelUsage()
 				_ = usage.GetEndpointUsage()
 				_ = usage.GetDailyUsage()
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -156,4 +152,3 @@ Parallel (16 cores):
 
 Speedup: 2x faster + thread-safe!
 */
-

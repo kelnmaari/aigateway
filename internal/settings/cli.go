@@ -146,19 +146,19 @@ func ExportCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 	}
 
 	// Convert to export-friendly structure
-	exportData := make(map[string]interface{})
+	exportData := make(map[string]any)
 	exportData["exported_at"] = time.Now().Format(time.RFC3339)
 	exportData["total_settings"] = len(allSettings)
 	exportData["format"] = format
 
-	settingsByCategory := make(map[string][]map[string]interface{})
+	settingsByCategory := make(map[string][]map[string]any)
 	for _, setting := range allSettings {
 		category := string(setting.Category)
 		if settingsByCategory[category] == nil {
-			settingsByCategory[category] = []map[string]interface{}{}
+			settingsByCategory[category] = []map[string]any{}
 		}
 
-		settingMap := map[string]interface{}{
+		settingMap := map[string]any{
 			"id":               setting.ID,
 			"key":              setting.Key,
 			"value":            setting.Value,
@@ -207,8 +207,8 @@ func ImportCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 	}
 
 	// Detect format (YAML or JSON)
-	var importData map[string]interface{}
-	
+	var importData map[string]any
+
 	// Try JSON first
 	if err := json.Unmarshal(fileData, &importData); err != nil {
 		// Try YAML
@@ -218,7 +218,7 @@ func ImportCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 	}
 
 	// Extract settings from import data
-	settingsData, ok := importData["settings"].(map[string]interface{})
+	settingsData, ok := importData["settings"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("invalid import file: missing 'settings' field")
 	}
@@ -226,29 +226,29 @@ func ImportCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 	// Parse settings by category
 	var settingsToImport []*Setting
 	for categoryName, categoryData := range settingsData {
-		categorySettings, ok := categoryData.([]interface{})
+		categorySettings, ok := categoryData.([]any)
 		if !ok {
 			logger.WithField("category", categoryName).Warn("Invalid category format, skipping")
 			continue
 		}
 
 		for _, settingData := range categorySettings {
-			settingMap, ok := settingData.(map[string]interface{})
+			settingMap, ok := settingData.(map[string]any)
 			if !ok {
 				continue
 			}
 
 			setting := &Setting{
-				ID:             getString(settingMap, "id"),
-				Category:       SettingCategory(categoryName),
-				Key:            getString(settingMap, "key"),
-				Value:          getString(settingMap, "value"),
-				Type:           SettingType(getString(settingMap, "type")),
-				DefaultValue:   getString(settingMap, "default_value"),
-				Description:    getString(settingMap, "description"),
-				IsEditable:     getBool(settingMap, "is_editable"),
+				ID:              getString(settingMap, "id"),
+				Category:        SettingCategory(categoryName),
+				Key:             getString(settingMap, "key"),
+				Value:           getString(settingMap, "value"),
+				Type:            SettingType(getString(settingMap, "type")),
+				DefaultValue:    getString(settingMap, "default_value"),
+				Description:     getString(settingMap, "description"),
+				IsEditable:      getBool(settingMap, "is_editable"),
 				RequiresRestart: getBool(settingMap, "requires_restart"),
-				ValidationRule: getString(settingMap, "validation_rule"),
+				ValidationRule:  getString(settingMap, "validation_rule"),
 			}
 
 			if setting.ID != "" {
@@ -292,7 +292,7 @@ func ImportCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 }
 
 // Helper functions for parsing import data
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -301,7 +301,7 @@ func getString(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func getBool(m map[string]interface{}, key string) bool {
+func getBool(m map[string]any, key string) bool {
 	if v, ok := m[key]; ok {
 		if b, ok := v.(bool); ok {
 			return b
@@ -432,17 +432,17 @@ func printDetailedDiff(dbSettings []*Setting, expectedSettings []Setting, dbMap 
 	// Print value mismatches with side-by-side comparison
 	if len(valueMismatches) > 0 {
 		fmt.Printf("🔄 VALUE MISMATCHES (%d):\n\n", len(valueMismatches))
-		
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "SETTING\tDATABASE\t→\tYAML")
 		fmt.Fprintln(w, "---\t---\t---\t---")
-		
+
 		for _, mismatch := range valueMismatches {
 			dbVal := truncate(mismatch.DBValue, 40)
 			yamlVal := truncate(mismatch.YAMLValue, 40)
 			fmt.Fprintf(w, "%s\t%s\t→\t%s\n", mismatch.ID, dbVal, yamlVal)
 		}
-		
+
 		w.Flush()
 		fmt.Println()
 	}
@@ -558,9 +558,9 @@ func DeleteCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 	if len(settingIDs) == 0 {
 		return fmt.Errorf("no setting IDs provided")
 	}
-	
+
 	logger.WithField("count", len(settingIDs)).Info("Starting settings deletion...")
-	
+
 	// Validate settings exist
 	var toDelete []*Setting
 	for _, id := range settingIDs {
@@ -572,18 +572,18 @@ func DeleteCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 		}
 		toDelete = append(toDelete, setting)
 	}
-	
+
 	if len(toDelete) == 0 {
 		fmt.Println("❌ No valid settings found to delete")
 		return fmt.Errorf("no valid settings found")
 	}
-	
+
 	// Display settings to be deleted
 	fmt.Printf("\n📋 Settings to be deleted (%d):\n\n", len(toDelete))
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tCategory\tKey\tValue\tMigrated")
 	fmt.Fprintln(w, "──\t────────\t───\t─────\t────────")
-	
+
 	for _, s := range toDelete {
 		migrated := "No"
 		if s.IsMigrated {
@@ -594,23 +594,23 @@ func DeleteCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 	}
 	w.Flush()
 	fmt.Println()
-	
+
 	// Confirmation prompt
 	if !force {
 		fmt.Print("⚠️  Are you sure you want to DELETE these settings? (yes/no): ")
 		var response string
 		fmt.Scanln(&response)
-		
+
 		if strings.ToLower(strings.TrimSpace(response)) != "yes" {
 			fmt.Println("❌ Deletion cancelled")
 			return nil
 		}
 	}
-	
+
 	// Delete settings
 	deleted := 0
 	failed := 0
-	
+
 	for _, setting := range toDelete {
 		if err := storage.DeleteSetting(ctx, setting.ID); err != nil {
 			fmt.Printf("❌ Failed to delete '%s': %v\n", setting.ID, err)
@@ -621,7 +621,7 @@ func DeleteCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 			deleted++
 		}
 	}
-	
+
 	fmt.Printf("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Printf("📊 Deletion Summary:\n")
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
@@ -630,16 +630,15 @@ func DeleteCommand(ctx context.Context, storage Storage, logger *logrus.Logger, 
 		fmt.Printf("❌ Failed:   %d\n", failed)
 	}
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	
+
 	logger.WithFields(logrus.Fields{
 		"deleted": deleted,
 		"failed":  failed,
 	}).Info("Settings deletion completed")
-	
+
 	if failed > 0 {
 		return fmt.Errorf("failed to delete %d settings", failed)
 	}
-	
+
 	return nil
 }
-

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 
 	"aigateway/internal/models"
@@ -40,19 +41,19 @@ func (t *TerminalTool) GetInfo() models.AgentTool {
 		Name:        "terminal.execute",
 		Category:    models.AgentToolCategoryTerminal,
 		Description: "Execute shell commands",
-		Parameters: map[string]interface{}{
+		Parameters: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"command": map[string]interface{}{
+			"properties": map[string]any{
+				"command": map[string]any{
 					"type":        "string",
 					"description": "Command to execute",
 				},
-				"shell": map[string]interface{}{
+				"shell": map[string]any{
 					"type":        "string",
 					"description": fmt.Sprintf("Shell to use (allowed: %v)", t.allowedShells),
 					"enum":        t.allowedShells,
 				},
-				"work_dir": map[string]interface{}{
+				"work_dir": map[string]any{
 					"type":        "string",
 					"description": "Working directory",
 				},
@@ -65,7 +66,7 @@ func (t *TerminalTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *TerminalTool) Validate(params map[string]interface{}) error {
+func (t *TerminalTool) Validate(params map[string]any) error {
 	command, ok := params["command"].(string)
 	if !ok || command == "" {
 		return fmt.Errorf("'command' parameter is required")
@@ -73,13 +74,7 @@ func (t *TerminalTool) Validate(params map[string]interface{}) error {
 
 	// Validate shell if provided
 	if shell, ok := params["shell"].(string); ok {
-		allowed := false
-		for _, allowedShell := range t.allowedShells {
-			if shell == allowedShell {
-				allowed = true
-				break
-			}
-		}
+		allowed := slices.Contains(t.allowedShells, shell)
 		if !allowed {
 			return fmt.Errorf("shell '%s' is not allowed. Allowed shells: %v", shell, t.allowedShells)
 		}
@@ -88,7 +83,7 @@ func (t *TerminalTool) Validate(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *TerminalTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *TerminalTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	command := params["command"].(string)
 
 	// Get shell (default to first allowed shell)
@@ -147,7 +142,7 @@ func (t *TerminalTool) Execute(ctx context.Context, params map[string]interface{
 	// Success if exit code is 0
 	success := exitCode == 0
 
-	output := map[string]interface{}{
+	output := map[string]any{
 		"command":   command,
 		"shell":     shell,
 		"work_dir":  workDir,
@@ -175,4 +170,3 @@ func RegisterTerminalTool(registry *Registry, workDir string) error {
 	tool := NewTerminalTool(workDir)
 	return registry.Register(tool)
 }
-

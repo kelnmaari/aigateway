@@ -43,7 +43,7 @@ func TestAggregator_Percentiles(t *testing.T) {
 
 	// Создаем набор данных от 1 до 100
 	values := make([]float64, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		values[i] = float64(i + 1)
 	}
 
@@ -216,4 +216,3 @@ func TestAggregator_AggregateDataPoints(t *testing.T) {
 		t.Errorf("Expected avg 2.0, got %f", stats.Avg)
 	}
 }
-

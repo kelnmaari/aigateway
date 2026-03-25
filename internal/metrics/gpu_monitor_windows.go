@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 // Package metrics provides GPU monitoring stub for Windows
 package metrics
@@ -78,5 +77,3 @@ func (m *GPUMonitor) GetMetrics() (*GPUMetrics, error) {
 		Devices:     []DeviceMetrics{},
 	}, nil
 }
-
-

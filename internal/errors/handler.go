@@ -4,6 +4,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -38,17 +39,17 @@ const (
 	ErrorTypeTimeout            ErrorType = "timeout"
 	ErrorTypeConversion         ErrorType = "conversion"
 	ErrorTypeModelNotFound      ErrorType = "model_not_found"
-	ErrorTypeUpstreamError        ErrorType = "upstream_error"
+	ErrorTypeUpstreamError      ErrorType = "upstream_error"
 )
 
 // ApplicationError представляет ошибку приложения
 type ApplicationError struct {
-	Type       ErrorType              `json:"type"`
-	Message    string                 `json:"message"`
-	Code       string                 `json:"code"`
-	StatusCode int                    `json:"status_code"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
-	Cause      error                  `json:"-"`
+	Type       ErrorType      `json:"type"`
+	Message    string         `json:"message"`
+	Code       string         `json:"code"`
+	StatusCode int            `json:"status_code"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
+	Cause      error          `json:"-"`
 }
 
 // Error реализует интерфейс error
@@ -89,9 +90,7 @@ func (h *ErrorHandler) handleApplicationError(c *gin.Context, appErr *Applicatio
 	}
 
 	if appErr.Metadata != nil {
-		for k, v := range appErr.Metadata {
-			logFields[k] = v
-		}
+		maps.Copy(logFields, appErr.Metadata)
 	}
 
 	// Выбираем уровень логирования
@@ -138,7 +137,7 @@ func (h *ErrorHandler) handleGenericError(c *gin.Context, err error) {
 // Создатели ошибок для разных типов
 
 // NewValidationError создает ошибку валидации
-func NewValidationError(message, code string, metadata map[string]interface{}) *ApplicationError {
+func NewValidationError(message, code string, metadata map[string]any) *ApplicationError {
 	return &ApplicationError{
 		Type:       ErrorTypeValidation,
 		Message:    message,
@@ -175,7 +174,7 @@ func NewModelNotFoundError(model string) *ApplicationError {
 		Message:    fmt.Sprintf("Model '%s' not found", model),
 		Code:       "model_not_found",
 		StatusCode: http.StatusNotFound,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"model": model,
 		},
 	}
@@ -189,7 +188,7 @@ func NewServiceUnavailableError(service string, cause error) *ApplicationError {
 		Code:       "service_unavailable",
 		StatusCode: http.StatusServiceUnavailable,
 		Cause:      cause,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"service": service,
 		},
 	}
@@ -202,7 +201,7 @@ func NewRateLimitError(limit int, resetTime int64) *ApplicationError {
 		Message:    "Rate limit exceeded",
 		Code:       "rate_limit_exceeded",
 		StatusCode: http.StatusTooManyRequests,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"limit":      limit,
 			"reset_time": resetTime,
 		},
@@ -216,7 +215,7 @@ func NewTimeoutError(operation string, timeout string) *ApplicationError {
 		Message:    fmt.Sprintf("Operation '%s' timed out after %s", operation, timeout),
 		Code:       "timeout",
 		StatusCode: http.StatusRequestTimeout,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"operation": operation,
 			"timeout":   timeout,
 		},
@@ -231,7 +230,7 @@ func NewConversionError(direction string, cause error) *ApplicationError {
 		Code:       "conversion_error",
 		StatusCode: http.StatusBadRequest,
 		Cause:      cause,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"conversion_direction": direction,
 		},
 	}
@@ -245,7 +244,7 @@ func NewUpstreamError(msg string, cause error) *ApplicationError {
 		Code:       "upstream_error",
 		StatusCode: http.StatusServiceUnavailable,
 		Cause:      cause,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"upstream_message": msg,
 		},
 	}
@@ -262,7 +261,7 @@ func IsRetriableError(err error) bool {
 	retriableTypes := map[ErrorType]bool{
 		ErrorTypeServiceUnavailable: true,
 		ErrorTypeTimeout:            true,
-		ErrorTypeUpstreamError:        true,
+		ErrorTypeUpstreamError:      true,
 	}
 
 	return retriableTypes[appErr.Type]
@@ -298,7 +297,7 @@ func GetErrorCode(err error) string {
 }
 
 // GetErrorMetadata извлекает метаданные ошибки
-func GetErrorMetadata(err error) map[string]interface{} {
+func GetErrorMetadata(err error) map[string]any {
 	var appErr *ApplicationError
 	if errors.As(err, &appErr) {
 		return appErr.Metadata
@@ -307,7 +306,7 @@ func GetErrorMetadata(err error) map[string]interface{} {
 }
 
 // NewApplicationError создает новую ApplicationError
-func NewApplicationError(errType ErrorType, message, code string, statusCode int, metadata map[string]interface{}, cause error) *ApplicationError {
+func NewApplicationError(errType ErrorType, message, code string, statusCode int, metadata map[string]any, cause error) *ApplicationError {
 	return &ApplicationError{
 		Type:       errType,
 		Message:    message,
@@ -317,4 +316,3 @@ func NewApplicationError(errType ErrorType, message, code string, statusCode int
 		Cause:      cause,
 	}
 }
-

@@ -4,6 +4,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -323,13 +324,7 @@ func TestPenetration_ModelRestrictions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Проверяем что есть wildcard
-		hasWildcard := false
-		for _, model := range fullKey.Models {
-			if model == "*" {
-				hasWildcard = true
-				break
-			}
-		}
+		hasWildcard := slices.Contains(fullKey.Models, "*")
 		assert.True(t, hasWildcard, "Key should have wildcard model access")
 	})
 }
@@ -388,13 +383,7 @@ func TestPenetration_PermissionEscalation(t *testing.T) {
 		require.NoError(t, err)
 
 		// Проверяем наличие wildcard permission
-		hasWildcard := false
-		for _, perm := range fullKey.Permissions {
-			if perm == "*" {
-				hasWildcard = true
-				break
-			}
-		}
+		hasWildcard := slices.Contains(fullKey.Permissions, "*")
 		assert.True(t, hasWildcard, "Admin key should have wildcard permission")
 	})
 }
@@ -405,7 +394,7 @@ func TestPenetration_KeyEnumeration(t *testing.T) {
 		manager, ctx := setupPenetrationTestManager(t)
 
 		// Создаем несколько ключей
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			req := models.CreateAPIKeyRequest{
 				Name:        fmt.Sprintf("Key %d", i),
 				Description: "Test key",
@@ -457,7 +446,7 @@ func TestPenetration_KeyEnumeration(t *testing.T) {
 		attempts := 100
 		successfulAttempts := 0
 
-		for i := 0; i < attempts; i++ {
+		for i := range attempts {
 			guessKey := fmt.Sprintf("sk-proj-%064x", i)
 			result, err := manager.ValidateAPIKey(ctx, guessKey)
 			require.NoError(t, err)
@@ -578,7 +567,7 @@ func TestPenetration_RateLimitBypass(t *testing.T) {
 
 		// Пытаемся сделать много запросов подряд
 		validations := 0
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			result, err := manager.ValidateAPIKey(ctx, key.PlainKey)
 			require.NoError(t, err)
 			if result.Valid {
@@ -657,7 +646,7 @@ func TestPenetration_ConcurrentAbuse(t *testing.T) {
 
 		// Горутина 1: постоянно валидирует ключ
 		go func() {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				_, _ = manager.ValidateAPIKey(ctx, key.PlainKey)
 				time.Sleep(10 * time.Millisecond)
 			}
@@ -697,7 +686,7 @@ func TestPenetration_ConcurrentAbuse(t *testing.T) {
 		// Пытаемся одновременно обновить ключ несколько раз
 		done := make(chan bool, 10)
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			go func(iteration int) {
 				desc := fmt.Sprintf("Updated description %d", iteration)
 				updateReq := models.UpdateAPIKeyRequest{
@@ -709,7 +698,7 @@ func TestPenetration_ConcurrentAbuse(t *testing.T) {
 		}
 
 		// Ждем завершения всех обновлений
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 
@@ -725,4 +714,3 @@ func TestPenetration_ConcurrentAbuse(t *testing.T) {
 			"Key description should be updated")
 	})
 }
-

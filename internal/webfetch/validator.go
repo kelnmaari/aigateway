@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -194,12 +195,5 @@ func (v *URLValidator) isLocalhost(hostname string) bool {
 		"::",
 	}
 
-	for _, variant := range localhostVariants {
-		if hostname == variant {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(localhostVariants, hostname)
 }
-

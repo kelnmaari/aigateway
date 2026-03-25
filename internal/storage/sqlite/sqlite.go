@@ -155,7 +155,7 @@ func (s *SQLiteDB) Ping(ctx context.Context) error {
 }
 
 // GetDB returns underlying *sql.DB connection (for internal use)
-func (s *SQLiteDB) GetDB() interface{} {
+func (s *SQLiteDB) GetDB() any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.db

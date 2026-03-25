@@ -28,8 +28,8 @@ type AnthropicRequest struct {
 
 // AnthropicMessage represents a message in the Anthropic format.
 type AnthropicMessage struct {
-	Role    string      `json:"role"` // "user" or "assistant"
-	Content interface{} `json:"content"`
+	Role    string `json:"role"` // "user" or "assistant"
+	Content any    `json:"content"`
 }
 
 // AnthropicContentBlock represents a content block in Anthropic format.
@@ -289,7 +289,7 @@ func mapAnthropicStopReason(reason string) string {
 
 // extractContentString extracts a string from ChatMessage.Content which can be
 // either a string or an array of content parts.
-func extractContentString(content interface{}) string {
+func extractContentString(content any) string {
 	switch v := content.(type) {
 	case string:
 		return v
@@ -301,7 +301,7 @@ func extractContentString(content interface{}) string {
 		if err != nil {
 			return fmt.Sprintf("%v", v)
 		}
-		var parts []map[string]interface{}
+		var parts []map[string]any
 		if err := json.Unmarshal(data, &parts); err != nil {
 			return string(data)
 		}

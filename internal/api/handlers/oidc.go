@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -460,7 +461,7 @@ func (h *OIDCHandler) provisionUser(ctx context.Context, issuer string, claims *
 			Language: "en",
 			Timezone: "UTC",
 		},
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[string]any),
 	}
 
 	if claims.EmailVerified {
@@ -549,28 +550,22 @@ func (h *OIDCHandler) isAdminRole(claims *oidcauth.KeycloakClaims) bool {
 
 	// Check realm roles
 	for _, role := range claims.RealmRoles {
-		for _, adminRole := range adminRoles {
-			if role == adminRole {
-				return true
-			}
+		if slices.Contains(adminRoles, role) {
+			return true
 		}
 	}
 
 	// Check realm access roles
 	for _, role := range claims.RealmAccess.Roles {
-		for _, adminRole := range adminRoles {
-			if role == adminRole {
-				return true
-			}
+		if slices.Contains(adminRoles, role) {
+			return true
 		}
 	}
 
 	// Check groups
 	for _, group := range claims.Groups {
-		for _, adminGroup := range adminGroups {
-			if group == adminGroup {
-				return true
-			}
+		if slices.Contains(adminGroups, group) {
+			return true
 		}
 	}
 

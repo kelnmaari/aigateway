@@ -33,8 +33,8 @@ func NewPyPIClient(logger *logrus.Logger) *PyPIClient {
 
 // PyPIPackageInfo represents PyPI package metadata
 type PyPIPackageInfo struct {
-	Info     PyPIInfo          `json:"info"`
-	Releases map[string][]any  `json:"releases"`
+	Info     PyPIInfo         `json:"info"`
+	Releases map[string][]any `json:"releases"`
 }
 
 // PyPIInfo represents package info
@@ -135,10 +135,7 @@ func comparePyPIVersion(a, b string) int {
 	aParts := parsePyPIVersion(a)
 	bParts := parsePyPIVersion(b)
 
-	maxLen := len(aParts)
-	if len(bParts) > maxLen {
-		maxLen = len(bParts)
-	}
+	maxLen := max(len(bParts), len(aParts))
 
 	for i := 0; i < maxLen; i++ {
 		av := 0
@@ -178,4 +175,3 @@ func parsePyPIVersion(version string) []int {
 
 	return result
 }
-

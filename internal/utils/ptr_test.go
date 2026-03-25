@@ -11,7 +11,7 @@ func TestPtr(t *testing.T) {
 
 	t.Run("string", func(t *testing.T) {
 		s := "hello"
-		ptr := Ptr(s)
+		ptr := new(s)
 		if ptr == nil {
 			t.Fatal("expected non-nil pointer")
 		}
@@ -22,7 +22,7 @@ func TestPtr(t *testing.T) {
 
 	t.Run("int", func(t *testing.T) {
 		i := 42
-		ptr := Ptr(i)
+		ptr := new(i)
 		if ptr == nil {
 			t.Fatal("expected non-nil pointer")
 		}
@@ -33,7 +33,7 @@ func TestPtr(t *testing.T) {
 
 	t.Run("float64", func(t *testing.T) {
 		f := 3.14
-		ptr := Ptr(f)
+		ptr := new(f)
 		if ptr == nil {
 			t.Fatal("expected non-nil pointer")
 		}
@@ -44,7 +44,7 @@ func TestPtr(t *testing.T) {
 
 	t.Run("bool", func(t *testing.T) {
 		b := true
-		ptr := Ptr(b)
+		ptr := new(b)
 		if ptr == nil {
 			t.Fatal("expected non-nil pointer")
 		}
@@ -166,7 +166,7 @@ func TestEqual(t *testing.T) {
 	})
 
 	t.Run("one nil", func(t *testing.T) {
-		a := Ptr(5)
+		a := new(5)
 		var b *int
 		if Equal(a, b) {
 			t.Error("expected false when one pointer is nil")
@@ -177,25 +177,25 @@ func TestEqual(t *testing.T) {
 	})
 
 	t.Run("equal values", func(t *testing.T) {
-		a := Ptr(42)
-		b := Ptr(42)
+		a := new(42)
+		b := new(42)
 		if !Equal(a, b) {
 			t.Error("expected true for equal values")
 		}
 	})
 
 	t.Run("different values", func(t *testing.T) {
-		a := Ptr(42)
-		b := Ptr(43)
+		a := new(42)
+		b := new(43)
 		if Equal(a, b) {
 			t.Error("expected false for different values")
 		}
 	})
 
 	t.Run("string comparison", func(t *testing.T) {
-		a := Ptr("hello")
-		b := Ptr("hello")
-		c := Ptr("world")
+		a := new("hello")
+		b := new("hello")
+		c := new("world")
 		if !Equal(a, b) {
 			t.Error("expected true for equal strings")
 		}
@@ -218,7 +218,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("non-nil pointer", func(t *testing.T) {
-		original := Ptr(42)
+		original := new(42)
 		clone := Clone(original)
 		if clone == nil {
 			t.Fatal("expected non-nil clone")
@@ -237,7 +237,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("string clone", func(t *testing.T) {
-		original := Ptr("hello")
+		original := new("hello")
 		clone := Clone(original)
 		if clone == nil || *clone != *original {
 			t.Error("string clone failed")
@@ -254,7 +254,7 @@ func BenchmarkPtr(b *testing.B) {
 	b.Attr("type", "performance")
 
 	for i := 0; i < b.N; i++ {
-		_ = Ptr(42)
+		_ = new(42)
 	}
 }
 
@@ -262,7 +262,7 @@ func BenchmarkValue(b *testing.B) {
 	b.Attr("category", "benchmarks")
 	b.Attr("type", "performance")
 
-	ptr := Ptr(42)
+	ptr := new(42)
 	for i := 0; i < b.N; i++ {
 		_ = Value(ptr, 0)
 	}
@@ -282,8 +282,8 @@ func BenchmarkEqual(b *testing.B) {
 	b.Attr("category", "benchmarks")
 	b.Attr("type", "performance")
 
-	a := Ptr(42)
-	b_ptr := Ptr(42)
+	a := new(42)
+	b_ptr := new(42)
 	for i := 0; i < b.N; i++ {
 		_ = Equal(a, b_ptr)
 	}
@@ -293,7 +293,7 @@ func BenchmarkClone(b *testing.B) {
 	b.Attr("category", "benchmarks")
 	b.Attr("type", "performance")
 
-	original := Ptr(42)
+	original := new(42)
 	for i := 0; i < b.N; i++ {
 		_ = Clone(original)
 	}

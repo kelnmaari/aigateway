@@ -165,10 +165,7 @@ func (pm *PerformanceMonitor) collectMetrics() {
 	// Calculate GC pause time (average of last 256 pauses)
 	if m.NumGC > 0 {
 		totalPause := uint64(0)
-		count := int(m.NumGC)
-		if count > 256 {
-			count = 256
-		}
+		count := min(int(m.NumGC), 256)
 		for i := 0; i < count; i++ {
 			totalPause += m.PauseNs[(m.NumGC-uint32(i)+255)%256]
 		}
@@ -282,4 +279,3 @@ func (pm *PerformanceMonitor) ResetBaseline() {
 	pm.baseline = pm.metrics
 	pm.logger.Info("Performance baseline reset")
 }
-

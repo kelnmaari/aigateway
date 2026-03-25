@@ -199,7 +199,7 @@ func TestToolBasedReviewer_HandleReportIssue(t *testing.T) {
 	r := &ToolBasedReviewer{}
 	collector := NewReviewCollector()
 
-	args, _ := json.Marshal(map[string]interface{}{
+	args, _ := json.Marshal(map[string]any{
 		"file_path":  "auth.go",
 		"line":       15,
 		"severity":   "critical",
@@ -244,7 +244,7 @@ func TestToolBasedReviewer_HandleReportSuggestion(t *testing.T) {
 	r := &ToolBasedReviewer{}
 	collector := NewReviewCollector()
 
-	args, _ := json.Marshal(map[string]interface{}{
+	args, _ := json.Marshal(map[string]any{
 		"title":       "Add input validation",
 		"description": "Validate user input before processing",
 		"priority":    "high",
@@ -270,7 +270,7 @@ func TestToolBasedReviewer_HandleSetReviewSummary(t *testing.T) {
 	r := &ToolBasedReviewer{}
 	collector := NewReviewCollector()
 
-	args, _ := json.Marshal(map[string]interface{}{
+	args, _ := json.Marshal(map[string]any{
 		"summary":       "Code looks good with minor issues",
 		"overall_score": 85,
 	})
@@ -309,7 +309,7 @@ func TestToolBasedReviewer_ExecuteTool_RoutesToOutputTools(t *testing.T) {
 	r := &ToolBasedReviewer{}
 	collector := NewReviewCollector()
 
-	args, _ := json.Marshal(map[string]interface{}{
+	args, _ := json.Marshal(map[string]any{
 		"file_path": "test.go",
 		"line":      1,
 		"severity":  "info",
@@ -430,7 +430,7 @@ func TestGetOutputToolDefinitions_ReportIssueSchema(t *testing.T) {
 	require.NotNil(t, reportIssue)
 
 	params := reportIssue.Function.Parameters
-	properties, ok := params["properties"].(map[string]interface{})
+	properties, ok := params["properties"].(map[string]any)
 	require.True(t, ok)
 
 	// Check required properties exist

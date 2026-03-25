@@ -35,7 +35,7 @@ type FileWSBroadcaster interface {
 	BroadcastFileUploadError(fileID, filename string, errorMsg string) error
 	BroadcastFileProcessingStart(fileID, filename string, processingType string) error
 	BroadcastFileProcessingProgress(fileID string, stage string, percent float64) error
-	BroadcastFileProcessingComplete(fileID string, result map[string]interface{}) error
+	BroadcastFileProcessingComplete(fileID string, result map[string]any) error
 	BroadcastFileProcessingError(fileID string, errorMsg string) error
 }
 
@@ -106,7 +106,7 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		Public:                isPublic,
 		Extract:               extract,
 		SkipContentValidation: true, // Пропускаем валидацию содержимого для HTTP uploads
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"description": description,
 		},
 	})
@@ -203,8 +203,8 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		FileID:    dbFile.ID,
 		UserID:    &userID,
 		Action:    "upload",
-		IPAddress: utils.Ptr(c.ClientIP()),
-		UserAgent: utils.Ptr(c.Request.UserAgent()),
+		IPAddress: new(c.ClientIP()),
+		UserAgent: new(c.Request.UserAgent()),
 	})
 
 	// WS-01 v1.10.2: Уведомляем о завершении загрузки и обработки
@@ -216,7 +216,7 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 
 		// Если файл обрабатывался, отправляем результат
 		if extract && extractionStatus == "completed" {
-			processingResult := map[string]interface{}{
+			processingResult := map[string]any{
 				"extracted_text_length": len(utils.Value(extractedText, "")),
 				"word_count":            utils.Value(wordCount, 0),
 				"language":              utils.Value(language, ""),
@@ -310,8 +310,8 @@ func (h *FileHandler) DownloadFile(c *gin.Context) {
 		FileID:    fileID,
 		UserID:    &userID,
 		Action:    "download",
-		IPAddress: utils.Ptr(c.ClientIP()),
-		UserAgent: utils.Ptr(c.Request.UserAgent()),
+		IPAddress: new(c.ClientIP()),
+		UserAgent: new(c.Request.UserAgent()),
 	})
 
 	// Устанавливаем заголовки для скачивания
@@ -451,8 +451,8 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		FileID:    fileID,
 		UserID:    &userID,
 		Action:    "delete",
-		IPAddress: utils.Ptr(c.ClientIP()),
-		UserAgent: utils.Ptr(c.Request.UserAgent()),
+		IPAddress: new(c.ClientIP()),
+		UserAgent: new(c.Request.UserAgent()),
 	})
 
 	h.logger.WithFields(logrus.Fields{

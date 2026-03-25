@@ -280,7 +280,7 @@ func (db *PostgreSQLDB) ListRoles(ctx context.Context, tenantID *string) ([]*mod
 	}
 
 	var query string
-	var args []interface{}
+	var args []any
 
 	if tenantID == nil {
 		// Get only global roles

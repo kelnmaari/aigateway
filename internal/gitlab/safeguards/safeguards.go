@@ -65,17 +65,17 @@ func NewWebhookRateLimiter(maxPerMin int, logger *logrus.Logger) *WebhookRateLim
 	if maxPerMin <= 0 {
 		maxPerMin = 60 // Default: 60 webhooks per minute per integration
 	}
-	
+
 	rl := &WebhookRateLimiter{
 		requests:    make(map[string]*rateLimitEntry),
 		maxPerMin:   maxPerMin,
 		cleanupTick: 5 * time.Minute,
 		logger:      logger,
 	}
-	
+
 	// Start cleanup goroutine
 	go rl.cleanup()
-	
+
 	return rl
 }
 
@@ -83,10 +83,10 @@ func NewWebhookRateLimiter(maxPerMin int, logger *logrus.Logger) *WebhookRateLim
 func (rl *WebhookRateLimiter) Allow(integrationID string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	now := time.Now()
 	entry, exists := rl.requests[integrationID]
-	
+
 	if !exists || now.After(entry.windowEnd) {
 		// New window
 		rl.requests[integrationID] = &rateLimitEntry{
@@ -95,7 +95,7 @@ func (rl *WebhookRateLimiter) Allow(integrationID string) bool {
 		}
 		return true
 	}
-	
+
 	if entry.count >= rl.maxPerMin {
 		rl.logger.WithFields(logrus.Fields{
 			"integration_id": integrationID,
@@ -104,7 +104,7 @@ func (rl *WebhookRateLimiter) Allow(integrationID string) bool {
 		}).Warn("Webhook rate limit exceeded")
 		return false
 	}
-	
+
 	entry.count++
 	return true
 }
@@ -112,7 +112,7 @@ func (rl *WebhookRateLimiter) Allow(integrationID string) bool {
 func (rl *WebhookRateLimiter) cleanup() {
 	ticker := time.NewTicker(rl.cleanupTick)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		rl.mu.Lock()
 		now := time.Now()
@@ -135,7 +135,7 @@ func IsBinaryFile(content []byte) bool {
 	if bytes.Contains(content[:min(len(content), 8000)], []byte{0}) {
 		return true
 	}
-	
+
 	// Check for common binary signatures
 	signatures := [][]byte{
 		{0x7f, 0x45, 0x4c, 0x46}, // ELF
@@ -146,23 +146,23 @@ func IsBinaryFile(content []byte) bool {
 		{0x50, 0x4b, 0x03, 0x04}, // ZIP/DOCX/XLSX
 		{0x25, 0x50, 0x44, 0x46}, // PDF
 	}
-	
+
 	for _, sig := range signatures {
 		if len(content) >= len(sig) && bytes.Equal(content[:len(sig)], sig) {
 			return true
 		}
 	}
-	
+
 	// Check for high ratio of non-printable characters
 	nonPrintable := 0
 	checkLen := min(len(content), 1000)
-	for i := 0; i < checkLen; i++ {
+	for i := range checkLen {
 		b := content[i]
 		if b < 32 && b != '\n' && b != '\r' && b != '\t' {
 			nonPrintable++
 		}
 	}
-	
+
 	return float64(nonPrintable)/float64(checkLen) > 0.3
 }
 
@@ -178,20 +178,13 @@ func IsBinaryExtension(filename string) bool {
 		".mp3": true, ".mp4": true, ".avi": true, ".mov": true, ".wav": true,
 		".o": true, ".a": true, ".pyc": true, ".class": true,
 	}
-	
+
 	idx := strings.LastIndex(filename, ".")
 	if idx == -1 {
 		return false
 	}
 	ext := strings.ToLower(filename[idx:])
 	return binaryExts[ext]
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // ============================================================================
@@ -215,7 +208,7 @@ func SafeExecute(logger *logrus.Logger, jobID string, fn func() error) (err erro
 // PanicError represents a recovered panic
 type PanicError struct {
 	JobID string
-	Value interface{}
+	Value any
 }
 
 func (e *PanicError) Error() string {
@@ -245,11 +238,11 @@ type StaleJobStore interface {
 
 // StaleJob represents a potentially stuck job
 type StaleJob struct {
-	ID          string
-	StartedAt   time.Time
-	WorkerID    string
-	RetryCount  int
-	MaxRetries  int
+	ID         string
+	StartedAt  time.Time
+	WorkerID   string
+	RetryCount int
+	MaxRetries int
 }
 
 // NewStaleJobDetector creates a new detector
@@ -278,7 +271,7 @@ func (d *StaleJobDetector) Stop() {
 func (d *StaleJobDetector) run() {
 	ticker := time.NewTicker(d.checkInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-d.ctx.Done():
@@ -291,20 +284,20 @@ func (d *StaleJobDetector) run() {
 
 func (d *StaleJobDetector) checkStaleJobs() {
 	staleAfter := time.Now().Add(-d.staleTimeout)
-	
+
 	jobs, err := d.store.GetStaleJobs(d.ctx, staleAfter)
 	if err != nil {
 		d.logger.WithError(err).Error("Failed to get stale jobs")
 		return
 	}
-	
+
 	for _, job := range jobs {
 		d.logger.WithFields(logrus.Fields{
 			"job_id":     job.ID,
 			"worker_id":  job.WorkerID,
 			"started_at": job.StartedAt,
 		}).Warn("Detected stale job")
-		
+
 		// Requeue if retries available, otherwise fail
 		if job.RetryCount < job.MaxRetries {
 			if err := d.store.RequeueStaleJob(d.ctx, job.ID); err != nil {
@@ -325,15 +318,15 @@ func (d *StaleJobDetector) checkStaleJobs() {
 // ValidateLLMResponse checks if LLM response is valid JSON or usable
 func ValidateLLMResponse(response string) error {
 	response = strings.TrimSpace(response)
-	
+
 	if response == "" {
 		return &LLMResponseError{Reason: "empty response"}
 	}
-	
+
 	if len(response) < 10 {
 		return &LLMResponseError{Reason: "response too short"}
 	}
-	
+
 	// Check for common error patterns
 	errorPatterns := []string{
 		"I cannot",
@@ -343,14 +336,14 @@ func ValidateLLMResponse(response string) error {
 		"error:",
 		"Internal server error",
 	}
-	
+
 	lower := strings.ToLower(response)
 	for _, pattern := range errorPatterns {
 		if strings.Contains(lower, strings.ToLower(pattern)) && len(response) < 200 {
 			return &LLMResponseError{Reason: "response appears to be an error message"}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -369,12 +362,12 @@ func (e *LLMResponseError) Error() string {
 
 // PaginatedFetcher handles GitLab API pagination
 type PaginatedFetcher struct {
-	client    *http.Client
-	baseURL   string
-	token     string
-	perPage   int
-	maxPages  int
-	logger    *logrus.Logger
+	client   *http.Client
+	baseURL  string
+	token    string
+	perPage  int
+	maxPages int
+	logger   *logrus.Logger
 }
 
 // NewPaginatedFetcher creates a paginated fetcher
@@ -392,50 +385,50 @@ func NewPaginatedFetcher(client *http.Client, baseURL, token string, logger *log
 // FetchAllPages fetches all pages for a paginated endpoint
 func (f *PaginatedFetcher) FetchAllPages(ctx context.Context, endpoint string, processor func(body []byte) (hasMore bool, err error)) error {
 	page := 1
-	
+
 	for page <= f.maxPages {
 		url := f.buildURL(endpoint, page)
-		
+
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return err
 		}
 		req.Header.Set("PRIVATE-TOKEN", f.token)
-		
+
 		resp, err := f.client.Do(req)
 		if err != nil {
 			return err
 		}
-		
+
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		
+
 		if err != nil {
 			return err
 		}
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return &APIError{StatusCode: resp.StatusCode, Body: string(body)}
 		}
-		
+
 		hasMore, err := processor(body)
 		if err != nil {
 			return err
 		}
-		
+
 		if !hasMore {
 			break
 		}
-		
+
 		// Check X-Next-Page header
 		nextPage := resp.Header.Get("X-Next-Page")
 		if nextPage == "" {
 			break
 		}
-		
+
 		page++
 	}
-	
+
 	return nil
 }
 
@@ -464,15 +457,15 @@ func (e *APIError) Error() string {
 // IsEmptyDiff checks if diff is effectively empty
 func IsEmptyDiff(diff string) bool {
 	diff = strings.TrimSpace(diff)
-	
+
 	if diff == "" {
 		return true
 	}
-	
+
 	// Check if only whitespace changes
 	lines := strings.Split(diff, "\n")
 	meaningfulChanges := 0
-	
+
 	for _, line := range lines {
 		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") {
 			// Skip header lines
@@ -486,7 +479,7 @@ func IsEmptyDiff(diff string) bool {
 			}
 		}
 	}
-	
+
 	return meaningfulChanges == 0
 }
 
@@ -530,7 +523,7 @@ func (cb *CircuitBreaker) Execute(fn func() error) error {
 	if !cb.AllowRequest() {
 		return &CircuitOpenError{}
 	}
-	
+
 	err := fn()
 	cb.RecordResult(err)
 	return err
@@ -542,7 +535,7 @@ func (cb *CircuitBreaker) AllowRequest() bool {
 	state := cb.state
 	lastFailure := cb.lastFailure
 	cb.mu.RUnlock()
-	
+
 	switch state {
 	case CircuitClosed:
 		return true
@@ -557,7 +550,7 @@ func (cb *CircuitBreaker) AllowRequest() bool {
 	case CircuitHalfOpen:
 		return true
 	}
-	
+
 	return true
 }
 
@@ -565,12 +558,12 @@ func (cb *CircuitBreaker) AllowRequest() bool {
 func (cb *CircuitBreaker) RecordResult(err error) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	if err != nil {
 		cb.failures++
 		cb.lastFailure = time.Now()
 		cb.successCount = 0
-		
+
 		if cb.failures >= cb.threshold {
 			cb.state = CircuitOpen
 			cb.logger.WithField("failures", cb.failures).Warn("Circuit breaker opened")
@@ -606,4 +599,3 @@ func readInt64(data []byte) int64 {
 	}
 	return int64(binary.LittleEndian.Uint64(data))
 }
-

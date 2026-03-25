@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 // Package metrics provides GPU monitoring using nvidia-smi (no CGO required)
 package metrics
@@ -320,4 +319,3 @@ func trimSpace(s string) string {
 
 	return s[start:end]
 }
-

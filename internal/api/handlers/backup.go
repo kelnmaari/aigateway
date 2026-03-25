@@ -397,7 +397,7 @@ func (h *BackupHandler) cleanupOldBackups() {
 
 	// Удаляем самые старые
 	deleteCount := len(backups) - h.maxBackups
-	for i := 0; i < deleteCount; i++ {
+	for i := range deleteCount {
 		backupPath := filepath.Join(h.backupDir, backups[i].name)
 		if err := os.Remove(backupPath); err != nil {
 			h.logger.WithError(err).WithField("filename", backups[i].name).Warn("Failed to delete old backup")
@@ -406,4 +406,3 @@ func (h *BackupHandler) cleanupOldBackups() {
 		}
 	}
 }
-

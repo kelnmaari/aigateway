@@ -133,7 +133,7 @@ func TestTracingMiddleware_MultipleRequests(t *testing.T) {
 	})
 
 	// Make multiple requests
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		req := httptest.NewRequest("GET", "/test", nil)
 		rr := httptest.NewRecorder()
 		router.ServeHTTP(rr, req)
@@ -162,4 +162,3 @@ func TestTracingMiddleware_SuccessStatus(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "Success", rr.Body.String())
 }
-

@@ -124,12 +124,3 @@ func RequireAuth(cfg *config.Config, logger *logrus.Logger) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// min возвращает минимум из двух чисел
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-

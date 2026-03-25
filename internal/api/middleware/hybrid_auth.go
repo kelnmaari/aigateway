@@ -20,8 +20,8 @@ import (
 func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+			tokenString := after
 
 			// Check if token looks like an API key (sk-* prefix) - try API key first
 			if strings.HasPrefix(tokenString, "sk-") {
@@ -96,4 +96,3 @@ func HybridAuth(jwtManager *jwt.Manager, cfg *config.Config, db storage.Database
 		c.Abort()
 	}
 }
-

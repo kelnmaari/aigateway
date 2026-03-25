@@ -3,6 +3,7 @@ package chunker
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -52,7 +53,7 @@ func TestSemanticChunker_EstimateTokens(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := chunker.EstimateTokens(tt.text)
-			
+
 			if result < tt.expected-tt.delta || result > tt.expected+tt.delta {
 				t.Errorf("EstimateTokens() = %d, expected %d ± %d", result, tt.expected, tt.delta)
 			}
@@ -85,7 +86,7 @@ func TestSemanticChunker_Chunk_SingleParagraph(t *testing.T) {
 		Overlap:       10,
 		Strategy:      "semantic",
 		PreserveLines: true,
-		Metadata:      map[string]interface{}{"test": true},
+		Metadata:      map[string]any{"test": true},
 	}
 
 	chunks, err := chunker.Chunk(ctx, text, options)
@@ -129,7 +130,7 @@ Paragraph three completes the document. This is the final section.`
 		Overlap:       5,
 		Strategy:      "semantic",
 		PreserveLines: true,
-		Metadata:      make(map[string]interface{}),
+		Metadata:      make(map[string]any),
 	}
 
 	chunks, err := chunker.Chunk(ctx, text, options)
@@ -169,7 +170,7 @@ func TestSemanticChunker_Chunk_LongParagraph(t *testing.T) {
 		Overlap:       10,
 		Strategy:      "semantic",
 		PreserveLines: true,
-		Metadata:      make(map[string]interface{}),
+		Metadata:      make(map[string]any),
 	}
 
 	chunks, err := chunker.Chunk(ctx, text, options)
@@ -204,7 +205,7 @@ func TestSemanticChunker_Chunk_Overlap(t *testing.T) {
 		Overlap:       10,
 		Strategy:      "semantic",
 		PreserveLines: true,
-		Metadata:      make(map[string]interface{}),
+		Metadata:      make(map[string]any),
 	}
 
 	chunks, err := chunker.Chunk(ctx, text, options)
@@ -231,13 +232,7 @@ func TestSemanticChunker_Chunk_Overlap(t *testing.T) {
 
 		// At least one word should overlap (simple check)
 		lastWord := chunk1Words[len(chunk1Words)-1]
-		hasOverlap := false
-		for _, word := range chunk2Words[:min(5, len(chunk2Words))] {
-			if word == lastWord {
-				hasOverlap = true
-				break
-			}
-		}
+		hasOverlap := slices.Contains(chunk2Words[:min(5, len(chunk2Words))], lastWord)
 
 		if !hasOverlap {
 			t.Logf("Warning: No obvious overlap detected between chunks %d and %d", i, i+1)
@@ -357,11 +352,11 @@ func TestSemanticChunker_GetOverlapText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := chunker.getOverlapText(tt.text, tt.overlapTokens)
-			
+
 			if tt.expectEmpty && result != "" {
 				t.Errorf("Expected empty overlap, got '%s'", result)
 			}
-			
+
 			if !tt.expectEmpty && result == "" && tt.text != "" {
 				t.Error("Expected non-empty overlap")
 			}
@@ -403,13 +398,3 @@ func BenchmarkSemanticChunker_EstimateTokens(b *testing.B) {
 		_ = chunker.EstimateTokens(text)
 	}
 }
-
-// Helper function
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-

@@ -107,7 +107,7 @@ func (s *SQLiteDB) GetModelConfig(ctx context.Context, id string) (*models.Model
 // GetModelConfigByScope получает конфигурацию модели по scope и ID
 func (s *SQLiteDB) GetModelConfigByScope(ctx context.Context, modelName, scope string, scopeID *string) (*models.ModelConfig, error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	switch scope {
 	case "global":
@@ -116,7 +116,7 @@ func (s *SQLiteDB) GetModelConfigByScope(ctx context.Context, modelName, scope s
 			FROM model_configs
 			WHERE model_name = ? AND scope = 'global'
 		`
-		args = []interface{}{modelName}
+		args = []any{modelName}
 
 	case "tenant":
 		if scopeID == nil {
@@ -127,7 +127,7 @@ func (s *SQLiteDB) GetModelConfigByScope(ctx context.Context, modelName, scope s
 			FROM model_configs
 			WHERE model_name = ? AND scope = 'tenant' AND tenant_id = ?
 		`
-		args = []interface{}{modelName, *scopeID}
+		args = []any{modelName, *scopeID}
 
 	case "user":
 		if scopeID == nil {
@@ -138,7 +138,7 @@ func (s *SQLiteDB) GetModelConfigByScope(ctx context.Context, modelName, scope s
 			FROM model_configs
 			WHERE model_name = ? AND scope = 'user' AND user_id = ?
 		`
-		args = []interface{}{modelName, *scopeID}
+		args = []any{modelName, *scopeID}
 
 	default:
 		return nil, fmt.Errorf("invalid scope: %s", scope)
@@ -185,7 +185,7 @@ func (s *SQLiteDB) GetModelConfigByScope(ctx context.Context, modelName, scope s
 // ListModelConfigs возвращает список конфигураций по фильтру
 func (s *SQLiteDB) ListModelConfigs(ctx context.Context, scope string, scopeID *string) ([]*models.ModelConfig, error) {
 	var query string
-	var args []interface{}
+	var args []any
 
 	if scope == "" {
 		// List all configs
@@ -214,7 +214,7 @@ func (s *SQLiteDB) ListModelConfigs(ctx context.Context, scope string, scopeID *
 				WHERE scope = 'tenant' AND tenant_id = ?
 				ORDER BY created_at DESC
 			`
-			args = []interface{}{*scopeID}
+			args = []any{*scopeID}
 
 		case "user":
 			if scopeID == nil {
@@ -226,7 +226,7 @@ func (s *SQLiteDB) ListModelConfigs(ctx context.Context, scope string, scopeID *
 				WHERE scope = 'user' AND user_id = ?
 				ORDER BY created_at DESC
 			`
-			args = []interface{}{*scopeID}
+			args = []any{*scopeID}
 
 		default:
 			return nil, fmt.Errorf("invalid scope: %s", scope)
@@ -411,4 +411,3 @@ func (tx *sqliteTx) DeleteModelConfig(ctx context.Context, id string) error {
 func (tx *sqliteTx) GetEffectiveModelConfig(ctx context.Context, modelName, userID, tenantID string) (*models.ModelParameters, error) {
 	return tx.db.GetEffectiveModelConfig(ctx, modelName, userID, tenantID)
 }
-

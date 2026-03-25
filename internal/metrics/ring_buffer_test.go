@@ -91,7 +91,7 @@ func TestRingBuffer_GetRange(t *testing.T) {
 
 	// Добавляем записи с известными timestamps
 	now := time.Now()
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		rb.Add(float64(i), nil)
 		time.Sleep(10 * time.Millisecond) // Небольшая задержка для разных timestamps
 	}
@@ -118,7 +118,7 @@ func TestRingBuffer_Clear(t *testing.T) {
 	rb := NewRingBuffer(5)
 
 	// Добавляем данные
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		rb.Add(float64(i), nil)
 	}
 
@@ -148,9 +148,9 @@ func TestRingBuffer_Concurrency(t *testing.T) {
 	done := make(chan bool)
 
 	// Запускаем несколько горутин для одновременной записи
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(id int) {
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				rb.Add(float64(id*100+j), map[string]string{"goroutine": string(rune(id))})
 			}
 			done <- true
@@ -158,7 +158,7 @@ func TestRingBuffer_Concurrency(t *testing.T) {
 	}
 
 	// Ждем завершения всех горутин
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 
@@ -198,4 +198,3 @@ func TestRingBuffer_Labels(t *testing.T) {
 		t.Errorf("Expected method label 'GET', got '%s'", data[0].Labels["method"])
 	}
 }
-

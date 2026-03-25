@@ -785,7 +785,7 @@ func (db *PostgreSQLDB) ListDeviceAPIKeys(ctx context.Context, userID string, fi
 	`
 
 	// Add status filter
-	args := []interface{}{userID}
+	args := []any{userID}
 	if filters.Status == "active" {
 		query += " AND status = 'active'"
 	} else if filters.Status == "expired" {

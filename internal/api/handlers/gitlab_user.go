@@ -4,6 +4,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
 
 	"aigateway/internal/gitlab/client"
@@ -428,13 +429,7 @@ func (h *GitLabUserHandler) ListMyAvailableModels(c *gin.Context) {
 			continue
 		}
 
-		isEmbedding := false
-		for _, cap := range inst.Spec.Capabilities {
-			if cap == "embeddings" {
-				isEmbedding = true
-				break
-			}
-		}
+		isEmbedding := slices.Contains(inst.Spec.Capabilities, "embeddings")
 
 		if analysisOnly && isEmbedding {
 			continue
@@ -461,13 +456,7 @@ func (h *GitLabUserHandler) ListMyAvailableModels(c *gin.Context) {
 				continue
 			}
 
-			isEmbedding := false
-			for _, cap := range saved.Capabilities {
-				if cap == "embeddings" {
-					isEmbedding = true
-					break
-				}
-			}
+			isEmbedding := slices.Contains(saved.Capabilities, "embeddings")
 
 			if analysisOnly && isEmbedding {
 				continue

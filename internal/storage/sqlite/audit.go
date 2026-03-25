@@ -92,7 +92,7 @@ func (s *SQLiteDB) GetAuditEvents(ctx context.Context, filters storage.AuditFilt
 		WHERE 1=1
 	`
 
-	var args []interface{}
+	var args []any
 
 	// Apply filters
 	if filters.EventType != "" {
@@ -240,5 +240,3 @@ func (s *SQLiteDB) scanAuditEvent(row scanner) (*models.AuditEvent, error) {
 
 	return &event, nil
 }
-
-

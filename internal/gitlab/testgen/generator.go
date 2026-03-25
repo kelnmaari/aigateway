@@ -184,7 +184,7 @@ func (g *Generator) collectCodeFiles(ctx context.Context, collection, projectID 
 	var files []codeFile
 	seen := make(map[string]bool)
 
-	err := g.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := g.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -542,7 +542,7 @@ Include 2-4 test cases covering:
 func (g *Generator) callLLM(ctx context.Context, modelID, prompt, language string) (string, int, error) {
 	systemPrompt := fmt.Sprintf("You are a test engineer. Generate clean, comprehensive unit tests for %s code. Output ONLY the test code, no explanations.", language)
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemPrompt},
@@ -664,11 +664,4 @@ func detectLanguage(path string) string {
 	default:
 		return "unknown"
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

@@ -117,7 +117,7 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *BootstrapRequest)
 			Theme:    "dark",
 			Language: "en",
 		},
-		Metadata: make(map[string]interface{}), // Empty map for JSONB
+		Metadata: make(map[string]any), // Empty map for JSONB
 	}
 
 	if user.FullName == "" {
@@ -159,7 +159,7 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *BootstrapRequest)
 			ChatEnabled:      true,
 			APIAccessEnabled: true,
 		},
-		Metadata: make(map[string]interface{}), // Empty map for JSONB
+		Metadata: make(map[string]any), // Empty map for JSONB
 	}
 
 	if err := tx.CreateTenant(ctx, tenant); err != nil {
@@ -174,7 +174,7 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *BootstrapRequest)
 		Role:      models.TenantRoleOwner,
 		JoinedAt:  time.Now(),
 		UpdatedAt: time.Now(),
-		Metadata:  make(map[string]interface{}), // Empty map for JSONB
+		Metadata:  make(map[string]any), // Empty map for JSONB
 	}
 
 	if err := tx.AddTenantMember(ctx, member); err != nil {
@@ -199,4 +199,3 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *BootstrapRequest)
 		Message: "System initialized successfully. First superadmin created.",
 	}, nil
 }
-

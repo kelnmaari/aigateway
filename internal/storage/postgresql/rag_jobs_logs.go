@@ -207,7 +207,7 @@ func (db *PostgreSQLDB) GetNextPendingRAGJob(ctx context.Context) (*models.RAGJo
 // CountRAGJobsByStatus подсчитывает задачи по статусу
 func (db *PostgreSQLDB) CountRAGJobsByStatus(ctx context.Context, status string) (int, error) {
 	query := "SELECT COUNT(*) FROM rag_jobs WHERE status = $1"
-	
+
 	var count int
 	err := db.db.QueryRowContext(ctx, query, status).Scan(&count)
 	if err != nil {
@@ -224,7 +224,7 @@ func (db *PostgreSQLDB) DeleteOldRAGJobs(ctx context.Context, cutoffTime time.Ti
 	}
 
 	placeholders := make([]string, len(statuses))
-	args := []interface{}{cutoffTime}
+	args := []any{cutoffTime}
 	for i, status := range statuses {
 		placeholders[i] = fmt.Sprintf("$%d", i+2)
 		args = append(args, status)
@@ -439,4 +439,3 @@ func (db *PostgreSQLDB) ListRAGQueryLogsByUser(ctx context.Context, userID strin
 
 	return logs, nil
 }
-

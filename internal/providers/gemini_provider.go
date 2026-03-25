@@ -78,7 +78,7 @@ func (p *GeminiProvider) HealthCheck(ctx context.Context) error {
 // geminiModelsResponse represents the response from GET /v1beta/models.
 type geminiModelsResponse struct {
 	Models []struct {
-		Name                       string   `json:"name"`                       // "models/gemini-1.5-pro"
+		Name                       string   `json:"name"` // "models/gemini-1.5-pro"
 		DisplayName                string   `json:"displayName"`
 		Description                string   `json:"description"`
 		Version                    string   `json:"version"`
@@ -118,8 +118,8 @@ func (p *GeminiProvider) ListModels(ctx context.Context) ([]*ProviderModel, erro
 	for _, m := range modelsResp.Models {
 		// Extract model ID from name (e.g., "models/gemini-1.5-pro" -> "gemini-1.5-pro")
 		modelID := m.Name
-		if strings.HasPrefix(modelID, "models/") {
-			modelID = strings.TrimPrefix(modelID, "models/")
+		if after, ok := strings.CutPrefix(modelID, "models/"); ok {
+			modelID = after
 		}
 
 		capabilities := inferGeminiCapabilities(modelID, m.SupportedGenerationMethods)
@@ -132,11 +132,11 @@ func (p *GeminiProvider) ListModels(ctx context.Context) ([]*ProviderModel, erro
 			ContextLength: &contextLen,
 			Description:   m.Description,
 			Tags:          []string{"gemini", "google"},
-			ProviderMeta: map[string]interface{}{
-				"version":             m.Version,
-				"input_token_limit":   m.InputTokenLimit,
-				"output_token_limit":  m.OutputTokenLimit,
-				"generation_methods":  m.SupportedGenerationMethods,
+			ProviderMeta: map[string]any{
+				"version":            m.Version,
+				"input_token_limit":  m.InputTokenLimit,
+				"output_token_limit": m.OutputTokenLimit,
+				"generation_methods": m.SupportedGenerationMethods,
 			},
 		})
 	}
@@ -178,8 +178,8 @@ func (p *GeminiProvider) GetModelInfo(ctx context.Context, modelID string) (*Pro
 	}
 
 	mid := m.Name
-	if strings.HasPrefix(mid, "models/") {
-		mid = strings.TrimPrefix(mid, "models/")
+	if after, ok := strings.CutPrefix(mid, "models/"); ok {
+		mid = after
 	}
 
 	capabilities := inferGeminiCapabilities(mid, m.SupportedGenerationMethods)
@@ -192,11 +192,11 @@ func (p *GeminiProvider) GetModelInfo(ctx context.Context, modelID string) (*Pro
 		ContextLength: &contextLen,
 		Description:   m.Description,
 		Tags:          []string{"gemini", "google"},
-		ProviderMeta: map[string]interface{}{
-			"version":             m.Version,
-			"input_token_limit":   m.InputTokenLimit,
-			"output_token_limit":  m.OutputTokenLimit,
-			"generation_methods":  m.SupportedGenerationMethods,
+		ProviderMeta: map[string]any{
+			"version":            m.Version,
+			"input_token_limit":  m.InputTokenLimit,
+			"output_token_limit": m.OutputTokenLimit,
+			"generation_methods": m.SupportedGenerationMethods,
 		},
 	}, nil
 }

@@ -430,7 +430,7 @@ func TestIntegration_ConcurrentLoads(t *testing.T) {
 	var wg sync.WaitGroup
 	errors := make(chan error, numModels)
 
-	for i := 0; i < numModels; i++ {
+	for i := range numModels {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()

@@ -45,9 +45,9 @@ type Finding struct {
 	FilePath    string   `json:"file_path"`
 	StartLine   int      `json:"start_line"`
 	EndLine     int      `json:"end_line"`
-	Match       string   `json:"match"`       // Redacted match
-	Context     string   `json:"context"`     // Surrounding code (redacted)
-	Suggestion  string   `json:"suggestion"`  // How to fix
+	Match       string   `json:"match"`      // Redacted match
+	Context     string   `json:"context"`    // Surrounding code (redacted)
+	Suggestion  string   `json:"suggestion"` // How to fix
 }
 
 // ScanRequest parameters for scanning
@@ -60,16 +60,16 @@ type ScanRequest struct {
 
 // ScanResult contains scan results
 type ScanResult struct {
-	ProjectID    string        `json:"project_id"`
-	ScanID       string        `json:"scan_id"`
-	StartedAt    time.Time     `json:"started_at"`
-	CompletedAt  time.Time     `json:"completed_at"`
-	Duration     string        `json:"duration"`
-	ChunksScanned int          `json:"chunks_scanned"`
-	Findings     []Finding     `json:"findings"`
-	Summary      ScanSummary   `json:"summary"`
-	Status       string        `json:"status"`
-	Error        string        `json:"error,omitempty"`
+	ProjectID     string      `json:"project_id"`
+	ScanID        string      `json:"scan_id"`
+	StartedAt     time.Time   `json:"started_at"`
+	CompletedAt   time.Time   `json:"completed_at"`
+	Duration      string      `json:"duration"`
+	ChunksScanned int         `json:"chunks_scanned"`
+	Findings      []Finding   `json:"findings"`
+	Summary       ScanSummary `json:"summary"`
+	Status        string      `json:"status"`
+	Error         string      `json:"error,omitempty"`
 }
 
 // ScanSummary provides overview of findings
@@ -227,7 +227,7 @@ func (s *Scanner) Scan(ctx context.Context, req ScanRequest) (*ScanResult, error
 	)
 
 	// Scroll through all chunks
-	err := s.vectorStore.ScrollAll(ctx, req.CollectionName, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, req.CollectionName, map[string]any{
 		"project_id": req.ProjectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -398,14 +398,8 @@ func redactSecret(secret string) string {
 // extractContext extracts surrounding code for context
 func extractContext(content string, start, end int) string {
 	// Get 50 chars before and after
-	contextStart := start - 50
-	if contextStart < 0 {
-		contextStart = 0
-	}
-	contextEnd := end + 50
-	if contextEnd > len(content) {
-		contextEnd = len(content)
-	}
+	contextStart := max(start-50, 0)
+	contextEnd := min(end+50, len(content))
 
 	ctx := content[contextStart:contextEnd]
 	// Redact the actual secret in context
@@ -446,4 +440,3 @@ func generateScanID() string {
 func generateFindingID() string {
 	return time.Now().Format("20060102150405.000000000")
 }
-

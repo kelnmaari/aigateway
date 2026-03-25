@@ -5,26 +5,26 @@ import "time"
 
 // BitbucketPullRequest represents a Bitbucket PR
 type BitbucketPullRequest struct {
-	ID          int64             `json:"id"`
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	State       string            `json:"state"` // OPEN, MERGED, DECLINED, SUPERSEDED
-	Author      *BitbucketUser    `json:"author"`
-	Source      BitbucketRef      `json:"source"`
-	Destination BitbucketRef      `json:"destination"`
-	Links       BitbucketLinks    `json:"links"`
-	CreatedOn   time.Time         `json:"created_on"`
-	UpdatedOn   time.Time         `json:"updated_on"`
-	MergeCommit *BitbucketCommit  `json:"merge_commit,omitempty"`
-	CloseSource bool              `json:"close_source_branch"`
-	Reviewers   []BitbucketUser   `json:"reviewers"`
+	ID           int64                  `json:"id"`
+	Title        string                 `json:"title"`
+	Description  string                 `json:"description"`
+	State        string                 `json:"state"` // OPEN, MERGED, DECLINED, SUPERSEDED
+	Author       *BitbucketUser         `json:"author"`
+	Source       BitbucketRef           `json:"source"`
+	Destination  BitbucketRef           `json:"destination"`
+	Links        BitbucketLinks         `json:"links"`
+	CreatedOn    time.Time              `json:"created_on"`
+	UpdatedOn    time.Time              `json:"updated_on"`
+	MergeCommit  *BitbucketCommit       `json:"merge_commit,omitempty"`
+	CloseSource  bool                   `json:"close_source_branch"`
+	Reviewers    []BitbucketUser        `json:"reviewers"`
 	Participants []BitbucketParticipant `json:"participants"`
 }
 
 // BitbucketRef represents a branch reference
 type BitbucketRef struct {
-	Branch     BitbucketBranch     `json:"branch"`
-	Commit     BitbucketCommit     `json:"commit"`
+	Branch     BitbucketBranch      `json:"branch"`
+	Commit     BitbucketCommit      `json:"commit"`
 	Repository *BitbucketRepository `json:"repository,omitempty"`
 }
 
@@ -35,12 +35,12 @@ type BitbucketBranch struct {
 
 // BitbucketCommit represents a commit
 type BitbucketCommit struct {
-	Hash    string             `json:"hash"`
-	Message string             `json:"message,omitempty"`
-	Author  *BitbucketUser     `json:"author,omitempty"`
-	Date    time.Time          `json:"date,omitempty"`
-	Links   BitbucketLinks     `json:"links,omitempty"`
-	Parents []BitbucketCommit  `json:"parents,omitempty"`
+	Hash    string            `json:"hash"`
+	Message string            `json:"message,omitempty"`
+	Author  *BitbucketUser    `json:"author,omitempty"`
+	Date    time.Time         `json:"date"`
+	Links   BitbucketLinks    `json:"links"`
+	Parents []BitbucketCommit `json:"parents,omitempty"`
 }
 
 // BitbucketUser represents a user
@@ -85,9 +85,9 @@ type BitbucketProject struct {
 
 // BitbucketLinks represents common links
 type BitbucketLinks struct {
-	Self   BitbucketLink `json:"self,omitempty"`
-	HTML   BitbucketLink `json:"html,omitempty"`
-	Avatar BitbucketLink `json:"avatar,omitempty"`
+	Self   BitbucketLink `json:"self"`
+	HTML   BitbucketLink `json:"html"`
+	Avatar BitbucketLink `json:"avatar"`
 }
 
 // BitbucketRepoLinks represents repository links
@@ -106,14 +106,14 @@ type BitbucketLink struct {
 
 // BitbucketComment represents a comment
 type BitbucketComment struct {
-	ID        int64              `json:"id"`
-	Content   BitbucketContent   `json:"content"`
-	User      *BitbucketUser     `json:"user"`
-	Inline    *BitbucketInline   `json:"inline,omitempty"`
-	Links     BitbucketLinks     `json:"links"`
-	CreatedOn time.Time          `json:"created_on"`
-	UpdatedOn time.Time          `json:"updated_on"`
-	Parent    *BitbucketComment  `json:"parent,omitempty"`
+	ID        int64             `json:"id"`
+	Content   BitbucketContent  `json:"content"`
+	User      *BitbucketUser    `json:"user"`
+	Inline    *BitbucketInline  `json:"inline,omitempty"`
+	Links     BitbucketLinks    `json:"links"`
+	CreatedOn time.Time         `json:"created_on"`
+	UpdatedOn time.Time         `json:"updated_on"`
+	Parent    *BitbucketComment `json:"parent,omitempty"`
 }
 
 // BitbucketContent represents content
@@ -150,12 +150,12 @@ type BitbucketDiffstat struct {
 
 // BitbucketDiffstatEntry represents a single file diff stat
 type BitbucketDiffstatEntry struct {
-	Type         string              `json:"type"`
-	Status       string              `json:"status"` // added, removed, modified, renamed
-	LinesAdded   int                 `json:"lines_added"`
-	LinesRemoved int                 `json:"lines_removed"`
-	Old          BitbucketDiffFile   `json:"old"`
-	New          BitbucketDiffFile   `json:"new"`
+	Type         string            `json:"type"`
+	Status       string            `json:"status"` // added, removed, modified, renamed
+	LinesAdded   int               `json:"lines_added"`
+	LinesRemoved int               `json:"lines_removed"`
+	Old          BitbucketDiffFile `json:"old"`
+	New          BitbucketDiffFile `json:"new"`
 }
 
 // BitbucketDiffFile represents a file in diff
@@ -169,7 +169,7 @@ type BitbucketDiffFile struct {
 
 // BitbucketPullRequestEvent represents a PR webhook event
 type BitbucketPullRequestEvent struct {
-	Actor       *BitbucketUser       `json:"actor"`
+	Actor       *BitbucketUser        `json:"actor"`
 	PullRequest *BitbucketPullRequest `json:"pullrequest"`
 	Repository  *BitbucketRepository  `json:"repository"`
 }
@@ -196,4 +196,3 @@ type BitbucketPushChange struct {
 	Commits   []BitbucketCommit `json:"commits"`
 	Truncated bool              `json:"truncated"`
 }
-

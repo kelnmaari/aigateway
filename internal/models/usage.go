@@ -42,7 +42,7 @@ type APIUsage struct {
 	ConversationID *string `json:"conversation_id,omitempty" db:"conversation_id"` // ID диалога (если через Chat UI)
 
 	// Metadata
-	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"`
+	Metadata map[string]any `json:"metadata,omitempty" db:"metadata"`
 }
 
 // UsageStats представляет агрегированную статистику использования
@@ -144,8 +144,8 @@ type UsageFilters struct {
 	Success  *bool   `json:"success,omitempty"`
 
 	// Временной период
-	StartDate time.Time `json:"start_date,omitempty"`
-	EndDate   time.Time `json:"end_date,omitempty"`
+	StartDate time.Time `json:"start_date"`
+	EndDate   time.Time `json:"end_date"`
 
 	// Pagination
 	Limit  int `json:"limit,omitempty"`
@@ -178,14 +178,14 @@ type UsageReportStats struct {
 
 // PerformanceReportStats представляет статистику для performance отчета
 type PerformanceReportStats struct {
-	TotalRequests      int64
-	AvgLatencyMS       float64
-	P50LatencyMS       float64
-	P95LatencyMS       float64
-	P99LatencyMS       float64
-	SlowRequestsCount  int
-	ErrorCount         int
-	RequestsPerSecond  float64
-	FastestRequest     float64
-	SlowestRequest     float64
+	TotalRequests     int64
+	AvgLatencyMS      float64
+	P50LatencyMS      float64
+	P95LatencyMS      float64
+	P99LatencyMS      float64
+	SlowRequestsCount int
+	ErrorCount        int
+	RequestsPerSecond float64
+	FastestRequest    float64
+	SlowestRequest    float64
 }

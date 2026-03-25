@@ -67,7 +67,7 @@ type PageMetadata struct {
 	TwitterDescription string
 
 	// JSON-LD structured data
-	StructuredData map[string]interface{}
+	StructuredData map[string]any
 }
 
 // ParsedContent результат парсинга HTML
@@ -79,4 +79,3 @@ type ParsedContent struct {
 	WordCount int
 	Language  string // Detected language code (e.g., "en", "ru")
 }
-

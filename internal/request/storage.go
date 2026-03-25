@@ -212,7 +212,7 @@ func (s *Storage) Sort(requests []*RequestInfo, field SortField, descending bool
 }
 
 // GetStats возвращает статистику по запросам
-func (s *Storage) GetStats() map[string]interface{} {
+func (s *Storage) GetStats() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -248,7 +248,7 @@ func (s *Storage) GetStats() map[string]interface{} {
 		avgDuration = totalDuration / int64(total-pending)
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"total":        total,
 		"pending":      pending,
 		"success":      success,
@@ -306,4 +306,3 @@ func (s *Storage) cleanup() {
 		s.logger.WithField("cleaned_count", cleaned).Debug("Cleaned old requests")
 	}
 }
-

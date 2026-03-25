@@ -173,7 +173,7 @@ func (db *PostgreSQLDB) ListMCPServers(ctx context.Context, req models.MCPServer
 	`
 	countQuery := `SELECT COUNT(*) FROM mcp_servers WHERE 1=1`
 
-	var args []interface{}
+	var args []any
 	var filters string
 
 	// Apply filters

@@ -27,13 +27,13 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	SSLMode  string
-	
+
 	// Query settings
-	Query        string // SQL query для загрузки данных
-	IDColumn     string // Колонка с ID
-	TitleColumn  string // Колонка с title (optional)
+	Query         string // SQL query для загрузки данных
+	IDColumn      string // Колонка с ID
+	TitleColumn   string // Колонка с title (optional)
 	ContentColumn string // Колонка с content
-	
+
 	// Incremental sync
 	UpdatedAtColumn string // Колонка для incremental sync (optional)
 }
@@ -82,8 +82,8 @@ func (s *DatabaseDataSource) Name() string {
 }
 
 // GetMetadata возвращает метаданные
-func (s *DatabaseDataSource) GetMetadata() map[string]interface{} {
-	return map[string]interface{}{
+func (s *DatabaseDataSource) GetMetadata() map[string]any {
+	return map[string]any{
 		"type":     string(s.Type()),
 		"name":     s.name,
 		"database": s.config.Database,
@@ -121,7 +121,7 @@ func (s *DatabaseDataSource) TestConnection(ctx context.Context) (*ConnectionTes
 		Success: true,
 		Message: "Database connection and query successful",
 		Latency: latency,
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"database": s.config.Database,
 		},
 	}, nil
@@ -149,8 +149,8 @@ func (s *DatabaseDataSource) Fetch(ctx context.Context) ([]Document, error) {
 
 	for rows.Next() {
 		// Create a slice of interface{} to hold each column value
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
+		values := make([]any, len(columns))
+		valuePtrs := make([]any, len(columns))
 		for i := range columns {
 			valuePtrs[i] = &values[i]
 		}
@@ -209,9 +209,9 @@ func (s *DatabaseDataSource) Sync(ctx context.Context) (*SyncResult, error) {
 }
 
 // buildDocument создает Document из row
-func (s *DatabaseDataSource) buildDocument(columns []string, values []interface{}) (Document, error) {
+func (s *DatabaseDataSource) buildDocument(columns []string, values []any) (Document, error) {
 	// Build metadata map
-	metadata := make(map[string]interface{})
+	metadata := make(map[string]any)
 	for i, col := range columns {
 		metadata[col] = values[i]
 	}
@@ -247,7 +247,7 @@ func (s *DatabaseDataSource) buildDocument(columns []string, values []interface{
 }
 
 // extractString извлекает строку из metadata
-func (s *DatabaseDataSource) extractString(metadata map[string]interface{}, key string) string {
+func (s *DatabaseDataSource) extractString(metadata map[string]any, key string) string {
 	if val, ok := metadata[key]; ok {
 		switch v := val.(type) {
 		case string:
@@ -271,5 +271,3 @@ func (s *DatabaseDataSource) Close() error {
 
 // Ensure DatabaseDataSource implements DataSource interface
 var _ DataSource = (*DatabaseDataSource)(nil)
-
-

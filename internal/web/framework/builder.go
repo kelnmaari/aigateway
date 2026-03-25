@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -24,8 +25,8 @@ var assetsFS embed.FS
 type Asset struct {
 	Type        AssetType // "js" or "css"
 	Content     []byte
-	ContentGzip []byte    // Pre-compressed gzip
-	ContentBr   []byte    // Pre-compressed brotli
+	ContentGzip []byte // Pre-compressed gzip
+	ContentBr   []byte // Pre-compressed brotli
 	ContentHash string
 	Size        int64
 	Minified    bool
@@ -123,14 +124,14 @@ func (b *Builder) buildJavaScriptBundle() error {
 	// Create asset
 	originalContent := buf.Bytes()
 	content := originalContent
-	
+
 	if b.minify {
 		minified, err := b.minifier.MinifyJS(content)
 		if err != nil {
 			b.logger.WithError(err).Warn("JS minification failed, using original")
 		} else {
 			content = minified
-			
+
 			// Analyze bundle
 			stats, err := b.minifier.AnalyzeBundle(originalContent, minified)
 			if err != nil {
@@ -203,14 +204,14 @@ func (b *Builder) buildCSSBundle() error {
 	// Create asset
 	originalContent := buf.Bytes()
 	content := originalContent
-	
+
 	if b.minify {
 		minified, err := b.minifier.MinifyCSS(content)
 		if err != nil {
 			b.logger.WithError(err).Warn("CSS minification failed, using original")
 		} else {
 			content = minified
-			
+
 			// Analyze bundle
 			stats, err := b.minifier.AnalyzeBundle(originalContent, minified)
 			if err != nil {
@@ -293,11 +294,9 @@ func (b *Builder) getAssetSize(name string) string {
 func (b *Builder) GetStats() map[string]*BundleStats {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	
+
 	result := make(map[string]*BundleStats)
-	for k, v := range b.stats {
-		result[k] = v
-	}
+	maps.Copy(result, b.stats)
 	return result
 }
 
@@ -312,5 +311,3 @@ func (b *Builder) Rebuild() error {
 	b.logger.WithField("build_num", b.buildNum).Info("Rebuilding framework assets...")
 	return b.Build()
 }
-
-

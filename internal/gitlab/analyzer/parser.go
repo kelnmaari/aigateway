@@ -19,7 +19,7 @@ func NewJSONParser() *JSONParser {
 // ParseAnalysisResult parses full analysis result from LLM response
 func (p *JSONParser) ParseAnalysisResult(response string) (*AnalysisResult, error) {
 	cleaned := p.cleanResponse(response)
-	
+
 	var result AnalysisResult
 	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
 		// Try to fix common JSON issues
@@ -28,17 +28,17 @@ func (p *JSONParser) ParseAnalysisResult(response string) (*AnalysisResult, erro
 			return nil, fmt.Errorf("parse analysis result: %w (original error: %v)", err2, err)
 		}
 	}
-	
+
 	// Validate and sanitize
 	p.sanitizeResult(&result)
-	
+
 	return &result, nil
 }
 
 // ParseFileReview parses single file review from LLM response
 func (p *JSONParser) ParseFileReview(response string) (*FileReview, error) {
 	cleaned := p.cleanResponse(response)
-	
+
 	var review FileReview
 	if err := json.Unmarshal([]byte(cleaned), &review); err != nil {
 		fixed := p.fixCommonJSONIssues(cleaned)
@@ -46,17 +46,17 @@ func (p *JSONParser) ParseFileReview(response string) (*FileReview, error) {
 			return nil, fmt.Errorf("parse file review: %w", err2)
 		}
 	}
-	
+
 	// Validate
 	p.sanitizeFileReview(&review)
-	
+
 	return &review, nil
 }
 
 // ParseSecurityResult parses security-focused analysis
 func (p *JSONParser) ParseSecurityResult(response string) (*SecurityAnalysisResult, error) {
 	cleaned := p.cleanResponse(response)
-	
+
 	var result SecurityAnalysisResult
 	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
 		fixed := p.fixCommonJSONIssues(cleaned)
@@ -64,7 +64,7 @@ func (p *JSONParser) ParseSecurityResult(response string) (*SecurityAnalysisResu
 			return nil, fmt.Errorf("parse security result: %w", err2)
 		}
 	}
-	
+
 	return &result, nil
 }
 
@@ -88,34 +88,34 @@ type SecurityIssue struct {
 // cleanResponse cleans LLM response and extracts JSON
 func (p *JSONParser) cleanResponse(response string) string {
 	response = strings.TrimSpace(response)
-	
+
 	// Remove markdown code blocks
 	patterns := []string{
 		"```json\n", "```json\r\n",
 		"```\n", "```\r\n",
 		"```",
 	}
-	
+
 	for _, pattern := range patterns {
 		response = strings.ReplaceAll(response, pattern, "")
 	}
-	
+
 	// Find JSON object boundaries
 	start := strings.Index(response, "{")
 	end := strings.LastIndex(response, "}")
-	
+
 	if start != -1 && end != -1 && end > start {
 		return response[start : end+1]
 	}
-	
+
 	// Try to find JSON array
 	start = strings.Index(response, "[")
 	end = strings.LastIndex(response, "]")
-	
+
 	if start != -1 && end != -1 && end > start {
 		return response[start : end+1]
 	}
-	
+
 	return response
 }
 
@@ -124,24 +124,24 @@ func (p *JSONParser) fixCommonJSONIssues(jsonStr string) string {
 	// Remove trailing commas before } or ]
 	re := regexp.MustCompile(`,\s*([}\]])`)
 	jsonStr = re.ReplaceAllString(jsonStr, "$1")
-	
+
 	// Fix single quotes to double quotes (but preserve escaped quotes)
 	// This is a simple heuristic that may not work for all cases
 	jsonStr = strings.ReplaceAll(jsonStr, `\'`, `ESCAPED_SINGLE_QUOTE`)
-	
+
 	// Replace unescaped single quotes with double quotes in key positions
 	// Pattern: 'key': -> "key":
 	reKeys := regexp.MustCompile(`'([^']+)'(\s*:)`)
 	jsonStr = reKeys.ReplaceAllString(jsonStr, `"$1"$2`)
-	
+
 	// Replace unescaped single quotes with double quotes in value positions
 	// This is risky but sometimes needed
 	// Pattern: : 'value' -> : "value"
 	reValues := regexp.MustCompile(`:\s*'([^']*)'`)
 	jsonStr = reValues.ReplaceAllString(jsonStr, `: "$1"`)
-	
+
 	jsonStr = strings.ReplaceAll(jsonStr, `ESCAPED_SINGLE_QUOTE`, `\'`)
-	
+
 	// Fix unescaped newlines in string values
 	// This is a heuristic - might cause issues with intentional newlines
 	lines := strings.Split(jsonStr, "\n")
@@ -150,15 +150,15 @@ func (p *JSONParser) fixCommonJSONIssues(jsonStr string) string {
 		result = append(result, strings.TrimRight(line, "\r"))
 	}
 	jsonStr = strings.Join(result, "\\n")
-	
+
 	// Try to re-parse to check if fixed
 	// If still invalid, return original
-	var test interface{}
+	var test any
 	if json.Unmarshal([]byte(jsonStr), &test) != nil {
 		// Revert newline fix as it might have broken the JSON
 		return strings.ReplaceAll(jsonStr, "\\n", "\n")
 	}
-	
+
 	return jsonStr
 }
 
@@ -171,17 +171,17 @@ func (p *JSONParser) sanitizeResult(result *AnalysisResult) {
 	if result.OverallScore > 100 {
 		result.OverallScore = 100
 	}
-	
+
 	// Sanitize categories
 	for i := range result.Categories {
 		p.sanitizeCategory(&result.Categories[i])
 	}
-	
+
 	// Sanitize file reviews
 	for i := range result.FileReviews {
 		p.sanitizeFileReview(&result.FileReviews[i])
 	}
-	
+
 	// Sanitize suggestions
 	for i := range result.Suggestions {
 		p.sanitizeSuggestion(&result.Suggestions[i])
@@ -198,11 +198,11 @@ func (p *JSONParser) sanitizeCategory(cat *CategoryResult) {
 		CategoryPerformance:  true,
 		CategoryBestPractice: true,
 	}
-	
+
 	if !validCategories[cat.Name] {
 		cat.Name = CategoryBestPractice // Default
 	}
-	
+
 	// Clamp score
 	if cat.Score < 0 {
 		cat.Score = 0
@@ -210,7 +210,7 @@ func (p *JSONParser) sanitizeCategory(cat *CategoryResult) {
 	if cat.Score > 100 {
 		cat.Score = 100
 	}
-	
+
 	// Ensure issues >= 0
 	if cat.Issues < 0 {
 		cat.Issues = 0
@@ -226,7 +226,7 @@ func (p *JSONParser) sanitizeFileReview(review *FileReview) {
 	if review.Score > 100 {
 		review.Score = 100
 	}
-	
+
 	// Sanitize line issues
 	for i := range review.LineIssues {
 		p.sanitizeLineIssue(&review.LineIssues[i])
@@ -239,7 +239,7 @@ func (p *JSONParser) sanitizeLineIssue(issue *LineIssue) {
 	if issue.Line < 1 {
 		issue.Line = 1
 	}
-	
+
 	// Validate severity
 	validSeverities := map[string]bool{
 		SeverityCritical:   true,
@@ -247,11 +247,11 @@ func (p *JSONParser) sanitizeLineIssue(issue *LineIssue) {
 		SeverityInfo:       true,
 		SeveritySuggestion: true,
 	}
-	
+
 	if !validSeverities[issue.Severity] {
 		issue.Severity = SeverityInfo // Default
 	}
-	
+
 	// Validate category
 	validCategories := map[string]bool{
 		CategorySecurity:     true,
@@ -260,7 +260,7 @@ func (p *JSONParser) sanitizeLineIssue(issue *LineIssue) {
 		CategoryPerformance:  true,
 		CategoryBestPractice: true,
 	}
-	
+
 	if !validCategories[issue.Category] {
 		issue.Category = CategoryBestPractice // Default
 	}
@@ -276,18 +276,18 @@ func (p *JSONParser) sanitizeSuggestion(suggestion *Suggestion) {
 		CategoryPerformance:  true,
 		CategoryBestPractice: true,
 	}
-	
+
 	if !validCategories[suggestion.Category] {
 		suggestion.Category = CategoryBestPractice
 	}
-	
+
 	// Validate priority
 	validPriorities := map[string]bool{
 		"high":   true,
 		"medium": true,
 		"low":    true,
 	}
-	
+
 	if !validPriorities[suggestion.Priority] {
 		suggestion.Priority = "medium"
 	}
@@ -300,23 +300,23 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 	result := &AnalysisResult{
 		OverallScore: 50, // Default moderate score
 	}
-	
+
 	cleaned := p.cleanResponse(response)
-	
+
 	// Try full parse first
 	if err := json.Unmarshal([]byte(cleaned), result); err == nil {
 		return result, nil
 	}
-	
+
 	// Try to extract individual fields
-	
+
 	// Extract summary
 	if match := regexp.MustCompile(`"summary"\s*:\s*"([^"]+)"`).FindStringSubmatch(cleaned); len(match) > 1 {
 		result.Summary = match[1]
 	} else {
 		errors = append(errors, "could not extract summary")
 	}
-	
+
 	// Extract overall_score
 	if match := regexp.MustCompile(`"overall_score"\s*:\s*(\d+)`).FindStringSubmatch(cleaned); len(match) > 1 {
 		var score int
@@ -325,7 +325,7 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 	} else {
 		errors = append(errors, "could not extract overall_score")
 	}
-	
+
 	// Try to extract file_reviews array
 	if idx := strings.Index(cleaned, `"file_reviews"`); idx != -1 {
 		// Find the array start
@@ -335,7 +335,7 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 			start := idx + arrayStart
 			bracketCount := 1
 			end := start + 1
-			
+
 			for end < len(cleaned) && bracketCount > 0 {
 				switch cleaned[end] {
 				case '[':
@@ -345,7 +345,7 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 				}
 				end++
 			}
-			
+
 			if bracketCount == 0 {
 				arrayJSON := cleaned[start:end]
 				var reviews []FileReview
@@ -355,7 +355,7 @@ func (p *JSONParser) TryParsePartialJSON(response string) (*AnalysisResult, []st
 			}
 		}
 	}
-	
+
 	return result, errors
 }
 
@@ -375,17 +375,17 @@ func GetSystemPrompt(customPrompt string) string {
 // Supports multiple JSON formats that LLMs might return
 func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 	parser := NewJSONParser()
-	
+
 	// Clean the response first
 	cleaned := parser.cleanResponse(response)
-	
+
 	// Try parsing as full AnalysisResult format
 	fullResult, err := parser.ParseAnalysisResult(response)
 	if err == nil && (fullResult.Summary != "" || len(fullResult.FileReviews) > 0 || len(fullResult.Categories) > 0) {
 		// Successfully parsed full format
 		return convertFullResult(fullResult), nil
 	}
-	
+
 	// Try parsing as alternative "issues" format: {"issues": [...], "overall_score": ...}
 	var altFormat struct {
 		Issues []struct {
@@ -402,7 +402,7 @@ func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 		Score        int    `json:"score"`
 		Summary      string `json:"summary"`
 	}
-	
+
 	// Parse alternative format - allow empty issues array (means no issues found)
 	if err := json.Unmarshal([]byte(cleaned), &altFormat); err == nil && altFormat.Issues != nil {
 		result := &AnalysisResultParsed{
@@ -421,7 +421,7 @@ func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 				result.Score = 70 // Default moderate score for issues
 			}
 		}
-		
+
 		for _, issue := range altFormat.Issues {
 			filePath := issue.FilePath
 			if filePath == "" {
@@ -436,15 +436,15 @@ func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 				Suggestion: issue.Suggestion,
 			})
 		}
-		
+
 		// Generate summary if empty
 		if result.Summary == "" && len(result.Issues) > 0 {
 			result.Summary = fmt.Sprintf("Found %d potential issues in the code.", len(result.Issues))
 		}
-		
+
 		return result, nil
 	}
-	
+
 	// Try partial parse as last resort
 	partialResult, parseErrors := parser.TryParsePartialJSON(response)
 	if partialResult != nil && (partialResult.Summary != "" || len(partialResult.FileReviews) > 0) {
@@ -455,7 +455,7 @@ func ParseAnalysisResponse(response string) (*AnalysisResultParsed, error) {
 		}
 		return result, nil
 	}
-	
+
 	// If all parsing fails, return the original error
 	return nil, err
 }
@@ -468,7 +468,7 @@ func convertFullResult(fullResult *AnalysisResult) *AnalysisResultParsed {
 		Issues:      make([]Issue, 0),
 		Suggestions: make([]SuggestionItem, 0),
 	}
-	
+
 	// Extract issues from file reviews
 	for _, fileReview := range fullResult.FileReviews {
 		for _, lineIssue := range fileReview.LineIssues {
@@ -483,7 +483,7 @@ func convertFullResult(fullResult *AnalysisResult) *AnalysisResultParsed {
 			})
 		}
 	}
-	
+
 	// Convert suggestions
 	for _, suggestion := range fullResult.Suggestions {
 		result.Suggestions = append(result.Suggestions, SuggestionItem{
@@ -493,13 +493,13 @@ func convertFullResult(fullResult *AnalysisResult) *AnalysisResultParsed {
 			Priority:    suggestion.Priority,
 		})
 	}
-	
+
 	// Apply sensible default score if LLM didn't provide one
 	// Score 0 with no issues means LLM didn't return score - give perfect score
 	if result.Score == 0 && len(result.Issues) == 0 {
 		result.Score = 100
 	}
-	
+
 	return result
 }
 
@@ -563,4 +563,3 @@ func NormalizePriority(priority string) string {
 		return "medium"
 	}
 }
-

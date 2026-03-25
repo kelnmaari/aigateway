@@ -149,7 +149,7 @@ func TestOpenAIEmbedder_Embed_Success(t *testing.T) {
 	result, err := embedder.Embed(context.Background(), EmbeddingRequest{
 		Text:  "Hello, world!",
 		Model: "text-embedding-3-small",
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"source": "test",
 		},
 	})
@@ -255,7 +255,7 @@ func TestOpenAIEmbedder_EmbedBatch_Success(t *testing.T) {
 		assert.Equal(t, "text-embedding-3-small", reqBody.Model)
 
 		// Input should be an array of strings
-		inputSlice, ok := reqBody.Input.([]interface{})
+		inputSlice, ok := reqBody.Input.([]any)
 		require.True(t, ok, "input should be a slice")
 		assert.Len(t, inputSlice, len(texts))
 
@@ -279,7 +279,7 @@ func TestOpenAIEmbedder_EmbedBatch_Success(t *testing.T) {
 	result, err := embedder.EmbedBatch(context.Background(), BatchEmbeddingRequest{
 		Texts: texts,
 		Model: "text-embedding-3-small",
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"batch": true,
 		},
 	})
@@ -334,7 +334,7 @@ func TestOpenAIEmbedder_EmbedBatch_LargeBatch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Determine how many texts were sent in this batch
-		inputSlice, ok := reqBody.Input.([]interface{})
+		inputSlice, ok := reqBody.Input.([]any)
 		require.True(t, ok, "input should be a slice")
 
 		// Generate response vectors for each input
@@ -363,7 +363,7 @@ func TestOpenAIEmbedder_EmbedBatch_LargeBatch(t *testing.T) {
 	// Create 13 texts — should result in 3 API calls (5 + 5 + 3)
 	totalTexts := 13
 	texts := make([]string, totalTexts)
-	for i := 0; i < totalTexts; i++ {
+	for i := range totalTexts {
 		texts[i] = "text number " + string(rune('A'+i))
 	}
 

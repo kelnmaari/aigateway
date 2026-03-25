@@ -136,18 +136,18 @@ func (l *Limiter) setRateLimitHeaders(c *gin.Context, keyInfo *models.APIKeyPubl
 }
 
 // GetRateLimitStatus возвращает статус rate limiting для API ключа
-func (l *Limiter) GetRateLimitStatus(keyID string) map[string]interface{} {
+func (l *Limiter) GetRateLimitStatus(keyID string) map[string]any {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 
 	keyLimiter, exists := l.limiters[keyID]
 	if !exists {
-		return map[string]interface{}{
+		return map[string]any{
 			"exists": false,
 		}
 	}
 
-	status := map[string]interface{}{
+	status := map[string]any{
 		"exists":    true,
 		"key_id":    keyLimiter.KeyID,
 		"key_name":  keyLimiter.KeyName,
@@ -209,4 +209,3 @@ func (l *Limiter) ResetLimiter(keyID string) {
 		l.logger.WithField("key_id", keyID).Info("Rate limiter reset for API key")
 	}
 }
-

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -79,15 +80,16 @@ func (h *MonitorUIHandler) RenderGPUMetrics(c *gin.Context) {
 // renderInlineGPUMetrics renders GPU metrics with inline HTML (fallback)
 func (h *MonitorUIHandler) renderInlineGPUMetrics(c *gin.Context, metricsData *metrics.GPUMetrics) {
 	c.Header("Content-Type", "text/html")
-	
+
 	// Check if we have GPU devices
 	if metricsData == nil || len(metricsData.Devices) == 0 {
 		c.String(http.StatusOK, `<div class="alert alert-warning">No GPU data available</div>`)
 		return
 	}
 
-	html := `<div class="gpu-grid">`
-	
+	var html strings.Builder
+	html.WriteString(`<div class="gpu-grid">`)
+
 	for _, device := range metricsData.Devices {
 		name := device.Name
 		if name == "" {
@@ -96,7 +98,7 @@ func (h *MonitorUIHandler) renderInlineGPUMetrics(c *gin.Context, metricsData *m
 
 		temperature := fmt.Sprintf("%d°C", device.TemperatureC)
 		utilization := fmt.Sprintf("%d%%", device.UtilizationGPU)
-		
+
 		memoryUsed := fmt.Sprintf("%.2f GB", device.MemoryUsedMB/1024)
 		memoryTotal := fmt.Sprintf("%.2f GB", device.MemoryTotalMB/1024)
 		memoryPercent := 0.0
@@ -109,7 +111,7 @@ func (h *MonitorUIHandler) renderInlineGPUMetrics(c *gin.Context, metricsData *m
 
 		fanSpeed := fmt.Sprintf("%d%%", device.FanSpeedPercent)
 
-		html += fmt.Sprintf(`
+		html.WriteString(fmt.Sprintf(`
 <div class="gpu-card">
 	<div class="gpu-header">
 		<h3>%s</h3>
@@ -148,24 +150,24 @@ func (h *MonitorUIHandler) renderInlineGPUMetrics(c *gin.Context, metricsData *m
 	</div>
 </div>
 `, name, temperature, utilization, utilization, memoryUsed, memoryTotal, memoryPercent,
-			powerDraw, powerLimit, fanSpeed, time.Now().Format("15:04:05"))
+			powerDraw, powerLimit, fanSpeed, time.Now().Format("15:04:05")))
 	}
 
-	html += `</div>`
-	c.String(http.StatusOK, html)
+	html.WriteString(`</div>`)
+	c.String(http.StatusOK, html.String())
 }
 
 // RenderAuditLogRows renders audit log table rows for HTMX polling
 // GET /ui/monitor/audit-logs
 func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	// Parse query parameters
 	filters := storage.AuditFilters{
 		Limit:  20, // Limit for live updates
 		Offset: 0,
 	}
-	
+
 	// Optional filters from query params
 	if severity := c.Query("severity"); severity != "" {
 		filters.Severity = severity
@@ -173,7 +175,7 @@ func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
 	if eventType := c.Query("event_type"); eventType != "" {
 		filters.EventType = eventType
 	}
-	
+
 	// Get recent audit events
 	events, _, err := h.db.GetAuditEvents(ctx, filters)
 	if err != nil {
@@ -187,7 +189,7 @@ func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Check if no events
 	if len(events) == 0 {
 		c.Header("Content-Type", "text/html")
@@ -199,10 +201,10 @@ func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Render rows
 	c.Header("Content-Type", "text/html")
-	html := ""
+	var html strings.Builder
 	for _, event := range events {
 		severityClass := "severity-info"
 		switch event.Severity {
@@ -211,13 +213,13 @@ func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
 		case "warning":
 			severityClass = "severity-warning"
 		}
-		
+
 		statusClass := "status-success"
 		if event.Status == "failure" {
 			statusClass = "status-failure"
 		}
-		
-		html += fmt.Sprintf(`
+
+		html.WriteString(fmt.Sprintf(`
 <tr class="audit-row">
 	<td>%s</td>
 	<td><span class="%s">%s</span></td>
@@ -236,10 +238,10 @@ func (h *MonitorUIHandler) RenderAuditLogRows(c *gin.Context) {
 			event.Resource, truncateString(event.Resource, 30),
 			statusClass, event.Status,
 			event.IPAddress,
-		)
+		))
 	}
-	
-	c.String(http.StatusOK, html)
+
+	c.String(http.StatusOK, html.String())
 }
 
 // truncateString truncates string to max length with ellipsis
@@ -254,7 +256,7 @@ func truncateString(s string, maxLen int) string {
 // GET /ui/monitor/usage-stats
 func (h *MonitorUIHandler) RenderUsageStats(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	// Get user ID from context
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -263,7 +265,7 @@ func (h *MonitorUIHandler) RenderUsageStats(c *gin.Context) {
 		return
 	}
 	userIDStr := userID.(string)
-	
+
 	// Get period from query (default: 24h)
 	period := 24 * time.Hour
 	if periodParam := c.Query("period"); periodParam != "" {
@@ -276,7 +278,7 @@ func (h *MonitorUIHandler) RenderUsageStats(c *gin.Context) {
 			period = 7 * 24 * time.Hour
 		}
 	}
-	
+
 	// Get usage stats for user
 	stats, err := h.db.GetUserUsageStats(ctx, userIDStr, period)
 	if err != nil {
@@ -285,18 +287,18 @@ func (h *MonitorUIHandler) RenderUsageStats(c *gin.Context) {
 		c.String(http.StatusOK, `<div class="alert alert-error">Failed to load usage statistics</div>`)
 		return
 	}
-	
+
 	// Format numbers
 	totalRequests := int64(0)
 	totalTokens := int64(0)
 	avgResponseTime := 0.0
-	
+
 	if stats != nil {
 		totalRequests = stats.TotalRequests
 		totalTokens = stats.TotalTokens
 		avgResponseTime = stats.AvgDurationMS
 	}
-	
+
 	now := time.Now()
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
@@ -355,4 +357,3 @@ func formatNumber(n int) string {
 	}
 	return fmt.Sprintf("%.1fM", float64(n)/1000000)
 }
-

@@ -767,7 +767,7 @@ func (s *SQLiteDB) ListDeviceAPIKeys(ctx context.Context, userID string, filters
 	`
 
 	// Add status filter
-	args := []interface{}{userID}
+	args := []any{userID}
 	if filters.Status == "active" {
 		query += " AND status = 'active'"
 	} else if filters.Status == "expired" {
@@ -949,4 +949,3 @@ func (s *SQLiteDB) UpdateDeviceName(ctx context.Context, keyID, userID, newName 
 
 	return nil
 }
-

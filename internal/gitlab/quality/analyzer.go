@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -155,7 +156,7 @@ func (a *Analyzer) getCodeFiles(ctx context.Context, collection, projectID strin
 	var files []codeFile
 	seen := make(map[string]bool)
 
-	err := a.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := a.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -317,7 +318,7 @@ Respond in JSON format ONLY:
 
 // callLLM makes a request to the LLM API
 func (a *Analyzer) callLLM(ctx context.Context, modelID, prompt string) (string, int, error) {
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "system", "content": "You are a code quality analyzer. Analyze code and provide scores and issues in JSON format only. No explanations outside JSON."},
@@ -608,26 +609,7 @@ func priorityOrder(p string) int {
 }
 
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	return slices.Contains(slice, item)
 }
 
 // ============================================================================

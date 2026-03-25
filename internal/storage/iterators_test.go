@@ -22,10 +22,7 @@ func TestPaginatedIterator(t *testing.T) {
 			if offset >= len(items) {
 				return []TestItem{}, nil
 			}
-			end := offset + limit
-			if end > len(items) {
-				end = len(items)
-			}
+			end := min(offset+limit, len(items))
 			return items[offset:end], nil
 		}
 
@@ -61,10 +58,7 @@ func TestPaginatedIterator(t *testing.T) {
 			if offset >= len(items) {
 				return []TestItem{}, nil
 			}
-			end := offset + limit
-			if end > len(items) {
-				end = len(items)
-			}
+			end := min(offset+limit, len(items))
 			return items[offset:end], nil
 		}
 
@@ -89,7 +83,7 @@ func TestChunkedIterator(t *testing.T) {
 	t.Run("full chunks", func(t *testing.T) {
 		items := []int{1, 2, 3, 4, 5, 6}
 		chunks := [][]int{}
-		
+
 		for chunk := range ChunkedIterator(items, 2) {
 			chunks = append(chunks, chunk)
 		}
@@ -105,7 +99,7 @@ func TestChunkedIterator(t *testing.T) {
 	t.Run("partial last chunk", func(t *testing.T) {
 		items := []int{1, 2, 3, 4, 5}
 		chunks := [][]int{}
-		
+
 		for chunk := range ChunkedIterator(items, 2) {
 			chunks = append(chunks, chunk)
 		}
@@ -121,7 +115,7 @@ func TestChunkedIterator(t *testing.T) {
 	t.Run("empty input", func(t *testing.T) {
 		items := []int{}
 		count := 0
-		
+
 		for range ChunkedIterator(items, 2) {
 			count++
 		}
@@ -160,7 +154,7 @@ func TestFilteredIterator(t *testing.T) {
 
 func TestMappedIterator(t *testing.T) {
 	items := []TestItem{{1, "a"}, {2, "b"}, {3, "c"}}
-	
+
 	mapper := func(item TestItem) int {
 		return item.ID * 10
 	}
@@ -252,7 +246,7 @@ func TestPairIterator(t *testing.T) {
 	t.Run("normal case", func(t *testing.T) {
 		items := []int{1, 2, 3, 4}
 		pairs := []Pair[int]{}
-		
+
 		for pair := range PairIterator(items) {
 			pairs = append(pairs, pair)
 		}
@@ -275,7 +269,7 @@ func TestPairIterator(t *testing.T) {
 	t.Run("insufficient items", func(t *testing.T) {
 		items := []int{1}
 		count := 0
-		
+
 		for range PairIterator(items) {
 			count++
 		}
@@ -288,7 +282,7 @@ func TestPairIterator(t *testing.T) {
 	t.Run("empty input", func(t *testing.T) {
 		items := []int{}
 		count := 0
-		
+
 		for range PairIterator(items) {
 			count++
 		}
@@ -302,7 +296,7 @@ func TestPairIterator(t *testing.T) {
 func TestEnumerateIterator(t *testing.T) {
 	items := []string{"a", "b", "c"}
 	collected := []Indexed[string]{}
-	
+
 	for indexed := range EnumerateIterator(items) {
 		collected = append(collected, indexed)
 	}
@@ -332,10 +326,7 @@ func BenchmarkPaginatedIterator(b *testing.B) {
 		if offset >= len(items) {
 			return []TestItem{}, nil
 		}
-		end := offset + limit
-		if end > len(items) {
-			end = len(items)
-		}
+		end := min(offset+limit, len(items))
 		return items[offset:end], nil
 	}
 
@@ -364,4 +355,3 @@ func BenchmarkFilteredIterator(b *testing.B) {
 		}
 	}
 }
-

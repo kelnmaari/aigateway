@@ -41,7 +41,7 @@ func NewCertificateManager(certDir string, logger *logrus.Logger) *CertificateMa
 	if logger == nil {
 		logger = logrus.New()
 	}
-	
+
 	return &CertificateManager{
 		certDir: certDir,
 		logger:  logger,
@@ -52,7 +52,7 @@ func NewCertificateManager(certDir string, logger *logrus.Logger) *CertificateMa
 func (cm *CertificateManager) EnsureCertificate(certFile, keyFile string, config CertificateConfig) error {
 	certPath := filepath.Join(cm.certDir, certFile)
 	keyPath := filepath.Join(cm.certDir, keyFile)
-	
+
 	// Check if both files exist
 	if _, err := os.Stat(certPath); err == nil {
 		if _, err := os.Stat(keyPath); err == nil {
@@ -63,14 +63,14 @@ func (cm *CertificateManager) EnsureCertificate(certFile, keyFile string, config
 			return nil
 		}
 	}
-	
+
 	// Generate new self-signed certificate
 	cm.logger.WithFields(logrus.Fields{
 		"cert": certPath,
 		"key":  keyPath,
 		"cn":   config.CommonName,
 	}).Info("🔐 Generating self-signed TLS certificate...")
-	
+
 	return cm.generateSelfSignedCert(certPath, keyPath, config)
 }
 
@@ -80,7 +80,7 @@ func (cm *CertificateManager) generateSelfSignedCert(certPath, keyPath string, c
 	if err := os.MkdirAll(cm.certDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cert directory: %w", err)
 	}
-	
+
 	// Set defaults
 	if config.ValidFor == 0 {
 		config.ValidFor = 365 * 24 * time.Hour // 1 year
@@ -94,24 +94,24 @@ func (cm *CertificateManager) generateSelfSignedCert(certPath, keyPath string, c
 	if len(config.Hosts) == 0 {
 		config.Hosts = []string{"localhost", "127.0.0.1", "::1"}
 	}
-	
+
 	// Generate ECDSA private key (P-256)
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return fmt.Errorf("failed to generate private key: %w", err)
 	}
-	
+
 	// Generate serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		return fmt.Errorf("failed to generate serial number: %w", err)
 	}
-	
+
 	// Create certificate template
 	notBefore := time.Now()
 	notAfter := notBefore.Add(config.ValidFor)
-	
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -129,40 +129,40 @@ func (cm *CertificateManager) generateSelfSignedCert(certPath, keyPath string, c
 		BasicConstraintsValid: true,
 		DNSNames:              config.Hosts,
 	}
-	
+
 	// Create self-signed certificate
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to create certificate: %w", err)
 	}
-	
+
 	// Write certificate to file
 	certFile, err := os.Create(certPath)
 	if err != nil {
 		return fmt.Errorf("failed to create cert file: %w", err)
 	}
 	defer certFile.Close()
-	
+
 	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
 		return fmt.Errorf("failed to write cert: %w", err)
 	}
-	
+
 	// Write private key to file
 	keyFile, err := os.OpenFile(keyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create key file: %w", err)
 	}
 	defer keyFile.Close()
-	
+
 	privBytes, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		return fmt.Errorf("failed to marshal private key: %w", err)
 	}
-	
+
 	if err := pem.Encode(keyFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes}); err != nil {
 		return fmt.Errorf("failed to write key: %w", err)
 	}
-	
+
 	cm.logger.WithFields(logrus.Fields{
 		"cert":      certPath,
 		"key":       keyPath,
@@ -170,7 +170,7 @@ func (cm *CertificateManager) generateSelfSignedCert(certPath, keyPath string, c
 		"cn":        config.CommonName,
 		"hosts":     config.Hosts,
 	}).Info("✅ Self-signed TLS certificate generated successfully")
-	
+
 	return nil
 }
 
@@ -185,17 +185,17 @@ func (cm *CertificateManager) ValidateCertificate(certPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read certificate: %w", err)
 	}
-	
+
 	block, _ := pem.Decode(certPEM)
 	if block == nil {
 		return fmt.Errorf("failed to parse certificate PEM")
 	}
-	
+
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate: %w", err)
 	}
-	
+
 	// Check expiration
 	now := time.Now()
 	if now.Before(cert.NotBefore) {
@@ -204,36 +204,36 @@ func (cm *CertificateManager) ValidateCertificate(certPath string) error {
 	if now.After(cert.NotAfter) {
 		return fmt.Errorf("certificate expired (valid until %v)", cert.NotAfter)
 	}
-	
+
 	cm.logger.WithFields(logrus.Fields{
-		"subject":     cert.Subject.CommonName,
-		"issuer":      cert.Issuer.CommonName,
-		"not_before":  cert.NotBefore,
-		"not_after":   cert.NotAfter,
-		"dns_names":   cert.DNSNames,
+		"subject":    cert.Subject.CommonName,
+		"issuer":     cert.Issuer.CommonName,
+		"not_before": cert.NotBefore,
+		"not_after":  cert.NotAfter,
+		"dns_names":  cert.DNSNames,
 	}).Info("Certificate is valid")
-	
+
 	return nil
 }
 
 // GetCertificateInfo returns information about the certificate
-func (cm *CertificateManager) GetCertificateInfo(certPath string) (map[string]interface{}, error) {
+func (cm *CertificateManager) GetCertificateInfo(certPath string) (map[string]any, error) {
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate: %w", err)
 	}
-	
+
 	block, _ := pem.Decode(certPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to parse certificate PEM")
 	}
-	
+
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
-	
-	info := map[string]interface{}{
+
+	info := map[string]any{
 		"subject":         cert.Subject.CommonName,
 		"organization":    cert.Subject.Organization,
 		"issuer":          cert.Issuer.CommonName,
@@ -245,7 +245,6 @@ func (cm *CertificateManager) GetCertificateInfo(certPath string) (map[string]in
 		"is_self_signed":  cert.Subject.CommonName == cert.Issuer.CommonName,
 		"expires_in_days": int(time.Until(cert.NotAfter).Hours() / 24),
 	}
-	
+
 	return info, nil
 }
-

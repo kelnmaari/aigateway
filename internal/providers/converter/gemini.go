@@ -13,10 +13,10 @@ import (
 
 // GeminiRequest represents a Gemini generateContent request.
 type GeminiRequest struct {
-	Contents          []GeminiContent          `json:"contents"`
-	SystemInstruction *GeminiContent           `json:"systemInstruction,omitempty"`
-	GenerationConfig  *GeminiGenerationConfig  `json:"generationConfig,omitempty"`
-	SafetySettings    []GeminiSafetySetting    `json:"safetySettings,omitempty"`
+	Contents          []GeminiContent         `json:"contents"`
+	SystemInstruction *GeminiContent          `json:"systemInstruction,omitempty"`
+	GenerationConfig  *GeminiGenerationConfig `json:"generationConfig,omitempty"`
+	SafetySettings    []GeminiSafetySetting   `json:"safetySettings,omitempty"`
 }
 
 // GeminiContent represents content in Gemini format.
@@ -50,17 +50,17 @@ type GeminiSafetySetting struct {
 
 // GeminiResponse represents a Gemini generateContent response.
 type GeminiResponse struct {
-	Candidates     []GeminiCandidate   `json:"candidates"`
+	Candidates     []GeminiCandidate     `json:"candidates"`
 	PromptFeedback *GeminiPromptFeedback `json:"promptFeedback,omitempty"`
 	UsageMetadata  *GeminiUsageMetadata  `json:"usageMetadata,omitempty"`
 }
 
 // GeminiCandidate represents a candidate in the Gemini response.
 type GeminiCandidate struct {
-	Content       GeminiContent       `json:"content"`
-	FinishReason  string              `json:"finishReason"` // "STOP", "MAX_TOKENS", "SAFETY", "RECITATION"
+	Content       GeminiContent        `json:"content"`
+	FinishReason  string               `json:"finishReason"` // "STOP", "MAX_TOKENS", "SAFETY", "RECITATION"
 	SafetyRatings []GeminiSafetyRating `json:"safetyRatings,omitempty"`
-	Index         int                 `json:"index"`
+	Index         int                  `json:"index"`
 }
 
 // GeminiPromptFeedback represents feedback about the prompt.
@@ -214,15 +214,15 @@ func ConvertGeminiSSE(data []byte, requestModel string, streamID string) (string
 	candidate := chunk.Candidates[0]
 
 	// Extract text from parts
-	var text string
+	var text strings.Builder
 	for _, part := range candidate.Content.Parts {
-		text += part.Text
+		text.WriteString(part.Text)
 	}
 
 	// Check if this is the final chunk
 	isFinal := candidate.FinishReason != "" && candidate.FinishReason != "FINISH_REASON_UNSPECIFIED"
 
-	if isFinal && text == "" {
+	if isFinal && text.String() == "" {
 		// Final chunk with just finish reason
 		finishReason := mapGeminiFinishReason(candidate.FinishReason)
 		openaiChunk := models.ChatCompletionChunk{
@@ -252,7 +252,7 @@ func ConvertGeminiSSE(data []byte, requestModel string, streamID string) (string
 			{
 				Index: 0,
 				Delta: models.ChatMessage{
-					Content: text,
+					Content: text.String(),
 				},
 			},
 		},

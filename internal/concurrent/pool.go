@@ -13,14 +13,14 @@ import (
 
 // WorkerPool manages concurrent task execution with bounded parallelism
 type WorkerPool struct {
-	workers    int
-	queueSize  int
-	taskQueue  chan Task
-	wg         sync.WaitGroup
-	logger     *logrus.Logger
-	metrics    *PoolMetrics
-	ctx        context.Context
-	cancel     context.CancelFunc
+	workers   int
+	queueSize int
+	taskQueue chan Task
+	wg        sync.WaitGroup
+	logger    *logrus.Logger
+	metrics   *PoolMetrics
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // Task represents a unit of work
@@ -32,20 +32,20 @@ type Task struct {
 
 // PoolMetrics tracks pool performance with cache line padding
 type PoolMetrics struct {
-	TotalTasks      int64
-	_pad1           [56]byte
-	CompletedTasks  int64
-	_pad2           [56]byte
-	FailedTasks     int64
-	_pad3           [56]byte
-	ActiveWorkers   int32
-	_pad4           [60]byte
+	TotalTasks     int64
+	_pad1          [56]byte
+	CompletedTasks int64
+	_pad2          [56]byte
+	FailedTasks    int64
+	_pad3          [56]byte
+	ActiveWorkers  int32
+	_pad4          [60]byte
 }
 
 // PoolConfig configuration for worker pool
 type PoolConfig struct {
-	Workers   int    // Number of concurrent workers
-	QueueSize int    // Task queue buffer size
+	Workers   int // Number of concurrent workers
+	QueueSize int // Task queue buffer size
 	Logger    *logrus.Logger
 }
 
@@ -60,9 +60,9 @@ func NewWorkerPool(config PoolConfig) *WorkerPool {
 	if config.Logger == nil {
 		config.Logger = logrus.New()
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	pool := &WorkerPool{
 		workers:   config.Workers,
 		queueSize: config.QueueSize,
@@ -72,18 +72,18 @@ func NewWorkerPool(config PoolConfig) *WorkerPool {
 		ctx:       ctx,
 		cancel:    cancel,
 	}
-	
+
 	// Start workers
 	for i := 0; i < config.Workers; i++ {
 		pool.wg.Add(1)
 		go pool.worker(i)
 	}
-	
+
 	pool.logger.WithFields(logrus.Fields{
 		"workers":    config.Workers,
 		"queue_size": config.QueueSize,
 	}).Info("✅ Worker pool started")
-	
+
 	return pool
 }
 
@@ -112,17 +112,17 @@ func (p *WorkerPool) TrySubmit(task Task) bool {
 // worker processes tasks from the queue
 func (p *WorkerPool) worker(id int) {
 	defer p.wg.Done()
-	
+
 	atomic.AddInt32(&p.metrics.ActiveWorkers, 1)
 	defer atomic.AddInt32(&p.metrics.ActiveWorkers, -1)
-	
+
 	for {
 		select {
 		case task, ok := <-p.taskQueue:
 			if !ok {
 				return // Channel closed
 			}
-			
+
 			// Execute task
 			if err := task.Execute(p.ctx); err != nil {
 				atomic.AddInt64(&p.metrics.FailedTasks, 1)
@@ -137,7 +137,7 @@ func (p *WorkerPool) worker(id int) {
 			} else {
 				atomic.AddInt64(&p.metrics.CompletedTasks, 1)
 			}
-			
+
 		case <-p.ctx.Done():
 			return
 		}
@@ -148,14 +148,14 @@ func (p *WorkerPool) worker(id int) {
 func (p *WorkerPool) Shutdown(timeout time.Duration) error {
 	// Close task queue
 	close(p.taskQueue)
-	
+
 	// Wait for workers with timeout
 	done := make(chan struct{})
 	go func() {
 		p.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		p.logger.Info("✅ Worker pool shut down gracefully")
@@ -194,7 +194,7 @@ func NewBatchProcessor[T any](batchSize int, pool *WorkerPool) *BatchProcessor[T
 	if batchSize <= 0 {
 		batchSize = 10
 	}
-	
+
 	return &BatchProcessor[T]{
 		batchSize: batchSize,
 		pool:      pool,
@@ -207,18 +207,18 @@ func (bp *BatchProcessor[T]) Process(ctx context.Context, items []T, fn func(T) 
 	if len(items) == 0 {
 		return nil
 	}
-	
+
 	// Split into batches
 	batches := bp.splitBatches(items)
-	
+
 	// Track errors
 	var mu sync.Mutex
 	var errors []error
-	
+
 	// Submit batches
 	for batchIdx, batch := range batches {
 		batchCopy := batch // Capture loop variable
-		
+
 		task := Task{
 			ID: "batch-" + string(rune(batchIdx)),
 			Execute: func(ctx context.Context) error {
@@ -235,12 +235,12 @@ func (bp *BatchProcessor[T]) Process(ctx context.Context, items []T, fn func(T) 
 				mu.Unlock()
 			},
 		}
-		
+
 		if err := bp.pool.Submit(task); err != nil {
 			return err
 		}
 	}
-	
+
 	// Wait for completion (simplified - poll metrics)
 	total := int64(len(batches))
 	for {
@@ -249,33 +249,30 @@ func (bp *BatchProcessor[T]) Process(ctx context.Context, items []T, fn func(T) 
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
-		
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 	}
-	
+
 	if len(errors) > 0 {
 		return errors[0] // Return first error
 	}
-	
+
 	return nil
 }
 
 // splitBatches splits items into batches
 func (bp *BatchProcessor[T]) splitBatches(items []T) [][]T {
 	var batches [][]T
-	
+
 	for i := 0; i < len(items); i += bp.batchSize {
-		end := i + bp.batchSize
-		if end > len(items) {
-			end = len(items)
-		}
+		end := min(i+bp.batchSize, len(items))
 		batches = append(batches, items[i:end])
 	}
-	
+
 	return batches
 }
 
@@ -288,36 +285,34 @@ func ParallelMap[T, R any](ctx context.Context, items []T, fn func(T) (R, error)
 	if len(items) == 0 {
 		return []R{}, nil
 	}
-	
+
 	if workers <= 0 {
 		workers = 10
 	}
-	
+
 	results := make([]R, len(items))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	var firstErr error
-	
+
 	// Channel for work items
 	work := make(chan int, len(items))
 	for i := range items {
 		work <- i
 	}
 	close(work)
-	
+
 	// Start workers
 	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			
+		wg.Go(func() {
+
 			for idx := range work {
 				select {
 				case <-ctx.Done():
 					return
 				default:
 				}
-				
+
 				result, err := fn(items[idx])
 				if err != nil {
 					mu.Lock()
@@ -327,18 +322,17 @@ func ParallelMap[T, R any](ctx context.Context, items []T, fn func(T) (R, error)
 					mu.Unlock()
 					return
 				}
-				
+
 				results[idx] = result
 			}
-		}()
+		})
 	}
-	
+
 	wg.Wait()
-	
+
 	if firstErr != nil {
 		return nil, firstErr
 	}
-	
+
 	return results, nil
 }
-

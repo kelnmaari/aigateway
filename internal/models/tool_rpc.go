@@ -7,17 +7,17 @@ import "time"
 type ToolExecutionRequest struct {
 	// Unique request ID for tracking request-response pairs
 	RequestID string `json:"request_id"`
-	
+
 	// Tool name (e.g., "file.read", "file.list", "terminal.execute")
 	Tool string `json:"tool"`
-	
+
 	// Tool parameters (tool-specific structure)
-	Parameters map[string]interface{} `json:"parameters"`
-	
+	Parameters map[string]any `json:"parameters"`
+
 	// Metadata for UI and logging
 	Description string    `json:"description,omitempty"` // Human-readable description
 	Timestamp   time.Time `json:"timestamp"`             // Request timestamp
-	
+
 	// Security & Approval
 	RequiresApproval bool `json:"requires_approval"` // Does this tool require user approval?
 	IsDangerous      bool `json:"is_dangerous"`      // Is this a dangerous operation?
@@ -28,16 +28,16 @@ type ToolExecutionRequest struct {
 type ToolExecutionResponse struct {
 	// Request ID (matches ToolExecutionRequest.RequestID)
 	RequestID string `json:"request_id"`
-	
+
 	// Execution result
-	Success bool        `json:"success"`
-	Result  interface{} `json:"result,omitempty"` // Tool-specific result structure
-	Error   string      `json:"error,omitempty"`  // Error message if success=false
-	
+	Success bool   `json:"success"`
+	Result  any    `json:"result,omitempty"` // Tool-specific result structure
+	Error   string `json:"error,omitempty"`  // Error message if success=false
+
 	// Execution metadata
-	Duration    int64     `json:"duration,omitempty"`     // Execution duration in milliseconds
-	CompletedAt time.Time `json:"completed_at,omitempty"` // Completion timestamp
-	
+	Duration    int64     `json:"duration,omitempty"` // Execution duration in milliseconds
+	CompletedAt time.Time `json:"completed_at"`       // Completion timestamp
+
 	// Approval status (for dangerous tools)
 	WasApproved   bool   `json:"was_approved,omitempty"`   // Was user approval granted?
 	ApprovalError string `json:"approval_error,omitempty"` // Error during approval process
@@ -48,16 +48,16 @@ type ToolExecutionResponse struct {
 type ToolApprovalRequest struct {
 	// Request ID (matches ToolExecutionRequest.RequestID)
 	RequestID string `json:"request_id"`
-	
+
 	// Tool information
-	Tool        string                 `json:"tool"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Description string                 `json:"description"`
-	
+	Tool        string         `json:"tool"`
+	Parameters  map[string]any `json:"parameters"`
+	Description string         `json:"description"`
+
 	// Risk information
 	RiskLevel   string `json:"risk_level"`   // "low", "medium", "high"
 	RiskWarning string `json:"risk_warning"` // Human-readable warning
-	
+
 	// Timeout
 	Timeout time.Duration `json:"timeout"` // How long to wait for user response
 }
@@ -66,11 +66,11 @@ type ToolApprovalRequest struct {
 type ToolApprovalResponse struct {
 	// Request ID (matches ToolApprovalRequest.RequestID)
 	RequestID string `json:"request_id"`
-	
+
 	// User decision
 	Approved bool   `json:"approved"`
 	Reason   string `json:"reason,omitempty"` // User-provided reason (optional)
-	
+
 	// Timestamp
 	RespondedAt time.Time `json:"responded_at"`
 }
@@ -79,16 +79,16 @@ type ToolApprovalResponse struct {
 const (
 	// Server → Client: Execute tool on client machine
 	WSMessageTypeToolExecutionRequest = "tool_execution_request"
-	
+
 	// Client → Server: Tool execution result
 	WSMessageTypeToolExecutionResponse = "tool_execution_response"
-	
+
 	// Client → User: Request approval for dangerous tool
 	WSMessageTypeToolApprovalRequest = "tool_approval_request"
-	
+
 	// User → Client: Approval decision
 	WSMessageTypeToolApprovalResponse = "tool_approval_response"
-	
+
 	// Server → Client: Cancel tool execution (timeout or user cancel)
 	WSMessageTypeToolExecutionCancel = "tool_execution_cancel"
 )
@@ -97,13 +97,13 @@ const (
 type ToolExecutionStatus string
 
 const (
-	ToolExecutionStatusPending        ToolExecutionStatus = "pending"          // Waiting for client to start
+	ToolExecutionStatusPending          ToolExecutionStatus = "pending"           // Waiting for client to start
 	ToolExecutionStatusAwaitingApproval ToolExecutionStatus = "awaiting_approval" // Waiting for user approval
-	ToolExecutionStatusExecuting      ToolExecutionStatus = "executing"        // Currently executing
-	ToolExecutionStatusCompleted      ToolExecutionStatus = "completed"        // Successfully completed
-	ToolExecutionStatusFailed         ToolExecutionStatus = "failed"           // Execution failed
-	ToolExecutionStatusCancelled      ToolExecutionStatus = "cancelled"        // Cancelled by user or timeout
-	ToolExecutionStatusTimedOut       ToolExecutionStatus = "timed_out"        // Request timed out
+	ToolExecutionStatusExecuting        ToolExecutionStatus = "executing"         // Currently executing
+	ToolExecutionStatusCompleted        ToolExecutionStatus = "completed"         // Successfully completed
+	ToolExecutionStatusFailed           ToolExecutionStatus = "failed"            // Execution failed
+	ToolExecutionStatusCancelled        ToolExecutionStatus = "cancelled"         // Cancelled by user or timeout
+	ToolExecutionStatusTimedOut         ToolExecutionStatus = "timed_out"         // Request timed out
 )
 
 // FileReadParams represents parameters for file.read tool
@@ -115,11 +115,11 @@ type FileReadParams struct {
 
 // FileReadResult represents the result of file.read tool
 type FileReadResult struct {
-	Content   string `json:"content"`             // File content
-	Lines     int    `json:"lines"`               // Total number of lines
-	Size      int64  `json:"size"`                // File size in bytes
-	Path      string `json:"path"`                // Full absolute path
-	IsTruncated bool `json:"is_truncated,omitempty"` // Was content truncated?
+	Content     string `json:"content"`                // File content
+	Lines       int    `json:"lines"`                  // Total number of lines
+	Size        int64  `json:"size"`                   // File size in bytes
+	Path        string `json:"path"`                   // Full absolute path
+	IsTruncated bool   `json:"is_truncated,omitempty"` // Was content truncated?
 }
 
 // FileListParams represents parameters for file.list tool
@@ -146,8 +146,8 @@ type FileListEntry struct {
 
 // FileWriteParams represents parameters for file.write tool
 type FileWriteParams struct {
-	Path    string `json:"path"`    // Relative path from project root
-	Content string `json:"content"` // Content to write
+	Path    string `json:"path"`             // Relative path from project root
+	Content string `json:"content"`          // Content to write
 	Append  bool   `json:"append,omitempty"` // Append to file (default: false = overwrite)
 }
 
@@ -166,20 +166,20 @@ type FileDeleteParams struct {
 
 // FileDeleteResult represents the result of file.delete tool
 type FileDeleteResult struct {
-	Path    string `json:"path"`     // Full absolute path
-	Deleted bool   `json:"deleted"`  // Was deletion successful?
-	IsDir   bool   `json:"is_dir"`   // Was this a directory?
+	Path    string `json:"path"`            // Full absolute path
+	Deleted bool   `json:"deleted"`         // Was deletion successful?
+	IsDir   bool   `json:"is_dir"`          // Was this a directory?
 	Count   int    `json:"count,omitempty"` // Number of items deleted (if recursive)
 }
 
 // TerminalExecuteParams represents parameters for terminal.execute tool
 type TerminalExecuteParams struct {
-	Command     string            `json:"command"`                // Command to execute
-	Args        []string          `json:"args,omitempty"`         // Command arguments
-	WorkingDir  string            `json:"working_dir,omitempty"`  // Working directory (relative to project root)
-	Env         map[string]string `json:"env,omitempty"`          // Environment variables
-	Timeout     int               `json:"timeout,omitempty"`      // Timeout in seconds (default: 30)
-	CaptureOutput bool            `json:"capture_output,omitempty"` // Capture stdout/stderr (default: true)
+	Command       string            `json:"command"`                  // Command to execute
+	Args          []string          `json:"args,omitempty"`           // Command arguments
+	WorkingDir    string            `json:"working_dir,omitempty"`    // Working directory (relative to project root)
+	Env           map[string]string `json:"env,omitempty"`            // Environment variables
+	Timeout       int               `json:"timeout,omitempty"`        // Timeout in seconds (default: 30)
+	CaptureOutput bool              `json:"capture_output,omitempty"` // Capture stdout/stderr (default: true)
 }
 
 // TerminalExecuteResult represents the result of terminal.execute tool
@@ -192,4 +192,3 @@ type TerminalExecuteResult struct {
 	TimedOut   bool   `json:"timed_out,omitempty"`   // Did execution time out?
 	WorkingDir string `json:"working_dir,omitempty"` // Working directory used
 }
-

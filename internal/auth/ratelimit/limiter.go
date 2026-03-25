@@ -33,7 +33,7 @@ type Limiter struct {
 	// Cleanup ticker
 	cleanupTicker *time.Ticker
 	stopCleanup   chan struct{}
-	
+
 	// Redis для distributed rate limiting (v3.0.6+)
 	redisService RedisRateLimitService
 }
@@ -79,7 +79,7 @@ type RateLimitResult struct {
 	Reason     string        `json:"reason,omitempty"`
 	RetryAfter time.Duration `json:"retry_after,omitempty"`
 	Remaining  int64         `json:"remaining,omitempty"`
-	ResetTime  time.Time     `json:"reset_time,omitempty"`
+	ResetTime  time.Time     `json:"reset_time"`
 }
 
 // SetRedisService sets Redis service for distributed rate limiting (v3.0.6+)
@@ -111,16 +111,16 @@ func (l *Limiter) CheckRateLimit(ctx context.Context, keyID string, keyInfo *mod
 	if !l.enabled {
 		return &RateLimitResult{Allowed: true}
 	}
-	
+
 	// Use Redis if available (v3.0.6+: distributed rate limiting)
 	if l.redisService != nil && keyInfo != nil {
 		// Check per-minute limit in Redis
 		redisKey := fmt.Sprintf("apikey:%s:requests:minute", keyID)
-		
+
 		// Get limit from config (default or keyInfo override)
 		limit := int64(l.config.Auth.RateLimiting.DefaultRequestsPerMinute)
 		window := time.Minute
-		
+
 		if limit > 0 {
 			allowed, remaining, resetAt, err := l.redisService.CheckLimit(ctx, redisKey, limit, window)
 			if err != nil {
@@ -135,7 +135,7 @@ func (l *Limiter) CheckRateLimit(ctx context.Context, keyID string, keyInfo *mod
 					"limit":     limit,
 					"window":    "1m",
 				}).Debug("Rate limit checked (Redis)")
-				
+
 				if !allowed {
 					return &RateLimitResult{
 						Allowed:    false,
@@ -145,7 +145,7 @@ func (l *Limiter) CheckRateLimit(ctx context.Context, keyID string, keyInfo *mod
 						ResetTime:  resetAt,
 					}
 				}
-				
+
 				return &RateLimitResult{
 					Allowed:   true,
 					Remaining: remaining,
@@ -488,4 +488,3 @@ func (tbc *TokenBucketCounter) GetRemaining() int64 {
 
 	return tbc.tokens
 }
-

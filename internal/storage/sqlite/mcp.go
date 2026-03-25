@@ -173,7 +173,7 @@ func (s *SQLiteDB) ListMCPServers(ctx context.Context, req models.MCPServerListR
 	`
 	countQuery := `SELECT COUNT(*) FROM mcp_servers WHERE 1=1`
 
-	var args []interface{}
+	var args []any
 	var filters string
 
 	// Apply filters
@@ -277,4 +277,3 @@ func (s *SQLiteDB) ListMCPServers(ctx context.Context, req models.MCPServerListR
 		Offset:  offset,
 	}, nil
 }
-

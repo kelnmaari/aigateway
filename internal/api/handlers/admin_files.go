@@ -10,7 +10,6 @@ import (
 	"aigateway/internal/filestorage"
 	"aigateway/internal/models"
 	"aigateway/internal/storage"
-	"aigateway/internal/utils"
 )
 
 // AdminFilesHandler обрабатывает административные операции с файлами (v1.10.0+)
@@ -115,8 +114,8 @@ func (h *AdminFilesHandler) DeleteFile(c *gin.Context) {
 		FileID:    fileID,
 		UserID:    &adminID,
 		Action:    "admin_delete",
-		IPAddress: utils.Ptr(c.ClientIP()),
-		UserAgent: utils.Ptr(c.Request.UserAgent()),
+		IPAddress: new(c.ClientIP()),
+		UserAgent: new(c.Request.UserAgent()),
 	})
 
 	h.logger.WithFields(logrus.Fields{

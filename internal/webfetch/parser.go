@@ -118,7 +118,7 @@ func (p *HTMLParser) cleanText(text string) string {
 // extractMetadata извлекает метаданные из HTML
 func (p *HTMLParser) extractMetadata(doc *goquery.Document) *PageMetadata {
 	meta := &PageMetadata{
-		StructuredData: make(map[string]interface{}),
+		StructuredData: make(map[string]any),
 	}
 
 	// Meta tags
@@ -191,4 +191,3 @@ func (p *HTMLParser) extractMetadata(doc *goquery.Document) *PageMetadata {
 
 	return meta
 }
-

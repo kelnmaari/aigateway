@@ -68,7 +68,7 @@ type GenericClaims struct {
 	StandardClaims
 
 	// Custom claims - flexible map for provider-specific claims
-	Custom map[string]interface{} `json:"-"`
+	Custom map[string]any `json:"-"`
 
 	// Groups - can be in different formats depending on provider
 	Groups []string `json:"groups,omitempty"`
@@ -102,5 +102,3 @@ type UserInfo struct {
 	// Metadata
 	UpdatedAt *time.Time
 }
-
-

@@ -16,12 +16,12 @@ import (
 type Tool interface {
 	// GetInfo returns tool metadata
 	GetInfo() models.AgentTool
-	
+
 	// Execute runs the tool with given parameters
-	Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error)
-	
+	Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error)
+
 	// Validate checks if parameters are valid for this tool
-	Validate(params map[string]interface{}) error
+	Validate(params map[string]any) error
 }
 
 // Registry manages available tools for agent
@@ -42,21 +42,21 @@ func NewRegistry(logger *logrus.Logger) *Registry {
 // Register registers a new tool
 func (r *Registry) Register(tool Tool) error {
 	info := tool.GetInfo()
-	
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if _, exists := r.tools[info.Name]; exists {
 		return fmt.Errorf("tool already registered: %s", info.Name)
 	}
-	
+
 	r.tools[info.Name] = tool
 	r.logger.WithFields(logrus.Fields{
-		"tool":     info.Name,
-		"category": info.Category,
+		"tool":      info.Name,
+		"category":  info.Category,
 		"dangerous": info.Dangerous,
 	}).Debug("Tool registered")
-	
+
 	return nil
 }
 
@@ -64,14 +64,14 @@ func (r *Registry) Register(tool Tool) error {
 func (r *Registry) Unregister(toolName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if _, exists := r.tools[toolName]; !exists {
 		return fmt.Errorf("tool not found: %s", toolName)
 	}
-	
+
 	delete(r.tools, toolName)
 	r.logger.WithField("tool", toolName).Debug("Tool unregistered")
-	
+
 	return nil
 }
 
@@ -79,12 +79,12 @@ func (r *Registry) Unregister(toolName string) error {
 func (r *Registry) Get(toolName string) (Tool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tool, exists := r.tools[toolName]
 	if !exists {
 		return nil, fmt.Errorf("tool not found: %s", toolName)
 	}
-	
+
 	return tool, nil
 }
 
@@ -92,12 +92,12 @@ func (r *Registry) Get(toolName string) (Tool, error) {
 func (r *Registry) List() []models.AgentTool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tools := make([]models.AgentTool, 0, len(r.tools))
 	for _, tool := range r.tools {
 		tools = append(tools, tool.GetInfo())
 	}
-	
+
 	return tools
 }
 
@@ -105,7 +105,7 @@ func (r *Registry) List() []models.AgentTool {
 func (r *Registry) ListByCategory(category models.AgentToolCategory) []models.AgentTool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tools := make([]models.AgentTool, 0)
 	for _, tool := range r.tools {
 		info := tool.GetInfo()
@@ -113,45 +113,45 @@ func (r *Registry) ListByCategory(category models.AgentToolCategory) []models.Ag
 			tools = append(tools, info)
 		}
 	}
-	
+
 	return tools
 }
 
 // Execute executes a tool with given parameters
-func (r *Registry) Execute(ctx context.Context, toolName string, params map[string]interface{}, timeout time.Duration) (*models.AgentStepResult, error) {
+func (r *Registry) Execute(ctx context.Context, toolName string, params map[string]any, timeout time.Duration) (*models.AgentStepResult, error) {
 	tool, err := r.Get(toolName)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Validate parameters
 	if err := tool.Validate(params); err != nil {
 		return nil, fmt.Errorf("parameter validation failed: %w", err)
 	}
-	
+
 	// Create execution context with timeout
 	execCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	
+
 	// Execute tool
 	startTime := time.Now()
-	
+
 	r.logger.WithFields(logrus.Fields{
 		"tool":    toolName,
 		"timeout": timeout,
 	}).Debug("Executing tool")
-	
+
 	result, err := tool.Execute(execCtx, params)
-	
+
 	duration := time.Since(startTime)
-	
+
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"tool":     toolName,
 			"duration": duration,
 			"error":    err,
 		}).Error("Tool execution failed")
-		
+
 		errMsg := err.Error()
 		return &models.AgentStepResult{
 			Success:  false,
@@ -159,18 +159,18 @@ func (r *Registry) Execute(ctx context.Context, toolName string, params map[stri
 			Duration: int(duration.Milliseconds()),
 		}, nil // Return result with error, not execution error
 	}
-	
+
 	// Update duration if not set
 	if result.Duration == 0 {
 		result.Duration = int(duration.Milliseconds())
 	}
-	
+
 	r.logger.WithFields(logrus.Fields{
 		"tool":     toolName,
 		"duration": duration,
 		"success":  result.Success,
 	}).Debug("Tool execution completed")
-	
+
 	return result, nil
 }
 
@@ -178,12 +178,12 @@ func (r *Registry) Execute(ctx context.Context, toolName string, params map[stri
 func (r *Registry) IsAvailable(toolName string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tool, exists := r.tools[toolName]
 	if !exists {
 		return false
 	}
-	
+
 	return tool.GetInfo().Available
 }
 
@@ -191,7 +191,6 @@ func (r *Registry) IsAvailable(toolName string) bool {
 func (r *Registry) Count() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	return len(r.tools)
 }
-

@@ -552,7 +552,7 @@ func (g *Generator) buildSummary(graph Graph) ScanSummary {
 }
 
 func (g *Generator) callLLM(ctx context.Context, modelID, prompt string) (string, int, error) {
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
@@ -656,9 +656,9 @@ func detectLanguage(filePath string) string {
 
 func extractImports(content, language string) []string {
 	var imports []string
-	lines := strings.Split(content, "\n")
+	lines := strings.SplitSeq(content, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		switch language {
 		case "go":
@@ -696,9 +696,9 @@ func extractImports(content, language string) []string {
 
 func extractFunctions(content, language string) []string {
 	var functions []string
-	lines := strings.Split(content, "\n")
+	lines := strings.SplitSeq(content, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		switch language {
 		case "go":
@@ -771,11 +771,3 @@ func extractMermaidCode(response string) string {
 	// Return as-is if no code block found
 	return strings.TrimSpace(response)
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-

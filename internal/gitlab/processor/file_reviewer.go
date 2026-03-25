@@ -121,7 +121,7 @@ func (r *PerFileReviewer) ReviewFiles(
 	for result := range results {
 		fileResults = append(fileResults, result)
 		totalTokens += result.TokensUsed
-		
+
 		if result.Error != nil {
 			r.logger.WithError(result.Error).WithField("file", result.FilePath).Warn("File review failed")
 		} else {
@@ -135,7 +135,7 @@ func (r *PerFileReviewer) ReviewFiles(
 
 	// Aggregate results
 	aggregated := r.aggregateResults(fileResults)
-	
+
 	r.logger.WithFields(logrus.Fields{
 		"total_files":   len(diffs),
 		"total_issues":  len(aggregated.Issues),
@@ -159,9 +159,9 @@ func (r *PerFileReviewer) reviewSingleFile(
 
 	// Build initial prompt for single file
 	prompt := r.buildFilePrompt(diff)
-	
+
 	// Messages for conversation
-	messages := []map[string]interface{}{
+	messages := []map[string]any{
 		{"role": "system", "content": r.getFileReviewSystemPrompt()},
 		{"role": "user", "content": prompt},
 	}
@@ -170,11 +170,11 @@ func (r *PerFileReviewer) reviewSingleFile(
 	// Track previous queries to detect loops
 	var finalResponse string
 	seenQueries := make(map[string]int)
-	
-	for i := 0; i < DefaultMaxToolIterations; i++ {
+
+	for i := range DefaultMaxToolIterations {
 		response, toolCalls, tokens, err := r.callLLM(ctx, modelID, messages)
 		result.TokensUsed += tokens
-		
+
 		if err != nil {
 			result.Error = err
 			return result
@@ -195,11 +195,11 @@ func (r *PerFileReviewer) reviewSingleFile(
 				allRepeated = false
 			}
 		}
-		
+
 		if allRepeated {
 			r.logger.WithField("file", diff.NewPath).Warn("Detected tool call loop, forcing final response")
 			// Add message telling model to give final answer
-			messages = append(messages, map[string]interface{}{
+			messages = append(messages, map[string]any{
 				"role":    "user",
 				"content": "You've already searched for this. Please provide your final review as JSON now.",
 			})
@@ -213,7 +213,7 @@ func (r *PerFileReviewer) reviewSingleFile(
 		}).Debug("Processing tool calls")
 
 		// Add assistant message with tool calls
-		messages = append(messages, map[string]interface{}{
+		messages = append(messages, map[string]any{
 			"role":       "assistant",
 			"content":    response,
 			"tool_calls": toolCalls,
@@ -230,7 +230,7 @@ func (r *PerFileReviewer) reviewSingleFile(
 					Content:    fmt.Sprintf("Error: %v", err),
 				}
 			}
-			messages = append(messages, map[string]interface{}{
+			messages = append(messages, map[string]any{
 				"role":         "tool",
 				"tool_call_id": toolResult.ToolCallID,
 				"content":      toolResult.Content,
@@ -252,7 +252,7 @@ func (r *PerFileReviewer) reviewSingleFile(
 			"response_len": len(finalResponse),
 			"response":     truncateString(finalResponse, 500),
 		}).Warn("Failed to parse file review response")
-		
+
 		result.Error = fmt.Errorf("parse response: %w", err)
 		result.Summary = "[Parse error] " + truncateString(finalResponse, 200)
 		result.Score = 50
@@ -271,9 +271,9 @@ func (r *PerFileReviewer) reviewSingleFile(
 func (r *PerFileReviewer) callLLM(
 	ctx context.Context,
 	modelID string,
-	messages []map[string]interface{},
+	messages []map[string]any,
 ) (string, []ToolCall, int, error) {
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"model":       modelID,
 		"messages":    messages,
 		"tools":       r.tools.GetToolDefinitions(),
@@ -345,14 +345,14 @@ func (r *PerFileReviewer) buildFilePrompt(diff client.Diff) string {
 	sb.WriteString("```diff\n")
 	sb.WriteString(diff.Diff)
 	sb.WriteString("\n```\n\n")
-	
+
 	sb.WriteString(`If you need to understand how functions or types are used elsewhere in the codebase, 
 use the available tools to search for related code before making your review.
 
 After gathering necessary context, provide your review as JSON:`)
-	
+
 	sb.WriteString(r.getResponseFormat(diff.NewPath))
-	
+
 	return sb.String()
 }
 
@@ -361,7 +361,7 @@ func (r *PerFileReviewer) getFileReviewSystemPrompt() string {
 	if r.reviewLanguage == "ru" {
 		langInstruction = "Пиши весь текст (summary, messages, suggestions) на русском языке."
 	}
-	
+
 	return fmt.Sprintf(`You are an expert code reviewer. Your task is to review code changes and output ONLY valid JSON.
 
 ## Language
@@ -446,19 +446,19 @@ func (r *PerFileReviewer) aggregateResults(results []FileReviewResult) *analyzer
 			totalScore += res.Score
 			reviewedCount++
 		}
-		
+
 		// ALWAYS set file path from the reviewed file (model often ignores instructions)
 		for _, issue := range res.Issues {
 			issue.FilePath = res.FilePath // Force file path
 			allIssues = append(allIssues, issue)
 		}
-		
+
 		// ALWAYS set file path for suggestions too
 		for _, sug := range res.Suggestions {
 			sug.FilePath = res.FilePath // Force file path
 			allSuggestions = append(allSuggestions, sug)
 		}
-		
+
 		if res.Summary != "" {
 			summaries = append(summaries, fmt.Sprintf("**%s**: %s", res.FilePath, res.Summary))
 		}
@@ -490,4 +490,3 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
-

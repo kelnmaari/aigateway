@@ -1,6 +1,8 @@
 // Package analyzer provides language-specific prompts for code review
 package analyzer
 
+import "slices"
+
 import "strings"
 
 // LanguagePrompt contains language-specific review instructions
@@ -31,16 +33,14 @@ func NewLanguagePromptManager() *LanguagePromptManager {
 // GetPromptForFile returns the appropriate prompt for a file
 func (m *LanguagePromptManager) GetPromptForFile(filename string) *LanguagePrompt {
 	ext := getFileExtension(filename)
-	
+
 	// Check for exact extension match
 	for _, prompt := range m.prompts {
-		for _, e := range prompt.Extensions {
-			if e == ext {
-				return prompt
-			}
+		if slices.Contains(prompt.Extensions, ext) {
+			return prompt
 		}
 	}
-	
+
 	return m.prompts["generic"]
 }
 
@@ -61,27 +61,27 @@ func (m *LanguagePromptManager) SetCustomPrompt(language, prompt string) {
 // GetInstructions returns combined instructions for a language
 func (m *LanguagePromptManager) GetInstructions(language string) string {
 	lang := strings.ToLower(language)
-	
+
 	// Check for custom override first
 	if custom, ok := m.customPrompts[lang]; ok {
 		return custom
 	}
-	
+
 	prompt := m.GetPromptForLanguage(language)
 	if prompt == nil {
 		return ""
 	}
-	
+
 	return prompt.Instructions
 }
 
 // BuildReviewPrompt builds a complete review prompt for given languages
 func (m *LanguagePromptManager) BuildReviewPrompt(languages []string, basePrompt string) string {
 	var sb strings.Builder
-	
+
 	sb.WriteString(basePrompt)
 	sb.WriteString("\n\n## Language-Specific Guidelines\n\n")
-	
+
 	seen := make(map[string]bool)
 	for _, lang := range languages {
 		lang = strings.ToLower(lang)
@@ -89,7 +89,7 @@ func (m *LanguagePromptManager) BuildReviewPrompt(languages []string, basePrompt
 			continue
 		}
 		seen[lang] = true
-		
+
 		prompt := m.GetPromptForLanguage(lang)
 		if prompt != nil && prompt.Instructions != "" {
 			sb.WriteString("### ")
@@ -99,7 +99,7 @@ func (m *LanguagePromptManager) BuildReviewPrompt(languages []string, basePrompt
 			sb.WriteString("\n\n")
 		}
 	}
-	
+
 	return sb.String()
 }
 
@@ -127,7 +127,7 @@ func (m *LanguagePromptManager) loadDefaultPrompts() {
 		},
 		Patterns: []string{
 			"_ = someFunction()", // ignored error
-			"go func()", // potential goroutine leak
+			"go func()",          // potential goroutine leak
 		},
 	}
 
@@ -404,7 +404,7 @@ func getFileExtension(filename string) string {
 	if strings.Contains(filename, "Dockerfile") {
 		return "Dockerfile"
 	}
-	
+
 	idx := strings.LastIndex(filename, ".")
 	if idx == -1 {
 		return ""
@@ -415,37 +415,37 @@ func getFileExtension(filename string) string {
 // DetectLanguage detects the primary language from a list of files
 func DetectLanguage(files []string) string {
 	counts := make(map[string]int)
-	
+
 	extToLang := map[string]string{
-		".go":         "go",
-		".ts":         "typescript",
-		".tsx":        "typescript",
-		".js":         "javascript",
-		".jsx":        "javascript",
-		".py":         "python",
-		".rs":         "rust",
-		".java":       "java",
-		".cpp":        "cpp",
-		".cc":         "cpp",
-		".c":          "c",
-		".h":          "cpp",
-		".hpp":        "cpp",
-		".sql":        "sql",
-		".sh":         "shell",
-		".bash":       "shell",
-		".yml":        "yaml",
-		".yaml":       "yaml",
-		".tf":         "terraform",
-		"Dockerfile":  "dockerfile",
+		".go":        "go",
+		".ts":        "typescript",
+		".tsx":       "typescript",
+		".js":        "javascript",
+		".jsx":       "javascript",
+		".py":        "python",
+		".rs":        "rust",
+		".java":      "java",
+		".cpp":       "cpp",
+		".cc":        "cpp",
+		".c":         "c",
+		".h":         "cpp",
+		".hpp":       "cpp",
+		".sql":       "sql",
+		".sh":        "shell",
+		".bash":      "shell",
+		".yml":       "yaml",
+		".yaml":      "yaml",
+		".tf":        "terraform",
+		"Dockerfile": "dockerfile",
 	}
-	
+
 	for _, file := range files {
 		ext := getFileExtension(file)
 		if lang, ok := extToLang[ext]; ok {
 			counts[lang]++
 		}
 	}
-	
+
 	// Find most common language
 	maxCount := 0
 	maxLang := "generic"
@@ -455,7 +455,7 @@ func DetectLanguage(files []string) string {
 			maxLang = lang
 		}
 	}
-	
+
 	return maxLang
 }
 
@@ -463,30 +463,30 @@ func DetectLanguage(files []string) string {
 func GetAllLanguages(files []string) []string {
 	seen := make(map[string]bool)
 	var languages []string
-	
+
 	extToLang := map[string]string{
-		".go":         "go",
-		".ts":         "typescript",
-		".tsx":        "typescript",
-		".js":         "javascript",
-		".jsx":        "javascript",
-		".py":         "python",
-		".rs":         "rust",
-		".java":       "java",
-		".cpp":        "cpp",
-		".cc":         "cpp",
-		".c":          "c",
-		".h":          "cpp",
-		".hpp":        "cpp",
-		".sql":        "sql",
-		".sh":         "shell",
-		".bash":       "shell",
-		".yml":        "yaml",
-		".yaml":       "yaml",
-		".tf":         "terraform",
-		"Dockerfile":  "dockerfile",
+		".go":        "go",
+		".ts":        "typescript",
+		".tsx":       "typescript",
+		".js":        "javascript",
+		".jsx":       "javascript",
+		".py":        "python",
+		".rs":        "rust",
+		".java":      "java",
+		".cpp":       "cpp",
+		".cc":        "cpp",
+		".c":         "c",
+		".h":         "cpp",
+		".hpp":       "cpp",
+		".sql":       "sql",
+		".sh":        "shell",
+		".bash":      "shell",
+		".yml":       "yaml",
+		".yaml":      "yaml",
+		".tf":        "terraform",
+		"Dockerfile": "dockerfile",
 	}
-	
+
 	for _, file := range files {
 		ext := getFileExtension(file)
 		if lang, ok := extToLang[ext]; ok {
@@ -496,7 +496,6 @@ func GetAllLanguages(files []string) []string {
 			}
 		}
 	}
-	
+
 	return languages
 }
-

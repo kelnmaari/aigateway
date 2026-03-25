@@ -4,6 +4,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"time"
 
 	"aigateway/internal/gitlab/jobs"
@@ -92,10 +93,8 @@ func (h *GitLabJobSubmitHandler) canAccessProject(c *gin.Context, project *model
 	// Check tenant membership
 	if tids, exists := c.Get("tenant_ids"); exists {
 		if ids, ok := tids.([]string); ok {
-			for _, tid := range ids {
-				if integration.TenantID == tid {
-					return true
-				}
+			if slices.Contains(ids, integration.TenantID) {
+				return true
 			}
 		}
 	}

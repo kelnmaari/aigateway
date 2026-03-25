@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 )
 
 // State представляет состояние circuit breaker
@@ -63,7 +62,7 @@ type Stats struct {
 }
 
 // Operation представляет операцию для выполнения через circuit breaker
-type Operation func(ctx context.Context) (interface{}, error)
+type Operation func(ctx context.Context) (any, error)
 
 // NewBreaker создает новый circuit breaker
 func NewBreaker(name string, maxFailures int, resetTimeout time.Duration, logger *logrus.Logger) *Breaker {
@@ -96,7 +95,7 @@ func NewBreaker(name string, maxFailures int, resetTimeout time.Duration, logger
 }
 
 // Execute выполняет операцию через circuit breaker
-func (b *Breaker) Execute(ctx context.Context, operation Operation) (interface{}, error) {
+func (b *Breaker) Execute(ctx context.Context, operation Operation) (any, error) {
 	// Проверяем можем ли выполнить операцию
 	if err := b.allowRequest(); err != nil {
 		return nil, err
@@ -352,4 +351,3 @@ func (m *Manager) ResetAll() {
 		m.logger.WithField("breaker", name).Info("Circuit breaker reset")
 	}
 }
-

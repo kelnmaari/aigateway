@@ -37,10 +37,7 @@ func PrometheusMetrics() gin.HandlerFunc {
 		duration := time.Since(start)
 
 		// Получаем размер ответа
-		responseSize := c.Writer.Size()
-		if responseSize < 0 {
-			responseSize = 0
-		}
+		responseSize := max(c.Writer.Size(), 0)
 
 		// Записываем метрики
 		metrics.DefaultMetrics.RecordHTTPRequest(
@@ -59,4 +56,3 @@ func PrometheusMetrics() gin.HandlerFunc {
 		}
 	}
 }
-

@@ -79,7 +79,7 @@ func TestPerformance_RateLimiting_MultipleKeys(t *testing.T) {
 
 		// Создаем несколько ключей с разными лимитами
 		keys := make([]*models.CreateAPIKeyResponse, 5)
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			req := models.CreateAPIKeyRequest{
 				Name:        "Performance Test Key",
 				Description: "Performance test",
@@ -110,7 +110,7 @@ func TestPerformance_RateLimiting_MultipleKeys(t *testing.T) {
 			go func(apiKey *models.APIKeyPublic, idx int) {
 				defer wg.Done()
 
-				for j := 0; j < requestsPerKey; j++ {
+				for range requestsPerKey {
 					result := limiter.CheckRateLimit(ctx, apiKey.ID, apiKey, 0)
 
 					mu.Lock()
@@ -165,7 +165,7 @@ func TestPerformance_RateLimiting_MultipleKeys(t *testing.T) {
 		rateLimitedCount := 0
 
 		start := time.Now()
-		for i := 0; i < burstSize; i++ {
+		for range burstSize {
 			result := limiter.CheckRateLimit(ctx, key.APIKey.ID, &key.APIKey, 0)
 			if result.Allowed {
 				successCount++
@@ -286,12 +286,10 @@ func TestPerformance_RateLimiting_HighConcurrency(t *testing.T) {
 
 		start := time.Now()
 
-		for i := 0; i < goroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range goroutines {
+			wg.Go(func() {
 
-				for j := 0; j < requestsPerGoroutine; j++ {
+				for range requestsPerGoroutine {
 					result := limiter.CheckRateLimit(ctx, key.APIKey.ID, &key.APIKey, 0)
 
 					mu.Lock()
@@ -302,7 +300,7 @@ func TestPerformance_RateLimiting_HighConcurrency(t *testing.T) {
 					}
 					mu.Unlock()
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -355,12 +353,10 @@ func TestPerformance_RateLimiting_HighConcurrency(t *testing.T) {
 
 		start := time.Now()
 
-		for i := 0; i < goroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range goroutines {
+			wg.Go(func() {
 
-				for j := 0; j < iterationsPerGoroutine; j++ {
+				for range iterationsPerGoroutine {
 					// Валидируем ключ
 					result, err := manager.ValidateAPIKey(ctx, key.PlainKey)
 					if err != nil || !result.Valid {
@@ -381,7 +377,7 @@ func TestPerformance_RateLimiting_HighConcurrency(t *testing.T) {
 					}
 					mu.Unlock()
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -418,7 +414,7 @@ func TestPerformance_APIKeyOperations(t *testing.T) {
 		keyCount := 50
 		start := time.Now()
 
-		for i := 0; i < keyCount; i++ {
+		for range keyCount {
 			req := models.CreateAPIKeyRequest{
 				Name:        "Batch Key",
 				Description: "Batch creation test",
@@ -445,7 +441,7 @@ func TestPerformance_APIKeyOperations(t *testing.T) {
 		manager, ctx := setupPerformanceTestManager(t)
 
 		// Создаем несколько ключей
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			req := models.CreateAPIKeyRequest{
 				Name:        "List Test Key",
 				Description: "List test",
@@ -464,10 +460,8 @@ func TestPerformance_APIKeyOperations(t *testing.T) {
 
 		start := time.Now()
 
-		for i := 0; i < goroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range goroutines {
+			wg.Go(func() {
 
 				listReq := models.ListAPIKeysRequest{
 					Limit:  100,
@@ -479,7 +473,7 @@ func TestPerformance_APIKeyOperations(t *testing.T) {
 					errors++
 					mu.Unlock()
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -550,4 +544,3 @@ func BenchmarkAPIKeyValidation_Parallel(b *testing.B) {
 		}
 	})
 }
-

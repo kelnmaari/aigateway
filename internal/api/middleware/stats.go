@@ -2,6 +2,7 @@
 package middleware
 
 import (
+	"slices"
 	"time"
 
 	"aigateway/internal/api/handlers"
@@ -14,11 +15,9 @@ func StatsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Пропускаем health checks и stats эндпоинт
 		skipPaths := []string{"/health", "/healthz", "/ready", "/api/stats"}
-		for _, path := range skipPaths {
-			if c.Request.URL.Path == path {
-				c.Next()
-				return
-			}
+		if slices.Contains(skipPaths, c.Request.URL.Path) {
+			c.Next()
+			return
 		}
 
 		// Увеличиваем счетчики
@@ -47,4 +46,3 @@ func StatsMiddleware() gin.HandlerFunc {
 		}
 	}
 }
-

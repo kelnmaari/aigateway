@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -630,13 +631,7 @@ func (h *GitLabAdminHandler) ListAvailableModels(c *gin.Context) {
 			continue
 		}
 
-		isEmbedding := false
-		for _, cap := range inst.Spec.Capabilities {
-			if cap == "embeddings" {
-				isEmbedding = true
-				break
-			}
-		}
+		isEmbedding := slices.Contains(inst.Spec.Capabilities, "embeddings")
 
 		if analysisOnly && isEmbedding {
 			continue
@@ -663,13 +658,7 @@ func (h *GitLabAdminHandler) ListAvailableModels(c *gin.Context) {
 				continue
 			}
 
-			isEmbedding := false
-			for _, cap := range saved.Capabilities {
-				if cap == "embeddings" {
-					isEmbedding = true
-					break
-				}
-			}
+			isEmbedding := slices.Contains(saved.Capabilities, "embeddings")
 
 			if analysisOnly && isEmbedding {
 				continue
@@ -1106,7 +1095,7 @@ func getBlockingReason(projects []models.GitLabProjectRef) string {
 }
 
 // SerializeJSON serializes data to JSON string
-func SerializeJSON(data interface{}) string {
+func SerializeJSON(data any) string {
 	b, _ := json.Marshal(data)
 	return string(b)
 }
@@ -1289,7 +1278,7 @@ func (h *GitLabAdminHandler) GetSettings(c *gin.Context) {
 
 // UpdateSettings PUT /api/admin/gitlab/settings
 func (h *GitLabAdminHandler) UpdateSettings(c *gin.Context) {
-	var req map[string]interface{}
+	var req map[string]any
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

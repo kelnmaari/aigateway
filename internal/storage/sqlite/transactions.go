@@ -290,7 +290,7 @@ func (tx *sqliteTx) ListUserTenants(ctx context.Context, userID string) ([]*mode
 // ========================================
 
 func (tx *sqliteTx) AddTenantMember(ctx context.Context, member *models.TenantMember) error {
-	tx.logger.WithFields(map[string]interface{}{
+	tx.logger.WithFields(map[string]any{
 		"tenant_id": member.TenantID,
 		"user_id":   member.UserID,
 		"role":      member.Role,

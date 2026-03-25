@@ -25,8 +25,8 @@ import (
 	"aigateway/internal/logger"
 	"aigateway/internal/metrics"
 	"aigateway/internal/observability"
-	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/rag/embeddings"
+	ragorchestrator "aigateway/internal/rag/orchestrator"
 	"aigateway/internal/rag/vector"
 	ragworker "aigateway/internal/rag/worker"
 	ragservice "aigateway/internal/services/rag"
@@ -163,14 +163,14 @@ func main() {
 			handleSettingsCommands(ctx, db, cfg, appLogger, *migrateConfig, *exportConfig, *validateConfig, *importConfig, *deleteSettings, *generateBootstrap, *categoryFilter, *dryRun, *diffMode, *exportFormat, *forceDelete)
 			os.Exit(0)
 		}
-		
+
 		// v3.1.0: Initialize Settings Manager для hybrid config mode
 		settingsStorage := settings.NewSQLStorageAdapter(db, appLogger)
 		settingsManager = settings.NewManager(
 			settingsStorage,
 			appLogger,
 		)
-		
+
 		// Seed settings из YAML если БД пустая (first run)
 		seeder := settings.NewConfigSeeder(settingsStorage, appLogger)
 		if count, err := seeder.SeedFromYAML(ctx, cfg); err != nil {
@@ -178,7 +178,7 @@ func main() {
 		} else if count > 0 {
 			appLogger.WithField("count", count).Info("Settings seeded from YAML config")
 		}
-		
+
 		// Register reload handlers для hot-reload settings
 		rawDB := extractRawDB(db)
 		if rawDB != nil {
@@ -186,7 +186,7 @@ func main() {
 			appLogger.Info("Live reload handlers registered successfully")
 			_ = reloadRegistry // Keep reference to prevent GC
 		}
-		
+
 		// Create HybridConfigSource (v3.1.0)
 		cfgNew, configSource, err := config.LoadWithSettings(*configPath, settingsManager, appLogger)
 		if err != nil {
@@ -195,7 +195,7 @@ func main() {
 		} else {
 			cfg = cfgNew // Replace with new config
 			configWrapper = config.NewConfigWrapper(cfg, configSource, appLogger)
-			
+
 			if configWrapper.IsBootstrapMode() {
 				appLogger.Info("✨ Running in BOOTSTRAP mode - database-first configuration")
 				fmt.Println("✨ Bootstrap mode active: settings loaded from database")
@@ -206,7 +206,7 @@ func main() {
 		}
 	} else {
 		appLogger.Info("Database not configured, skipping initialization")
-		
+
 		// Legacy mode без БД
 		configWrapper = config.NewConfigWrapper(cfg, nil, appLogger)
 
@@ -270,7 +270,7 @@ func main() {
 			}
 		}()
 
-		appLogger.WithFields(map[string]interface{}{
+		appLogger.WithFields(map[string]any{
 			"provider":      cfg.Observability.Tracing.Provider,
 			"endpoint":      endpoint,
 			"sampling_rate": cfg.Observability.Tracing.SamplingRate,
@@ -318,7 +318,7 @@ func main() {
 
 		// Note: perfMonitor.Stop() called explicitly in shutdown section
 
-		appLogger.WithFields(map[string]interface{}{
+		appLogger.WithFields(map[string]any{
 			"collection_interval":    collectionInterval,
 			"memory_threshold_mb":    cfg.Observability.Performance.MemoryThresholdMB,
 			"goroutine_threshold":    cfg.Observability.Performance.GoroutineThreshold,
@@ -412,14 +412,14 @@ func main() {
 
 		// Note: customMetrics.Stop() called explicitly in shutdown section
 
-		appLogger.WithFields(map[string]interface{}{
+		appLogger.WithFields(map[string]any{
 			"service_name": "Ollama-OpenAI-Proxy",
 			"monigo_port":  monigoPort,
 			"proxy_path":   "/admin/performance",
 		}).Info("✅ MoniGo Performance Dashboard initialized successfully")
 		fmt.Printf("📊 MoniGo Dashboard: http://localhost:%d (metrics API proxy: /admin/performance/monigo/api/v1/metrics)\n", monigoPort)
 	} else {
-		appLogger.WithFields(map[string]interface{}{
+		appLogger.WithFields(map[string]any{
 			"db_initialized":  db != nil,
 			"jwt_initialized": jwtManager != nil,
 		}).Warn("MoniGo Performance Dashboard NOT initialized - missing dependencies")
@@ -429,7 +429,7 @@ func main() {
 	// Инициализация RAG Data Source Service (Version 1.13.1+)
 	var ragDataSourceService *ragservice.DataSourceService
 	var ragOrchestrator *ragorchestrator.RAGOrchestrator
-	var ragWorker *ragworker.RAGWorker      // Объявляем на верхнем уровне для graceful shutdown
+	var ragWorker *ragworker.RAGWorker // Объявляем на верхнем уровне для graceful shutdown
 	var vectorStore vector.VectorStore // Объявляем на верхнем уровне для передачи в роутер
 	if cfg.RAG.Enabled && db != nil {
 		appLogger.Info("Initializing RAG Data Source Service...")
@@ -451,17 +451,17 @@ func main() {
 		} else {
 			appLogger.Info("✅ RAG Data Source Service initialized successfully")
 			fmt.Println("🧠 RAG System включен")
-			
+
 			// Создаем отдельный logger для RAG worker
 			ragLogger := logger.NewFileLogger("logs/rag-worker.log", cfg.Logging.Level)
 			ragLogger.Info("RAG Worker logger initialized")
-			
+
 			// Инициализация Embeddings (Version 1.14.0+)
 			var embedder embeddings.Embedder
-			
+
 			if cfg.RAG.Embeddings.Provider != "" {
 				appLogger.Info("Initializing Embeddings...")
-				
+
 				// Конфигурация embedder
 				embedConfig := embeddings.EmbedderConfig{
 					Provider:     cfg.RAG.Embeddings.Provider,
@@ -474,18 +474,18 @@ func main() {
 				}
 
 				embedder = embeddings.NewOpenAIEmbedder(embedConfig, appLogger)
-				appLogger.WithFields(map[string]interface{}{
+				appLogger.WithFields(map[string]any{
 					"provider": embedConfig.Provider,
 					"model":    embedConfig.Model,
 					"dims":     embedConfig.Dimensions,
 				}).Info("✅ Embeddings initialized")
 				fmt.Printf("🧮 Embeddings: %s (%s, %d dims)\n", embedConfig.Provider, embedConfig.Model, embedConfig.Dimensions)
-				
+
 				// Инициализация Vector Store
 				switch cfg.RAG.VectorStore.Type {
 				case "pgvector":
 					appLogger.Info("Initializing pgvector store...")
-					
+
 					// Извлекаем параметры подключения из connection string
 					pgConfig := vector.PostgreSQLConfig{
 						ConnectionString: cfg.RAG.VectorStore.ConnectionString,
@@ -495,50 +495,50 @@ func main() {
 						CreateIndex:      true,
 						IndexType:        "hnsw", // или ivfflat
 					}
-					
+
 					vs, err := vector.NewPgVectorStore(pgConfig, appLogger)
 					if err != nil {
 						appLogger.WithError(err).Warn("Failed to initialize pgvector store, continuing without vector search")
 					} else {
 						vectorStore = vs
-						appLogger.WithFields(map[string]interface{}{
+						appLogger.WithFields(map[string]any{
 							"table":  pgConfig.TableName,
 							"dims":   pgConfig.Dimensions,
 							"metric": pgConfig.DistanceMetric,
 						}).Info("✅ pgvector store initialized")
 						fmt.Printf("🔍 Vector Store: pgvector (%d dims, %s metric)\n", pgConfig.Dimensions, pgConfig.DistanceMetric)
 					}
-					
+
 				case "qdrant":
 					appLogger.Info("Initializing Qdrant vector store...")
-					
+
 					qdrantConfig := vector.QdrantStoreConfig{
 						URL:        cfg.RAG.VectorStore.Qdrant.URL,
 						Collection: cfg.RAG.VectorStore.Qdrant.Collection,
 						Dimensions: cfg.RAG.VectorStore.Dimensions,
 						Timeout:    cfg.RAG.VectorStore.Qdrant.Timeout,
 					}
-					
+
 					vs, err := vector.NewQdrantStore(qdrantConfig, appLogger)
 					if err != nil {
 						appLogger.WithError(err).Warn("Failed to initialize Qdrant store, continuing without vector search")
 					} else {
 						vectorStore = vs
-						appLogger.WithFields(map[string]interface{}{
+						appLogger.WithFields(map[string]any{
 							"url":        qdrantConfig.URL,
 							"collection": qdrantConfig.Collection,
 							"dims":       qdrantConfig.Dimensions,
 						}).Info("✅ Qdrant vector store initialized")
 						fmt.Printf("🔍 Vector Store: Qdrant (%s, collection: %s, %d dims)\n", qdrantConfig.URL, qdrantConfig.Collection, qdrantConfig.Dimensions)
 					}
-					
+
 				default:
 					appLogger.WithField("type", cfg.RAG.VectorStore.Type).Warn("Unknown vector store type, continuing without vector search")
 				}
 			} else {
 				appLogger.Warn("Embeddings not configured, RAG will work in simple mode without similarity search")
 			}
-			
+
 			// Инициализация RAG Orchestrator для чата (Version 1.14.0+)
 			appLogger.Info("Initializing RAG Orchestrator...")
 			ragOrchestrator = ragorchestrator.NewRAGOrchestrator(
@@ -547,7 +547,7 @@ func main() {
 				vectorStore, // Vector store для similarity search
 				appLogger,
 			)
-			
+
 			if embedder != nil && vectorStore != nil {
 				appLogger.Info("✅ RAG Orchestrator initialized (full mode with embeddings + vector search)")
 				fmt.Println("🔍 RAG Orchestrator готов (полный режим с embeddings)")
@@ -555,21 +555,21 @@ func main() {
 				appLogger.Info("✅ RAG Orchestrator initialized (simple mode)")
 				fmt.Println("🔍 RAG Orchestrator готов (упрощенный режим)")
 			}
-			
+
 			// Запуск RAG Worker для обработки jobs (Version 1.14.0+)
 			appLogger.Info("Starting RAG Worker...")
-			
+
 			// Создаем и запускаем worker с embedder и vectorStore
 			ragWorker = ragworker.NewRAGWorker(db, embedder, vectorStore, ragLogger)
-			
+
 			// Запускаем в отдельной goroutine
 			go func() {
 				workerCtx := context.Background()
 				ragWorker.Start(workerCtx)
 			}()
-			
+
 			// Note: ragWorker.Stop() вызывается явно в shutdown секции перед закрытием БД
-			
+
 			if embedder != nil {
 				appLogger.Info("✅ RAG Worker started with embeddings support")
 				fmt.Println("⚙️  RAG Worker запущен (с embeddings)")
@@ -586,7 +586,7 @@ func main() {
 	// Всегда используем NewWithOptions для передачи database (необходим для MCP и других фич)
 
 	// DEBUG: Проверяем что MoniGo настроен корректно
-	appLogger.WithFields(map[string]interface{}{
+	appLogger.WithFields(map[string]any{
 		"monigo_enabled": monigoInstance != nil,
 		"monigo_port":    monigoPort,
 	}).Debug("Creating router with MoniGo configuration")
@@ -594,8 +594,8 @@ func main() {
 	appRouter, err = router.NewWithOptions(router.NewOptions{
 		Config:               cfg,
 		Logger:               appLogger,
-		HTTPLogger:           loggers.HTTP,         // Отдельный файл для HTTP логов (может быть nil)
-		MetricsLogger:        loggers.Metrics,      // Отдельный файл для GPU/performance метрик (может быть nil)
+		HTTPLogger:           loggers.HTTP,    // Отдельный файл для HTTP логов (может быть nil)
+		MetricsLogger:        loggers.Metrics, // Отдельный файл для GPU/performance метрик (может быть nil)
 		Version:              version.Version,
 		Database:             db,                   // Может быть nil для legacy mode
 		JWTManager:           jwtManager,           // Может быть nil для legacy mode
@@ -627,14 +627,14 @@ func main() {
 	// Auto-seed settings from YAML (v3.0.9 Phase 2)
 	if db != nil {
 		appLogger.Info("Checking settings database...")
-		
+
 		// Create settings storage adapter
 		settingsStorage := settings.NewSQLStorageAdapter(db, appLogger)
 		seeder := settings.NewConfigSeeder(settingsStorage, appLogger)
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		seeded, err := seeder.SeedFromYAML(ctx, cfg)
 		if err != nil {
 			appLogger.WithError(err).Warn("Failed to seed settings from YAML, continuing...")
@@ -642,10 +642,10 @@ func main() {
 			appLogger.WithField("count", seeded).Info("✅ Settings seeded from YAML config")
 			fmt.Printf("🌱 Настройки загружены в БД: %d параметров\n", seeded)
 		}
-		
+
 		// Initialize live reload handlers (v3.0.9 Phase 4)
 		settingsManager := settings.NewManager(settingsStorage, appLogger)
-		
+
 		// Get underlying *sql.DB for connection pool handlers
 		type dbGetter interface {
 			GetDB() *sql.DB
@@ -654,10 +654,10 @@ func main() {
 		if dbg, ok := db.(dbGetter); ok {
 			rawDB = dbg.GetDB()
 		}
-		
+
 		reloadRegistry := settings.NewReloadHandlerRegistry(settingsManager, appLogger, rawDB)
 		appLogger.Info("✅ Live reload handlers registered")
-		
+
 		// Store for use in router if needed
 		_ = reloadRegistry // Will be passed to router or middleware in future
 	}
@@ -672,13 +672,13 @@ func main() {
 		IdleTimeout:    cfg.Server.IdleTimeout,
 		MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
 	}
-	
+
 	// HTTPS server (v3.0.8+: Auto-generated self-signed certificate)
 	var tlsServer *http.Server
 	if cfg.Server.TLS.Enabled {
 		// Initialize certificate manager
 		certManager := tls.NewCertificateManager("certs", appLogger)
-		
+
 		// Prepare certificate configuration from config or defaults
 		certConfig := tls.CertificateConfig{
 			CommonName:   cfg.Server.TLS.CommonName,
@@ -686,7 +686,7 @@ func main() {
 			ValidFor:     365 * 24 * time.Hour, // Default: 1 year
 			Hosts:        cfg.Server.TLS.Hosts,
 		}
-		
+
 		// Apply defaults if not configured
 		if certConfig.CommonName == "" {
 			certConfig.CommonName = "localhost"
@@ -697,14 +697,14 @@ func main() {
 		if cfg.Server.TLS.ValidDays > 0 {
 			certConfig.ValidFor = time.Duration(cfg.Server.TLS.ValidDays) * 24 * time.Hour
 		}
-		
+
 		// Ensure certificate exists (auto-generate if missing)
 		if err := certManager.EnsureCertificate("server.crt", "server.key", certConfig); err != nil {
 			appLogger.WithError(err).Fatal("Failed to ensure TLS certificate")
 		}
-		
+
 		certPath, keyPath := certManager.GetCertificatePaths("server.crt", "server.key")
-		
+
 		// Validate certificate
 		if err := certManager.ValidateCertificate(certPath); err != nil {
 			appLogger.WithError(err).Warn("Certificate validation failed, regenerating...")
@@ -715,26 +715,26 @@ func main() {
 				appLogger.WithError(err).Fatal("Failed to regenerate TLS certificate")
 			}
 		}
-		
+
 		// Log certificate info
 		if certInfo, err := certManager.GetCertificateInfo(certPath); err == nil {
-			appLogger.WithFields(map[string]interface{}{
+			appLogger.WithFields(map[string]any{
 				"subject":     certInfo["subject"],
 				"issuer":      certInfo["issuer"],
 				"dns_names":   certInfo["dns_names"],
 				"expires_in":  certInfo["expires_in_days"],
 				"self_signed": certInfo["is_self_signed"],
 			}).Info("TLS certificate loaded")
-			
-			fmt.Printf("🔐 TLS Certificate: CN=%s, Hosts=%v, Expires in %d days\n", 
+
+			fmt.Printf("🔐 TLS Certificate: CN=%s, Hosts=%v, Expires in %d days\n",
 				certInfo["subject"], certInfo["dns_names"], certInfo["expires_in_days"])
 		}
-		
+
 		// Calculate TLS port (HTTP port + 400)
 		// Example: :8080 → :8480, :8085 → :8485
 		tlsPort := cfg.Server.Port + 400
 		tlsAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, tlsPort)
-		
+
 		tlsServer = &http.Server{
 			Addr:           tlsAddr,
 			Handler:        appRouter.Engine(),
@@ -743,8 +743,8 @@ func main() {
 			IdleTimeout:    cfg.Server.IdleTimeout,
 			MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
 		}
-		
-		appLogger.WithFields(map[string]interface{}{
+
+		appLogger.WithFields(map[string]any{
 			"http_addr":  server.Addr,
 			"https_addr": tlsServer.Addr,
 			"cert":       certPath,
@@ -766,15 +766,15 @@ func main() {
 			appLogger.WithError(err).Fatal("Failed to start HTTP server")
 		}
 	}()
-	
+
 	// Запуск HTTPS сервера в горутине (если включен TLS)
 	if tlsServer != nil {
 		go func() {
 			certPath, keyPath := tls.NewCertificateManager("certs", appLogger).GetCertificatePaths("server.crt", "server.key")
-			
+
 			appLogger.WithField("addr", tlsServer.Addr).Info("Starting HTTPS server")
 			fmt.Printf("🔐 HTTPS сервер запущен на %s\n", tlsServer.Addr)
-			
+
 			if err := tlsServer.ListenAndServeTLS(certPath, keyPath); err != nil && err != http.ErrServerClosed {
 				appLogger.WithError(err).Fatal("Failed to start HTTPS server")
 			}
@@ -799,7 +799,7 @@ func main() {
 	} else {
 		appLogger.Info("HTTP server stopped gracefully")
 	}
-	
+
 	if tlsServer != nil {
 		if err := tlsServer.Shutdown(shutdownCtx); err != nil {
 			appLogger.WithError(err).Error("Failed to gracefully shutdown HTTPS server")
@@ -814,12 +814,12 @@ func main() {
 		appLogger.Info("Stopping custom metrics collector...")
 		customMetrics.Stop()
 	}
-	
+
 	if gpuMonitor != nil {
 		appLogger.Info("Stopping GPU monitor...")
 		gpuMonitor.Stop()
 	}
-	
+
 	if perfMonitor != nil {
 		appLogger.Info("Stopping performance monitor...")
 		perfMonitor.Stop()
@@ -849,7 +849,7 @@ func main() {
 }
 
 // handleMigrationCommands handles migration management CLI commands (REFACTOR-01)
-func handleMigrationCommands(db storage.Database, appLogger interface{},
+func handleMigrationCommands(db storage.Database, appLogger any,
 	showVersion, listMigs bool, rollbackCount, rollbackTo int, destroy bool) {
 
 	ctx := context.Background()
@@ -908,10 +908,7 @@ func handleMigrationCommands(db storage.Database, appLogger interface{},
 			os.Exit(1)
 		}
 
-		targetVersion := currentVersion - rollbackCount
-		if targetVersion < 0 {
-			targetVersion = 0
-		}
+		targetVersion := max(currentVersion-rollbackCount, 0)
 
 		fmt.Printf("🔄 Rolling back last %d migrations (from v%d to v%d)...\n",
 			rollbackCount, currentVersion, targetVersion)
@@ -1031,7 +1028,7 @@ func handleSettingsCommands(
 		for i := range settingIDs {
 			settingIDs[i] = strings.TrimSpace(settingIDs[i])
 		}
-		
+
 		if err := settings.DeleteCommand(ctx, settingsStorage, logger, settingIDs, forceDelete); err != nil {
 			fmt.Printf("❌ Deletion failed: %v\n", err)
 			os.Exit(1)
@@ -1073,10 +1070,10 @@ func extractRawDB(db storage.Database) *sql.DB {
 	type hasGetDB interface {
 		GetDB() *sql.DB
 	}
-	
+
 	if dbWithRaw, ok := db.(hasGetDB); ok {
 		return dbWithRaw.GetDB()
 	}
-	
+
 	return nil
 }

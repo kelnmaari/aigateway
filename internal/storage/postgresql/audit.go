@@ -94,7 +94,7 @@ func (db *PostgreSQLDB) GetAuditEvents(ctx context.Context, filters storage.Audi
 		WHERE 1=1
 	`
 
-	var args []interface{}
+	var args []any
 	paramIndex := 1 // PostgreSQL uses $1, $2, $3...
 
 	// Apply filters

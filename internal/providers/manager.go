@@ -170,32 +170,32 @@ func (pm *ProviderManager) DiscoverModels(ctx context.Context) (int, error) {
 				continue
 			}
 
-		// Создаем новую запись в registry
-		registryModel := &models.ModelRegistry{
-			ModelID:       providerModel.ID,
-			ModelName:     providerModel.Name,
-			ProviderID:    providerID,
-			Capabilities:  providerModel.Capabilities,
-			Parameters:    providerModel.Parameters,
-			RequiresGPU:   providerModel.RequiresGPU,
-			MinVRAMGB:     providerModel.MinVRAMGB,
-			ContextLength: providerModel.ContextLength,
-			Description:   providerModel.Description,
-			Tags:          providerModel.Tags,
-			Status:        models.ModelStatusActive,
-			HealthStatus:  models.HealthStatusUnknown,
-		}
-		
-		// Ensure JSON fields are not nil for database insert
-		if registryModel.Capabilities == nil {
-			registryModel.Capabilities = []models.ModelCapability{}
-		}
-		if registryModel.Parameters == nil {
-			registryModel.Parameters = make(map[string]interface{})
-		}
-		if registryModel.Tags == nil {
-			registryModel.Tags = []string{}
-		}
+			// Создаем новую запись в registry
+			registryModel := &models.ModelRegistry{
+				ModelID:       providerModel.ID,
+				ModelName:     providerModel.Name,
+				ProviderID:    providerID,
+				Capabilities:  providerModel.Capabilities,
+				Parameters:    providerModel.Parameters,
+				RequiresGPU:   providerModel.RequiresGPU,
+				MinVRAMGB:     providerModel.MinVRAMGB,
+				ContextLength: providerModel.ContextLength,
+				Description:   providerModel.Description,
+				Tags:          providerModel.Tags,
+				Status:        models.ModelStatusActive,
+				HealthStatus:  models.HealthStatusUnknown,
+			}
+
+			// Ensure JSON fields are not nil for database insert
+			if registryModel.Capabilities == nil {
+				registryModel.Capabilities = []models.ModelCapability{}
+			}
+			if registryModel.Parameters == nil {
+				registryModel.Parameters = make(map[string]any)
+			}
+			if registryModel.Tags == nil {
+				registryModel.Tags = []string{}
+			}
 
 			if err := pm.db.CreateModelRegistry(ctx, registryModel); err != nil {
 				pm.logger.WithError(err).Errorf("Failed to register model: %s", providerModel.ID)
@@ -248,7 +248,7 @@ func (pm *ProviderManager) DiscoverModelsFromProvider(ctx context.Context, provi
 			ModelName:    providerModel.Name,
 			ProviderID:   providerID,
 			Capabilities: []models.ModelCapability{},
-			Parameters:   make(map[string]interface{}),
+			Parameters:   make(map[string]any),
 			Tags:         []string{},
 			Status:       models.ModelStatusActive,
 			HealthStatus: models.HealthStatusUnknown,
@@ -319,4 +319,3 @@ func (pm *ProviderManager) RunHealthCheckLoop(ctx context.Context, interval time
 		}
 	}
 }
-

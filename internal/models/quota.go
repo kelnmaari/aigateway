@@ -53,13 +53,13 @@ type QuotaUsage struct {
 	TargetID string `json:"target_id" db:"target_id"`
 
 	// Current usage counters
-	TokensUsedToday   int64 `json:"tokens_used_today" db:"tokens_used_today"`
-	TokensUsedMonth   int64 `json:"tokens_used_month" db:"tokens_used_month"`
-	RequestsToday     int64 `json:"requests_today" db:"requests_today"`
-	RequestsMonth     int64 `json:"requests_month" db:"requests_month"`
-	CurrentConcurrent int   `json:"current_concurrent" db:"current_concurrent"`
-	StorageUsedBytes  int64 `json:"storage_used_bytes" db:"storage_used_bytes"`
-	ConversationsCount int  `json:"conversations_count" db:"conversations_count"`
+	TokensUsedToday    int64 `json:"tokens_used_today" db:"tokens_used_today"`
+	TokensUsedMonth    int64 `json:"tokens_used_month" db:"tokens_used_month"`
+	RequestsToday      int64 `json:"requests_today" db:"requests_today"`
+	RequestsMonth      int64 `json:"requests_month" db:"requests_month"`
+	CurrentConcurrent  int   `json:"current_concurrent" db:"current_concurrent"`
+	StorageUsedBytes   int64 `json:"storage_used_bytes" db:"storage_used_bytes"`
+	ConversationsCount int   `json:"conversations_count" db:"conversations_count"`
 
 	// Reset timestamps
 	LastDailyReset   time.Time `json:"last_daily_reset" db:"last_daily_reset"`
@@ -72,37 +72,37 @@ type QuotaUsage struct {
 type QuotaCheck struct {
 	Allowed     bool   `json:"allowed"`
 	QuotaExists bool   `json:"quota_exists"`
-	ErrorType   string `json:"error_type,omitempty"`   // "daily_tokens", "monthly_tokens", etc.
-	Limit       int64  `json:"limit,omitempty"`        // The quota limit
-	Used        int64  `json:"used,omitempty"`         // Current usage
-	Remaining   int64  `json:"remaining,omitempty"`    // Remaining quota
-	Message     string `json:"message,omitempty"`      // Human-readable message
+	ErrorType   string `json:"error_type,omitempty"` // "daily_tokens", "monthly_tokens", etc.
+	Limit       int64  `json:"limit,omitempty"`      // The quota limit
+	Used        int64  `json:"used,omitempty"`       // Current usage
+	Remaining   int64  `json:"remaining,omitempty"`  // Remaining quota
+	Message     string `json:"message,omitempty"`    // Human-readable message
 }
 
 // QuotaStats представляет статистику использования квоты (для UI)
 type QuotaStats struct {
-	QuotaID   string     `json:"quota_id"`
-	Scope     QuotaScope `json:"scope"`
-	TargetID  string     `json:"target_id"`
-	TargetName string    `json:"target_name,omitempty"` // User/Tenant name for display
+	QuotaID    string     `json:"quota_id"`
+	Scope      QuotaScope `json:"scope"`
+	TargetID   string     `json:"target_id"`
+	TargetName string     `json:"target_name,omitempty"` // User/Tenant name for display
 
 	// Token stats
-	TokensPerDay      *int64  `json:"tokens_per_day,omitempty"`
-	TokensUsedToday   int64   `json:"tokens_used_today"`
-	TokensPercentDay  float64 `json:"tokens_percent_day,omitempty"`
+	TokensPerDay     *int64  `json:"tokens_per_day,omitempty"`
+	TokensUsedToday  int64   `json:"tokens_used_today"`
+	TokensPercentDay float64 `json:"tokens_percent_day,omitempty"`
 
-	TokensPerMonth      *int64  `json:"tokens_per_month,omitempty"`
-	TokensUsedMonth     int64   `json:"tokens_used_month"`
-	TokensPercentMonth  float64 `json:"tokens_percent_month,omitempty"`
+	TokensPerMonth     *int64  `json:"tokens_per_month,omitempty"`
+	TokensUsedMonth    int64   `json:"tokens_used_month"`
+	TokensPercentMonth float64 `json:"tokens_percent_month,omitempty"`
 
 	// Request stats
-	RequestsPerDay      *int64  `json:"requests_per_day,omitempty"`
-	RequestsToday       int64   `json:"requests_today"`
-	RequestsPercentDay  float64 `json:"requests_percent_day,omitempty"`
+	RequestsPerDay     *int64  `json:"requests_per_day,omitempty"`
+	RequestsToday      int64   `json:"requests_today"`
+	RequestsPercentDay float64 `json:"requests_percent_day,omitempty"`
 
-	RequestsPerMonth      *int64  `json:"requests_per_month,omitempty"`
-	RequestsMonth         int64   `json:"requests_month"`
-	RequestsPercentMonth  float64 `json:"requests_percent_month,omitempty"`
+	RequestsPerMonth     *int64  `json:"requests_per_month,omitempty"`
+	RequestsMonth        int64   `json:"requests_month"`
+	RequestsPercentMonth float64 `json:"requests_percent_month,omitempty"`
 
 	// Concurrent stats
 	MaxConcurrent     *int    `json:"max_concurrent,omitempty"`
@@ -110,9 +110,9 @@ type QuotaStats struct {
 	ConcurrentPercent float64 `json:"concurrent_percent,omitempty"`
 
 	// Storage stats
-	MaxStorageBytes     *int64  `json:"max_storage_bytes,omitempty"`
-	StorageUsedBytes    int64   `json:"storage_used_bytes"`
-	StoragePercentUsed  float64 `json:"storage_percent_used,omitempty"`
+	MaxStorageBytes    *int64  `json:"max_storage_bytes,omitempty"`
+	StorageUsedBytes   int64   `json:"storage_used_bytes"`
+	StoragePercentUsed float64 `json:"storage_percent_used,omitempty"`
 
 	// Last reset times
 	LastDailyReset   time.Time `json:"last_daily_reset"`
@@ -131,7 +131,7 @@ func (s StringSlice) Value() (driver.Value, error) {
 }
 
 // Scan implements sql.Scanner
-func (s *StringSlice) Scan(value interface{}) error {
+func (s *StringSlice) Scan(value any) error {
 	if value == nil {
 		*s = nil
 		return nil
@@ -156,20 +156,6 @@ type CreateQuotaRequest struct {
 	Scope    QuotaScope `json:"scope" binding:"required,oneof=user tenant"`
 	TargetID string     `json:"target_id" binding:"required"`
 
-	TokensPerDay      *int64      `json:"tokens_per_day,omitempty"`
-	TokensPerMonth    *int64      `json:"tokens_per_month,omitempty"`
-	RequestsPerDay    *int64      `json:"requests_per_day,omitempty"`
-	RequestsPerMonth  *int64      `json:"requests_per_month,omitempty"`
-	MaxConcurrent     *int        `json:"max_concurrent,omitempty"`
-	MaxStorageBytes   *int64      `json:"max_storage_bytes,omitempty"`
-	MaxConversations  *int        `json:"max_conversations,omitempty"`
-	MaxFileSize       *int64      `json:"max_file_size,omitempty"`
-	AllowedModels     StringSlice `json:"allowed_models,omitempty"`
-}
-
-// UpdateQuotaRequest представляет запрос на обновление квоты
-type UpdateQuotaRequest struct {
-	Name             *string     `json:"name,omitempty"`
 	TokensPerDay     *int64      `json:"tokens_per_day,omitempty"`
 	TokensPerMonth   *int64      `json:"tokens_per_month,omitempty"`
 	RequestsPerDay   *int64      `json:"requests_per_day,omitempty"`
@@ -178,8 +164,20 @@ type UpdateQuotaRequest struct {
 	MaxStorageBytes  *int64      `json:"max_storage_bytes,omitempty"`
 	MaxConversations *int        `json:"max_conversations,omitempty"`
 	MaxFileSize      *int64      `json:"max_file_size,omitempty"`
-	AllowedModels    *StringSlice `json:"allowed_models,omitempty"`
-	Enabled          *bool       `json:"enabled,omitempty"`
+	AllowedModels    StringSlice `json:"allowed_models,omitempty"`
 }
 
-
+// UpdateQuotaRequest представляет запрос на обновление квоты
+type UpdateQuotaRequest struct {
+	Name             *string      `json:"name,omitempty"`
+	TokensPerDay     *int64       `json:"tokens_per_day,omitempty"`
+	TokensPerMonth   *int64       `json:"tokens_per_month,omitempty"`
+	RequestsPerDay   *int64       `json:"requests_per_day,omitempty"`
+	RequestsPerMonth *int64       `json:"requests_per_month,omitempty"`
+	MaxConcurrent    *int         `json:"max_concurrent,omitempty"`
+	MaxStorageBytes  *int64       `json:"max_storage_bytes,omitempty"`
+	MaxConversations *int         `json:"max_conversations,omitempty"`
+	MaxFileSize      *int64       `json:"max_file_size,omitempty"`
+	AllowedModels    *StringSlice `json:"allowed_models,omitempty"`
+	Enabled          *bool        `json:"enabled,omitempty"`
+}

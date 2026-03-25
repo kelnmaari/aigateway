@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,7 +36,7 @@ func NewRBACUIHandler(db storage.Database, renderer *templates.Renderer, logger 
 // GET /api/ui/rbac/roles
 func (h *RBACUIHandler) GetRolesList(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	// Get global roles (tenantID = nil)
 	var tenantID *string = nil
 	roles, err := h.db.ListRoles(ctx, tenantID)
@@ -50,7 +51,7 @@ func (h *RBACUIHandler) GetRolesList(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Check if no roles
 	if len(roles) == 0 {
 		c.Header("Content-Type", "text/html")
@@ -62,11 +63,11 @@ func (h *RBACUIHandler) GetRolesList(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Render rows
 	c.Header("Content-Type", "text/html")
-	html := ""
-	
+	var html strings.Builder
+
 	for _, role := range roles {
 		// Get permissions count for this role
 		permissions, err := h.db.GetRolePermissions(ctx, role.ID)
@@ -74,20 +75,20 @@ func (h *RBACUIHandler) GetRolesList(c *gin.Context) {
 			h.logger.WithError(err).Warn("Failed to get role permissions")
 			permissions = []*models.RBACPermission{}
 		}
-		
+
 		// Get users count for this role
 		users, err := h.db.GetRoleUsers(ctx, role.ID)
 		if err != nil {
 			h.logger.WithError(err).Warn("Failed to get role users")
 			users = []*models.User{}
 		}
-		
+
 		scopeDisplay := "Global"
 		if role.TenantID != nil {
 			scopeDisplay = "Tenant"
 		}
-		
-		html += fmt.Sprintf(`
+
+		html.WriteString(fmt.Sprintf(`
 <tr class="role-row" data-role-id="%s">
 	<td>
 		<div class="role-info">
@@ -128,10 +129,10 @@ func (h *RBACUIHandler) GetRolesList(c *gin.Context) {
 			formatTimeAgo(role.CreatedAt),
 			role.ID,
 			role.ID,
-		)
+		))
 	}
-	
-	c.String(http.StatusOK, html)
+
+	c.String(http.StatusOK, html.String())
 }
 
 // GetCreateRoleForm returns HTML form for creating a new role
@@ -217,7 +218,7 @@ func (h *RBACUIHandler) GetCreateRoleForm(c *gin.Context) {
 func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 	ctx := c.Request.Context()
 	roleID := c.Param("id")
-	
+
 	// Get role
 	role, err := h.db.GetRole(ctx, roleID)
 	if err != nil {
@@ -229,7 +230,7 @@ func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	if role == nil {
 		c.Header("Content-Type", "text/html")
 		c.String(http.StatusNotFound, `
@@ -238,7 +239,7 @@ func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
 <div class="modal-header">
@@ -308,7 +309,7 @@ func (h *RBACUIHandler) GetEditRoleForm(c *gin.Context) {
 func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 	ctx := c.Request.Context()
 	roleID := c.Param("id")
-	
+
 	// Get role
 	role, err := h.db.GetRole(ctx, roleID)
 	if err != nil {
@@ -320,7 +321,7 @@ func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	if role == nil {
 		c.Header("Content-Type", "text/html")
 		c.String(http.StatusNotFound, `
@@ -329,27 +330,27 @@ func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 </div>`)
 		return
 	}
-	
+
 	// Get current permissions
 	currentPermissions, err := h.db.GetRolePermissions(ctx, roleID)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get role permissions")
 		currentPermissions = []*models.RBACPermission{}
 	}
-	
+
 	// Build map of assigned permissions
 	assignedPermissions := make(map[string]bool)
 	for _, perm := range currentPermissions {
 		assignedPermissions[perm.ID] = true
 	}
-	
+
 	// Get all available permissions
 	allPermissions, err := h.db.ListPermissions(ctx)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to list permissions")
 		allPermissions = []*models.RBACPermission{}
 	}
-	
+
 	// Group permissions by resource (instead of category)
 	permsByResource := make(map[string][]*models.RBACPermission)
 	for _, perm := range allPermissions {
@@ -359,7 +360,7 @@ func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 		}
 		permsByResource[resource] = append(permsByResource[resource], perm)
 	}
-	
+
 	// Build permissions HTML grouped by resource
 	permsHTML := ""
 	for resource, perms := range permsByResource {
@@ -367,13 +368,13 @@ func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 		<div class="permission-category">
 			<h4>%s</h4>
 			<div class="permissions-grid">`, template.HTMLEscapeString(resource))
-		
+
 		for _, perm := range perms {
 			checked := ""
 			if assignedPermissions[perm.ID] {
 				checked = "checked"
 			}
-			
+
 			permsHTML += fmt.Sprintf(`
 				<div class="form-group">
 					<label class="checkbox-label">
@@ -387,16 +388,16 @@ func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 				template.HTMLEscapeString(perm.Name),
 				template.HTMLEscapeString(perm.Description))
 		}
-		
+
 		permsHTML += `
 			</div>
 		</div>`
 	}
-	
+
 	if permsHTML == "" {
 		permsHTML = `<p class="text-muted">No permissions available</p>`
 	}
-	
+
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, fmt.Sprintf(`
 <div class="modal-header">
@@ -458,7 +459,7 @@ func (h *RBACUIHandler) GetRolePermissionsForm(c *gin.Context) {
 // GET /api/ui/rbac/permissions
 func (h *RBACUIHandler) GetPermissionsList(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	// Get all permissions
 	permissions, err := h.db.ListPermissions(ctx)
 	if err != nil {
@@ -472,7 +473,7 @@ func (h *RBACUIHandler) GetPermissionsList(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Check if no permissions
 	if len(permissions) == 0 {
 		c.Header("Content-Type", "text/html")
@@ -484,18 +485,18 @@ func (h *RBACUIHandler) GetPermissionsList(c *gin.Context) {
 </tr>`)
 		return
 	}
-	
+
 	// Render rows
 	c.Header("Content-Type", "text/html")
-	html := ""
-	
+	var html strings.Builder
+
 	for _, perm := range permissions {
 		resource := perm.Resource
 		if resource == "" {
 			resource = "-"
 		}
-		
-		html += fmt.Sprintf(`
+
+		html.WriteString(fmt.Sprintf(`
 <tr>
 	<td>
 		<div class="role-info">
@@ -513,9 +514,8 @@ func (h *RBACUIHandler) GetPermissionsList(c *gin.Context) {
 			template.HTMLEscapeString(perm.Resource+":"+perm.Action),
 			perm.CreatedAt.Format(time.RFC3339),
 			formatTimeAgo(perm.CreatedAt),
-		)
+		))
 	}
-	
-	c.String(http.StatusOK, html)
-}
 
+	c.String(http.StatusOK, html.String())
+}

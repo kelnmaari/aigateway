@@ -30,7 +30,7 @@ type SlidingWindowLimiter struct {
 
 	// In-memory cache для быстрого доступа (key = "rateLimit:windowType:targetID")
 	cache map[string]*windowState
-	
+
 	// Redis для distributed rate limiting (v3.0.6+)
 	redisService RedisRateLimitService
 }
@@ -72,7 +72,7 @@ func (l *SlidingWindowLimiter) CheckLimit(
 
 	// Cache key
 	cacheKey := fmt.Sprintf("%s:%s:%s", rateLimitID, windowType, targetID)
-	
+
 	// Use Redis if available (v3.0.6+: distributed rate limiting)
 	if l.redisService != nil {
 		allowed, remaining, err := l.redisService.CheckLimit(ctx, cacheKey, limit, window)
@@ -231,7 +231,7 @@ func (l *SlidingWindowLimiter) StartCleanupLoop(ctx context.Context, interval ti
 }
 
 // GetCacheStats возвращает статистику cache (для мониторинга)
-func (l *SlidingWindowLimiter) GetCacheStats() map[string]interface{} {
+func (l *SlidingWindowLimiter) GetCacheStats() map[string]any {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -242,18 +242,9 @@ func (l *SlidingWindowLimiter) GetCacheStats() map[string]interface{} {
 		state.mu.RUnlock()
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"cache_entries":    len(l.cache),
 		"total_timestamps": totalTimestamps,
 		"avg_per_entry":    float64(totalTimestamps) / float64(max(len(l.cache), 1)),
 	}
 }
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-

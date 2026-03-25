@@ -34,9 +34,9 @@ type QdrantStoreConfig struct {
 
 // Qdrant API structures
 type qdrantPoint struct {
-	ID      string                 `json:"id"`
-	Vector  []float64              `json:"vector"`
-	Payload map[string]interface{} `json:"payload"`
+	ID      string         `json:"id"`
+	Vector  []float64      `json:"vector"`
+	Payload map[string]any `json:"payload"`
 }
 
 type qdrantUpsertRequest struct {
@@ -57,16 +57,16 @@ type qdrantFilter struct {
 }
 
 type qdrantCondition struct {
-	Key   string      `json:"key"`
-	Match interface{} `json:"match"`
+	Key   string `json:"key"`
+	Match any    `json:"match"`
 }
 
 type qdrantSearchResult struct {
-	ID      string                 `json:"id"`
-	Version int                    `json:"version"`
-	Score   float64                `json:"score"`
-	Payload map[string]interface{} `json:"payload"`
-	Vector  []float64              `json:"vector,omitempty"`
+	ID      string         `json:"id"`
+	Version int            `json:"version"`
+	Score   float64        `json:"score"`
+	Payload map[string]any `json:"payload"`
+	Vector  []float64      `json:"vector,omitempty"`
 }
 
 type qdrantSearchResponse struct {
@@ -250,7 +250,7 @@ func (s *QdrantStore) InsertBatch(ctx context.Context, docs []VectorDocument) er
 	for i, doc := range docs {
 		payload := doc.Metadata
 		if payload == nil {
-			payload = make(map[string]interface{})
+			payload = make(map[string]any)
 		}
 		payload["text"] = doc.Text
 		payload["created_at"] = doc.CreatedAt.Format(time.RFC3339)
@@ -333,7 +333,7 @@ func (s *QdrantStore) Search(ctx context.Context, req SearchRequest) (*SearchRes
 		for key, value := range req.Filters {
 			conditions = append(conditions, qdrantCondition{
 				Key:   key,
-				Match: map[string]interface{}{"value": value},
+				Match: map[string]any{"value": value},
 			})
 		}
 		searchReq.Filter = &qdrantFilter{Must: conditions}
@@ -414,7 +414,7 @@ func (s *QdrantStore) Search(ctx context.Context, req SearchRequest) (*SearchRes
 func (s *QdrantStore) Delete(ctx context.Context, id string) error {
 	s.logger.WithField("id", id).Debug("Deleting vector from Qdrant")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"points": []string{id},
 	})
 
@@ -446,7 +446,7 @@ func (s *QdrantStore) Delete(ctx context.Context, id string) error {
 }
 
 // DeleteByMetadata deletes vectors by metadata filters
-func (s *QdrantStore) DeleteByMetadata(ctx context.Context, filters map[string]interface{}) (int, error) {
+func (s *QdrantStore) DeleteByMetadata(ctx context.Context, filters map[string]any) (int, error) {
 	if len(filters) == 0 {
 		return 0, fmt.Errorf("filters are required")
 	}
@@ -457,12 +457,12 @@ func (s *QdrantStore) DeleteByMetadata(ctx context.Context, filters map[string]i
 	for key, value := range filters {
 		conditions = append(conditions, qdrantCondition{
 			Key:   key,
-			Match: map[string]interface{}{"value": value},
+			Match: map[string]any{"value": value},
 		})
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"filter": map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
+		"filter": map[string]any{
 			"must": conditions,
 		},
 	})
@@ -549,7 +549,7 @@ func (s *QdrantStore) GetByID(ctx context.Context, id string) (*VectorDocument, 
 }
 
 // CreateIndex creates an index (Qdrant manages indexes automatically)
-func (s *QdrantStore) CreateIndex(ctx context.Context, indexType string, params map[string]interface{}) error {
+func (s *QdrantStore) CreateIndex(ctx context.Context, indexType string, params map[string]any) error {
 	s.logger.WithFields(logrus.Fields{
 		"index_type": indexType,
 		"params":     params,
@@ -680,11 +680,11 @@ func (s *QdrantStore) Close() error {
 
 // ScrollRequest for scrolling through all points in a collection
 type ScrollRequest struct {
-	Collection string                 // Collection name (empty = use default)
-	Filters    map[string]interface{} // Metadata filters
-	Limit      int                    // Points per page
-	Offset     *string                // Offset for pagination (nil = start from beginning)
-	WithVector bool                   // Include vectors in response
+	Collection string         // Collection name (empty = use default)
+	Filters    map[string]any // Metadata filters
+	Limit      int            // Points per page
+	Offset     *string        // Offset for pagination (nil = start from beginning)
+	WithVector bool           // Include vectors in response
 }
 
 // ScrollResponse contains scroll results
@@ -711,7 +711,7 @@ func (s *QdrantStore) Scroll(ctx context.Context, req ScrollRequest) (*ScrollRes
 	}).Debug("Scrolling Qdrant collection")
 
 	// Build scroll request body
-	scrollReq := map[string]interface{}{
+	scrollReq := map[string]any{
 		"limit":        req.Limit,
 		"with_payload": true,
 		"with_vector":  req.WithVector,
@@ -727,10 +727,10 @@ func (s *QdrantStore) Scroll(ctx context.Context, req ScrollRequest) (*ScrollRes
 		for key, value := range req.Filters {
 			conditions = append(conditions, qdrantCondition{
 				Key:   key,
-				Match: map[string]interface{}{"value": value},
+				Match: map[string]any{"value": value},
 			})
 		}
-		scrollReq["filter"] = map[string]interface{}{
+		scrollReq["filter"] = map[string]any{
 			"must": conditions,
 		}
 	}
@@ -762,7 +762,7 @@ func (s *QdrantStore) Scroll(ctx context.Context, req ScrollRequest) (*ScrollRes
 	var scrollResp struct {
 		Result struct {
 			Points     []qdrantSearchResult `json:"points"`
-			NextPageID interface{}          `json:"next_page_offset"`
+			NextPageID any                  `json:"next_page_offset"`
 		} `json:"result"`
 		Status string  `json:"status"`
 		Time   float64 `json:"time"`
@@ -816,7 +816,7 @@ func (s *QdrantStore) Scroll(ctx context.Context, req ScrollRequest) (*ScrollRes
 }
 
 // ScrollAll scrolls through ALL points in collection using callback
-func (s *QdrantStore) ScrollAll(ctx context.Context, collection string, filters map[string]interface{}, callback func([]VectorDocument) error) error {
+func (s *QdrantStore) ScrollAll(ctx context.Context, collection string, filters map[string]any, callback func([]VectorDocument) error) error {
 	var offset *string
 	batchNum := 0
 

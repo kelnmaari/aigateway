@@ -10,16 +10,16 @@ import (
 const (
 	// MaxNoteLength is the maximum length for a GitLab note (1MB)
 	MaxNoteLength = 1_000_000
-	
+
 	// SafeNoteLength is the practical limit for readability (~50KB)
 	SafeNoteLength = 50_000
-	
+
 	// MaxInlineCommentLength is the practical limit for inline comments
 	MaxInlineCommentLength = 10_000
-	
+
 	// SplitThreshold is when to start splitting (slightly below safe limit)
 	SplitThreshold = 45_000
-	
+
 	// PartOverlap is the context overlap between parts
 	PartOverlap = 500
 )
@@ -128,7 +128,7 @@ func (s *Splitter) Split(content string) []string {
 			oldHeader := s.partHeader(i+1, totalParts)
 			newHeader := s.partHeader(i+1, actualTotal)
 			parts[i] = strings.Replace(parts[i], oldHeader, newHeader, 1)
-			
+
 			// Update footer (especially important for last part)
 			oldFooter := s.partFooter(i+1, totalParts)
 			newFooter := s.partFooter(i+1, actualTotal)
@@ -147,10 +147,7 @@ func (s *Splitter) findSplitPoint(content string, maxLen int) int {
 	}
 
 	// Search window: last 2000 chars before maxLen
-	searchStart := maxLen - 2000
-	if searchStart < 0 {
-		searchStart = 0
-	}
+	searchStart := max(maxLen-2000, 0)
 	searchWindow := content[searchStart:maxLen]
 
 	// Try to find section header (## )
@@ -230,7 +227,7 @@ func (s *Splitter) TruncateInlineComment(content string) string {
 
 	// Find a good truncation point
 	truncateAt := MaxInlineCommentLength - 50 // Leave room for truncation notice
-	
+
 	// Prefer truncating at a line break
 	if idx := strings.LastIndex(content[:truncateAt], "\n"); idx > truncateAt/2 {
 		truncateAt = idx
@@ -238,12 +235,3 @@ func (s *Splitter) TruncateInlineComment(content string) string {
 
 	return content[:truncateAt] + "\n\n*... (comment truncated due to length)*"
 }
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-

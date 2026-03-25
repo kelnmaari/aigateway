@@ -17,10 +17,10 @@ type User struct {
 	PasswordHash string `json:"-" db:"password_hash"` // Bcrypt hash пароля (не возвращается в JSON)
 
 	// OIDC аутентификация (Version 1.11.1+: Keycloak SSO Integration)
-	AuthProvider string  `json:"auth_provider" db:"auth_provider"` // Authentication provider: 'local', 'oidc', 'ldap'
-	OIDCSubject  *string `json:"oidc_subject,omitempty" db:"oidc_subject"`   // OIDC 'sub' claim (unique identifier)
-	OIDCIssuer   *string `json:"oidc_issuer,omitempty" db:"oidc_issuer"`     // OIDC issuer URL
-	
+	AuthProvider string  `json:"auth_provider" db:"auth_provider"`         // Authentication provider: 'local', 'oidc', 'ldap'
+	OIDCSubject  *string `json:"oidc_subject,omitempty" db:"oidc_subject"` // OIDC 'sub' claim (unique identifier)
+	OIDCIssuer   *string `json:"oidc_issuer,omitempty" db:"oidc_issuer"`   // OIDC issuer URL
+
 	// LDAP аутентификация (Version 1.11.3+: LDAP/AD Integration)
 	LDAPDN *string `json:"ldap_dn,omitempty" db:"ldap_dn"` // LDAP Distinguished Name
 
@@ -40,7 +40,7 @@ type User struct {
 	Preferences UserPreferences `json:"preferences" db:"preferences"` // Хранится как JSONB
 
 	// Metadata
-	Metadata map[string]interface{} `json:"metadata,omitempty" db:"metadata"` // Дополнительные данные
+	Metadata map[string]any `json:"metadata,omitempty" db:"metadata"` // Дополнительные данные
 }
 
 // UserStatus представляет статус пользователя
@@ -92,10 +92,10 @@ func (u *User) ToPublic() *UserPublic {
 // UserWithDetails расширенная информация о пользователе для админ-панели (v2.2.2+)
 type UserWithDetails struct {
 	User
-	
+
 	// RBAC roles пользователя
 	Roles []RoleInfo `json:"roles,omitempty"`
-	
+
 	// Tenants в которых пользователь является участником
 	Tenants []TenantInfo `json:"tenants,omitempty"`
 }
@@ -126,4 +126,3 @@ type UserFilters struct {
 	Limit  int `json:"limit,omitempty"`
 	Offset int `json:"offset,omitempty"`
 }
-

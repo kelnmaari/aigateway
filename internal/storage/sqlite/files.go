@@ -169,7 +169,7 @@ func (s *SQLiteDB) ListFilesWithUserInfo(ctx context.Context, req models.ListFil
 		WHERE f.deleted_at IS NULL
 	`
 
-	args := []interface{}{}
+	args := []any{}
 
 	// Фильтры
 	if req.UserID != nil {
@@ -274,7 +274,7 @@ func (s *SQLiteDB) ListFiles(ctx context.Context, req models.ListFilesRequest) (
 		WHERE deleted_at IS NULL
 	`
 
-	args := []interface{}{}
+	args := []any{}
 
 	// Фильтры
 	if req.UserID != nil {
@@ -410,4 +410,3 @@ func (s *SQLiteDB) GetFileAccessLogs(ctx context.Context, fileID string, limit i
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
-

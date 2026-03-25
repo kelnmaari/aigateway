@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"aigateway/internal/gitlab/client"
@@ -20,7 +21,7 @@ import (
 
 // QdrantStoreForSecrets interface for secrets scanning
 type QdrantStoreForSecrets interface {
-	ScrollAll(ctx context.Context, collection string, filters map[string]interface{}, callback func([]vector.VectorDocument) error) error
+	ScrollAll(ctx context.Context, collection string, filters map[string]any, callback func([]vector.VectorDocument) error) error
 }
 
 // QdrantStoreInterface type alias for router package
@@ -110,10 +111,8 @@ func (h *GitLabSecretsHandler) canAccessProject(c *gin.Context, project *models.
 	// Check tenant membership
 	if tids, exists := c.Get("tenant_ids"); exists {
 		if ids, ok := tids.([]string); ok {
-			for _, tid := range ids {
-				if integration.TenantID == tid {
-					return true
-				}
+			if slices.Contains(ids, integration.TenantID) {
+				return true
 			}
 		}
 	}
@@ -240,9 +239,9 @@ func (h *GitLabSecretsHandler) GetPatterns(c *gin.Context) {
 	patterns := h.scanner.GetPatterns()
 
 	// Convert to response format (without regex)
-	response := make([]map[string]interface{}, len(patterns))
+	response := make([]map[string]any, len(patterns))
 	for i, p := range patterns {
-		response[i] = map[string]interface{}{
+		response[i] = map[string]any{
 			"id":          p.ID,
 			"name":        p.Name,
 			"description": p.Description,
@@ -414,7 +413,7 @@ func (h *GitLabSecretsHandler) deepScanWithStreaming(
 	}
 
 	// Send initial event
-	h.sendSSEEvent(c.Writer, flusher, "start", map[string]interface{}{
+	h.sendSSEEvent(c.Writer, flusher, "start", map[string]any{
 		"project_id": projectID,
 		"model":      modelID,
 		"status":     "starting",
@@ -478,7 +477,7 @@ func (h *GitLabSecretsHandler) deepScanWithStreaming(
 }
 
 // sendSSEEvent sends a Server-Sent Event
-func (h *GitLabSecretsHandler) sendSSEEvent(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {
+func (h *GitLabSecretsHandler) sendSSEEvent(w http.ResponseWriter, flusher http.Flusher, event string, data any) {
 	if data != nil {
 		jsonData, err := json.Marshal(data)
 		if err != nil {

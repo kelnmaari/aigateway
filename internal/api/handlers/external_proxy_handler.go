@@ -303,13 +303,13 @@ func (h *ExternalProxyHandler) streamAnthropicToOpenAI(c *gin.Context, resp *htt
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if strings.HasPrefix(line, "event: ") {
-			currentEventType = strings.TrimPrefix(line, "event: ")
+		if after, ok0 := strings.CutPrefix(line, "event: "); ok0 {
+			currentEventType = after
 			continue
 		}
 
-		if strings.HasPrefix(line, "data: ") {
-			data := strings.TrimPrefix(line, "data: ")
+		if after, ok0 := strings.CutPrefix(line, "data: "); ok0 {
+			data := after
 
 			openaiData, isDone, err := converter.ConvertAnthropicSSE(currentEventType, []byte(data), requestModel, streamID)
 			if err != nil {

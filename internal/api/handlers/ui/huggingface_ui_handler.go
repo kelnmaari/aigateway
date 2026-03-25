@@ -40,7 +40,7 @@ func NewHuggingFaceUIHandler(hfClient *huggingface.Client, downloader *huggingfa
 func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
-	
+
 	// Parse filters
 	search := c.Query("search")
 	if search == "" {
@@ -51,18 +51,18 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 	providerFilter := c.DefaultQuery("provider", "all")
 	sortBy := c.DefaultQuery("sort", "downloads")
 	limitStr := c.DefaultQuery("limit", "30")
-	
+
 	limit, _ := strconv.Atoi(limitStr)
 	if limit <= 0 || limit > 100 {
 		limit = 30
 	}
-	
+
 	// Parse tags
 	var tags []string
 	if tagsStr != "" {
 		tags = strings.Split(tagsStr, ",")
 	}
-	
+
 	// Apply provider-specific filters
 	var library string
 	switch providerFilter {
@@ -101,7 +101,7 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		FullResponse: true,
 		CardData:     true,
 	}
-	
+
 	h.logger.WithFields(logrus.Fields{
 		"search": search,
 		"author": author,
@@ -109,7 +109,7 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		"sort":   sortBy,
 		"limit":  limit,
 	}).Debug("Searching Hugging Face models")
-	
+
 	// Search models
 	models, err := h.hfClient.SearchModels(ctx, filters)
 	if err != nil {
@@ -123,7 +123,7 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		h.renderError(c, "Failed to search models: "+err.Error())
 		return
 	}
-	
+
 	// For llama.cpp filter, library=gguf was already passed to API
 	// All returned models should be GGUF models, mark them as such
 	if providerFilter == "llama.cpp" {
@@ -132,7 +132,7 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		}
 		h.logger.WithField("count", len(models)).Debug("Marked all models as GGUF (library=gguf filter applied)")
 	}
-	
+
 	// Check if JSON response is requested (SvelteKit frontend)
 	if strings.Contains(c.GetHeader("Accept"), "application/json") {
 		c.JSON(http.StatusOK, gin.H{
@@ -141,13 +141,13 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Render HTML results (HTMX)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Models": models,
 		"Count":  len(models),
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_models_list", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render results")
@@ -160,7 +160,7 @@ func (h *HuggingFaceUIHandler) GetModelsSearch(c *gin.Context) {
 func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
-	
+
 	modelID := c.Param("model_id")
 	// Reconstruct model ID (e.g., "TheBloke/Llama-2-7B-GGUF")
 	if strings.Contains(c.Request.URL.Path, "/") {
@@ -175,7 +175,7 @@ func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	if modelID == "" {
 		if strings.Contains(c.GetHeader("Accept"), "application/json") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Model ID is required"})
@@ -184,9 +184,9 @@ func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 		h.renderError(c, "Model ID is required")
 		return
 	}
-	
+
 	h.logger.WithField("model_id", modelID).Debug("Fetching model details")
-	
+
 	// Get model info
 	model, err := h.hfClient.GetModelInfo(ctx, modelID)
 	if err != nil {
@@ -198,18 +198,18 @@ func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 		h.renderError(c, "Failed to load model details: "+err.Error())
 		return
 	}
-	
+
 	// Check if JSON response is requested (SvelteKit frontend)
 	if strings.Contains(c.GetHeader("Accept"), "application/json") {
 		c.JSON(http.StatusOK, model)
 		return
 	}
-	
+
 	// Render HTML details (HTMX)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Model": model,
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_model_details", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render details")
@@ -221,7 +221,7 @@ func (h *HuggingFaceUIHandler) GetModelDetails(c *gin.Context) {
 func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
-	
+
 	modelID := c.Param("model_id")
 	if strings.Contains(c.Request.URL.Path, "/") {
 		parts := strings.Split(c.Request.URL.Path, "/gguf-files/")
@@ -229,12 +229,12 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 			modelID = parts[1]
 		}
 	}
-	
+
 	if modelID == "" {
 		h.renderError(c, "Model ID is required")
 		return
 	}
-	
+
 	// Get model info
 	model, err := h.hfClient.GetModelInfo(ctx, modelID)
 	if err != nil {
@@ -242,20 +242,20 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 		h.renderError(c, "Failed to load GGUF files: "+err.Error())
 		return
 	}
-	
+
 	// Filter only GGUF files
 	if !model.HasGGUF {
 		h.renderError(c, "Model has no GGUF files")
 		return
 	}
-	
+
 	// Log file sizes for debugging
 	h.logger.WithFields(logrus.Fields{
-		"model_id":    model.ID,
-		"gguf_count":  len(model.GGUFFiles),
-		"total_size":  model.TotalSize,
+		"model_id":   model.ID,
+		"gguf_count": len(model.GGUFFiles),
+		"total_size": model.TotalSize,
 	}).Debug("Rendering GGUF files list")
-	
+
 	for i, file := range model.GGUFFiles {
 		h.logger.WithFields(logrus.Fields{
 			"file_index": i,
@@ -270,7 +270,7 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 			}).Debug("LFS details")
 		}
 	}
-	
+
 	// Check if JSON response is requested (SvelteKit frontend)
 	if strings.Contains(c.GetHeader("Accept"), "application/json") {
 		c.JSON(http.StatusOK, gin.H{
@@ -279,13 +279,13 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Render GGUF files list (HTMX)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"ModelID": model.ID,
 		"Files":   model.GGUFFiles,
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_gguf_files", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render GGUF files")
@@ -297,10 +297,10 @@ func (h *HuggingFaceUIHandler) GetGGUFFilesList(c *gin.Context) {
 func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
-	
+
 	category := c.DefaultQuery("category", "all")
 	providerFilter := c.DefaultQuery("provider", "all")
-	
+
 	// Pagination parameters
 	limitStr := c.DefaultQuery("limit", "30")
 	pageStr := c.DefaultQuery("page", "1")
@@ -312,10 +312,10 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 	if page <= 0 {
 		page = 1
 	}
-	
+
 	var search string
 	var additionalTags []string
-	
+
 	switch category {
 	case "llama":
 		search = "llama"
@@ -336,7 +336,7 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		// All popular models
 		search = ""
 	}
-	
+
 	// Apply provider-specific filters
 	var baseTags []string
 	var library string
@@ -359,7 +359,7 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		// "all" - show text-generation models
 		baseTags = []string{"text-generation"}
 	}
-	
+
 	filters := huggingface.ModelFilters{
 		Search:       search,
 		Tags:         append(baseTags, additionalTags...),
@@ -371,7 +371,7 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		FullResponse: true,
 		CardData:     true,
 	}
-	
+
 	models, err := h.hfClient.SearchModels(ctx, filters)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get popular models")
@@ -384,7 +384,7 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		h.renderError(c, "Failed to load popular models: "+err.Error())
 		return
 	}
-	
+
 	// For llama.cpp filter, library=gguf was already passed to API
 	// All returned models are GGUF models, mark them as such
 	if providerFilter == "llama.cpp" {
@@ -392,7 +392,7 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 			models[i].HasGGUF = true
 		}
 	}
-	
+
 	// Check if JSON response is requested (SvelteKit frontend)
 	if strings.Contains(c.GetHeader("Accept"), "application/json") {
 		c.JSON(http.StatusOK, gin.H{
@@ -403,13 +403,13 @@ func (h *HuggingFaceUIHandler) GetPopularModels(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Render popular models (HTMX)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Models":   models,
 		"Category": category,
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_popular_models", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render popular models")
@@ -426,10 +426,10 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 		TotalSize int64  `json:"total_size" form:"total_size"`
 		SHA256    string `json:"sha256" form:"sha256"`
 	}
-	
+
 	var req DownloadRequest
 	isJSONRequest := c.ContentType() == "application/json"
-	
+
 	// Support both JSON and form data for HTMX compatibility
 	if isJSONRequest {
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -446,13 +446,13 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 			return
 		}
 	}
-	
+
 	h.logger.WithFields(logrus.Fields{
 		"model_id": req.ModelID,
 		"filename": req.Filename,
 		"size":     req.TotalSize,
 	}).Info("Model download requested")
-	
+
 	// Start download
 	download, err := h.downloader.StartDownload(req.ModelID, req.Filename, req.TotalSize, req.SHA256)
 	if err != nil {
@@ -464,7 +464,7 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 		h.renderError(c, "Failed to start download: "+err.Error())
 		return
 	}
-	
+
 	// Check if JSON response is requested (SvelteKit frontend)
 	if strings.Contains(c.GetHeader("Accept"), "application/json") || isJSONRequest {
 		c.JSON(http.StatusOK, gin.H{
@@ -473,12 +473,12 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Return download started response with progress (HTMX)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Download": download,
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_download_started", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render download status")
@@ -489,16 +489,16 @@ func (h *HuggingFaceUIHandler) PostDownloadModel(c *gin.Context) {
 // GetDownloadProgress returns download progress for HTMX polling
 func (h *HuggingFaceUIHandler) GetDownloadProgress(c *gin.Context) {
 	downloadID := c.Param("download_id")
-	
+
 	download, exists := h.downloader.GetDownload(downloadID)
 	if !exists {
 		h.renderError(c, "Download not found")
 		return
 	}
-	
+
 	download.Mu.RLock()
 	defer download.Mu.RUnlock()
-	
+
 	// Return only progress bar HTML for efficient updates
 	html := fmt.Sprintf(`
 		<div class="progress-fill" 
@@ -509,7 +509,7 @@ func (h *HuggingFaceUIHandler) GetDownloadProgress(c *gin.Context) {
 			<span class="progress-text">%.1f%%</span>
 		</div>
 	`, download.Progress, downloadID, download.Progress)
-	
+
 	// If completed, stop polling
 	if download.Status == huggingface.DownloadStatusCompleted {
 		html = fmt.Sprintf(`
@@ -524,7 +524,7 @@ func (h *HuggingFaceUIHandler) GetDownloadProgress(c *gin.Context) {
 			</div>
 		`, download.Progress, download.Error)
 	}
-	
+
 	c.Header("Content-Type", "text/html")
 	c.String(http.StatusOK, html)
 }
@@ -532,20 +532,20 @@ func (h *HuggingFaceUIHandler) GetDownloadProgress(c *gin.Context) {
 // PostPauseDownload pauses an active download
 func (h *HuggingFaceUIHandler) PostPauseDownload(c *gin.Context) {
 	downloadID := c.Param("download_id")
-	
+
 	if err := h.downloader.PauseDownload(downloadID); err != nil {
 		h.logger.WithError(err).Error("Failed to pause download")
 		h.renderError(c, "Failed to pause download: "+err.Error())
 		return
 	}
-	
+
 	download, _ := h.downloader.GetDownload(downloadID)
-	
+
 	// Return updated download card
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Download": download,
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_download_paused", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render download status")
@@ -556,13 +556,13 @@ func (h *HuggingFaceUIHandler) PostPauseDownload(c *gin.Context) {
 // PostCancelDownload cancels and removes a download
 func (h *HuggingFaceUIHandler) PostCancelDownload(c *gin.Context) {
 	downloadID := c.Param("download_id")
-	
+
 	if err := h.downloader.CancelDownload(downloadID); err != nil {
 		h.logger.WithError(err).Error("Failed to cancel download")
 		h.renderError(c, "Failed to cancel download: "+err.Error())
 		return
 	}
-	
+
 	// Return empty div (removes download card)
 	html := `<div class="alert alert-info">Download cancelled and removed.</div>`
 	c.Header("Content-Type", "text/html")
@@ -572,7 +572,7 @@ func (h *HuggingFaceUIHandler) PostCancelDownload(c *gin.Context) {
 // GetDownloadsList returns all active downloads
 func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
 	downloads := h.downloader.ListDownloads()
-	
+
 	// Check if JSON response is requested (SvelteKit frontend)
 	if strings.Contains(c.GetHeader("Accept"), "application/json") {
 		c.JSON(http.StatusOK, gin.H{
@@ -581,13 +581,13 @@ func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Render HTML (HTMX)
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Downloads": downloads,
 		"Count":     len(downloads),
 	}
-	
+
 	if err := h.renderer.RenderInlineTemplate(c.Writer, "hf_downloads_list", data); err != nil {
 		h.logger.WithError(err).Error("Failed to render template")
 		h.renderError(c, "Failed to render downloads list")
@@ -598,7 +598,7 @@ func (h *HuggingFaceUIHandler) GetDownloadsList(c *gin.Context) {
 // PostClearCompleted removes all completed, failed, and cancelled downloads
 func (h *HuggingFaceUIHandler) PostClearCompleted(c *gin.Context) {
 	cleared := h.downloader.ClearCompleted()
-	
+
 	// Return JSON for SvelteKit frontend
 	if strings.Contains(c.GetHeader("Accept"), "application/json") {
 		c.JSON(http.StatusOK, gin.H{
@@ -607,7 +607,7 @@ func (h *HuggingFaceUIHandler) PostClearCompleted(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Return HTML for HTMX
 	html := fmt.Sprintf(`<div class="alert alert-success">Cleared %d completed downloads.</div>`, cleared)
 	c.Header("Content-Type", "text/html")
@@ -641,4 +641,3 @@ func hfErrorStatusCode(err error) int {
 	}
 	return http.StatusInternalServerError
 }
-

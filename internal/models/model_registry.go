@@ -91,10 +91,10 @@ type ModelProvider struct {
 	APIKey       string            `json:"-" db:"api_key"`                   // Encrypted, не возвращается в API
 
 	// Configuration
-	Enabled  bool                   `json:"enabled" db:"enabled"`
-	Priority int                    `json:"priority" db:"priority"`       // Higher = preferred
-	Config   map[string]interface{} `json:"config" db:"config"`           // Provider-specific config
-	ConfigDB string                 `json:"-" db:"config_json,omitempty"` // For DB serialization
+	Enabled  bool           `json:"enabled" db:"enabled"`
+	Priority int            `json:"priority" db:"priority"`       // Higher = preferred
+	Config   map[string]any `json:"config" db:"config"`           // Provider-specific config
+	ConfigDB string         `json:"-" db:"config_json,omitempty"` // For DB serialization
 
 	// Health
 	HealthStatus    ModelHealthStatus `json:"health_status" db:"health_status"`
@@ -123,7 +123,7 @@ func (p *ModelProvider) MarshalConfigToDB() error {
 // UnmarshalConfigFromDB десериализует Config из JSON string из БД
 func (p *ModelProvider) UnmarshalConfigFromDB() error {
 	if p.ConfigDB == "" {
-		p.Config = make(map[string]interface{})
+		p.Config = make(map[string]any)
 		return nil
 	}
 	return json.Unmarshal([]byte(p.ConfigDB), &p.Config)
@@ -131,23 +131,23 @@ func (p *ModelProvider) UnmarshalConfigFromDB() error {
 
 // CreateModelProviderRequest представляет запрос на создание provider
 type CreateModelProviderRequest struct {
-	Name         string                 `json:"name" binding:"required"`
-	ProviderType ModelProviderType      `json:"provider_type" binding:"required"`
-	BaseURL      string                 `json:"base_url" binding:"required"`
-	APIKey       string                 `json:"api_key,omitempty"`
-	Enabled      *bool                  `json:"enabled,omitempty"`
-	Priority     *int                   `json:"priority,omitempty"`
-	Config       map[string]interface{} `json:"config,omitempty"`
+	Name         string            `json:"name" binding:"required"`
+	ProviderType ModelProviderType `json:"provider_type" binding:"required"`
+	BaseURL      string            `json:"base_url" binding:"required"`
+	APIKey       string            `json:"api_key,omitempty"`
+	Enabled      *bool             `json:"enabled,omitempty"`
+	Priority     *int              `json:"priority,omitempty"`
+	Config       map[string]any    `json:"config,omitempty"`
 }
 
 // UpdateModelProviderRequest представляет запрос на обновление provider
 type UpdateModelProviderRequest struct {
-	Name     *string                `json:"name,omitempty"`
-	BaseURL  *string                `json:"base_url,omitempty"`
-	APIKey   *string                `json:"api_key,omitempty"`
-	Enabled  *bool                  `json:"enabled,omitempty"`
-	Priority *int                   `json:"priority,omitempty"`
-	Config   map[string]interface{} `json:"config,omitempty"`
+	Name     *string        `json:"name,omitempty"`
+	BaseURL  *string        `json:"base_url,omitempty"`
+	APIKey   *string        `json:"api_key,omitempty"`
+	Enabled  *bool          `json:"enabled,omitempty"`
+	Priority *int           `json:"priority,omitempty"`
+	Config   map[string]any `json:"config,omitempty"`
 }
 
 // ========================================
@@ -162,10 +162,10 @@ type ModelRegistry struct {
 	ProviderID string `json:"provider_id" db:"provider_id"` // FK to model_providers
 
 	// Capabilities & Parameters
-	Capabilities   []ModelCapability      `json:"capabilities" db:"capabilities"`
-	CapabilitiesDB string                 `json:"-" db:"capabilities_json,omitempty"` // For DB serialization
-	Parameters     map[string]interface{} `json:"parameters" db:"parameters"`
-	ParametersDB   string                 `json:"-" db:"parameters_json,omitempty"` // For DB serialization
+	Capabilities   []ModelCapability `json:"capabilities" db:"capabilities"`
+	CapabilitiesDB string            `json:"-" db:"capabilities_json,omitempty"` // For DB serialization
+	Parameters     map[string]any    `json:"parameters" db:"parameters"`
+	ParametersDB   string            `json:"-" db:"parameters_json,omitempty"` // For DB serialization
 
 	// Requirements
 	RequiresGPU   bool `json:"requires_gpu" db:"requires_gpu"`
@@ -244,13 +244,13 @@ func (m *ModelRegistry) UnmarshalFromDB() error {
 
 	// Parameters
 	if m.ParametersDB != "" {
-		var params map[string]interface{}
+		var params map[string]any
 		if err := json.Unmarshal([]byte(m.ParametersDB), &params); err != nil {
 			return err
 		}
 		m.Parameters = params
 	} else {
-		m.Parameters = make(map[string]interface{})
+		m.Parameters = make(map[string]any)
 	}
 
 	// Tags parsing handled in storage layer (different for SQLite/PostgreSQL)
@@ -260,30 +260,30 @@ func (m *ModelRegistry) UnmarshalFromDB() error {
 
 // CreateModelRegistryRequest представляет запрос на регистрацию модели
 type CreateModelRegistryRequest struct {
-	ModelID       string                 `json:"model_id" binding:"required"`
-	ModelName     string                 `json:"model_name" binding:"required"`
-	ProviderID    string                 `json:"provider_id" binding:"required"`
-	Capabilities  []ModelCapability      `json:"capabilities,omitempty"`
-	Parameters    map[string]interface{} `json:"parameters,omitempty"`
-	RequiresGPU   *bool                  `json:"requires_gpu,omitempty"`
-	MinVRAMGB     *int                   `json:"min_vram_gb,omitempty"`
-	ContextLength *int                   `json:"context_length,omitempty"`
-	Description   string                 `json:"description,omitempty"`
-	Tags          []string               `json:"tags,omitempty"`
+	ModelID       string            `json:"model_id" binding:"required"`
+	ModelName     string            `json:"model_name" binding:"required"`
+	ProviderID    string            `json:"provider_id" binding:"required"`
+	Capabilities  []ModelCapability `json:"capabilities,omitempty"`
+	Parameters    map[string]any    `json:"parameters,omitempty"`
+	RequiresGPU   *bool             `json:"requires_gpu,omitempty"`
+	MinVRAMGB     *int              `json:"min_vram_gb,omitempty"`
+	ContextLength *int              `json:"context_length,omitempty"`
+	Description   string            `json:"description,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
 }
 
 // UpdateModelRegistryRequest представляет запрос на обновление модели
 type UpdateModelRegistryRequest struct {
-	ModelName     *string                `json:"model_name,omitempty"`
-	ProviderID    *string                `json:"provider_id,omitempty"`
-	Capabilities  []ModelCapability      `json:"capabilities,omitempty"`
-	Parameters    map[string]interface{} `json:"parameters,omitempty"`
-	Status        *ModelStatus           `json:"status,omitempty"`
-	RequiresGPU   *bool                  `json:"requires_gpu,omitempty"`
-	MinVRAMGB     *int                   `json:"min_vram_gb,omitempty"`
-	ContextLength *int                   `json:"context_length,omitempty"`
-	Description   *string                `json:"description,omitempty"`
-	Tags          []string               `json:"tags,omitempty"`
+	ModelName     *string           `json:"model_name,omitempty"`
+	ProviderID    *string           `json:"provider_id,omitempty"`
+	Capabilities  []ModelCapability `json:"capabilities,omitempty"`
+	Parameters    map[string]any    `json:"parameters,omitempty"`
+	Status        *ModelStatus      `json:"status,omitempty"`
+	RequiresGPU   *bool             `json:"requires_gpu,omitempty"`
+	MinVRAMGB     *int              `json:"min_vram_gb,omitempty"`
+	ContextLength *int              `json:"context_length,omitempty"`
+	Description   *string           `json:"description,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
 }
 
 // ModelRegistryFilter представляет фильтры для поиска моделей

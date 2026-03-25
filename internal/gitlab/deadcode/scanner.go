@@ -169,7 +169,7 @@ type codeChunk struct {
 func (s *Scanner) collectChunks(ctx context.Context, collection, projectID string, maxChunks int) ([]codeChunk, error) {
 	var chunks []codeChunk
 
-	err := s.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -294,7 +294,7 @@ func (s *Scanner) searchUsages(ctx context.Context, collection, projectID string
 
 	var usages []string
 
-	err := s.vectorStore.ScrollAll(ctx, collection, map[string]interface{}{
+	err := s.vectorStore.ScrollAll(ctx, collection, map[string]any{
 		"project_id": projectID,
 	}, func(docs []vector.VectorDocument) error {
 		for _, doc := range docs {
@@ -378,7 +378,7 @@ Respond in JSON only:
 
 // callLLM makes a request to the LLM API
 func (s *Scanner) callLLM(ctx context.Context, modelID, prompt string) (string, int, error) {
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": modelID,
 		"messages": []map[string]string{
 			{"role": "system", "content": "You are a code analyzer. Determine if code is unused. Respond in JSON only."},
@@ -502,13 +502,6 @@ func extractJSON(s string) string {
 		return s[start : end+1]
 	}
 	return s
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // ============================================================================

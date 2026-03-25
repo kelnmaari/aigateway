@@ -42,7 +42,7 @@ type StoreOptions struct {
 	MimeType string // MIME type файла
 
 	// Metadata дополнительные метаданные (для будущего использования)
-	Metadata map[string]interface{}
+	Metadata map[string]any
 
 	// Public флаг публичного доступа (для S3 ACL)
 	Public bool
@@ -53,11 +53,10 @@ type StoreOptions struct {
 
 // FileInfo информация о сохраненном файле
 type FileInfo struct {
-	Path      string                 // Storage path
-	Size      int64                  // Размер в байтах
-	MimeType  string                 // MIME type
-	Checksum  string                 // SHA-256 checksum
-	Metadata  map[string]interface{} // Метаданные
-	CreatedAt time.Time              // Время создания
+	Path      string         // Storage path
+	Size      int64          // Размер в байтах
+	MimeType  string         // MIME type
+	Checksum  string         // SHA-256 checksum
+	Metadata  map[string]any // Метаданные
+	CreatedAt time.Time      // Время создания
 }
-

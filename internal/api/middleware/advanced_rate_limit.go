@@ -70,10 +70,7 @@ func AdvancedRateLimitMiddleware(limiter *ratelimit.AdvancedRateLimiter, logger 
 
 		if !result.Allowed {
 			// Calculate retry-after in seconds
-			retryAfter := int(time.Until(result.ResetAt).Seconds())
-			if retryAfter < 0 {
-				retryAfter = 0
-			}
+			retryAfter := max(int(time.Until(result.ResetAt).Seconds()), 0)
 
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
 
@@ -134,7 +131,7 @@ func extractModelFromContext(c *gin.Context) string {
 }
 
 // stringValue безопасное извлечение string из interface{}
-func stringValue(val interface{}) string {
+func stringValue(val any) string {
 	if val == nil {
 		return ""
 	}
@@ -163,5 +160,3 @@ func formatRateLimitMessage(result *models.RateLimitResult) string {
 	}
 	return "Rate limit exceeded"
 }
-
-

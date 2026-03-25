@@ -7,6 +7,7 @@ package oidc
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -72,13 +73,7 @@ func NewOIDCProvider(ctx context.Context, cfg *config.OIDCConfig, logger *logrus
 	}
 
 	// Ensure "openid" scope is always present (required for OIDC)
-	hasOpenID := false
-	for _, scope := range scopes {
-		if scope == oidc.ScopeOpenID {
-			hasOpenID = true
-			break
-		}
-	}
+	hasOpenID := slices.Contains(scopes, oidc.ScopeOpenID)
 	if !hasOpenID {
 		scopes = append([]string{oidc.ScopeOpenID}, scopes...)
 	}
@@ -217,5 +212,3 @@ func (p *OIDCProvider) GetConfig() *config.OIDCConfig {
 func (p *OIDCProvider) GetEndpoint() oauth2.Endpoint {
 	return p.oauth2Config.Endpoint
 }
-
-

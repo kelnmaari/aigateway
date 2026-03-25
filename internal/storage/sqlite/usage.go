@@ -71,7 +71,7 @@ func (s *SQLiteDB) RecordAPIUsage(ctx context.Context, usage *models.APIUsage) e
 	}
 
 	// DEBUG: Log successful insert
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"id":                usage.ID,
 		"user_id":           usage.UserID,
 		"api_key_id":        usage.APIKeyID,
@@ -272,14 +272,14 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 				s.logger.WithError(err).Warn("Failed to scan API key usage")
 				continue
 			}
-			
+
 			// Parse timestamp with multiple format support
 			if lastUsedStr.Valid && lastUsedStr.String != "" {
 				apiKey.LastUsed = s.parseTimestamp(lastUsedStr.String)
 			} else {
 				apiKey.LastUsed = time.Time{} // Zero time if NULL
 			}
-			
+
 			stats.APIKeys = append(stats.APIKeys, apiKey)
 		}
 	}
@@ -315,14 +315,14 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 				s.logger.WithError(err).Warn("Failed to scan recent request")
 				continue
 			}
-			
+
 			// Parse timestamp with multiple format support
 			if timestampStr.Valid && timestampStr.String != "" {
 				req.Timestamp = s.parseTimestamp(timestampStr.String)
 			} else {
 				req.Timestamp = time.Now() // Fallback to current time
 			}
-			
+
 			stats.RecentRequests = append(stats.RecentRequests, req)
 		}
 	}
@@ -331,7 +331,7 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 	stats.StartDate = startTime
 	stats.EndDate = time.Now()
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"user_id":        userID,
 		"total_requests": stats.TotalRequests,
 		"total_tokens":   stats.TotalTokens,
@@ -344,24 +344,24 @@ func (s *SQLiteDB) GetUserUsageStats(ctx context.Context, userID string, period 
 func (s *SQLiteDB) parseTimestamp(ts string) time.Time {
 	// Список форматов для пробы
 	formats := []string{
-		"2006-01-02 15:04:05",                    // SQLite datetime
-		time.RFC3339,                             // 2006-01-02T15:04:05Z07:00
-		time.RFC3339Nano,                         // 2006-01-02T15:04:05.999999999Z07:00
+		"2006-01-02 15:04:05", // SQLite datetime
+		time.RFC3339,          // 2006-01-02T15:04:05Z07:00
+		time.RFC3339Nano,      // 2006-01-02T15:04:05.999999999Z07:00
 		"2006-01-02 15:04:05.999999999 -0700 MST", // Go time.String() format
 	}
-	
+
 	for _, format := range formats {
 		if t, err := time.Parse(format, ts); err == nil {
 			return t
 		}
 	}
-	
+
 	// Если ничего не подошло, попробуем удалить "m=+XXX" из конца (monotonic clock)
 	if idx := strings.Index(ts, " m="); idx > 0 {
 		cleaned := ts[:idx]
 		return s.parseTimestamp(cleaned) // Рекурсивно с очищенной строкой
 	}
-	
+
 	s.logger.Warnf("Failed to parse timestamp in any format: %s", ts)
 	return time.Time{} // Zero time as last resort
 }
@@ -526,7 +526,7 @@ func (s *SQLiteDB) GetTenantUsageStats(ctx context.Context, tenantID string, per
 	stats.StartDate = startTime
 	stats.EndDate = time.Now()
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"tenant_id":      tenantID,
 		"total_requests": stats.TotalRequests,
 		"total_tokens":   stats.TotalTokens,
@@ -541,14 +541,14 @@ func (s *SQLiteDB) GetTenantUsageStats(ctx context.Context, tenantID string, per
 
 // GetUsageStats возвращает статистику использования за период для отчетов
 func (s *SQLiteDB) GetUsageStats(ctx context.Context, start, end time.Time) (*models.UsageReportStats, error) {
-if s.db == nil {
-return nil, fmt.Errorf("database not connected")
-}
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
 
-stats := &models.UsageReportStats{}
+	stats := &models.UsageReportStats{}
 
-// Get aggregate statistics
-query := `
+	// Get aggregate statistics
+	query := `
 SELECT
 COUNT(*) as total_requests,
 SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_requests,
@@ -560,20 +560,20 @@ FROM api_usage
 WHERE created_at >= ? AND created_at <= ?
 `
 
-err := s.db.QueryRowContext(ctx, query, start, end).Scan(
-&stats.TotalRequests,
-&stats.SuccessfulRequests,
-&stats.FailedRequests,
-&stats.TotalTokens,
-&stats.UniqueUsers,
-&stats.UniqueModels,
-)
-if err != nil {
-return nil, fmt.Errorf("failed to get usage stats: %w", err)
-}
+	err := s.db.QueryRowContext(ctx, query, start, end).Scan(
+		&stats.TotalRequests,
+		&stats.SuccessfulRequests,
+		&stats.FailedRequests,
+		&stats.TotalTokens,
+		&stats.UniqueUsers,
+		&stats.UniqueModels,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get usage stats: %w", err)
+	}
 
-// Get top models
-modelQuery := `
+	// Get top models
+	modelQuery := `
 SELECT model, COUNT(*) as requests, SUM(total_tokens) as tokens
 FROM api_usage
 WHERE created_at >= ? AND created_at <= ?
@@ -582,26 +582,26 @@ ORDER BY requests DESC
 LIMIT 10
 `
 
-rows, err := s.db.QueryContext(ctx, modelQuery, start, end)
-if err != nil {
-return nil, fmt.Errorf("failed to get top models: %w", err)
-}
-defer rows.Close()
+	rows, err := s.db.QueryContext(ctx, modelQuery, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get top models: %w", err)
+	}
+	defer rows.Close()
 
-for rows.Next() {
-var model struct {
-Model    string
-Requests int64
-Tokens   int64
-}
-if err := rows.Scan(&model.Model, &model.Requests, &model.Tokens); err != nil {
-continue
-}
-stats.TopModels = append(stats.TopModels, model)
-}
+	for rows.Next() {
+		var model struct {
+			Model    string
+			Requests int64
+			Tokens   int64
+		}
+		if err := rows.Scan(&model.Model, &model.Requests, &model.Tokens); err != nil {
+			continue
+		}
+		stats.TopModels = append(stats.TopModels, model)
+	}
 
-// Get top users (join with users table to get usernames)
-userQuery := `
+	// Get top users (join with users table to get usernames)
+	userQuery := `
 SELECT u.username, COUNT(a.id) as requests, SUM(a.total_tokens) as tokens
 FROM api_usage a
 JOIN users u ON a.user_id = u.id
@@ -611,35 +611,35 @@ ORDER BY requests DESC
 LIMIT 10
 `
 
-rows2, err := s.db.QueryContext(ctx, userQuery, start, end)
-if err == nil {
-defer rows2.Close()
-for rows2.Next() {
-var user struct {
-Username string
-Requests int64
-Tokens   int64
-}
-if err := rows2.Scan(&user.Username, &user.Requests, &user.Tokens); err != nil {
-continue
-}
-stats.TopUsers = append(stats.TopUsers, user)
-}
-}
+	rows2, err := s.db.QueryContext(ctx, userQuery, start, end)
+	if err == nil {
+		defer rows2.Close()
+		for rows2.Next() {
+			var user struct {
+				Username string
+				Requests int64
+				Tokens   int64
+			}
+			if err := rows2.Scan(&user.Username, &user.Requests, &user.Tokens); err != nil {
+				continue
+			}
+			stats.TopUsers = append(stats.TopUsers, user)
+		}
+	}
 
-return stats, nil
+	return stats, nil
 }
 
 // GetPerformanceStats возвращает статистику производительности за период для отчетов
 func (s *SQLiteDB) GetPerformanceStats(ctx context.Context, start, end time.Time) (*models.PerformanceReportStats, error) {
-if s.db == nil {
-return nil, fmt.Errorf("database not connected")
-}
+	if s.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
 
-stats := &models.PerformanceReportStats{}
+	stats := &models.PerformanceReportStats{}
 
-// Get aggregate statistics
-query := `
+	// Get aggregate statistics
+	query := `
 SELECT
 COUNT(*) as total_requests,
 AVG(duration_ms) as avg_latency,
@@ -650,125 +650,121 @@ FROM api_usage
 WHERE created_at >= ? AND created_at <= ?
 `
 
-err := s.db.QueryRowContext(ctx, query, start, end).Scan(
-&stats.TotalRequests,
-&stats.AvgLatencyMS,
-&stats.FastestRequest,
-&stats.SlowestRequest,
-&stats.ErrorCount,
-)
-if err != nil {
-return nil, fmt.Errorf("failed to get performance stats: %w", err)
-}
+	err := s.db.QueryRowContext(ctx, query, start, end).Scan(
+		&stats.TotalRequests,
+		&stats.AvgLatencyMS,
+		&stats.FastestRequest,
+		&stats.SlowestRequest,
+		&stats.ErrorCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get performance stats: %w", err)
+	}
 
-// Calculate percentiles (simplified - use sorting)
-percQuery := `
+	// Calculate percentiles (simplified - use sorting)
+	percQuery := `
 SELECT duration_ms
 FROM api_usage
 WHERE created_at >= ? AND created_at <= ?
 ORDER BY duration_ms
 `
 
-rows, err := s.db.QueryContext(ctx, percQuery, start, end)
-if err == nil {
-defer rows.Close()
-durations := []float64{}
-for rows.Next() {
-var d float64
-if err := rows.Scan(&d); err == nil {
-durations = append(durations, d)
-}
-}
+	rows, err := s.db.QueryContext(ctx, percQuery, start, end)
+	if err == nil {
+		defer rows.Close()
+		durations := []float64{}
+		for rows.Next() {
+			var d float64
+			if err := rows.Scan(&d); err == nil {
+				durations = append(durations, d)
+			}
+		}
 
-if len(durations) > 0 {
-stats.P50LatencyMS = percentile(durations, 0.50)
-stats.P95LatencyMS = percentile(durations, 0.95)
-stats.P99LatencyMS = percentile(durations, 0.99)
-}
-}
+		if len(durations) > 0 {
+			stats.P50LatencyMS = percentile(durations, 0.50)
+			stats.P95LatencyMS = percentile(durations, 0.95)
+			stats.P99LatencyMS = percentile(durations, 0.99)
+		}
+	}
 
-// Count slow requests (>5 seconds)
-slowQuery := `SELECT COUNT(*) FROM api_usage WHERE created_at >= ? AND created_at <= ? AND duration_ms > 5000`
-s.db.QueryRowContext(ctx, slowQuery, start, end).Scan(&stats.SlowRequestsCount)
+	// Count slow requests (>5 seconds)
+	slowQuery := `SELECT COUNT(*) FROM api_usage WHERE created_at >= ? AND created_at <= ? AND duration_ms > 5000`
+	s.db.QueryRowContext(ctx, slowQuery, start, end).Scan(&stats.SlowRequestsCount)
 
-// Calculate requests per second
-duration := end.Sub(start).Seconds()
-if duration > 0 {
-stats.RequestsPerSecond = float64(stats.TotalRequests) / duration
-}
+	// Calculate requests per second
+	duration := end.Sub(start).Seconds()
+	if duration > 0 {
+		stats.RequestsPerSecond = float64(stats.TotalRequests) / duration
+	}
 
-return stats, nil
+	return stats, nil
 }
 
 // CountActiveUsers возвращает количество активных пользователей за период
 func (s *SQLiteDB) CountActiveUsers(ctx context.Context, period time.Duration) (int, error) {
-if s.db == nil {
-return 0, fmt.Errorf("database not connected")
-}
+	if s.db == nil {
+		return 0, fmt.Errorf("database not connected")
+	}
 
-since := time.Now().Add(-period)
-var count int
+	since := time.Now().Add(-period)
+	var count int
 
-query := `
+	query := `
 SELECT COUNT(DISTINCT user_id)
 FROM api_usage
 WHERE created_at >= ?
 `
 
-err := s.db.QueryRowContext(ctx, query, since).Scan(&count)
-if err != nil {
-return 0, fmt.Errorf("failed to count active users: %w", err)
-}
+	err := s.db.QueryRowContext(ctx, query, since).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count active users: %w", err)
+	}
 
-return count, nil
+	return count, nil
 }
 
 // CountTotalUsers возвращает общее количество пользователей
 func (s *SQLiteDB) CountTotalUsers(ctx context.Context) (int, error) {
-if s.db == nil {
-return 0, fmt.Errorf("database not connected")
-}
+	if s.db == nil {
+		return 0, fmt.Errorf("database not connected")
+	}
 
-var count int
-query := `SELECT COUNT(*) FROM users WHERE status != 'deleted'`
+	var count int
+	query := `SELECT COUNT(*) FROM users WHERE status != 'deleted'`
 
-err := s.db.QueryRowContext(ctx, query).Scan(&count)
-if err != nil {
-return 0, fmt.Errorf("failed to count total users: %w", err)
-}
+	err := s.db.QueryRowContext(ctx, query).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count total users: %w", err)
+	}
 
-return count, nil
+	return count, nil
 }
 
 // CountActiveAPIKeys возвращает количество активных API ключей
 func (s *SQLiteDB) CountActiveAPIKeys(ctx context.Context) (int, error) {
-if s.db == nil {
-return 0, fmt.Errorf("database not connected")
-}
+	if s.db == nil {
+		return 0, fmt.Errorf("database not connected")
+	}
 
-var count int
-query := `SELECT COUNT(*) FROM api_keys WHERE status = 'active' AND (expires_at IS NULL OR expires_at > datetime('now'))`
+	var count int
+	query := `SELECT COUNT(*) FROM api_keys WHERE status = 'active' AND (expires_at IS NULL OR expires_at > datetime('now'))`
 
-err := s.db.QueryRowContext(ctx, query).Scan(&count)
-if err != nil {
-return 0, fmt.Errorf("failed to count active API keys: %w", err)
-}
+	err := s.db.QueryRowContext(ctx, query).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count active API keys: %w", err)
+	}
 
-return count, nil
+	return count, nil
 }
 
 // percentile calculates percentile from sorted slice
 func percentile(sorted []float64, p float64) float64 {
-if len(sorted) == 0 {
-return 0
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := max(int(float64(len(sorted)-1)*p), 0)
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
+	return sorted[idx]
 }
-idx := int(float64(len(sorted)-1) * p)
-if idx < 0 {
-idx = 0
-}
-if idx >= len(sorted) {
-idx = len(sorted) - 1
-}
-return sorted[idx]
-}
-

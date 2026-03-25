@@ -10,8 +10,10 @@ package utils
 //	    Temperature: utils.Ptr(0.7),
 //	    MaxTokens:   utils.Ptr(2048),
 //	}
+//
+//go:fix inline
 func Ptr[T any](v T) *T {
-	return &v
+	return new(v)
 }
 
 // Value extracts the value from a pointer, returning the default value if the pointer is nil.

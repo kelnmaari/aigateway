@@ -125,7 +125,7 @@ func (s *PostgresStore) GetIntegration(ctx context.Context, id string) (*models.
 
 func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLabIntegrationListRequest) ([]models.GitLabIntegration, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.Status != nil {
@@ -166,10 +166,7 @@ func (s *PostgresStore) ListIntegrations(ctx context.Context, req *models.GitLab
 	if limit <= 0 {
 		limit = 20
 	}
-	offset := req.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(req.Offset, 0)
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -295,7 +292,7 @@ func (s *PostgresStore) ListIntegrationsByOwner(ctx context.Context, ownerID str
 
 func (s *PostgresStore) UpdateIntegration(ctx context.Context, id string, req *models.UpdateGitLabIntegrationRequest) error {
 	var sets []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.Name != nil {
@@ -574,7 +571,7 @@ func (s *PostgresStore) GetProjectByGitLabID(ctx context.Context, integrationID 
 
 func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProjectListRequest) ([]models.GitLabProject, int, error) {
 	var conditions []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.IntegrationID != nil {
@@ -625,10 +622,7 @@ func (s *PostgresStore) ListProjects(ctx context.Context, req *models.GitLabProj
 	if limit <= 0 {
 		limit = 20
 	}
-	offset := req.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(req.Offset, 0)
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -799,7 +793,7 @@ func (s *PostgresStore) ListProjectsByIntegration(ctx context.Context, integrati
 
 func (s *PostgresStore) UpdateProject(ctx context.Context, id string, req *models.UpdateGitLabProjectRequest) error {
 	var sets []string
-	var args []interface{}
+	var args []any
 	argNum := 1
 
 	if req.Name != nil {

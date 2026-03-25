@@ -29,7 +29,7 @@ func NewFileReadTool(baseDir string) *FileReadTool {
 			baseDir = absBaseDir
 		}
 	}
-	
+
 	return &FileReadTool{
 		baseDir: baseDir,
 	}
@@ -41,10 +41,10 @@ func (t *FileReadTool) GetInfo() models.AgentTool {
 		Name:        "file.read",
 		Category:    models.AgentToolCategoryFile,
 		Description: "Read contents of a file",
-		Parameters: map[string]interface{}{
+		Parameters: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"path": map[string]interface{}{
+			"properties": map[string]any{
+				"path": map[string]any{
 					"type":        "string",
 					"description": "Path to the file to read",
 				},
@@ -57,7 +57,7 @@ func (t *FileReadTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *FileReadTool) Validate(params map[string]interface{}) error {
+func (t *FileReadTool) Validate(params map[string]any) error {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
 		return fmt.Errorf("'path' parameter is required and must be a string")
@@ -65,9 +65,9 @@ func (t *FileReadTool) Validate(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *FileReadTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *FileReadTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	path := params["path"].(string)
-	
+
 	// Security: validate path if baseDir is set
 	if t.baseDir != "" {
 		absPath, err := filepath.Abs(path)
@@ -78,7 +78,7 @@ func (t *FileReadTool) Execute(ctx context.Context, params map[string]interface{
 				Error:   &errMsg,
 			}, nil
 		}
-		
+
 		if !strings.HasPrefix(absPath, t.baseDir) {
 			errMsg := fmt.Sprintf("access denied: path outside allowed directory")
 			return &models.AgentStepResult{
@@ -87,7 +87,7 @@ func (t *FileReadTool) Execute(ctx context.Context, params map[string]interface{
 			}, nil
 		}
 	}
-	
+
 	// Read file
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -97,10 +97,10 @@ func (t *FileReadTool) Execute(ctx context.Context, params map[string]interface{
 			Error:   &errMsg,
 		}, nil
 	}
-	
+
 	return &models.AgentStepResult{
 		Success: true,
-		Output: map[string]interface{}{
+		Output: map[string]any{
 			"path":    path,
 			"content": string(content),
 			"size":    len(content),
@@ -125,7 +125,7 @@ func NewFileWriteTool(baseDir string) *FileWriteTool {
 			baseDir = absBaseDir
 		}
 	}
-	
+
 	return &FileWriteTool{
 		baseDir: baseDir,
 	}
@@ -137,14 +137,14 @@ func (t *FileWriteTool) GetInfo() models.AgentTool {
 		Name:        "file.write",
 		Category:    models.AgentToolCategoryFile,
 		Description: "Write content to a file (overwrites existing)",
-		Parameters: map[string]interface{}{
+		Parameters: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"path": map[string]interface{}{
+			"properties": map[string]any{
+				"path": map[string]any{
 					"type":        "string",
 					"description": "Path to the file to write",
 				},
-				"content": map[string]interface{}{
+				"content": map[string]any{
 					"type":        "string",
 					"description": "Content to write",
 				},
@@ -157,24 +157,24 @@ func (t *FileWriteTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *FileWriteTool) Validate(params map[string]interface{}) error {
+func (t *FileWriteTool) Validate(params map[string]any) error {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
 		return fmt.Errorf("'path' parameter is required")
 	}
-	
+
 	_, ok = params["content"].(string)
 	if !ok {
 		return fmt.Errorf("'content' parameter is required and must be a string")
 	}
-	
+
 	return nil
 }
 
-func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *FileWriteTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	path := params["path"].(string)
 	content := params["content"].(string)
-	
+
 	// Security check
 	if t.baseDir != "" {
 		absPath, err := filepath.Abs(path)
@@ -185,7 +185,7 @@ func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface
 				Error:   &errMsg,
 			}, nil
 		}
-		
+
 		if !strings.HasPrefix(absPath, t.baseDir) {
 			errMsg := "access denied: path outside allowed directory"
 			return &models.AgentStepResult{
@@ -194,7 +194,7 @@ func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface
 			}, nil
 		}
 	}
-	
+
 	// Create parent directory if needed
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -204,7 +204,7 @@ func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface
 			Error:   &errMsg,
 		}, nil
 	}
-	
+
 	// Write file
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		errMsg := fmt.Sprintf("failed to write file: %v", err)
@@ -213,11 +213,11 @@ func (t *FileWriteTool) Execute(ctx context.Context, params map[string]interface
 			Error:   &errMsg,
 		}, nil
 	}
-	
+
 	return &models.AgentStepResult{
 		Success: true,
-		Output: map[string]interface{}{
-			"path":         path,
+		Output: map[string]any{
+			"path":          path,
 			"bytes_written": len(content),
 		},
 		RequiresApproval: false, // Already approved by virtue of execution
@@ -241,7 +241,7 @@ func NewFileListTool(baseDir string) *FileListTool {
 			baseDir = absBaseDir
 		}
 	}
-	
+
 	return &FileListTool{
 		baseDir: baseDir,
 	}
@@ -253,15 +253,15 @@ func (t *FileListTool) GetInfo() models.AgentTool {
 		Name:        "file.list",
 		Category:    models.AgentToolCategoryFile,
 		Description: "List files in a directory",
-		Parameters: map[string]interface{}{
+		Parameters: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"path": map[string]interface{}{
+			"properties": map[string]any{
+				"path": map[string]any{
 					"type":        "string",
 					"description": "Directory path to list",
 					"default":     ".",
 				},
-				"recursive": map[string]interface{}{
+				"recursive": map[string]any{
 					"type":        "boolean",
 					"description": "List recursively",
 					"default":     false,
@@ -274,24 +274,24 @@ func (t *FileListTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *FileListTool) Validate(params map[string]interface{}) error {
+func (t *FileListTool) Validate(params map[string]any) error {
 	if path, ok := params["path"].(string); ok && path == "" {
 		return fmt.Errorf("'path' cannot be empty")
 	}
 	return nil
 }
 
-func (t *FileListTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *FileListTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	path := "."
 	if p, ok := params["path"].(string); ok && p != "" {
 		path = p
 	}
-	
+
 	recursive := false
 	if r, ok := params["recursive"].(bool); ok {
 		recursive = r
 	}
-	
+
 	// Security check
 	if t.baseDir != "" {
 		absPath, err := filepath.Abs(path)
@@ -302,7 +302,7 @@ func (t *FileListTool) Execute(ctx context.Context, params map[string]interface{
 				Error:   &errMsg,
 			}, nil
 		}
-		
+
 		if !strings.HasPrefix(absPath, t.baseDir) {
 			errMsg := "access denied: path outside allowed directory"
 			return &models.AgentStepResult{
@@ -311,28 +311,28 @@ func (t *FileListTool) Execute(ctx context.Context, params map[string]interface{
 			}, nil
 		}
 	}
-	
-	var files []map[string]interface{}
-	
+
+	var files []map[string]any
+
 	if recursive {
 		// Walk directory tree
 		err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			
+
 			relPath, _ := filepath.Rel(path, filePath)
-			files = append(files, map[string]interface{}{
-				"name":  info.Name(),
-				"path":  relPath,
-				"size":  info.Size(),
+			files = append(files, map[string]any{
+				"name":   info.Name(),
+				"path":   relPath,
+				"size":   info.Size(),
 				"is_dir": info.IsDir(),
-				"mode":  info.Mode().String(),
+				"mode":   info.Mode().String(),
 			})
-			
+
 			return nil
 		})
-		
+
 		if err != nil {
 			errMsg := fmt.Sprintf("failed to walk directory: %v", err)
 			return &models.AgentStepResult{
@@ -350,22 +350,22 @@ func (t *FileListTool) Execute(ctx context.Context, params map[string]interface{
 				Error:   &errMsg,
 			}, nil
 		}
-		
+
 		for _, entry := range entries {
 			info, _ := entry.Info()
-			files = append(files, map[string]interface{}{
-				"name":  entry.Name(),
-				"path":  entry.Name(),
-				"size":  info.Size(),
+			files = append(files, map[string]any{
+				"name":   entry.Name(),
+				"path":   entry.Name(),
+				"size":   info.Size(),
 				"is_dir": entry.IsDir(),
-				"mode":  info.Mode().String(),
+				"mode":   info.Mode().String(),
 			})
 		}
 	}
-	
+
 	return &models.AgentStepResult{
 		Success: true,
-		Output: map[string]interface{}{
+		Output: map[string]any{
 			"path":      path,
 			"files":     files,
 			"count":     len(files),
@@ -391,7 +391,7 @@ func NewFileDeleteTool(baseDir string) *FileDeleteTool {
 			baseDir = absBaseDir
 		}
 	}
-	
+
 	return &FileDeleteTool{
 		baseDir: baseDir,
 	}
@@ -403,10 +403,10 @@ func (t *FileDeleteTool) GetInfo() models.AgentTool {
 		Name:        "file.delete",
 		Category:    models.AgentToolCategoryFile,
 		Description: "Delete a file or directory",
-		Parameters: map[string]interface{}{
+		Parameters: map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"path": map[string]interface{}{
+			"properties": map[string]any{
+				"path": map[string]any{
 					"type":        "string",
 					"description": "Path to delete",
 				},
@@ -419,7 +419,7 @@ func (t *FileDeleteTool) GetInfo() models.AgentTool {
 	}
 }
 
-func (t *FileDeleteTool) Validate(params map[string]interface{}) error {
+func (t *FileDeleteTool) Validate(params map[string]any) error {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
 		return fmt.Errorf("'path' parameter is required")
@@ -427,9 +427,9 @@ func (t *FileDeleteTool) Validate(params map[string]interface{}) error {
 	return nil
 }
 
-func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]interface{}) (*models.AgentStepResult, error) {
+func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]any) (*models.AgentStepResult, error) {
 	path := params["path"].(string)
-	
+
 	// Security check
 	if t.baseDir != "" {
 		absPath, err := filepath.Abs(path)
@@ -440,7 +440,7 @@ func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]interfac
 				Error:   &errMsg,
 			}, nil
 		}
-		
+
 		if !strings.HasPrefix(absPath, t.baseDir) {
 			errMsg := "access denied: path outside allowed directory"
 			return &models.AgentStepResult{
@@ -449,7 +449,7 @@ func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]interfac
 			}, nil
 		}
 	}
-	
+
 	// Delete file/directory
 	if err := os.RemoveAll(path); err != nil {
 		errMsg := fmt.Sprintf("failed to delete: %v", err)
@@ -458,10 +458,10 @@ func (t *FileDeleteTool) Execute(ctx context.Context, params map[string]interfac
 			Error:   &errMsg,
 		}, nil
 	}
-	
+
 	return &models.AgentStepResult{
 		Success: true,
-		Output: map[string]interface{}{
+		Output: map[string]any{
 			"path":    path,
 			"deleted": true,
 		},
@@ -480,13 +480,12 @@ func RegisterFileTools(registry *Registry, baseDir string) error {
 		NewFileListTool(baseDir),
 		NewFileDeleteTool(baseDir),
 	}
-	
+
 	for _, tool := range tools {
 		if err := registry.Register(tool); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
-

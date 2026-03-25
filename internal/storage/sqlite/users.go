@@ -29,7 +29,7 @@ func (s *SQLiteDB) CreateUser(ctx context.Context, user *models.User) error {
 	}
 
 	// Serialize metadata to JSON if present
-	var metadataValue interface{}
+	var metadataValue any
 	if user.Metadata != nil {
 		metadataJSON, err := json.Marshal(user.Metadata)
 		if err != nil {
@@ -37,7 +37,7 @@ func (s *SQLiteDB) CreateUser(ctx context.Context, user *models.User) error {
 		}
 		metadataValue = metadataJSON
 	} else {
-		metadataValue = nil  // SQLite NULL
+		metadataValue = nil // SQLite NULL
 	}
 
 	query := `
@@ -170,7 +170,7 @@ func (s *SQLiteDB) GetUserByOIDCSubject(ctx context.Context, issuer, subject str
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	s.logger.WithFields(map[string]interface{}{
+	s.logger.WithFields(map[string]any{
 		"issuer":  issuer,
 		"subject": subject,
 	}).Debug("Getting user by OIDC subject")
@@ -394,7 +394,7 @@ func (s *SQLiteDB) ListUsers(ctx context.Context, filters models.UserFilters) ([
 		WHERE 1=1
 	`
 
-	var args []interface{}
+	var args []any
 
 	// Apply filters
 	if filters.Status != nil {
@@ -461,7 +461,7 @@ func (s *SQLiteDB) ListUsers(ctx context.Context, filters models.UserFilters) ([
 
 // scanner is an interface that matches both sql.Row and sql.Rows
 type scanner interface {
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }
 
 // scanUser сканирует строку БД в модель User
@@ -510,7 +510,6 @@ func (s *SQLiteDB) scanUser(row scanner) (*models.User, error) {
 
 	return &user, nil
 }
-
 
 // GetUsersWithDetails возвращает список пользователей с enriched данными (roles, tenants)
 // для админ-панели (v2.2.2+)

@@ -51,7 +51,7 @@ type ChatRequest struct {
 // ChatMessage represents a message in the conversation.
 type ChatMessage struct {
 	Role       string           `json:"role"`
-	Content    interface{}      `json:"content,omitempty"` // string or []ContentPart for multimodal
+	Content    interface{}      `json:"content"` // string or []ContentPart for multimodal; must not use omitempty to preserve null for tool-calling messages
 	ToolCalls  []tools.ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
@@ -133,6 +133,8 @@ func (h *ChatToolsHandler) handleWithTools(c *gin.Context, endpoint, providerMod
 		llmResp, err := h.callLLM(c.Request.Context(), endpoint, bodyBytes)
 		if err != nil {
 			h.sendToolEvent(c, flusher, tools.ToolEvent{Type: "error", Tool: "llm", Query: err.Error()})
+			fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+			flusher.Flush()
 			return
 		}
 
@@ -264,9 +266,22 @@ func (h *ChatToolsHandler) streamFinalResponse(c *gin.Context, flusher http.Flus
 	resp, err := h.client.Do(req)
 	if err != nil {
 		h.logger.WithError(err).Error("LLM request failed")
+		h.sendToolEvent(c, flusher, tools.ToolEvent{Type: "error", Tool: "llm", Query: fmt.Sprintf("LLM request failed: %v", err)})
+		fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+		flusher.Flush()
 		return
 	}
 	defer resp.Body.Close()
+
+	// Check for non-200 response (LLM may reject tool messages without tool definitions)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		h.logger.WithField("status", resp.StatusCode).WithField("body", string(body)).Error("LLM streaming request failed")
+		h.sendToolEvent(c, flusher, tools.ToolEvent{Type: "error", Tool: "llm", Query: fmt.Sprintf("LLM error (status %d)", resp.StatusCode)})
+		fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+		flusher.Flush()
+		return
+	}
 
 	// Stream response
 	reader := bufio.NewReader(resp.Body)

@@ -185,24 +185,36 @@
 				}
 			}
 
-			// Add assistant message
-			const assistantMessage = {
-				id: generateUUID(),
-				role: 'assistant' as const,
-				content: fullResponse,
-				created_at: new Date().toISOString(),
-				model: chatStore.selectedModel
-			};
-			chatStore.addMessage(assistantMessage);
+			// Check if there were error events from tools
+			const errorEvents = chatStore.toolEvents.filter(e => e.type === 'error');
 
-			// Save to backend (skip if response is empty — e.g. stream returned no content)
 			if (fullResponse.trim()) {
+				// Add assistant message
+				const assistantMessage = {
+					id: generateUUID(),
+					role: 'assistant' as const,
+					content: fullResponse,
+					created_at: new Date().toISOString(),
+					model: chatStore.selectedModel
+				};
+				chatStore.addMessage(assistantMessage);
+
+				// Save to backend
 				await chatApi.createMessage(
 					conversationId,
 					'assistant',
 					fullResponse,
 					chatStore.selectedModel
 				);
+			} else if (errorEvents.length > 0) {
+				// No content but there were errors — show them as assistant message
+				const errorText = errorEvents.map(e => e.query).join('\n');
+				chatStore.addMessage({
+					id: generateUUID(),
+					role: 'assistant',
+					content: `Error: ${errorText}`,
+					created_at: new Date().toISOString()
+				});
 			}
 
 			// Refresh conversations to update timestamp
@@ -220,7 +232,7 @@
 			}
 		} finally {
 			chatStore.setStreaming(false);
-			chatStore.clearToolEvents(); // Clear tool events after response complete
+			chatStore.clearToolEvents();
 			abortController = null;
 		}
 	}

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [4.13.7] - 2026-03-25
+
+### Fixed
+
+- **Web Search Error Flash**: Fixed error messages from web search (tool events) flashing briefly in chat UI and disappearing before user could read them — error tool events were cleared by `clearToolEvents()` in the `finally` block
+- **Empty Assistant Message on Tool Failure**: When web search tool flow failed with no content, an empty assistant chat bubble was displayed. Now error events are captured and shown as a persistent `Error: ...` assistant message
+- **SSE Stream Not Terminated on Error**: Backend `handleWithTools` now sends `data: [DONE]` after error tool events so the frontend stream terminates properly
+- **streamFinalResponse Silent Failure**: Added LLM response status code check in `streamFinalResponse` — previously if vLLM rejected the request (e.g. tool messages without tool definitions), the error was silently swallowed
+- **Content Field Omitted in Tool-Calling Messages**: Removed `omitempty` from `Content` JSON tag in `ChatMessage` struct — when LLM returned `null` content with `tool_calls`, the field was stripped entirely, causing downstream LLM APIs to reject the request
+
+### Technical
+
+- `ChatMessage.Content` JSON tag changed from `json:"content,omitempty"` to `json:"content"` in `chat_tools_handler.go`
+- Added `data: [DONE]\n\n` + flush after all error tool events in `handleWithTools` and `streamFinalResponse`
+- Added HTTP status check and error event emission in `streamFinalResponse` for non-200 LLM responses
+- Frontend `+page.svelte` now checks for error tool events and converts them to persistent assistant error messages instead of silently clearing them
+
+---
+
 ## [4.13.6] - 2026-03-16
 
 ### Fixed

@@ -1,32 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Server,
-		Plus,
-		Play,
-		Square,
-		RefreshCw,
-		Loader2,
-		Trash2,
-		Settings,
-		Wrench,
-		Database,
-		X,
-		Search,
-		ExternalLink,
-		Code,
-		Rocket,
-		Cloud,
-		Brain,
-		Box,
-		ChevronLeft,
-		ChevronRight,
-		Copy,
-		Check,
-		Tag,
-		Github,
-		Globe
-	} from 'lucide-svelte';
+		faServer,
+		faPlus,
+		faPlay,
+		faSquare,
+		faArrowsRotate,
+		faSpinner,
+		faTrash,
+		faGear,
+		faWrench,
+		faDatabase,
+		faXmark,
+		faMagnifyingGlass,
+		faArrowUpRightFromSquare,
+		faCode,
+		faRocket,
+		faCloud,
+		faBrain,
+		faBoxOpen,
+		faChevronLeft,
+		faChevronRight,
+		faCopy,
+		faCheck,
+		faTag,
+		faGlobe
+	} from '@fortawesome/free-solid-svg-icons';
+	import { faGithub } from '@fortawesome/free-brands-svg-icons';
 	import { mcpApi, type MCPServer } from '$lib/api/mcp';
 	import { cn, formatRelativeTime, debounce, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -242,12 +243,12 @@
 
 	function getCategoryIcon(category: string | undefined) {
 		switch (category) {
-			case 'development': return Code;
-			case 'productivity': return Rocket;
-			case 'database': return Database;
-			case 'cloud': return Cloud;
-			case 'ai': return Brain;
-			default: return Box;
+			case 'development': return faCode;
+			case 'productivity': return faRocket;
+			case 'database': return faDatabase;
+			case 'cloud': return faCloud;
+			case 'ai': return faBrain;
+			default: return faBoxOpen;
 		}
 	}
 
@@ -299,12 +300,12 @@
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={() => loadServers()} disabled={isLoading}>
-				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				{m.common_refresh()}
 			</Button>
 			{#if isAdmin}
 				<Button onclick={openCreateModal}>
-					<Plus class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 					{m.mcp_add_server()}
 				</Button>
 			{/if}
@@ -316,7 +317,7 @@
 		<div class="flex flex-wrap items-center gap-4">
 			<!-- Search -->
 			<div class="relative flex-1 min-w-[200px]">
-				<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+				<FontAwesomeIcon icon={faMagnifyingGlass} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 				<input
 					type="text"
 					placeholder={m.mcp_search()}
@@ -359,7 +360,7 @@
 
 			<!-- Clear Filters -->
 			<Button variant="outline" size="sm" onclick={clearFilters}>
-				<X class="mr-1 h-4 w-4" />
+				<FontAwesomeIcon icon={faXmark} class="mr-1 h-4 w-4" />
 				Clear
 			</Button>
 		</div>
@@ -377,18 +378,18 @@
 	<!-- Servers Grid -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if servers.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Server class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faServer} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium">No MCP servers found</p>
 			<p class="mt-1 text-muted-foreground">
 				{isAdmin ? 'Try adjusting your filters or add a new server' : 'No servers available in the catalog'}
 			</p>
 			{#if isAdmin}
 				<Button class="mt-6" onclick={openCreateModal}>
-					<Plus class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 					Add Server
 				</Button>
 			{/if}
@@ -404,7 +405,7 @@
 							'flex h-10 w-10 items-center justify-center rounded-lg',
 							server.status === 'running' ? 'bg-green-500/10 text-green-500' : 'bg-primary/10 text-primary'
 						)}>
-							<CategoryIcon class="h-5 w-5" />
+							<FontAwesomeIcon icon={CategoryIcon} class="h-5 w-5" />
 						</div>
 						<span class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
 							{formatCategory(server.category)}
@@ -445,12 +446,12 @@
 						</Button>
 						{#if server.github_url}
 							<a href={server.github_url} target="_blank" rel="noopener noreferrer" class="rounded-lg border border-input p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
-								<Github class="h-4 w-4" />
+								<FontAwesomeIcon icon={faGithub} class="h-4 w-4" />
 							</a>
 						{/if}
 						{#if server.website_url}
 							<a href={server.website_url} target="_blank" rel="noopener noreferrer" class="rounded-lg border border-input p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
-								<ExternalLink class="h-4 w-4" />
+								<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-4 w-4" />
 							</a>
 						{/if}
 					</div>
@@ -462,7 +463,7 @@
 		{#if totalPages > 1}
 			<div class="mt-6 flex items-center justify-center gap-4">
 				<Button variant="outline" size="sm" onclick={prevPage} disabled={currentPage === 0}>
-					<ChevronLeft class="mr-1 h-4 w-4" />
+					<FontAwesomeIcon icon={faChevronLeft} class="mr-1 h-4 w-4" />
 					Previous
 				</Button>
 				<span class="text-sm text-muted-foreground">
@@ -470,7 +471,7 @@
 				</span>
 				<Button variant="outline" size="sm" onclick={nextPage} disabled={currentPage >= totalPages - 1}>
 					Next
-					<ChevronRight class="ml-1 h-4 w-4" />
+					<FontAwesomeIcon icon={faChevronRight} class="ml-1 h-4 w-4" />
 				</Button>
 			</div>
 		{/if}
@@ -490,7 +491,7 @@
 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
 				<h2 class="text-lg font-semibold">Add MCP Server</h2>
 				<button onclick={() => (showCreateModal = false)} class="rounded p-1 text-muted-foreground hover:bg-accent">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -659,7 +660,7 @@
 				</Button>
 				<Button onclick={handleCreateServer} disabled={isCreating}>
 					{#if isCreating}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					{m.common_create()}
 				</Button>
@@ -688,7 +689,7 @@
 					{/if}
 				</div>
 				<button onclick={() => (showDetailModal = false)} class="rounded p-1 text-muted-foreground hover:bg-accent">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -708,10 +709,10 @@
 							<h3 class="text-sm font-medium text-muted-foreground">Installation Guide</h3>
 							<Button variant="ghost" size="sm" onclick={copyInstallGuide}>
 								{#if copiedGuide}
-									<Check class="mr-1 h-3 w-3" />
+									<FontAwesomeIcon icon={faCheck} class="mr-1 h-3 w-3" />
 									Copied
 								{:else}
-									<Copy class="mr-1 h-3 w-3" />
+									<FontAwesomeIcon icon={faCopy} class="mr-1 h-3 w-3" />
 									Copy
 								{/if}
 							</Button>
@@ -724,7 +725,7 @@
 				{#if selectedServer.tags && selectedServer.tags.length > 0}
 					<div class="mb-6">
 						<h3 class="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-							<Tag class="h-4 w-4" />
+							<FontAwesomeIcon icon={faTag} class="h-4 w-4" />
 							Tags
 						</h3>
 						<div class="flex flex-wrap gap-2">
@@ -742,13 +743,13 @@
 						<div class="flex gap-2">
 							{#if selectedServer.github_url}
 								<a href={selectedServer.github_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-input px-3 py-2 text-sm hover:bg-accent">
-									<Github class="h-4 w-4" />
+									<FontAwesomeIcon icon={faGithub} class="h-4 w-4" />
 									GitHub
 								</a>
 							{/if}
 							{#if selectedServer.website_url}
 								<a href={selectedServer.website_url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-input px-3 py-2 text-sm hover:bg-accent">
-									<Globe class="h-4 w-4" />
+									<FontAwesomeIcon icon={faGlobe} class="h-4 w-4" />
 									Website
 								</a>
 							{/if}
@@ -760,7 +761,7 @@
 				{#if selectedServer.tools && selectedServer.tools.length > 0}
 					<div class="mb-6">
 						<h3 class="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-							<Wrench class="h-4 w-4" />
+							<FontAwesomeIcon icon={faWrench} class="h-4 w-4" />
 							Tools ({selectedServer.tools.length})
 						</h3>
 						<div class="space-y-2">
@@ -780,7 +781,7 @@
 				{#if selectedServer.resources && selectedServer.resources.length > 0}
 					<div class="mb-6">
 						<h3 class="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-							<Database class="h-4 w-4" />
+							<FontAwesomeIcon icon={faDatabase} class="h-4 w-4" />
 							Resources ({selectedServer.resources.length})
 						</h3>
 						<div class="space-y-2">
@@ -814,12 +815,12 @@
 					<div class="flex gap-2">
 						{#if selectedServer.status === 'running'}
 							<Button variant="outline" size="sm" onclick={() => handleStopServer(selectedServer!)}>
-								<Square class="mr-1 h-3 w-3" />
+								<FontAwesomeIcon icon={faSquare} class="mr-1 h-3 w-3" />
 								Stop
 							</Button>
 						{:else}
 							<Button variant="outline" size="sm" onclick={() => handleStartServer(selectedServer!)}>
-								<Play class="mr-1 h-3 w-3" />
+								<FontAwesomeIcon icon={faPlay} class="mr-1 h-3 w-3" />
 								Start
 							</Button>
 						{/if}
@@ -829,7 +830,7 @@
 							onclick={() => handleDeleteServer(selectedServer!)}
 							class="text-destructive hover:bg-destructive/10"
 						>
-							<Trash2 class="mr-1 h-3 w-3" />
+							<FontAwesomeIcon icon={faTrash} class="mr-1 h-3 w-3" />
 							Delete
 						</Button>
 					</div>

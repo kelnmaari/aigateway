@@ -1,22 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Server,
-		Plus,
-		Pencil,
-		Trash2,
-		Loader2,
-		RefreshCw,
-		Activity,
-		Search,
-		X,
-		Globe,
-		Zap,
-		Eye,
-		EyeOff,
-		ChevronDown,
-		ChevronUp
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faServer, faPlus, faPen, faTrash, faSpinner, faArrowsRotate, faChartLine, faMagnifyingGlass, faXmark, faGlobe, faBolt, faEye, faEyeSlash, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 	import {
 		registryApi,
 		type ModelProvider,
@@ -327,11 +312,11 @@
 		</div>
 		<div class="flex items-center gap-2">
 			<Button variant="outline" size="sm" onclick={loadProviders} disabled={isLoading}>
-				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				Refresh
 			</Button>
 			<Button size="sm" onclick={openCreateDialog}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				Add Provider
 			</Button>
 		</div>
@@ -340,7 +325,7 @@
 	<!-- Providers Table -->
 	{#if registryDisabled}
 		<div class="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 py-16 text-center">
-			<Server class="mx-auto h-12 w-12 text-amber-500/60" />
+			<FontAwesomeIcon icon={faServer} class="mx-auto h-12 w-12 text-amber-500/60" />
 			<p class="mt-4 text-lg font-medium text-amber-700 dark:text-amber-400">Model Registry is disabled</p>
 			<p class="mt-1 text-sm text-amber-600/70 dark:text-amber-500/70">
 				Enable it in server configuration: <code class="bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded text-xs">model_registry.enabled: true</code>
@@ -348,17 +333,17 @@
 		</div>
 	{:else if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if providers.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Server class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faServer} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium text-muted-foreground">No providers configured</p>
 			<p class="mt-1 text-sm text-muted-foreground/70">
 				Add an AI provider to start routing model requests
 			</p>
 			<Button class="mt-4" size="sm" onclick={openCreateDialog}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				Add Provider
 			</Button>
 		</div>
@@ -396,7 +381,7 @@
 							<!-- Name -->
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-2">
-									<Globe class="h-4 w-4 text-muted-foreground shrink-0" />
+									<FontAwesomeIcon icon={faGlobe} class="h-4 w-4 text-muted-foreground shrink-0" />
 									<div>
 										<span class="font-medium text-foreground">{provider.name}</span>
 										{#if provider.error_message}
@@ -470,9 +455,9 @@
 										title="Health Check"
 									>
 										{#if healthCheckLoading[provider.id]}
-											<Loader2 class="h-4 w-4 animate-spin" />
+											<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 										{:else}
-											<Activity class="h-4 w-4" />
+											<FontAwesomeIcon icon={faChartLine} class="h-4 w-4" />
 										{/if}
 									</button>
 									<button
@@ -482,9 +467,9 @@
 										title="Discover Models"
 									>
 										{#if discoverLoading[provider.id]}
-											<Loader2 class="h-4 w-4 animate-spin" />
+											<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 										{:else}
-											<Search class="h-4 w-4" />
+											<FontAwesomeIcon icon={faMagnifyingGlass} class="h-4 w-4" />
 										{/if}
 									</button>
 									<button
@@ -492,7 +477,7 @@
 										class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
 										title="Edit"
 									>
-										<Pencil class="h-4 w-4" />
+										<FontAwesomeIcon icon={faPen} class="h-4 w-4" />
 									</button>
 									<button
 										onclick={() => handleDelete(provider)}
@@ -501,9 +486,9 @@
 										title="Delete"
 									>
 										{#if deleteLoading[provider.id]}
-											<Loader2 class="h-4 w-4 animate-spin" />
+											<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 										{:else}
-											<Trash2 class="h-4 w-4" />
+											<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 										{/if}
 									</button>
 								</div>
@@ -522,7 +507,7 @@
 			class="flex w-full items-center justify-between rounded-lg border border-border bg-card/50 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
 		>
 			<div class="flex items-center gap-2">
-				<Zap class="h-4 w-4 text-muted-foreground" />
+				<FontAwesomeIcon icon={faBolt} class="h-4 w-4 text-muted-foreground" />
 				<span class="text-sm font-medium text-foreground">Registry Models</span>
 				{#if models.length > 0}
 					<span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -531,9 +516,9 @@
 				{/if}
 			</div>
 			{#if showModels}
-				<ChevronUp class="h-4 w-4 text-muted-foreground" />
+				<FontAwesomeIcon icon={faChevronUp} class="h-4 w-4 text-muted-foreground" />
 			{:else}
-				<ChevronDown class="h-4 w-4 text-muted-foreground" />
+				<FontAwesomeIcon icon={faChevronDown} class="h-4 w-4 text-muted-foreground" />
 			{/if}
 		</button>
 
@@ -541,11 +526,11 @@
 			<div class="mt-4">
 				{#if isLoadingModels}
 					<div class="flex items-center justify-center py-12">
-						<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+						<FontAwesomeIcon icon={faSpinner} class="h-6 w-6 animate-spin text-muted-foreground" />
 					</div>
 				{:else if models.length === 0}
 					<div class="rounded-lg border border-dashed border-border py-10 text-center">
-						<Zap class="mx-auto h-10 w-10 text-muted-foreground/40" />
+						<FontAwesomeIcon icon={faBolt} class="mx-auto h-10 w-10 text-muted-foreground/40" />
 						<p class="mt-3 text-sm text-muted-foreground">
 							No models in registry. Use "Discover Models" on a provider to populate.
 						</p>
@@ -669,7 +654,7 @@
 					onclick={closeDialog}
 					class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
 				>
-					<X class="h-4 w-4" />
+					<FontAwesomeIcon icon={faXmark} class="h-4 w-4" />
 				</button>
 			</div>
 
@@ -745,9 +730,9 @@
 							class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
 						>
 							{#if showApiKey}
-								<EyeOff class="h-4 w-4" />
+								<FontAwesomeIcon icon={faEyeSlash} class="h-4 w-4" />
 							{:else}
-								<Eye class="h-4 w-4" />
+								<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 							{/if}
 						</button>
 					</div>
@@ -796,7 +781,7 @@
 					</Button>
 					<Button type="submit" disabled={isSaving}>
 						{#if isSaving}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
 						{isEditing ? 'Save Changes' : 'Create Provider'}
 					</Button>

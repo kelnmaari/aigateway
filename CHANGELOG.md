@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.0.0] - 2026-03-25
+
+### Changed
+
+- **Icon System Overhaul**: Replaced all icons across the entire Svelte WebUI from lucide-svelte to Font Awesome 7 (SVG+JS via `@fortawesome/svelte-fontawesome`). Tree-shaking ensures only used icons are bundled.
+- **Favicon Refresh**: New SVG favicon with multiple sizes (96x96 PNG, Apple Touch Icon 180x180, ICO), PWA manifest icons (192x192, 512x512), and `site.webmanifest` for "AI Gateway" app branding
+- **Emoji Replaced**: All decorative emoji (30+) and text symbols (close buttons, arrows) across admin pages, model management, GitLab integration replaced with consistent Font Awesome SVG icons
+
+### Technical
+
+- Removed `lucide-svelte` dependency, added `@fortawesome/fontawesome-svg-core`, `@fortawesome/free-solid-svg-icons`, `@fortawesome/free-regular-svg-icons`, `@fortawesome/free-brands-svg-icons`, `@fortawesome/svelte-fontawesome`
+- 30+ Svelte component files migrated: `<Icon class="h-4 w-4" />` pattern replaced with `<FontAwesomeIcon icon={faIcon} class="h-4 w-4" />`
+- Dynamic icon rendering in navbar, admin layout, GitLab nav, MCP catalog updated to pass FA icon definitions instead of Svelte component references
+- Updated `app.html` with proper favicon links (SVG, PNG, ICO, Apple Touch, Web Manifest)
+
+---
+
 ## [4.13.9] - 2026-03-25
 
 ### Added

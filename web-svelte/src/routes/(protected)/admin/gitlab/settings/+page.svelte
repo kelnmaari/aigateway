@@ -4,6 +4,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { api } from '$lib/api/client';
 	import GitLabNav from '$lib/components/gitlab-nav.svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faXmark, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 
 	// Telegram Settings
@@ -124,9 +126,9 @@
 				bot_token: telegramBotToken,
 				chat_id: telegramDefaultChat
 			});
-			telegramTestStatus = '✓ Connection successful!';
+			telegramTestStatus = 'OK Connection successful!';
 		} catch {
-			telegramTestStatus = '✗ Connection failed';
+			telegramTestStatus = 'FAIL Connection failed';
 		}
 	}
 
@@ -244,7 +246,7 @@
 									Test Connection
 								</Button>
 								{#if telegramTestStatus}
-									<span class={telegramTestStatus.includes('✓') ? 'text-green-500' : 'text-red-500'}>
+									<span class={telegramTestStatus.includes('OK') ? 'text-green-500' : 'text-red-500'}>
 										{telegramTestStatus}
 									</span>
 								{/if}
@@ -289,7 +291,7 @@
 							<span class="px-2 py-1 text-xs font-medium text-white rounded {priorityColors[rule.priority]}">
 								{priorityLabels[rule.priority]}
 							</span>
-							<button class="text-muted-foreground hover:text-foreground" onclick={() => removePriorityRule(index)}>×</button>
+							<button class="text-muted-foreground hover:text-foreground" onclick={() => removePriorityRule(index)}><FontAwesomeIcon icon={faXmark} /></button>
 						</div>
 					{/each}
 
@@ -298,7 +300,7 @@
 					</Button>
 
 					<div class="text-sm text-muted-foreground pt-4 border-t">
-						<p><strong>Priority Order:</strong> Critical → High → Normal → Low</p>
+						<p><strong>Priority Order:</strong> Critical <FontAwesomeIcon icon={faArrowRight} class="inline h-3 w-3" /> High <FontAwesomeIcon icon={faArrowRight} class="inline h-3 w-3" /> Normal <FontAwesomeIcon icon={faArrowRight} class="inline h-3 w-3" /> Low</p>
 						<p>Jobs targeting main/master branches get highest priority by default.</p>
 					</div>
 				</CardContent>

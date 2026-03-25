@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { HelpCircle } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faCircleQuestion } from '@fortawesome/free-solid-svg-icons';
 	import { Tooltip } from '$lib/components/ui/tooltip';
 
 	interface Props {
@@ -29,8 +30,7 @@
 	</label>
 	{#if description}
 		<Tooltip text={description} position="right">
-			<HelpCircle class="h-3.5 w-3.5 text-muted-foreground/60 hover:text-primary cursor-help transition-colors" />
+			<FontAwesomeIcon icon={faCircleQuestion} class="h-3.5 w-3.5 text-muted-foreground/60 hover:text-primary cursor-help transition-colors" />
 		</Tooltip>
 	{/if}
 </div>
-

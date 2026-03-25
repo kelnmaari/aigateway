@@ -45,25 +45,29 @@
 	} from '$lib/api/gitlab-jobs';
 	import { JobProgressCard } from '$lib/components/gitlab';
 	import * as m from '$lib/paraglide/messages';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Settings,
-		X,
-		Loader2,
-		Edit,
-		RefreshCw,
-		CheckCircle,
-		XCircle,
-		Clock,
-		Shield,
-		Brain,
-		Package,
-		BarChart3,
-		FileCode,
-		FileEdit,
-		TestTube,
-		Trash2,
-		ExternalLink
-	} from 'lucide-svelte';
+		faGear,
+		faXmark,
+		faSpinner,
+		faPen,
+		faArrowsRotate,
+		faCircleCheck,
+		faCircleXmark,
+		faClock,
+		faShield,
+		faBrain,
+		faBoxOpen,
+		faChartColumn,
+		faFileCode,
+		faFilePen,
+		faFlask,
+		faTrash,
+		faArrowUpRightFromSquare,
+		faArrowRight,
+		faArrowLeft,
+		faCheck
+	} from '@fortawesome/free-solid-svg-icons';
 
 	const integrationId = $page.params.id ?? '';
 
@@ -876,7 +880,7 @@
 						onclick={openDiscovery}
 						class="flex items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20"
 					>
-						<RefreshCw class="h-4 w-4" />
+						<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4" />
 						{m.gitlab_discover_repos && m.gitlab_discover_repos()
 							? m.gitlab_discover_repos()
 							: 'Discover & Bulk Add'}
@@ -995,9 +999,9 @@
 												Indexing...
 											</span>
 										{:else if project.index_status === 'completed'}
-											<span class="text-sm text-green-400">✓ Indexed</span>
+											<span class="text-sm text-green-400"><FontAwesomeIcon icon={faCheck} class="h-3 w-3 inline" /> Indexed</span>
 										{:else if project.index_status === 'failed'}
-											<span class="text-sm text-red-400">✗ Failed</span>
+											<span class="text-sm text-red-400"><FontAwesomeIcon icon={faCircleXmark} class="h-3 w-3 inline" /> Failed</span>
 										{:else}
 											<span class="text-sm text-gray-500">Not indexed</span>
 										{/if}
@@ -1043,7 +1047,7 @@
 										class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-indigo-900/30 hover:text-indigo-400"
 										title="Edit project"
 									>
-										<Settings class="h-5 w-5" />
+										<FontAwesomeIcon icon={faGear} class="h-5 w-5" />
 									</button>
 									<button
 										onclick={() => openAnalysis(project)}
@@ -1097,7 +1101,7 @@
 										</a>
 									</h3>
 									<div class="mt-1 flex items-center gap-3 text-sm text-gray-500">
-										<span>{review.source_branch} → {review.target_branch}</span>
+										<span>{review.source_branch} <FontAwesomeIcon icon={faArrowRight} class="h-3 w-3 inline" /> {review.target_branch}</span>
 										<span>by {review.mr_author}</span>
 									</div>
 								</div>
@@ -1187,7 +1191,7 @@
 						required
 					/>
 					<p class="mt-1 text-xs text-gray-500">
-						Find this in GitLab: Settings → General → Project ID
+						Find this in GitLab: Settings <FontAwesomeIcon icon={faArrowRight} class="h-2.5 w-2.5 inline" /> General <FontAwesomeIcon icon={faArrowRight} class="h-2.5 w-2.5 inline" /> Project ID
 					</p>
 				</div>
 
@@ -1565,7 +1569,7 @@
 								onclick={() => (analysisResult = null)}
 								class="text-sm font-medium text-indigo-400 hover:text-indigo-300"
 							>
-								← Back to all scanners
+								<FontAwesomeIcon icon={faArrowLeft} class="h-3 w-3 inline" /> Back to all scanners
 							</button>
 						</div>
 
@@ -1666,7 +1670,7 @@
 														: 'border-gray-700 bg-gray-800/50 text-gray-500 hover:border-gray-600 hover:text-gray-300'
 												}`}
 											>
-												<Package class="h-4 w-4" />
+												<FontAwesomeIcon icon={faBoxOpen} class="h-4 w-4" />
 												{ecosystem.language || ecosystem.name}
 												<span
 													class={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
@@ -1689,7 +1693,7 @@
 													<div class="flex flex-wrap items-start justify-between gap-4">
 														<div class="flex items-start gap-3">
 															<div class="mt-1 rounded-lg bg-gray-800 p-2 text-gray-400">
-																<Package class="h-5 w-5" />
+																<FontAwesomeIcon icon={faBoxOpen} class="h-5 w-5" />
 															</div>
 															<div>
 																<h5 class="flex items-center gap-2 font-bold text-gray-200">
@@ -1717,9 +1721,9 @@
 																	class="flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-bold text-indigo-400 transition-colors hover:bg-gray-700"
 																>
 																	{#if changelogLoading[`${dep.dependency.name}-${dep.dependency.latest_version}`]}
-																		<Loader2 class="h-3 w-3 animate-spin" />
+																		<FontAwesomeIcon icon={faSpinner} class="h-3 w-3 animate-spin" />
 																	{:else}
-																		<Brain class="h-3 w-3" />
+																		<FontAwesomeIcon icon={faBrain} class="h-3 w-3" />
 																	{/if}
 																	Analyze Changelog
 																</button>
@@ -1731,7 +1735,7 @@
 																	rel="noopener noreferrer"
 																	class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300"
 																>
-																	<ExternalLink class="h-4 w-4" />
+																	<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-4 w-4" />
 																</a>
 															{/if}
 														</div>
@@ -1897,7 +1901,7 @@
 										>
 											<div class="mb-2 flex items-center justify-between">
 												<div class="flex items-center gap-2">
-													<FileEdit class="h-4 w-4 text-emerald-500" />
+													<FontAwesomeIcon icon={faFilePen} class="h-4 w-4 text-emerald-500" />
 													<span class="font-mono text-sm font-bold text-gray-200"
 														>{symbol.name}</span
 													>
@@ -1930,7 +1934,7 @@
 										>
 											<div class="mb-2 flex items-center justify-between">
 												<div class="flex items-center gap-2">
-													<TestTube class="h-4 w-4 text-indigo-400" />
+													<FontAwesomeIcon icon={faFlask} class="h-4 w-4 text-indigo-400" />
 													<span class="font-mono text-sm font-bold text-gray-200">{func.name}</span>
 												</div>
 												<div class="flex items-center gap-2">
@@ -2081,7 +2085,7 @@
 												</h4>
 												<p class="text-xs text-gray-500 italic">
 													Analyzed package: {analysisResult.package_name} ({analysisResult.current_version}
-													→ {analysisResult.latest_version})
+													<FontAwesomeIcon icon={faArrowRight} class="h-2.5 w-2.5 inline" /> {analysisResult.latest_version})
 												</p>
 											</div>
 										</div>
@@ -2152,7 +2156,7 @@
 								<div
 									class="rounded-xl border border-gray-700 bg-gray-900/40 p-8 text-center text-gray-400"
 								>
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 text-green-500/50" />
+									<FontAwesomeIcon icon={faCircleCheck} class="mx-auto mb-3 h-12 w-12 text-green-500/50" />
 									<p class="font-medium text-gray-200">Scan completed successfully</p>
 									<p class="mt-1 text-sm">No findings were reported for this analysis.</p>
 									{#if analysisResult.summary}
@@ -2244,11 +2248,11 @@
 		{#if activeTab === 'history'}
 			{#if scanHistoryLoading}
 				<div class="flex justify-center py-12">
-					<Loader2 class="h-10 w-10 animate-spin text-indigo-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-10 w-10 animate-spin text-indigo-500" />
 				</div>
 			{:else if scanHistory.length === 0}
 				<div class="rounded-xl border border-gray-700 bg-gray-800 p-12 text-center">
-					<Clock class="mx-auto mb-4 h-12 w-12 text-gray-600" />
+					<FontAwesomeIcon icon={faClock} class="mx-auto mb-4 h-12 w-12 text-gray-600" />
 					<h3 class="text-xl font-semibold text-gray-300">No scan history</h3>
 					<p class="mt-2 text-gray-500">
 						You haven't run any scans for projects in this integration yet.
@@ -2281,13 +2285,13 @@
 									<td class="px-6 py-4">
 										<div class="flex items-center gap-2">
 											{#if scan.scan_type === 'secrets' || scan.scan_type === 'secrets_deep'}
-												<Shield class="h-4 w-4 text-orange-400" />
+												<FontAwesomeIcon icon={faShield} class="h-4 w-4 text-orange-400" />
 											{:else if scan.scan_type === 'dependencies'}
-												<Package class="h-4 w-4 text-blue-400" />
+												<FontAwesomeIcon icon={faBoxOpen} class="h-4 w-4 text-blue-400" />
 											{:else if scan.scan_type === 'quality'}
-												<Brain class="h-4 w-4 text-indigo-400" />
+												<FontAwesomeIcon icon={faBrain} class="h-4 w-4 text-indigo-400" />
 											{:else}
-												<FileCode class="h-4 w-4 text-gray-400" />
+												<FontAwesomeIcon icon={faFileCode} class="h-4 w-4 text-gray-400" />
 											{/if}
 											<span class="text-gray-300">
 												{scanTypes.find((t) => t.value === scan.scan_type)?.label || scan.scan_type}
@@ -2342,7 +2346,7 @@
 						disabled={jobsLoading}
 						class="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						<RefreshCw class="h-4 w-4 {jobsLoading ? 'animate-spin' : ''}" />
+						<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4 {jobsLoading ? 'animate-spin' : ''}" />
 						Refresh
 					</button>
 				</div>
@@ -2356,11 +2360,11 @@
 
 				{#if jobsLoading}
 					<div class="flex justify-center py-12">
-						<Loader2 class="h-10 w-10 animate-spin text-indigo-500" />
+						<FontAwesomeIcon icon={faSpinner} class="h-10 w-10 animate-spin text-indigo-500" />
 					</div>
 				{:else if jobs.length === 0}
 					<div class="rounded-xl border border-gray-700 bg-gray-800 p-12 text-center">
-						<Clock class="mx-auto mb-4 h-12 w-12 text-gray-600" />
+						<FontAwesomeIcon icon={faClock} class="mx-auto mb-4 h-12 w-12 text-gray-600" />
 						<h3 class="text-xl font-semibold text-gray-300">No jobs found</h3>
 						<p class="mt-2 text-gray-500">
 							Start a scan from a project to see background jobs here.

@@ -3,37 +3,25 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import {
-		LayoutDashboard,
-		Users,
-		Key,
-		Settings,
-		FileText,
-		Shield,
-		Server,
-		Mail,
-		Download,
-		Cpu,
-		GitBranch,
-		Cloud
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faGauge, faUsers, faKey, faGear, faFileLines, faShield, faServer, faEnvelope, faDownload, faMicrochip, faCodeBranch, faCloud } from '@fortawesome/free-solid-svg-icons';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
 
 	let { children } = $props();
 
 	const tabs = [
-		{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
-		{ id: 'users', label: m.admin_users, icon: Users, href: '/admin/users' },
-		{ id: 'invitations', label: 'Invitations', icon: Mail, href: '/admin/invitations' },
-		{ id: 'api-keys', label: 'API Keys', icon: Key, href: '/admin/api-keys' },
-		{ id: 'models', label: m.admin_models, icon: Cpu, href: '/admin/models' },
-		{ id: 'providers', label: 'Providers', icon: Cloud, href: '/admin/providers' },
-		{ id: 'downloads', label: 'Downloads', icon: Download, href: '/admin/downloads' },
-		{ id: 'mcp', label: 'MCP', icon: Server, href: '/admin/mcp' },
-		{ id: 'gitlab', label: 'GitLab', icon: GitBranch, href: '/admin/gitlab' },
-		{ id: 'settings', label: m.admin_settings, icon: Settings, href: '/admin/settings' },
-		{ id: 'logs', label: m.admin_logs, icon: FileText, href: '/admin/logs' }
+		{ id: 'dashboard', label: 'Dashboard', icon: faGauge, href: '/admin' },
+		{ id: 'users', label: m.admin_users, icon: faUsers, href: '/admin/users' },
+		{ id: 'invitations', label: 'Invitations', icon: faEnvelope, href: '/admin/invitations' },
+		{ id: 'api-keys', label: 'API Keys', icon: faKey, href: '/admin/api-keys' },
+		{ id: 'models', label: m.admin_models, icon: faMicrochip, href: '/admin/models' },
+		{ id: 'providers', label: 'Providers', icon: faCloud, href: '/admin/providers' },
+		{ id: 'downloads', label: 'Downloads', icon: faDownload, href: '/admin/downloads' },
+		{ id: 'mcp', label: 'MCP', icon: faServer, href: '/admin/mcp' },
+		{ id: 'gitlab', label: 'GitLab', icon: faCodeBranch, href: '/admin/gitlab' },
+		{ id: 'settings', label: m.admin_settings, icon: faGear, href: '/admin/settings' },
+		{ id: 'logs', label: m.admin_logs, icon: faFileLines, href: '/admin/logs' }
 	];
 
 	function getCurrentTab(): string {
@@ -61,7 +49,7 @@
 		<div class="mx-auto max-w-[1600px] px-4 py-4 sm:px-6 lg:px-8">
 			<div class="flex items-center gap-3">
 				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-					<Shield class="h-5 w-5" />
+					<FontAwesomeIcon icon={faShield} class="h-5 w-5" />
 				</div>
 				<div>
 					<h1 class="text-xl font-bold text-foreground">{m.admin_title()}</h1>
@@ -85,7 +73,7 @@
 								: 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
 						)}
 					>
-						<tab.icon class="h-4 w-4" />
+						<FontAwesomeIcon icon={tab.icon} class="h-4 w-4" />
 						{typeof tab.label === 'function' ? tab.label() : tab.label}
 					</a>
 				{/each}

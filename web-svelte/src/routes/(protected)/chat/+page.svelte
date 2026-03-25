@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { MessageSquare, PanelLeftClose, PanelLeft, Loader2 } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faComments, faBarsStaggered, faSpinner } from '@fortawesome/free-solid-svg-icons';
 	import { chatStore } from '$lib/stores/chat.svelte';
 	import { chatApi } from '$lib/api';
 	import {
@@ -274,11 +275,7 @@
 				class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
 				title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
 			>
-				{#if sidebarOpen}
-					<PanelLeftClose class="h-5 w-5" />
-				{:else}
-					<PanelLeft class="h-5 w-5" />
-				{/if}
+				<FontAwesomeIcon icon={faBarsStaggered} class="h-5 w-5" />
 			</button>
 
 			{#if chatStore.currentConversation}
@@ -303,7 +300,7 @@
 		<!-- Messages or Welcome -->
 		{#if chatStore.isLoading}
 			<div class="flex flex-1 items-center justify-center">
-				<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+				<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 			</div>
 		{:else if chatStore.hasMessages || chatStore.isStreaming}
 			<MessageList
@@ -316,7 +313,7 @@
 			<!-- Welcome Screen -->
 			<div class="flex flex-1 flex-col items-center justify-center p-8">
 				<div class="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-					<MessageSquare class="h-8 w-8" />
+					<FontAwesomeIcon icon={faComments} class="h-8 w-8" />
 				</div>
 				<h2 class="mb-2 text-xl font-semibold text-foreground">{m.chat_newChat()}</h2>
 				<p class="mb-8 max-w-md text-center text-muted-foreground">
@@ -347,4 +344,3 @@
 		/>
 	</div>
 </div>
-

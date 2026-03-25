@@ -1,25 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		Users,
-		Key,
-		Activity,
-		TrendingUp,
-		Clock,
-		Cpu,
-		HardDrive,
-		Loader2,
-		Building2,
-		Server,
-		Database,
-		BrainCircuit,
-		CheckCircle,
-		XCircle,
-		AlertCircle,
-		Zap,
-		Thermometer,
-		Gauge
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faUsers, faKey, faChartLine, faArrowTrendUp, faClockRotateLeft, faMicrochip, faHardDrive, faSpinner, faBuilding, faServer, faDatabase, faBrain, faCircleCheck, faCircleXmark, faCircleExclamation, faBolt, faTemperatureHalf, faGauge } from '@fortawesome/free-solid-svg-icons';
 	import { adminApi, type AdminStats, type SystemMetrics, type RAGStats, type GPUMetricsResponse, type GPUDevice, type BackendStatusResponse, type DockerImagesResponse, type DockerImageStatus } from '$lib/api/admin';
 	import { cn } from '$lib/utils';
 
@@ -181,7 +163,7 @@
 
 {#if isLoading}
 	<div class="flex items-center justify-center py-20">
-		<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+		<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 	</div>
 {:else}
 	<div class="space-y-6">
@@ -190,7 +172,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-						<Users class="h-5 w-5" />
+						<FontAwesomeIcon icon={faUsers} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Total Users</p>
@@ -202,7 +184,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
-						<Key class="h-5 w-5" />
+						<FontAwesomeIcon icon={faKey} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">API Keys</p>
@@ -214,7 +196,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
-						<Building2 class="h-5 w-5" />
+						<FontAwesomeIcon icon={faBuilding} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Tenants</p>
@@ -226,7 +208,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
-						<Activity class="h-5 w-5" />
+						<FontAwesomeIcon icon={faChartLine} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Total Requests</p>
@@ -245,7 +227,7 @@
 					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
-								<Cpu class="h-4 w-4" />
+								<FontAwesomeIcon icon={faMicrochip} class="h-4 w-4" />
 								CPU ({metrics.system.cpu_cores} cores)
 							</span>
 							<span class="text-sm font-medium">{cpuPercent.toFixed(1)}%</span>
@@ -265,7 +247,7 @@
 					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
-								<HardDrive class="h-4 w-4" />
+								<FontAwesomeIcon icon={faHardDrive} class="h-4 w-4" />
 								Memory
 							</span>
 							<span class="text-sm font-medium">
@@ -287,7 +269,7 @@
 					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
-								<Database class="h-4 w-4" />
+								<FontAwesomeIcon icon={faDatabase} class="h-4 w-4" />
 								Disk
 							</span>
 							<span class="text-sm font-medium">
@@ -308,7 +290,7 @@
 					<!-- Uptime -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<Clock class="h-4 w-4" />
+							<FontAwesomeIcon icon={faClockRotateLeft} class="h-4 w-4" />
 							Uptime
 						</div>
 						<div class="space-y-1">
@@ -325,15 +307,15 @@
 			<div class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold flex items-center gap-2">
-						<BrainCircuit class="h-5 w-5 text-purple-500" />
+						<FontAwesomeIcon icon={faBrain} class="h-5 w-5 text-purple-500" />
 						LLM Inference Backend
 					</h2>
 					<span class={cn("text-sm font-medium flex items-center gap-1.5", backendStatus.ready ? 'text-green-500' : 'text-amber-500')}>
 						{#if backendStatus.ready}
-							<CheckCircle class="h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4" />
 							Ready
 						{:else}
-							<AlertCircle class="h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="h-4 w-4" />
 							Not Configured
 						{/if}
 					</span>
@@ -344,7 +326,7 @@
 					<div class="rounded-lg border border-border/50 p-3">
 						<div class="mb-1 text-xs font-medium text-muted-foreground">Backend Type</div>
 						<div class="flex items-center gap-2">
-							<Server class="h-4 w-4 text-blue-500" />
+							<FontAwesomeIcon icon={faServer} class="h-4 w-4 text-blue-500" />
 							<span class="font-medium">Docker Containers</span>
 						</div>
 					</div>
@@ -354,10 +336,10 @@
 						<div class="mb-1 text-xs font-medium text-muted-foreground">Running Models</div>
 						<div class="flex items-center gap-2">
 							{#if (backendStatus.running_models ?? 0) > 0}
-								<CheckCircle class="h-4 w-4 text-green-500" />
+								<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4 text-green-500" />
 								<span class="font-medium text-green-500">{backendStatus.running_models}</span>
 							{:else}
-								<AlertCircle class="h-4 w-4 text-amber-500" />
+								<FontAwesomeIcon icon={faCircleExclamation} class="h-4 w-4 text-amber-500" />
 								<span class="font-medium text-amber-500">None</span>
 							{/if}
 						</div>
@@ -388,11 +370,11 @@
 								<div class="flex items-center justify-between rounded-lg border border-border/50 p-2.5">
 									<div class="flex items-center gap-2 min-w-0 flex-1">
 										{#if img.exists}
-											<CheckCircle class="h-4 w-4 text-green-500 flex-shrink-0" />
+											<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4 text-green-500 flex-shrink-0" />
 										{:else if isPulling}
-											<Loader2 class="h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
+											<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
 										{:else}
-											<XCircle class="h-4 w-4 text-red-500 flex-shrink-0" />
+											<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4 text-red-500 flex-shrink-0" />
 										{/if}
 										<div class="min-w-0">
 											<div class="text-sm font-medium capitalize">{img.provider}</div>
@@ -426,7 +408,7 @@
 			<div class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold flex items-center gap-2">
-						<Zap class="h-5 w-5 text-green-500" />
+						<FontAwesomeIcon icon={faBolt} class="h-5 w-5 text-green-500" />
 						GPU ({gpuMetrics.data.device_count} {gpuMetrics.data.device_count === 1 ? 'device' : 'devices'})
 					</h2>
 					<span class="text-xs text-muted-foreground">Auto-refresh: 10s</span>
@@ -451,18 +433,18 @@
 								<div class="flex items-center gap-4 text-sm">
 									<!-- Temperature -->
 									<div class="flex items-center gap-1.5">
-										<Thermometer class={cn("h-4 w-4", getTempColor(gpu.temperature_c))} />
+										<FontAwesomeIcon icon={faTemperatureHalf} class={cn("h-4 w-4", getTempColor(gpu.temperature_c))} />
 										<span class={cn("font-bold", getTempColor(gpu.temperature_c))}>{gpu.temperature_c}°C</span>
 									</div>
 									<!-- Power -->
 									<div class="flex items-center gap-1.5">
-										<Zap class="h-4 w-4 text-amber-500" />
+										<FontAwesomeIcon icon={faBolt} class="h-4 w-4 text-amber-500" />
 										<span class="font-medium">{gpu.power_usage_w.toFixed(0)}W</span>
 										<span class="text-xs text-muted-foreground">/ {gpu.power_limit_w.toFixed(0)}W</span>
 									</div>
 									<!-- Clock -->
 									<div class="flex items-center gap-1.5">
-										<Gauge class="h-4 w-4 text-blue-500" />
+										<FontAwesomeIcon icon={faGauge} class="h-4 w-4 text-blue-500" />
 										<span class="font-medium">{gpu.clock_graphics_mhz} MHz</span>
 									</div>
 									{#if gpu.fan_speed_percent > 0}
@@ -523,7 +505,7 @@
 					<div>
 						<div class="mb-2 flex items-center justify-between">
 							<span class="flex items-center gap-2 text-sm text-muted-foreground">
-								<Server class="h-4 w-4" />
+								<FontAwesomeIcon icon={faServer} class="h-4 w-4" />
 								Go Heap
 							</span>
 							<span class="text-sm font-medium">
@@ -544,7 +526,7 @@
 					<!-- Goroutines -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<Activity class="h-4 w-4" />
+							<FontAwesomeIcon icon={faChartLine} class="h-4 w-4" />
 							Goroutines
 						</div>
 						<p class="text-xl font-semibold">{metrics.app.num_goroutines}</p>
@@ -553,7 +535,7 @@
 					<!-- GC Runs -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<TrendingUp class="h-4 w-4" />
+							<FontAwesomeIcon icon={faArrowTrendUp} class="h-4 w-4" />
 							GC Runs
 						</div>
 						<p class="text-xl font-semibold">{metrics.app.num_gc}</p>
@@ -562,7 +544,7 @@
 					<!-- Alloc Rate -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<TrendingUp class="h-4 w-4" />
+							<FontAwesomeIcon icon={faArrowTrendUp} class="h-4 w-4" />
 							Alloc Rate
 						</div>
 						<p class="text-xl font-semibold">{metrics.app.alloc_rate_mb_s?.toFixed(2) ?? '0'} MB/s</p>
@@ -575,7 +557,7 @@
 		{#if ragStats}
 			<div class="rounded-xl border border-border bg-card p-6">
 				<h2 class="mb-4 text-lg font-semibold flex items-center gap-2">
-					<BrainCircuit class="h-5 w-5" />
+					<FontAwesomeIcon icon={faBrain} class="h-5 w-5" />
 					RAG / Vector Store
 				</h2>
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -583,11 +565,11 @@
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
 							{#if ragStats.health_status === 'healthy'}
-								<CheckCircle class="h-4 w-4 text-green-500" />
+								<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4 text-green-500" />
 							{:else if ragStats.health_status === 'unhealthy'}
-								<XCircle class="h-4 w-4 text-red-500" />
+								<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4 text-red-500" />
 							{:else}
-								<AlertCircle class="h-4 w-4 text-amber-500" />
+								<FontAwesomeIcon icon={faCircleExclamation} class="h-4 w-4 text-amber-500" />
 							{/if}
 							Status
 						</div>
@@ -600,7 +582,7 @@
 					<!-- Provider -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<Database class="h-4 w-4" />
+							<FontAwesomeIcon icon={faDatabase} class="h-4 w-4" />
 							Provider
 						</div>
 						<p class="text-xl font-semibold capitalize">{ragStats.provider || '—'}</p>
@@ -609,7 +591,7 @@
 					<!-- Total Vectors -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<Activity class="h-4 w-4" />
+							<FontAwesomeIcon icon={faChartLine} class="h-4 w-4" />
 							Total Vectors
 						</div>
 						<p class="text-xl font-semibold">
@@ -620,7 +602,7 @@
 					<!-- Dimensions -->
 					<div>
 						<div class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-							<TrendingUp class="h-4 w-4" />
+							<FontAwesomeIcon icon={faArrowTrendUp} class="h-4 w-4" />
 							Dimensions
 						</div>
 						<p class="text-xl font-semibold">
@@ -639,28 +621,28 @@
 					href="/admin/users"
 					class="flex items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
 				>
-					<Users class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faUsers} class="h-5 w-5 text-muted-foreground" />
 					<span class="font-medium">Manage Users</span>
 				</a>
 				<a
 					href="/admin/api-keys"
 					class="flex items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
 				>
-					<Key class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faKey} class="h-5 w-5 text-muted-foreground" />
 					<span class="font-medium">View API Keys</span>
 				</a>
 				<a
 					href="/admin/settings"
 					class="flex items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
 				>
-					<Server class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faServer} class="h-5 w-5 text-muted-foreground" />
 					<span class="font-medium">System Settings</span>
 				</a>
 				<a
 					href="/admin/logs"
 					class="flex items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
 				>
-					<Activity class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faChartLine} class="h-5 w-5 text-muted-foreground" />
 					<span class="font-medium">View Logs</span>
 				</a>
 			</div>

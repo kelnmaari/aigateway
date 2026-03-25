@@ -5,7 +5,8 @@
 	import { authStore } from '$lib';
 	import { authApi } from '$lib/api';
 	import { cn } from '$lib/utils';
-	import { Eye, EyeOff, Loader2, CheckCircle, XCircle } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faEye, faEyeSlash, faSpinner, faCircleCheck, faCircleXmark, faRobot } from '@fortawesome/free-solid-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 
 	// Get invitation token from URL if present
@@ -123,7 +124,7 @@
 			<div
 				class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-3xl text-primary-foreground"
 			>
-				🤖
+				<FontAwesomeIcon icon={faRobot} class="h-8 w-8" />
 			</div>
 			<h1 class="text-2xl font-bold text-foreground">{m.auth_create_account()}</h1>
 			<p class="mt-2 text-muted-foreground">{m.auth_join()}</p>
@@ -133,7 +134,7 @@
 		<div class="rounded-xl border border-border bg-card p-6 shadow-sm">
 			{#if validatingInvitation}
 				<div class="flex items-center justify-center gap-2 py-8 text-muted-foreground">
-					<Loader2 class="h-5 w-5 animate-spin" />
+					<FontAwesomeIcon icon={faSpinner} class="h-5 w-5 animate-spin" />
 					{m.auth_validating()}
 				</div>
 			{:else}
@@ -229,9 +230,9 @@
 								class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 							>
 								{#if showPassword}
-									<EyeOff class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEyeSlash} class="h-4 w-4" />
 								{:else}
-									<Eye class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 								{/if}
 							</button>
 						</div>
@@ -240,9 +241,9 @@
 						<div class="mt-2 space-y-1 text-xs">
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.minLength}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.minLength ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_min_length()}
@@ -250,9 +251,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasUppercase}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasUppercase ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_uppercase()}
@@ -260,9 +261,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasLowercase}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasLowercase ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_lowercase()}
@@ -270,9 +271,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasNumber}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasNumber ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_number()}
@@ -280,9 +281,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasSpecial}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasSpecial ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_special()}
@@ -344,7 +345,7 @@
 						)}
 					>
 						{#if loading}
-							<Loader2 class="h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 							{m.auth_creating()}
 						{:else}
 							{m.auth_create_account()}
@@ -365,4 +366,3 @@
 		</p>
 	</div>
 </div>
-

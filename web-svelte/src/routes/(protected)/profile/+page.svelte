@@ -1,20 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		User,
-		Mail,
-		Lock,
-		Save,
-		Loader2,
-		Eye,
-		EyeOff,
-		CheckCircle,
-		Smartphone,
-		Monitor,
-		Tablet,
-		LogOut,
-		Shield
-	} from 'lucide-svelte';
+		faUser,
+		faEnvelope,
+		faLock,
+		faFloppyDisk,
+		faSpinner,
+		faEye,
+		faEyeSlash,
+		faCircleCheck,
+		faMobileScreen,
+		faDesktop,
+		faTabletScreenButton,
+		faRightFromBracket,
+		faShield
+	} from '@fortawesome/free-solid-svg-icons';
 	import { profileApi, type UserProfile, type Device } from '$lib/api/profile';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { cn, formatRelativeTime } from '$lib/utils';
@@ -155,11 +156,11 @@
 	function getDeviceIcon(type: string) {
 		switch (type.toLowerCase()) {
 			case 'mobile':
-				return Smartphone;
+				return faMobileScreen;
 			case 'tablet':
-				return Tablet;
+				return faTabletScreenButton;
 			default:
-				return Monitor;
+				return faDesktop;
 		}
 	}
 </script>
@@ -173,7 +174,7 @@
 
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if profile}
 		<div class="grid gap-6 lg:grid-cols-2">
@@ -183,14 +184,14 @@
 				<section class="rounded-xl border border-border bg-card p-6">
 					<div class="mb-6 flex items-center gap-4">
 						<div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-							<User class="h-8 w-8" />
+							<FontAwesomeIcon icon={faUser} class="h-8 w-8" />
 						</div>
 						<div>
 							<h2 class="text-lg font-semibold">{profile.full_name || profile.username}</h2>
 							<p class="text-sm text-muted-foreground">@{profile.username}</p>
 							{#if profile.is_admin}
 								<span class="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-									<Shield class="h-3 w-3" />
+									<FontAwesomeIcon icon={faShield} class="h-3 w-3" />
 									Admin
 								</span>
 							{/if}
@@ -205,7 +206,7 @@
 						{/if}
 					{#if profileSuccess}
 						<div class="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-500">
-							<CheckCircle class="h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4" />
 							{m.profile_updated()}
 						</div>
 					{/if}
@@ -213,7 +214,7 @@
 					<div>
 						<FormLabel label={m.form_profile_fullname()} description={m.form_profile_fullname_desc()} for="full-name" />
 						<div class="relative">
-							<User class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+							<FontAwesomeIcon icon={faUser} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 							<input
 								id="full-name"
 								type="text"
@@ -227,7 +228,7 @@
 					<div>
 						<FormLabel label={m.form_profile_email()} description={m.form_profile_email_desc()} for="email" />
 						<div class="relative">
-							<Mail class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+							<FontAwesomeIcon icon={faEnvelope} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 							<input
 								id="email"
 								type="email"
@@ -241,9 +242,9 @@
 						<div class="flex justify-end">
 							<Button type="submit" disabled={isSavingProfile}>
 								{#if isSavingProfile}
-									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+									<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 								{:else}
-									<Save class="mr-2 h-4 w-4" />
+									<FontAwesomeIcon icon={faFloppyDisk} class="mr-2 h-4 w-4" />
 								{/if}
 								{m.common_save()}
 							</Button>
@@ -254,7 +255,7 @@
 				<!-- Change Password -->
 				<section class="rounded-xl border border-border bg-card p-6">
 				<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold">
-					<Lock class="h-5 w-5" />
+					<FontAwesomeIcon icon={faLock} class="h-5 w-5" />
 					{m.profile_changePassword()}
 				</h2>
 
@@ -266,7 +267,7 @@
 						{/if}
 					{#if passwordSuccess}
 						<div class="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-500">
-							<CheckCircle class="h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4" />
 							{m.profile_passwordChanged()}
 						</div>
 					{/if}
@@ -274,7 +275,7 @@
 					<div>
 						<FormLabel label={m.form_profile_password_current()} description={m.form_profile_password_current_desc()} required for="current-password" />
 						<div class="relative">
-							<Lock class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+							<FontAwesomeIcon icon={faLock} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 							<input
 								id="current-password"
 								type={showPasswords ? 'text' : 'password'}
@@ -288,9 +289,9 @@
 								class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 							>
 								{#if showPasswords}
-									<EyeOff class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEyeSlash} class="h-4 w-4" />
 								{:else}
-									<Eye class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 								{/if}
 							</button>
 						</div>
@@ -325,7 +326,7 @@
 					<div class="flex justify-end">
 						<Button type="submit" disabled={isChangingPassword}>
 							{#if isChangingPassword}
-								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{/if}
 							{m.profile_changePassword()}
 						</Button>
@@ -340,12 +341,12 @@
 				<section class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="flex items-center gap-2 text-lg font-semibold">
-						<Monitor class="h-5 w-5" />
+						<FontAwesomeIcon icon={faDesktop} class="h-5 w-5" />
 						{m.profile_activeSessions()}
 					</h2>
 					{#if devices.length > 1}
 						<Button variant="outline" size="sm" onclick={handleRevokeAll}>
-							<LogOut class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faRightFromBracket} class="mr-2 h-4 w-4" />
 							{m.profile_revokeAll()}
 						</Button>
 					{/if}
@@ -353,7 +354,7 @@
 
 					{#if loadingDevices}
 						<div class="flex items-center justify-center py-8">
-							<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+							<FontAwesomeIcon icon={faSpinner} class="h-6 w-6 animate-spin text-muted-foreground" />
 						</div>
 				{:else if devices.length === 0}
 					<p class="py-4 text-center text-muted-foreground">{m.profile_noSessions()}</p>
@@ -364,7 +365,7 @@
 								<div class="flex items-center justify-between rounded-lg border border-border p-4">
 									<div class="flex items-center gap-4">
 										<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-											<DeviceIcon class="h-5 w-5 text-muted-foreground" />
+											<FontAwesomeIcon icon={DeviceIcon} class="h-5 w-5 text-muted-foreground" />
 										</div>
 										<div>
 											<p class="font-medium text-foreground">
@@ -386,7 +387,7 @@
 											class="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
 											title="Revoke access"
 										>
-											<LogOut class="h-4 w-4" />
+											<FontAwesomeIcon icon={faRightFromBracket} class="h-4 w-4" />
 										</button>
 									{/if}
 								</div>

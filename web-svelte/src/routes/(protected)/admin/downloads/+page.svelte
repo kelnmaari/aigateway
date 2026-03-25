@@ -1,18 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		Download,
-		RefreshCw,
-		Loader2,
-		Trash2,
-		CheckCircle,
-		XCircle,
-		Clock,
-		HardDrive,
-		Pause,
-		Play,
-		AlertTriangle
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faDownload, faArrowsRotate, faSpinner, faTrash, faCircleCheck, faCircleXmark, faClockRotateLeft, faHardDrive, faPause, faPlay, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 	import { cn } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
@@ -128,15 +117,15 @@
 	function getStatusIcon(status: string) {
 		switch (status) {
 			case 'completed':
-				return CheckCircle;
+				return faCircleCheck;
 			case 'failed':
-				return XCircle;
+				return faCircleXmark;
 			case 'downloading':
-				return Download;
+				return faDownload;
 			case 'paused':
-				return Pause;
+				return faPause;
 			default:
-				return Clock;
+				return faClockRotateLeft;
 		}
 	}
 
@@ -169,12 +158,12 @@
 		<div class="flex gap-2">
 			{#if completedDownloads.length > 0 || failedDownloads.length > 0}
 				<Button variant="outline" size="sm" onclick={clearCompleted}>
-					<Trash2 class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faTrash} class="mr-2 h-4 w-4" />
 					{m.admin_downloads_clear()}
 				</Button>
 			{/if}
 			<Button variant="outline" size="sm" onclick={loadDownloads} disabled={isLoading}>
-				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				{m.common_refresh()}
 			</Button>
 		</div>
@@ -185,7 +174,7 @@
 		<div class="rounded-lg border border-border bg-card p-4">
 			<div class="flex items-center gap-3">
 				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-					<Download class="h-5 w-5" />
+					<FontAwesomeIcon icon={faDownload} class="h-5 w-5" />
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{activeDownloads.length}</p>
@@ -197,7 +186,7 @@
 		<div class="rounded-lg border border-border bg-card p-4">
 			<div class="flex items-center gap-3">
 				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
-					<Clock class="h-5 w-5" />
+					<FontAwesomeIcon icon={faClockRotateLeft} class="h-5 w-5" />
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{downloads.filter((d) => d.status === 'pending').length}</p>
@@ -209,7 +198,7 @@
 		<div class="rounded-lg border border-border bg-card p-4">
 			<div class="flex items-center gap-3">
 				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
-					<CheckCircle class="h-5 w-5" />
+					<FontAwesomeIcon icon={faCircleCheck} class="h-5 w-5" />
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{completedDownloads.length}</p>
@@ -221,7 +210,7 @@
 		<div class="rounded-lg border border-border bg-card p-4">
 			<div class="flex items-center gap-3">
 				<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10 text-red-500">
-					<XCircle class="h-5 w-5" />
+					<FontAwesomeIcon icon={faCircleXmark} class="h-5 w-5" />
 				</div>
 				<div>
 					<p class="text-2xl font-bold">{failedDownloads.length}</p>

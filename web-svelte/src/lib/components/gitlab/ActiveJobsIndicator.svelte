@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { getActiveJobs, type UserJob, getJobTypeName } from '$lib/api/gitlab-jobs';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faGear, faArrowRight, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 
 	export let refreshInterval: number = 5000; // 5 seconds
 
@@ -47,7 +49,7 @@
 
 <div class="jobs-indicator" on:click|stopPropagation={toggleDropdown}>
 	<button class="indicator-btn" class:has-jobs={hasActiveJobs} aria-label="Active jobs">
-		<span class="icon">⚙️</span>
+		<span class="icon"><FontAwesomeIcon icon={faGear} /></span>
 		{#if hasActiveJobs}
 			<span class="badge">{activeJobs.length}</span>
 		{/if}
@@ -60,12 +62,12 @@
 		<div class="dropdown" on:click|stopPropagation>
 			<div class="dropdown-header">
 				<span class="header-title">Active Jobs</span>
-				<a href="/gitlab/jobs" class="view-all">View All →</a>
+				<a href="/gitlab/jobs" class="view-all">View All <FontAwesomeIcon icon={faArrowRight} class="inline h-3 w-3" /></a>
 			</div>
 
 			{#if activeJobs.length === 0}
 				<div class="empty-state">
-					<span class="empty-icon">✨</span>
+					<span class="empty-icon"><FontAwesomeIcon icon={faWandMagicSparkles} /></span>
 					<span class="empty-text">No active jobs</span>
 				</div>
 			{:else}

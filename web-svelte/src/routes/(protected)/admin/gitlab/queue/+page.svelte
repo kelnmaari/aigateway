@@ -1,21 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		Activity,
-		RefreshCw,
-		Loader2,
-		X,
-		CheckCircle,
-		XCircle,
-		AlertCircle,
-		Clock,
-		Play,
-		Pause,
-		Server,
-		RotateCcw,
-		Wifi,
-		WifiOff
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faChartLine, faArrowsRotate, faSpinner, faXmark, faCircleCheck, faCircleXmark, faCircleExclamation, faClock, faPlay, faPause, faServer, faRotateLeft, faWifi } from '@fortawesome/free-solid-svg-icons';
 	import { gitlabApi, type GitLabQueueStats, type GitLabJob } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -207,17 +193,17 @@
 	function getStatusIcon(status: string) {
 		switch (status) {
 			case 'completed':
-				return CheckCircle;
+				return faCircleCheck;
 			case 'failed':
 			case 'cancelled':
-				return XCircle;
+				return faCircleXmark;
 			case 'processing':
-				return Loader2;
+				return faSpinner;
 			case 'pending':
 			case 'retrying':
-				return Clock;
+				return faClock;
 			default:
-				return AlertCircle;
+				return faCircleExclamation;
 		}
 	}
 
@@ -263,10 +249,10 @@
 				title={wsConnected ? 'Connected - Click to disconnect' : 'Disconnected - Click to connect'}
 			>
 				{#if wsConnected}
-					<Wifi class="mr-2 h-4 w-4 text-green-500" />
+					<FontAwesomeIcon icon={faWifi} class="mr-2 h-4 w-4 text-green-500" />
 					{m.admin_queue_live()}
 				{:else}
-					<WifiOff class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faWifi} class="mr-2 h-4 w-4" />
 					{wsEnabled ? m.admin_queue_connecting() : m.admin_queue_offline()}
 				{/if}
 			</Button>
@@ -276,15 +262,15 @@
 				onclick={() => { autoRefresh = !autoRefresh; }}
 			>
 				{#if autoRefresh}
-					<Pause class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faPause} class="mr-2 h-4 w-4" />
 					{m.admin_queue_autorefresh_on()}
 				{:else}
-					<Play class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faPlay} class="mr-2 h-4 w-4" />
 					{m.admin_queue_autorefresh_off()}
 				{/if}
 			</Button>
 			<Button variant="outline" size="sm" onclick={loadAll}>
-				<RefreshCw class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faArrowsRotate} class="mr-2 h-4 w-4" />
 				{m.common_refresh()}
 			</Button>
 		</div>
@@ -295,35 +281,35 @@
 		<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
-					<Clock class="h-4 w-4 text-yellow-500" />
+					<FontAwesomeIcon icon={faClock} class="h-4 w-4 text-yellow-500" />
 					<span class="text-sm text-muted-foreground">{m.admin_gitlab_pending()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.pending}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
-					<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-blue-500" />
 					<span class="text-sm text-muted-foreground">{m.admin_gitlab_processing()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.processing}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
-					<CheckCircle class="h-4 w-4 text-green-500" />
+					<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4 text-green-500" />
 					<span class="text-sm text-muted-foreground">{m.admin_queue_completed()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.completed}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
-					<XCircle class="h-4 w-4 text-red-500" />
+					<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4 text-red-500" />
 					<span class="text-sm text-muted-foreground">{m.admin_gitlab_failed()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">{stats.failed}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
-					<Server class="h-4 w-4 text-purple-500" />
+					<FontAwesomeIcon icon={faServer} class="h-4 w-4 text-purple-500" />
 					<span class="text-sm text-muted-foreground">{m.admin_gitlab_workers()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">
@@ -333,7 +319,7 @@
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				<div class="flex items-center gap-2">
-					<Activity class="h-4 w-4 text-cyan-500" />
+					<FontAwesomeIcon icon={faChartLine} class="h-4 w-4 text-cyan-500" />
 					<span class="text-sm text-muted-foreground">{m.admin_queue_avg_time()}</span>
 				</div>
 				<p class="mt-1 text-3xl font-bold">
@@ -371,11 +357,11 @@
 	<div class="rounded-lg border bg-card">
 		{#if isLoading && jobs.length === 0}
 			<div class="flex items-center justify-center py-12">
-				<Loader2 class="h-8 w-8 animate-spin text-primary" />
+				<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-primary" />
 			</div>
 		{:else if jobs.length === 0}
 			<div class="flex flex-col items-center justify-center py-12 text-center">
-				<Activity class="h-12 w-12 text-muted-foreground/50" />
+				<FontAwesomeIcon icon={faChartLine} class="h-12 w-12 text-muted-foreground/50" />
 				<p class="mt-4 text-lg font-medium text-muted-foreground">No jobs found</p>
 				<p class="text-sm text-muted-foreground">Jobs will appear here when MRs are queued for analysis</p>
 			</div>
@@ -405,7 +391,7 @@
 								{#if true}
 									{@const StatusIcon = getStatusIcon(job.status)}
 									<div class="flex items-center gap-2">
-										<StatusIcon
+										<FontAwesomeIcon icon={StatusIcon}
 											class={cn(
 												'h-4 w-4',
 												getStatusColor(job.status),
@@ -465,7 +451,7 @@
 											class="rounded p-1.5 text-primary hover:bg-primary/10"
 											title="Retry"
 										>
-											<RotateCcw class="h-4 w-4" />
+											<FontAwesomeIcon icon={faRotateLeft} class="h-4 w-4" />
 										</button>
 									{/if}
 									{#if job.status === 'pending' || job.status === 'processing'}
@@ -474,7 +460,7 @@
 											class="rounded p-1.5 text-red-500 hover:bg-red-500/10"
 											title="Cancel"
 										>
-											<X class="h-4 w-4" />
+											<FontAwesomeIcon icon={faXmark} class="h-4 w-4" />
 										</button>
 									{/if}
 								</div>
@@ -517,7 +503,7 @@
 	{#if wsConnected && recentEvents.length > 0}
 		<div class="rounded-lg border bg-card p-4">
 			<h3 class="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-				<Wifi class="h-4 w-4 text-green-500" />
+				<FontAwesomeIcon icon={faWifi} class="h-4 w-4 text-green-500" />
 				Live Events
 			</h3>
 			<div class="space-y-2 max-h-48 overflow-y-auto">

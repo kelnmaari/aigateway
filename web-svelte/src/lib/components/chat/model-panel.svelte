@@ -1,5 +1,14 @@
 <script lang="ts">
-	import { Settings, ChevronDown, Sparkles, Scale, Target, Code, Search } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import {
+		faGear,
+		faChevronDown,
+		faWandMagicSparkles,
+		faScaleBalanced,
+		faBullseye,
+		faCode,
+		faMagnifyingGlass
+	} from '@fortawesome/free-solid-svg-icons';
 	import { cn } from '$lib/utils';
 	import type { ChatParams } from '$lib/stores/chat.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -25,10 +34,10 @@
 	let showParams = $state(false);
 
 	const presets = [
-		{ id: 'creative', label: m.chat_preset_creative, desc: m.chat_preset_creative_desc, icon: Sparkles, color: 'text-purple-500' },
-		{ id: 'balanced', label: m.chat_preset_balanced, desc: m.chat_preset_balanced_desc, icon: Scale, color: 'text-blue-500' },
-		{ id: 'precise', label: m.chat_preset_precise, desc: m.chat_preset_precise_desc, icon: Target, color: 'text-green-500' },
-		{ id: 'coding', label: m.chat_preset_coding, desc: m.chat_preset_coding_desc, icon: Code, color: 'text-orange-500' }
+		{ id: 'creative', label: m.chat_preset_creative, desc: m.chat_preset_creative_desc, icon: faWandMagicSparkles, color: 'text-purple-500' },
+		{ id: 'balanced', label: m.chat_preset_balanced, desc: m.chat_preset_balanced_desc, icon: faScaleBalanced, color: 'text-blue-500' },
+		{ id: 'precise', label: m.chat_preset_precise, desc: m.chat_preset_precise_desc, icon: faBullseye, color: 'text-green-500' },
+		{ id: 'coding', label: m.chat_preset_coding, desc: m.chat_preset_coding_desc, icon: faCode, color: 'text-orange-500' }
 	] as const;
 
 	let activePreset = $state<string | null>(null);
@@ -65,7 +74,7 @@
 					)}
 					title={preset.desc()}
 				>
-					<preset.icon class="h-3.5 w-3.5" />
+					<FontAwesomeIcon icon={preset.icon} class="h-3.5 w-3.5" />
 					<span class="hidden lg:inline">{preset.label()}</span>
 				</button>
 			{/each}
@@ -79,8 +88,8 @@
 				showParams && 'bg-accent'
 			)}
 		>
-			<Settings class="h-4 w-4" />
-			<ChevronDown class={cn('h-3 w-3 transition-transform', showParams && 'rotate-180')} />
+			<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
+			<FontAwesomeIcon icon={faChevronDown} class={cn('h-3 w-3 transition-transform', showParams && 'rotate-180')} />
 		</button>
 	</div>
 
@@ -160,7 +169,7 @@
 					/>
 				</div>
 			</div>
-			
+
 			<!-- Web Search Toggle -->
 			<div class="mt-4 border-t border-border pt-4">
 				<label class="flex items-center gap-3 cursor-pointer">
@@ -170,7 +179,7 @@
 						onchange={(e) => onParamsChange({ use_tools: e.currentTarget.checked })}
 						class="h-4 w-4 rounded border-border text-primary focus:ring-primary"
 					/>
-					<Search class="h-4 w-4 text-blue-500" />
+					<FontAwesomeIcon icon={faMagnifyingGlass} class="h-4 w-4 text-blue-500" />
 					<div class="flex-1">
 						<span class="text-sm font-medium">{m.chat_use_tools()}</span>
 						<p class="text-xs text-muted-foreground">{m.chat_use_tools_hint()}</p>
@@ -191,7 +200,7 @@
 						)}
 						title={preset.desc()}
 					>
-						<preset.icon class="h-3.5 w-3.5" />
+						<FontAwesomeIcon icon={preset.icon} class="h-3.5 w-3.5" />
 						{preset.label()}
 					</button>
 				{/each}
@@ -199,4 +208,3 @@
 		</div>
 	{/if}
 </div>
-

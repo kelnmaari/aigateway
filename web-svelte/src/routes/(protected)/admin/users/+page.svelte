@@ -1,20 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Search,
-		Plus,
-		MoreVertical,
-		UserCheck,
-		UserX,
-		Trash2,
-		Key,
-		Loader2,
-		Shield,
-		ShieldOff,
-		X,
-		Eye,
-		EyeOff
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faMagnifyingGlass, faPlus, faEllipsisVertical, faUserCheck, faUserXmark, faTrash, faKey, faSpinner, faShield, faShieldHalved, faXmark, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 	import { adminApi, type AdminUser } from '$lib/api/admin';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -158,7 +145,7 @@
 		<div class="flex gap-3">
 			<!-- Search -->
 			<form onsubmit={(e) => { e.preventDefault(); handleSearch(); }} class="relative">
-				<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+				<FontAwesomeIcon icon={faMagnifyingGlass} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 				<input
 					type="text"
 					bind:value={search}
@@ -167,7 +154,7 @@
 				/>
 			</form>
 			<Button onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.admin_add_user()}
 			</Button>
 		</div>
@@ -176,7 +163,7 @@
 	<!-- Table -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if users.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
@@ -224,7 +211,7 @@
 							<td class="px-4 py-3">
 								{#if user.is_admin}
 									<span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-										<Shield class="h-3 w-3" />
+										<FontAwesomeIcon icon={faShield} class="h-3 w-3" />
 										{m.admin_users_admin()}
 									</span>
 								{:else}
@@ -235,12 +222,12 @@
 								{#if user.oidc_subject}
 									<!-- User has OIDC linked (may also have local password) -->
 									<span class="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400" title="OIDC linked{user.auth_provider === 'local' ? ' + Local password' : ''}">
-										<Key class="h-3 w-3" />
+										<FontAwesomeIcon icon={faKey} class="h-3 w-3" />
 										OIDC
 									</span>
 								{:else if user.auth_provider === 'ldap'}
 									<span class="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
-										<Key class="h-3 w-3" />
+										<FontAwesomeIcon icon={faKey} class="h-3 w-3" />
 										LDAP
 									</span>
 								{:else}
@@ -270,7 +257,7 @@
 									onclick={() => (showMenuFor = showMenuFor === user.id ? null : user.id)}
 									class="rounded p-1.5 text-muted-foreground hover:bg-accent"
 								>
-									<MoreVertical class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEllipsisVertical} class="h-4 w-4" />
 								</button>
 
 								{#if showMenuFor === user.id}
@@ -280,10 +267,10 @@
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 										>
 											{#if user.is_admin}
-												<ShieldOff class="h-4 w-4" />
+												<FontAwesomeIcon icon={faShieldHalved} class="h-4 w-4" />
 												{m.admin_users_remove_admin()}
 											{:else}
-												<Shield class="h-4 w-4" />
+												<FontAwesomeIcon icon={faShield} class="h-4 w-4" />
 												{m.admin_users_make_admin()}
 											{/if}
 										</button>
@@ -292,10 +279,10 @@
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 										>
 											{#if user.status === 'active'}
-												<UserX class="h-4 w-4" />
+												<FontAwesomeIcon icon={faUserXmark} class="h-4 w-4" />
 												{m.admin_users_disable()}
 											{:else}
-												<UserCheck class="h-4 w-4" />
+												<FontAwesomeIcon icon={faUserCheck} class="h-4 w-4" />
 												{m.admin_users_enable()}
 											{/if}
 										</button>
@@ -303,7 +290,7 @@
 											onclick={() => handleDeleteUser(user)}
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
 										>
-											<Trash2 class="h-4 w-4" />
+											<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 											{m.admin_users_delete()}
 										</button>
 									</div>
@@ -362,7 +349,7 @@
 					class="rounded p-1 text-muted-foreground hover:bg-accent"
 					title={m.common_close()}
 				>
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -414,9 +401,9 @@
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 						>
 							{#if showPassword}
-								<EyeOff class="h-4 w-4" />
+								<FontAwesomeIcon icon={faEyeSlash} class="h-4 w-4" />
 							{:else}
-								<Eye class="h-4 w-4" />
+								<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 							{/if}
 						</button>
 					</div>
@@ -444,7 +431,7 @@
 					</Button>
 					<Button type="submit" disabled={isCreating}>
 						{#if isCreating}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
 						{m.common_create()}
 					</Button>

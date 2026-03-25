@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		BarChart3,
-		Loader2,
-		RefreshCw,
-		TrendingUp,
-		Zap,
-		Clock,
-		Calendar
-	} from 'lucide-svelte';
+		faChartColumn,
+		faSpinner,
+		faArrowsRotate,
+		faArrowTrendUp,
+		faBolt,
+		faClockRotateLeft,
+		faCalendar
+	} from '@fortawesome/free-solid-svg-icons';
 	import { usageApi, type UsageStats, type UsageRecord } from '$lib/api/usage';
 	import { cn, formatNumber, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -78,14 +79,14 @@
 				{/each}
 			</div>
 			<Button variant="outline" onclick={loadUsage} disabled={isLoading}>
-				<RefreshCw class={cn('h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('h-4 w-4', isLoading && 'animate-spin')} />
 			</Button>
 		</div>
 	</div>
 
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if stats}
 		<!-- Stats Cards -->
@@ -93,7 +94,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-						<Zap class="h-5 w-5" />
+						<FontAwesomeIcon icon={faBolt} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Total Requests</p>
@@ -105,7 +106,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
-						<BarChart3 class="h-5 w-5" />
+						<FontAwesomeIcon icon={faChartColumn} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Total Tokens</p>
@@ -117,7 +118,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
-						<TrendingUp class="h-5 w-5" />
+						<FontAwesomeIcon icon={faArrowTrendUp} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Input Tokens</p>
@@ -129,7 +130,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
-						<TrendingUp class="h-5 w-5" />
+						<FontAwesomeIcon icon={faArrowTrendUp} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Output Tokens</p>
@@ -198,7 +199,7 @@
 		{/if}
 	{:else}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<BarChart3 class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faChartColumn} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium">No usage data</p>
 			<p class="mt-1 text-muted-foreground">Start using the API to see statistics here</p>
 		</div>

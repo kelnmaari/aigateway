@@ -1,6 +1,18 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { User, Bot, Copy, Check, Brain, ChevronDown, ChevronRight, Search, Globe, Loader2 } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import {
+		faUser,
+		faRobot,
+		faCopy,
+		faCheck,
+		faBrain,
+		faChevronDown,
+		faChevronRight,
+		faMagnifyingGlass,
+		faGlobe,
+		faSpinner
+	} from '@fortawesome/free-solid-svg-icons';
 	import { cn, copyToClipboard as copyText } from '$lib/utils';
 	import type { Message, ToolEvent } from '$lib/stores/chat.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -13,17 +25,17 @@
 	}
 
 	let { messages, streamingContent = '', isStreaming = false, toolEvents = [] }: Props = $props();
-	
+
 	// Get icon for tool type
 	function getToolIcon(tool: string) {
 		switch (tool) {
 			case 'web_search':
-				return Search;
+				return faMagnifyingGlass;
 			default:
-				return Globe;
+				return faGlobe;
 		}
 	}
-	
+
 	// Get label for tool type
 	function getToolLabel(tool: string) {
 		switch (tool) {
@@ -71,7 +83,7 @@
 		// Match <think> or variations with any brackets
 		const thinkRegex = /[<\[{(]+\s*think\s*[>\]})]+\s*\n?([\s\S]*?)[<\[{(]+\s*\/\s*think\s*[>\]})]+/i;
 		const match = normalized.match(thinkRegex);
-		
+
 		if (match) {
 			const thinking = match[1].trim();
 			const beforeThink = normalized.slice(0, match.index).trim();
@@ -84,7 +96,7 @@
 		const openRegex = /[<\[{(]+\s*think\s*[>\]})]+/i;
 		const closeRegex = /[<\[{(]+\s*\/\s*think\s*[>\]})]+/i;
 		const openMatch = normalized.match(openRegex);
-		
+
 		if (openMatch && !normalized.match(closeRegex)) {
 			const openIdx = openMatch.index || 0;
 			const thinking = normalized.slice(openIdx + openMatch[0].length).trim();
@@ -120,7 +132,7 @@
 	// Simple markdown to HTML (basic implementation)
 	function renderMarkdown(text: string): string {
 		if (!text) return '';
-		
+
 		// Escape HTML first
 		let html = text
 			.replace(/&/g, '&amp;')
@@ -172,9 +184,9 @@
 					)}
 				>
 					{#if message.role === 'user'}
-						<User class="h-4 w-4" />
+						<FontAwesomeIcon icon={faUser} class="h-4 w-4" />
 					{:else}
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 					{/if}
 				</div>
 
@@ -193,7 +205,7 @@
 						</div>
 					{:else}
 						{@const parsed = parseThinkingContent(message.content)}
-						
+
 						<!-- Thinking Block (collapsible) -->
 						{#if parsed.thinking}
 							<div class="mb-3">
@@ -201,15 +213,15 @@
 									onclick={() => toggleThinking(message.id)}
 									class="flex w-full items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-left text-sm transition-colors hover:bg-purple-500/20"
 								>
-									<Brain class="h-4 w-4 text-purple-500" />
+									<FontAwesomeIcon icon={faBrain} class="h-4 w-4 text-purple-500" />
 									<span class="font-medium text-purple-500">{m.chat_thinking()}</span>
 									{#if expandedThinking.has(message.id)}
-										<ChevronDown class="ml-auto h-4 w-4 text-purple-500" />
+										<FontAwesomeIcon icon={faChevronDown} class="ml-auto h-4 w-4 text-purple-500" />
 									{:else}
-										<ChevronRight class="ml-auto h-4 w-4 text-purple-500" />
+										<FontAwesomeIcon icon={faChevronRight} class="ml-auto h-4 w-4 text-purple-500" />
 									{/if}
 								</button>
-								
+
 								{#if expandedThinking.has(message.id)}
 									<div class="mt-2 max-h-64 overflow-y-auto rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-muted-foreground">
 										<pre class="whitespace-pre-wrap font-sans">{parsed.thinking}</pre>
@@ -217,7 +229,7 @@
 								{/if}
 							</div>
 						{/if}
-						
+
 						<!-- Response -->
 						{#if parsed.response}
 							<div class="prose prose-sm dark:prose-invert max-w-none">
@@ -225,7 +237,7 @@
 							</div>
 						{:else if parsed.isThinking}
 							<div class="flex items-center gap-2 text-sm text-muted-foreground">
-								<Brain class="h-4 w-4 animate-pulse text-purple-500" />
+								<FontAwesomeIcon icon={faBrain} class="h-4 w-4 animate-pulse text-purple-500" />
 								<span>{m.chat_thinking_progress()}</span>
 							</div>
 						{/if}
@@ -241,9 +253,9 @@
 						title={m.chat_copy_message()}
 					>
 						{#if copiedId === message.id}
-							<Check class="h-3.5 w-3.5 text-green-500" />
+							<FontAwesomeIcon icon={faCheck} class="h-3.5 w-3.5 text-green-500" />
 						{:else}
-							<Copy class="h-3.5 w-3.5 text-muted-foreground" />
+							<FontAwesomeIcon icon={faCopy} class="h-3.5 w-3.5 text-muted-foreground" />
 						{/if}
 					</button>
 				</div>
@@ -253,24 +265,24 @@
 		<!-- Tool Events (like Cursor's "Searched for X") -->
 		{#if toolEvents.length > 0}
 			{@const completedQueries = new Set(toolEvents.filter(e => e.type === 'tool_end').map(e => e.query))}
-			{@const filteredEvents = toolEvents.filter(e => 
+			{@const filteredEvents = toolEvents.filter(e =>
 				e.type !== 'tool_start' || !completedQueries.has(e.query)
 			)}
 			{#if filteredEvents.length > 0}
 				<div class="flex gap-4">
 					<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-500">
-						<Globe class="h-4 w-4" />
+						<FontAwesomeIcon icon={faGlobe} class="h-4 w-4" />
 					</div>
 					<div class="flex-1 space-y-2">
 						{#each filteredEvents as event}
-							{@const ToolIcon = getToolIcon(event.tool)}
+							{@const toolIcon = getToolIcon(event.tool)}
 							<div class="flex items-center gap-2 text-sm">
 								{#if event.type === 'tool_start'}
-									<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+									<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-blue-500" />
 									<span class="text-muted-foreground">{getToolLabel(event.tool)}</span>
 									<span class="font-medium text-foreground">"{event.query}"</span>
 								{:else if event.type === 'tool_end'}
-									<ToolIcon class="h-4 w-4 text-green-500" />
+									<FontAwesomeIcon icon={toolIcon} class="h-4 w-4 text-green-500" />
 									<span class="text-muted-foreground">{m.chat_tool_searched()}</span>
 									<span class="font-medium text-foreground">"{event.query}"</span>
 									{#if event.elapsed}
@@ -295,9 +307,9 @@
 			<div class="flex gap-4">
 				<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
 					{#if streamParsed.isThinking}
-						<Brain class="h-4 w-4 animate-pulse text-purple-500" />
+						<FontAwesomeIcon icon={faBrain} class="h-4 w-4 animate-pulse text-purple-500" />
 					{:else}
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 					{/if}
 				</div>
 				<div class="max-w-[80%] rounded-2xl bg-muted px-4 py-3">
@@ -305,7 +317,7 @@
 					{#if streamParsed.isThinking}
 						<div class="mb-3">
 							<div class="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-sm">
-								<Brain class="h-4 w-4 animate-pulse text-purple-500" />
+								<FontAwesomeIcon icon={faBrain} class="h-4 w-4 animate-pulse text-purple-500" />
 								<span class="font-medium text-purple-500">{m.chat_thinking_progress()}</span>
 							</div>
 							<div class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-muted-foreground">
@@ -313,28 +325,27 @@
 							</div>
 						</div>
 					{/if}
-					
+
 					<!-- Completed thinking + response -->
 					{#if streamParsed.thinking && !streamParsed.isThinking}
 						<div class="mb-3">
 							<div class="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm">
-								<Brain class="h-4 w-4 text-green-500" />
+								<FontAwesomeIcon icon={faBrain} class="h-4 w-4 text-green-500" />
 								<span class="font-medium text-green-500">{m.chat_thought_complete()}</span>
 							</div>
 						</div>
 					{/if}
-					
+
 					<!-- Response content -->
 					{#if streamParsed.response}
 						<div class="prose prose-sm dark:prose-invert max-w-none">
 							{@html renderMarkdown(streamParsed.response)}
 						</div>
 					{/if}
-					
+
 					<span class="ml-1 inline-block h-4 w-1 animate-pulse bg-foreground"></span>
 				</div>
 			</div>
 		{/if}
 	</div>
 </div>
-

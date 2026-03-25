@@ -1,18 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Key,
-		Plus,
-		Trash2,
-		Copy,
-		Check,
-		Building2,
-		User,
-		Loader2,
-		Eye,
-		EyeOff,
-		X
-	} from 'lucide-svelte';
+		faKey,
+		faPlus,
+		faTrash,
+		faCopy,
+		faCheck,
+		faBuilding,
+		faUser,
+		faSpinner,
+		faEye,
+		faEyeSlash,
+		faXmark
+	} from '@fortawesome/free-solid-svg-icons';
 	import { apiKeysStore } from '$lib/stores/apikeys.svelte';
 	import { apiKeysApi, type CreateAPIKeyRequest } from '$lib/api/apikeys';
 	import { chatApi } from '$lib/api';
@@ -196,7 +197,7 @@
 			<p class="mt-1 text-muted-foreground">{m.apikeys_subtitle()}</p>
 		</div>
 		<Button onclick={openCreateModal}>
-			<Plus class="mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 			{m.apikeys_create()}
 		</Button>
 	</div>
@@ -212,7 +213,7 @@
 					: 'border-transparent text-muted-foreground hover:text-foreground'
 			)}
 		>
-			<User class="h-4 w-4" />
+			<FontAwesomeIcon icon={faUser} class="h-4 w-4" />
 			Personal Keys
 		</button>
 		{#if apiKeysStore.hasTenants}
@@ -225,7 +226,7 @@
 						: 'border-transparent text-muted-foreground hover:text-foreground'
 				)}
 			>
-				<Building2 class="h-4 w-4" />
+				<FontAwesomeIcon icon={faBuilding} class="h-4 w-4" />
 				Organization Keys
 			</button>
 		{/if}
@@ -251,14 +252,14 @@
 	<!-- Keys Table -->
 	{#if apiKeysStore.isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if apiKeysStore.currentKeys.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Key class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faKey} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-muted-foreground">No API keys yet</p>
 			<Button variant="outline" class="mt-4" onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				Create your first key
 			</Button>
 		</div>
@@ -308,7 +309,7 @@
 									size="sm"
 									onclick={() => copyText(key.key_prefix || '')}
 								>
-									<Copy />
+									<FontAwesomeIcon icon={faCopy} />
 								</IconButton>
 								</div>
 							</td>
@@ -341,7 +342,7 @@
 									variant="destructive"
 									onclick={() => handleDeleteKey(key.id)}
 								>
-									<Trash2 />
+									<FontAwesomeIcon icon={faTrash} />
 								</IconButton>
 							</td>
 						</tr>
@@ -369,7 +370,7 @@
 					onclick={() => (showCreateModal = false)}
 					class="rounded p-1 text-muted-foreground hover:bg-accent"
 				>
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -461,7 +462,7 @@
 					</Button>
 					<Button type="submit" disabled={isCreating}>
 						{#if isCreating}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
 						{m.common_create()}
 					</Button>
@@ -480,7 +481,7 @@
 		<div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl">
 			<div class="mb-4 text-center">
 				<div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 text-green-500">
-					<Key class="h-6 w-6" />
+					<FontAwesomeIcon icon={faKey} class="h-6 w-6" />
 				</div>
 				<h2 class="text-lg font-semibold">API Key Created</h2>
 				<p class="mt-1 text-sm text-muted-foreground">
@@ -499,10 +500,10 @@
 					onclick={() => copyToClipboard(apiKeysStore.createdKeyValue!)}
 				>
 					{#if copiedKey}
-						<Check class="mr-2 h-4 w-4 text-green-500" />
+						<FontAwesomeIcon icon={faCheck} class="mr-2 h-4 w-4 text-green-500" />
 						Copied!
 					{:else}
-						<Copy class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faCopy} class="mr-2 h-4 w-4" />
 						Copy Key
 					{/if}
 				</Button>

@@ -17,7 +17,9 @@
 	} from '$lib/api/inference';
 	import { api } from '$lib/api/client';
 	import { downloadsApi } from '$lib/api/downloads';
-	import { Search, Download, ExternalLink, Loader2 } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faMagnifyingGlass, faDownload, faArrowUpRightFromSquare, faSpinner, faFont, faBolt, faRocket, faFaceSmile, faHorse, faLink, faChartBar, faShuffle, faGear, faArrowsRotate, faPause, faPlay, faXmark, faCircleCheck, faTriangleExclamation, faCircleXmark, faHourglass, faFolder, faTrashCan, faLightbulb, faArrowRight, faClipboard, faBan, faArrowDown } from '@fortawesome/free-solid-svg-icons';
+	import { faHeart } from '@fortawesome/free-regular-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 
 	// GPU devices for selection
@@ -97,35 +99,35 @@
 		id: HFProviderFilter;
 		label: string;
 		description: string;
-		icon: string;
+		icon: any;
 	}[] = [
-		{ id: 'all', label: 'All LLMs', description: 'Text generation models', icon: '🔤' },
-		{ id: 'vllm', label: 'vLLM', description: 'For vLLM inference', icon: '⚡' },
-		{ id: 'sglang', label: 'SGLang', description: 'For SGLang inference', icon: '🚀' },
-		{ id: 'tgi', label: 'TGI', description: 'For Text Generation Inference', icon: '🤗' },
+		{ id: 'all', label: 'All LLMs', description: 'Text generation models', icon: faFont },
+		{ id: 'vllm', label: 'vLLM', description: 'For vLLM inference', icon: faBolt },
+		{ id: 'sglang', label: 'SGLang', description: 'For SGLang inference', icon: faRocket },
+		{ id: 'tgi', label: 'TGI', description: 'For Text Generation Inference', icon: faFaceSmile },
 		{
 			id: 'llama.cpp',
 			label: 'llama.cpp (GGUF)',
 			description: 'Quantized GGUF models',
-			icon: '🦙'
+			icon: faHorse
 		},
 		{
 			id: 'tei',
 			label: 'TEI',
 			description: 'Text Embeddings Inference compatible',
-			icon: '🔗'
+			icon: faLink
 		},
 		{
 			id: 'embedding',
 			label: 'Embeddings',
 			description: 'Feature extraction & embeddings',
-			icon: '📊'
+			icon: faChartBar
 		},
 		{
 			id: 'rerank',
 			label: 'Rerank',
 			description: 'Reranking & cross-encoder models',
-			icon: '🔀'
+			icon: faShuffle
 		}
 	];
 
@@ -1457,7 +1459,7 @@
 			class={`-mb-px px-4 py-2 ${activeTab === 'hf' ? 'border-primary border-b-2 font-semibold' : 'text-muted-foreground'}`}
 			onclick={() => (activeTab = 'hf')}
 		>
-			🤗 HuggingFace
+			<FontAwesomeIcon icon={faFaceSmile} class="inline h-4 w-4" /> HuggingFace
 		</button>
 		<button
 			class={`-mb-px px-4 py-2 ${activeTab === 'cache' ? 'border-primary border-b-2 font-semibold' : 'text-muted-foreground'}`}
@@ -1610,7 +1612,7 @@
 							<div class="flex items-start justify-between gap-4">
 								<div class="flex-1">
 									<div class="mb-1 text-sm font-medium">
-										{memoryRecommendation.willFit ? '✅' : '⚠️'} Memory Recommendation
+										<FontAwesomeIcon icon={memoryRecommendation.willFit ? faCircleCheck : faTriangleExclamation} class="mr-1 h-3.5 w-3.5" /> Memory Recommendation
 									</div>
 									<div class="text-muted-foreground grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
 										<div>
@@ -1905,7 +1907,7 @@
 											onclick={() => openEditSavedModal(saved)}
 											title="Edit parameters"
 										>
-											⚙️
+											<FontAwesomeIcon icon={faGear} class="h-3 w-3" />
 										</button>
 										{#if saved.hf_repo}
 											<button
@@ -1913,7 +1915,7 @@
 												onclick={() => refreshSavedModel(saved)}
 												title="Update/re-download model files"
 											>
-												🔄
+												<FontAwesomeIcon icon={faArrowsRotate} class="h-3 w-3" />
 											</button>
 										{/if}
 										<button
@@ -1921,11 +1923,11 @@
 											onclick={() => toggleAutoStart(saved)}
 											title={saved.auto_start ? 'Disable auto-start' : 'Enable auto-start'}
 										>
-											{saved.auto_start ? '⏸' : '▶'}
+											<FontAwesomeIcon icon={saved.auto_start ? faPause : faPlay} class="h-3 w-3" />
 										</button>
 										<button
 											class="rounded border px-2 py-1 text-xs text-red-500 hover:bg-red-500/10"
-											onclick={() => deleteSavedModel(saved.alias)}>✕</button
+											onclick={() => deleteSavedModel(saved.alias)}><FontAwesomeIcon icon={faXmark} class="h-3 w-3" /></button
 										>
 									</div>
 								</div>
@@ -2056,7 +2058,7 @@
 					<div class="bg-muted/50 flex items-center justify-between border-b px-4 py-3">
 						<h2 class="font-semibold">{selectedModel.alias}</h2>
 						<button class="text-muted-foreground hover:text-foreground" onclick={closeDetails}
-							>✕</button
+							><FontAwesomeIcon icon={faXmark} class="h-4 w-4" /></button
 						>
 					</div>
 					<div class="space-y-4 p-4">
@@ -2176,7 +2178,7 @@
 							}}
 							title={pf.description}
 						>
-							<span>{pf.icon}</span>
+							<span><FontAwesomeIcon icon={pf.icon} class="h-4 w-4" /></span>
 							{pf.label}
 						</button>
 					{/each}
@@ -2229,21 +2231,21 @@
 				<!-- Provider hint -->
 				<div class="text-muted-foreground bg-muted/50 rounded px-3 py-2 text-xs">
 					{#if hfProviderFilter === 'llama.cpp'}
-						🦙 GGUF quantized models for <strong>llama.cpp</strong> — efficient CPU/GPU inference
+						<FontAwesomeIcon icon={faHorse} class="mr-1 h-3 w-3" /> GGUF quantized models for <strong>llama.cpp</strong> — efficient CPU/GPU inference
 					{:else if hfProviderFilter === 'vllm'}
-						⚡ Models for <strong>vLLM</strong> — high-throughput production serving
+						<FontAwesomeIcon icon={faBolt} class="mr-1 h-3 w-3" /> Models for <strong>vLLM</strong> — high-throughput production serving
 					{:else if hfProviderFilter === 'sglang'}
-						🚀 Models for <strong>SGLang</strong> — fast inference with RadixAttention
+						<FontAwesomeIcon icon={faRocket} class="mr-1 h-3 w-3" /> Models for <strong>SGLang</strong> — fast inference with RadixAttention
 					{:else if hfProviderFilter === 'tgi'}
-						🤗 Models for <strong>TGI</strong> — HuggingFace Text Generation Inference
+						<FontAwesomeIcon icon={faFaceSmile} class="mr-1 h-3 w-3" /> Models for <strong>TGI</strong> — HuggingFace Text Generation Inference
 					{:else if hfProviderFilter === 'tei'}
-						🔗 Models for <strong>TEI</strong> — Text Embeddings Inference (embeddings & reranking)
+						<FontAwesomeIcon icon={faLink} class="mr-1 h-3 w-3" /> Models for <strong>TEI</strong> — Text Embeddings Inference (embeddings & reranking)
 					{:else if hfProviderFilter === 'embedding'}
-						📊 Embedding models for <strong>vLLM/SGLang</strong> — feature extraction & RAG
+						<FontAwesomeIcon icon={faChartBar} class="mr-1 h-3 w-3" /> Embedding models for <strong>vLLM/SGLang</strong> — feature extraction & RAG
 					{:else if hfProviderFilter === 'rerank'}
-						🔀 Reranking models for <strong>TEI</strong> — cross-encoder reranking
+						<FontAwesomeIcon icon={faShuffle} class="mr-1 h-3 w-3" /> Reranking models for <strong>TEI</strong> — cross-encoder reranking
 					{:else}
-						💡 Filter by provider to find compatible models
+						<FontAwesomeIcon icon={faLightbulb} class="mr-1 h-3 w-3" /> Filter by provider to find compatible models
 					{/if}
 				</div>
 
@@ -2278,8 +2280,8 @@
 								<div class="min-w-0 flex-1">
 									<div class="truncate font-medium">{hfm.id}</div>
 									<div class="text-muted-foreground mt-1 flex flex-wrap gap-2 text-xs">
-										<span>⬇️ {formatNumber(hfm.downloads || 0)}</span>
-										<span>❤️ {formatNumber(hfm.likes || 0)}</span>
+										<span><FontAwesomeIcon icon={faArrowDown} class="mr-0.5 h-3 w-3" /> {formatNumber(hfm.downloads || 0)}</span>
+										<span><FontAwesomeIcon icon={faHeart} class="mr-0.5 h-3 w-3" /> {formatNumber(hfm.likes || 0)}</span>
 										{#if extractModelSizeB(hfm)}
 											<span
 												class="rounded bg-blue-500/20 px-1.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400"
@@ -2314,7 +2316,7 @@
 									Searching...
 								{:else if hfSearchError}
 									<div class="text-amber-500">
-										⚠️ {hfSearchError}
+										<FontAwesomeIcon icon={faTriangleExclamation} class="mr-1 h-3.5 w-3.5" /> {hfSearchError}
 									</div>
 									<div class="text-xs mt-2">
 										Try a different search term or check model name spelling
@@ -2477,7 +2479,7 @@
 						onclick={clearAllCache}
 						disabled={busy || (artifacts || []).length === 0}
 					>
-						🗑️ Clear All
+						<FontAwesomeIcon icon={faTrashCan} class="mr-1 h-3 w-3" /> Clear All
 					</button>
 					<button class="hover:bg-muted rounded border px-3 py-1.5 text-sm" onclick={loadCache}>
 						Refresh
@@ -2653,7 +2655,7 @@
 										)}/{formatSize(dl.total_size)}
 									</div>
 									{#if dl.local_path}
-										<div class="text-muted-foreground mt-1 text-xs">📁 {dl.local_path}</div>
+										<div class="text-muted-foreground mt-1 text-xs"><FontAwesomeIcon icon={faFolder} class="mr-0.5 h-3 w-3" /> {dl.local_path}</div>
 									{/if}
 								</div>
 								<div class="flex items-center gap-2">
@@ -2663,7 +2665,7 @@
 											onclick={() => cancelRepoDownload(dl.model_id)}
 											title="Cancel download"
 										>
-											✕ Cancel
+											<FontAwesomeIcon icon={faXmark} class="mr-0.5 h-3 w-3" /> Cancel
 										</button>
 									{:else if dl.status === 'completed' || dl.status === 'failed' || dl.status === 'cancelled'}
 										<button
@@ -2671,7 +2673,7 @@
 											onclick={() => removeRepoDownload(dl.model_id)}
 											title="Remove from list"
 										>
-											✕
+											<FontAwesomeIcon icon={faXmark} class="h-3 w-3" />
 										</button>
 									{/if}
 									<span
@@ -2687,15 +2689,15 @@
 															: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
 										}`}
 									>
-										{dl.status === 'downloading'
-											? '⏳ '
-											: dl.status === 'completed'
-												? '✅ '
-												: dl.status === 'failed'
-													? '❌ '
-													: dl.status === 'cancelled'
-														? '🚫 '
-														: ''}
+										{#if dl.status === 'downloading'}
+											<FontAwesomeIcon icon={faHourglass} class="mr-0.5 h-3 w-3" />
+										{:else if dl.status === 'completed'}
+											<FontAwesomeIcon icon={faCircleCheck} class="mr-0.5 h-3 w-3" />
+										{:else if dl.status === 'failed'}
+											<FontAwesomeIcon icon={faCircleXmark} class="mr-0.5 h-3 w-3" />
+										{:else if dl.status === 'cancelled'}
+											<FontAwesomeIcon icon={faBan} class="mr-0.5 h-3 w-3" />
+										{/if}
 										{dl.status}
 									</span>
 								</div>
@@ -2737,7 +2739,7 @@
 				<h3 class="text-lg font-semibold">Edit: {editingSavedModel.alias}</h3>
 				<button
 					class="text-muted-foreground hover:text-foreground"
-					onclick={() => (editingSavedModel = null)}>✕</button
+					onclick={() => (editingSavedModel = null)}><FontAwesomeIcon icon={faXmark} class="h-4 w-4" /></button
 				>
 			</div>
 
@@ -3085,7 +3087,7 @@
 						onclick={closeLogsModal}
 						title="Close"
 					>
-						×
+						<FontAwesomeIcon icon={faXmark} class="h-4 w-4" />
 					</button>
 				</div>
 			</div>

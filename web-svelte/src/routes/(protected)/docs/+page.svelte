@@ -1,54 +1,55 @@
 <script lang="ts">
-	import { Book, Package, Shield, Brain, GitBranch, FileCode, Search, Bot, FileEdit, TestTube } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faBook, faBoxOpen, faShield, faBrain, faCodeBranch, faFileCode, faMagnifyingGlass, faRobot, faFilePen, faFlask } from '@fortawesome/free-solid-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 
 	// Documentation sections
 	const sections = [
 		{
 			id: 'dependency-scanner',
-			icon: Package,
+			icon: faBoxOpen,
 			title: 'Dependency Scanner',
 			description: 'Автоматическая проверка зависимостей на обновления и уязвимости'
 		},
 		{
 			id: 'secrets-scanner',
-			icon: Shield,
+			icon: faShield,
 			title: 'Secrets Scanner',
 			description: 'Поиск хардкод секретов и конфиденциальных данных в коде'
 		},
 		{
 			id: 'quality-score',
-			icon: Brain,
+			icon: faBrain,
 			title: 'Quality Score',
 			description: 'LLM-based оценка качества кода с метриками'
 		},
 		{
 			id: 'dead-code',
-			icon: FileCode,
+			icon: faFileCode,
 			title: 'Dead Code',
 			description: 'Обнаружение неиспользуемого кода'
 		},
 		{
 			id: 'mr-review',
-			icon: GitBranch,
+			icon: faCodeBranch,
 			title: 'MR Review',
 			description: 'Автоматический code review merge requests с помощью LLM'
 		},
 		{
 			id: 'autodoc',
-			icon: FileEdit,
+			icon: faFilePen,
 			title: 'Auto-Documentation',
 			description: 'Автоматическая генерация документации для кода'
 		},
 		{
 			id: 'testgen',
-			icon: TestTube,
+			icon: faFlask,
 			title: 'Test Generation',
 			description: 'Генерация unit-тестов с помощью LLM'
 		},
 		{
 			id: 'rag',
-			icon: Search,
+			icon: faMagnifyingGlass,
 			title: 'RAG & Indexing',
 			description: 'Индексация кодовой базы для семантического поиска'
 		}
@@ -64,7 +65,7 @@
 <div class="container mx-auto max-w-6xl p-6">
 	<div class="mb-8">
 		<div class="flex items-center gap-3 mb-2">
-			<Book class="h-8 w-8 text-primary" />
+			<FontAwesomeIcon icon={faBook} class="h-8 w-8 text-primary" />
 			<h1 class="text-3xl font-bold">{m.nav_docs?.() || 'Documentation'}</h1>
 		</div>
 		<p class="text-muted-foreground">{m.docs_subtitle?.() || 'Руководство по использованию AIGateway'}</p>
@@ -79,7 +80,7 @@
 					class="w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors
 						{activeSection === section.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}"
 				>
-					<section.icon class="h-5 w-5" />
+					<FontAwesomeIcon icon={section.icon} class="h-5 w-5" />
 					<span class="text-sm font-medium">{section.title}</span>
 				</button>
 			{/each}
@@ -89,13 +90,13 @@
 		<div class="md:col-span-3 bg-card rounded-lg border p-6">
 			{#if activeSection === 'dependency-scanner'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<Package class="h-6 w-6 text-blue-500" />
+					<FontAwesomeIcon icon={faBoxOpen} class="h-6 w-6 text-blue-500" />
 					Dependency Scanner
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>Автоматическая проверка зависимостей проекта на обновления и уязвимости.</p>
-					
+
 					<h3>Поддерживаемые языки</h3>
 					<table class="w-full text-sm">
 						<thead>
@@ -114,42 +115,42 @@
 
 					<h3>Как использовать</h3>
 					<ol>
-						<li><strong>Проиндексируйте репозиторий</strong> — Admin → GitLab → [Проект] → 🔄 Index</li>
-						<li><strong>Запустите проверку</strong> — нажмите 📦 Check Dependencies</li>
+						<li><strong>Проиндексируйте репозиторий</strong> — Admin <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> GitLab <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> [Проект] <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> Index</li>
+						<li><strong>Запустите проверку</strong> — нажмите <FontAwesomeIcon icon={faBoxOpen} class="inline h-3 w-3" /> Check Dependencies</li>
 						<li><strong>Просмотрите результаты</strong> — обновления, уязвимости, рекомендации</li>
 					</ol>
 
 					<h3>Типы обновлений</h3>
 					<ul>
-						<li><span class="text-red-500 font-bold">major</span> — мажорное (1.x → 2.x), возможны breaking changes</li>
-						<li><span class="text-yellow-500 font-bold">minor</span> — минорное (1.1 → 1.2), новые функции</li>
-						<li><span class="text-green-500 font-bold">patch</span> — патч (1.1.1 → 1.1.2), исправления</li>
+						<li><span class="text-red-500 font-bold">major</span> — мажорное (1.x <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> 2.x), возможны breaking changes</li>
+						<li><span class="text-yellow-500 font-bold">minor</span> — минорное (1.1 <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> 1.2), новые функции</li>
+						<li><span class="text-green-500 font-bold">patch</span> — патч (1.1.1 <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> 1.1.2), исправления</li>
 					</ul>
 
 					<h3>Проверка уязвимостей</h3>
-					<p>Каждая зависимость проверяется через <a href="https://osv.dev" target="_blank" class="text-primary hover:underline">OSV.dev</a> — 
+					<p>Каждая зависимость проверяется через <a href="https://osv.dev" target="_blank" class="text-primary hover:underline">OSV.dev</a> —
 					открытую базу данных уязвимостей (CVE, GHSA).</p>
 				</div>
 
 			{:else if activeSection === 'secrets-scanner'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<Shield class="h-6 w-6 text-green-500" />
+					<FontAwesomeIcon icon={faShield} class="h-6 w-6 text-green-500" />
 					Secrets Scanner
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>Поиск хардкод секретов и конфиденциальных данных в проиндексированном коде.</p>
-					
+
 					<h3>Два режима сканирования</h3>
-					
-					<h4>🛡️ Regex Scan (быстрый)</h4>
+
+					<h4><FontAwesomeIcon icon={faShield} class="inline h-4 w-4" /> Regex Scan (быстрый)</h4>
 					<ul>
 						<li>~30 предустановленных паттернов</li>
 						<li>AWS ключи, GitHub токены, пароли</li>
 						<li>Мгновенный результат</li>
 					</ul>
 
-					<h4>🧠 Deep Scan (LLM)</h4>
+					<h4><FontAwesomeIcon icon={faBrain} class="inline h-4 w-4" /> Deep Scan (LLM)</h4>
 					<ul>
 						<li>Семантический анализ с помощью LLM</li>
 						<li>Понимает контекст (placeholder vs реальный секрет)</li>
@@ -160,20 +161,20 @@
 					<h3>Как использовать</h3>
 					<ol>
 						<li>Проиндексируйте репозиторий</li>
-						<li>Нажмите 🛡️ (Regex) или 🧠 (LLM) рядом с проектом</li>
+						<li>Нажмите <FontAwesomeIcon icon={faShield} class="inline h-3 w-3" /> (Regex) или <FontAwesomeIcon icon={faBrain} class="inline h-3 w-3" /> (LLM) рядом с проектом</li>
 						<li>Просмотрите найденные секреты</li>
 					</ol>
 				</div>
 
 			{:else if activeSection === 'quality-score'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<Brain class="h-6 w-6 text-indigo-500" />
+					<FontAwesomeIcon icon={faBrain} class="h-6 w-6 text-indigo-500" />
 					Code Quality Score
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>LLM-based оценка качества кода с детальным разбором по категориям.</p>
-					
+
 					<h3>Категории оценки</h3>
 					<ul>
 						<li><strong>complexity</strong> — сложность кода (цикломатическая)</li>
@@ -187,7 +188,7 @@
 					<ol>
 						<li>Проиндексируйте репозиторий</li>
 						<li>Настройте Analysis Model в проекте</li>
-						<li>Нажмите 📊 рядом с проектом</li>
+						<li>Нажмите <FontAwesomeIcon icon={faBrain} class="inline h-3 w-3" /> рядом с проектом</li>
 						<li>Просмотрите результат: общая оценка, breakdown, рекомендации</li>
 					</ol>
 
@@ -210,13 +211,13 @@
 
 			{:else if activeSection === 'dead-code'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<FileCode class="h-6 w-6 text-orange-500" />
+					<FontAwesomeIcon icon={faFileCode} class="h-6 w-6 text-orange-500" />
 					Dead Code Detection
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>Обнаружение неиспользуемого кода через RAG + LLM анализ.</p>
-					
+
 					<h3>Что обнаруживает</h3>
 					<ul>
 						<li>Неиспользуемые функции</li>
@@ -236,7 +237,7 @@
 					<ol>
 						<li>Проиндексируйте репозиторий</li>
 						<li>Настройте Analysis Model</li>
-						<li>Нажмите 🗑️ (Dead Code) рядом с проектом</li>
+						<li>Нажмите <FontAwesomeIcon icon={faFileCode} class="inline h-3 w-3" /> (Dead Code) рядом с проектом</li>
 						<li>Просмотрите найденные символы</li>
 					</ol>
 
@@ -250,13 +251,13 @@
 
 			{:else if activeSection === 'mr-review'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<GitBranch class="h-6 w-6 text-purple-500" />
+					<FontAwesomeIcon icon={faCodeBranch} class="h-6 w-6 text-purple-500" />
 					MR Review
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>Автоматический code review merge requests с использованием LLM.</p>
-					
+
 					<h3>Возможности</h3>
 					<ul>
 						<li>Анализ diff файлов</li>
@@ -268,7 +269,7 @@
 
 					<h3>Настройка</h3>
 					<ol>
-						<li><strong>Добавьте GitLab интеграцию</strong> — Admin → GitLab → Add Integration</li>
+						<li><strong>Добавьте GitLab интеграцию</strong> — Admin <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> GitLab <FontAwesomeIcon icon={faCodeBranch} class="inline h-3 w-3" /> Add Integration</li>
 						<li><strong>Добавьте проект</strong> — укажите Analysis Model</li>
 						<li><strong>Настройте webhook</strong> — для автоматического запуска</li>
 						<li><strong>Проиндексируйте код</strong> — для контекста</li>
@@ -285,13 +286,13 @@
 
 			{:else if activeSection === 'autodoc'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<FileEdit class="h-6 w-6 text-purple-500" />
+					<FontAwesomeIcon icon={faFilePen} class="h-6 w-6 text-purple-500" />
 					Auto-Documentation
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>Автоматическая генерация документации для недокументированного кода.</p>
-					
+
 					<h3>Поддерживаемые языки</h3>
 					<table class="w-full text-sm">
 						<thead>
@@ -311,7 +312,7 @@
 					<ol>
 						<li>Проиндексируйте репозиторий</li>
 						<li>Настройте Analysis Model</li>
-						<li>Нажмите ✏️ (Auto Doc) рядом с проектом</li>
+						<li>Нажмите <FontAwesomeIcon icon={faFilePen} class="inline h-3 w-3" /> (Auto Doc) рядом с проектом</li>
 						<li>Система найдет недокументированные функции и сгенерирует для них документацию</li>
 						<li>Скопируйте документацию кнопкой "Copy"</li>
 					</ol>
@@ -326,13 +327,13 @@
 
 			{:else if activeSection === 'testgen'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<TestTube class="h-6 w-6 text-green-500" />
+					<FontAwesomeIcon icon={faFlask} class="h-6 w-6 text-green-500" />
 					Test Generation
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>LLM-генерация unit-тестов для функций без тестов.</p>
-					
+
 					<h3>Поддерживаемые фреймворки</h3>
 					<table class="w-full text-sm">
 						<thead>
@@ -352,7 +353,7 @@
 					<ol>
 						<li>Проиндексируйте репозиторий</li>
 						<li>Настройте Analysis Model</li>
-						<li>Нажмите 🧪 (Generate Tests) рядом с проектом</li>
+						<li>Нажмите <FontAwesomeIcon icon={faFlask} class="inline h-3 w-3" /> (Generate Tests) рядом с проектом</li>
 						<li>Система найдет функции без тестов и сгенерирует тесты</li>
 						<li>Скопируйте тесты кнопкой "Copy"</li>
 					</ol>
@@ -369,13 +370,13 @@
 
 			{:else if activeSection === 'rag'}
 				<h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
-					<Search class="h-6 w-6 text-orange-500" />
+					<FontAwesomeIcon icon={faMagnifyingGlass} class="h-6 w-6 text-orange-500" />
 					RAG & Indexing
 				</h2>
-				
+
 				<div class="prose prose-sm dark:prose-invert max-w-none">
 					<p>Индексация кодовой базы для семантического поиска и контекста.</p>
-					
+
 					<h3>Как это работает</h3>
 					<ol>
 						<li><strong>Клонирование</strong> — репозиторий клонируется локально</li>
@@ -403,4 +404,3 @@
 		</div>
 	</div>
 </div>
-

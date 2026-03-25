@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Settings, Save, RefreshCw, Loader2, AlertTriangle, Check } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faGear, faFloppyDisk, faArrowsRotate, faSpinner, faTriangleExclamation, faCheck } from '@fortawesome/free-solid-svg-icons';
 	import { adminApi, type Setting } from '$lib/api/admin';
 	import { cn } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -126,18 +127,18 @@
 	<div class="flex items-center justify-between">
 		<h2 class="text-lg font-semibold">{m.admin_settings()}</h2>
 		<Button variant="outline" onclick={loadSettings} disabled={isLoading}>
-			<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+			<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 			{m.common_refresh()}
 		</Button>
 	</div>
 
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if Object.keys(groupedSettings).length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Settings class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faGear} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-muted-foreground">No settings available</p>
 		</div>
 	{:else}
@@ -158,7 +159,7 @@
 										</label>
 										{#if setting.requires_restart}
 											<span class="flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-500">
-												<AlertTriangle class="h-3 w-3" />
+												<FontAwesomeIcon icon={faTriangleExclamation} class="h-3 w-3" />
 												Restart required
 											</span>
 										{/if}
@@ -209,14 +210,14 @@
 											disabled={savingKeys.has(setting.key)}
 										>
 											{#if savingKeys.has(setting.key)}
-												<Loader2 class="h-4 w-4 animate-spin" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 											{:else}
-												<Save class="h-4 w-4" />
+												<FontAwesomeIcon icon={faFloppyDisk} class="h-4 w-4" />
 											{/if}
 										</Button>
 									{:else if savedKeys.has(setting.key)}
 										<span class="flex h-8 w-8 items-center justify-center text-green-500">
-											<Check class="h-4 w-4" />
+											<FontAwesomeIcon icon={faCheck} class="h-4 w-4" />
 										</span>
 									{/if}
 								</div>

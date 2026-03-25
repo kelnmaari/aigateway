@@ -7,28 +7,29 @@
 	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
 	import * as m from '$lib/paraglide/messages';
 	import { api } from '$lib/api/client';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Home,
-		MessageSquare,
-		Key,
-		Building2,
-		User,
-		Settings,
-		Shield,
-		LogOut,
-		Sun,
-		Moon,
-		Globe,
-		Menu,
-		X,
-		ChevronDown,
-		FolderOpen,
-		Database,
-		Server,
-		GitBranch,
-		Info,
-		FileText
-	} from 'lucide-svelte';
+		faHouse,
+		faComments,
+		faKey,
+		faBuilding,
+		faUser,
+		faGear,
+		faShield,
+		faRightFromBracket,
+		faSun,
+		faMoon,
+		faGlobe,
+		faBars,
+		faXmark,
+		faChevronDown,
+		faFolderOpen,
+		faDatabase,
+		faServer,
+		faCodeBranch,
+		faCircleInfo,
+		faFileLines
+	} from '@fortawesome/free-solid-svg-icons';
 	import { Tooltip } from '$lib/components/ui/tooltip';
 	import { ActiveJobsIndicator } from '$lib/components/gitlab';
 
@@ -39,18 +40,18 @@
 	let appVersion = $state('');
 
 	const navItems = [
-		{ href: '/dashboard', label: () => m.nav_dashboard(), icon: Home },
-		{ href: '/chat', label: () => m.nav_chat(), icon: MessageSquare },
-		{ href: '/api-keys', label: () => m.nav_apiKeys(), icon: Key },
-		{ href: '/tenants', label: () => m.nav_tenants(), icon: Building2 },
-		{ href: '/files', label: () => m.nav_files(), icon: FolderOpen },
-		{ href: '/rag', label: () => m.nav_rag(), icon: Database },
-		{ href: '/mcp', label: () => m.nav_mcp(), icon: Server },
-		{ href: '/gitlab', label: () => 'GitLab', icon: GitBranch }
+		{ href: '/dashboard', label: () => m.nav_dashboard(), icon: faHouse },
+		{ href: '/chat', label: () => m.nav_chat(), icon: faComments },
+		{ href: '/api-keys', label: () => m.nav_apiKeys(), icon: faKey },
+		{ href: '/tenants', label: () => m.nav_tenants(), icon: faBuilding },
+		{ href: '/files', label: () => m.nav_files(), icon: faFolderOpen },
+		{ href: '/rag', label: () => m.nav_rag(), icon: faDatabase },
+		{ href: '/mcp', label: () => m.nav_mcp(), icon: faServer },
+		{ href: '/gitlab', label: () => 'GitLab', icon: faCodeBranch }
 	];
 
 	// Admin-only menu items
-	const adminItems = [{ href: '/admin', label: () => m.nav_admin(), icon: Shield }];
+	const adminItems = [{ href: '/admin', label: () => m.nav_admin(), icon: faShield }];
 
 	function isActive(href: string): boolean {
 		return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
@@ -115,7 +116,7 @@
 					<div
 						class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg text-lg"
 					>
-						🤖
+						<FontAwesomeIcon icon={faComments} class="h-5 w-5" />
 					</div>
 					<span class="text-foreground hidden font-semibold sm:block">AIGateway</span>
 				</a>
@@ -132,7 +133,7 @@
 									: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 							)}
 						>
-							<item.icon class="h-4 w-4" />
+							<FontAwesomeIcon icon={item.icon} class="h-4 w-4" />
 							{item.label()}
 						</a>
 					{/each}
@@ -148,7 +149,7 @@
 										: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 								)}
 							>
-								<item.icon class="h-4 w-4" />
+								<FontAwesomeIcon icon={item.icon} class="h-4 w-4" />
 								{item.label()}
 							</a>
 						{/each}
@@ -165,9 +166,9 @@
 						class="text-muted-foreground hover:bg-accent hover:text-accent-foreground hidden h-9 w-9 items-center justify-center rounded-md sm:flex"
 					>
 						{#if themeStore.isDark}
-							<Sun class="h-4 w-4" />
+							<FontAwesomeIcon icon={faSun} class="h-4 w-4" />
 						{:else}
-							<Moon class="h-4 w-4" />
+							<FontAwesomeIcon icon={faMoon} class="h-4 w-4" />
 						{/if}
 					</button>
 				</Tooltip>
@@ -178,7 +179,7 @@
 						onclick={toggleLocale}
 						class="text-muted-foreground hover:bg-accent hover:text-accent-foreground hidden h-9 items-center gap-1 rounded-md px-2 text-sm sm:flex"
 					>
-						<Globe class="h-4 w-4" />
+						<FontAwesomeIcon icon={faGlobe} class="h-4 w-4" />
 						<span class="uppercase">{getLocale()}</span>
 					</button>
 				</Tooltip>
@@ -197,12 +198,12 @@
 						<div
 							class="bg-primary/10 text-primary flex h-7 w-7 items-center justify-center rounded-full"
 						>
-							<User class="h-4 w-4" />
+							<FontAwesomeIcon icon={faUser} class="h-4 w-4" />
 						</div>
 						<span class="text-foreground hidden max-w-[100px] truncate sm:block">
 							{authStore.user?.username || 'User'}
 						</span>
-						<ChevronDown class="text-muted-foreground hidden h-4 w-4 sm:block" />
+						<FontAwesomeIcon icon={faChevronDown} class="text-muted-foreground hidden h-4 w-4 sm:block" />
 					</button>
 
 					{#if userMenuOpen}
@@ -228,7 +229,7 @@
 								onclick={closeMenus}
 								class="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2 px-4 py-2 text-sm"
 							>
-								<User class="h-4 w-4" />
+								<FontAwesomeIcon icon={faUser} class="h-4 w-4" />
 								{m.nav_profile()}
 							</a>
 
@@ -237,7 +238,7 @@
 								onclick={closeMenus}
 								class="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2 px-4 py-2 text-sm"
 							>
-								<Settings class="h-4 w-4" />
+								<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
 								{m.nav_settings()}
 							</a>
 
@@ -246,7 +247,7 @@
 								onclick={closeMenus}
 								class="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2 px-4 py-2 text-sm"
 							>
-								<Info class="h-4 w-4" />
+								<FontAwesomeIcon icon={faCircleInfo} class="h-4 w-4" />
 								{m.nav_about()}
 							</a>
 							<a
@@ -254,7 +255,7 @@
 								onclick={closeMenus}
 								class="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2 px-4 py-2 text-sm"
 							>
-								<FileText class="h-4 w-4" />
+								<FontAwesomeIcon icon={faFileLines} class="h-4 w-4" />
 								{m.nav_docs?.() || 'Documentation'}
 							</a>
 
@@ -268,7 +269,7 @@
 									onclick={handleLogout}
 									class="text-destructive hover:bg-destructive/10 flex w-full items-center gap-2 px-4 py-2 text-sm"
 								>
-									<LogOut class="h-4 w-4" />
+									<FontAwesomeIcon icon={faRightFromBracket} class="h-4 w-4" />
 									{m.auth_logout()}
 								</button>
 							</div>
@@ -282,9 +283,9 @@
 					class="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex h-9 w-9 items-center justify-center rounded-md md:hidden"
 				>
 					{#if mobileMenuOpen}
-						<X class="h-5 w-5" />
+						<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 					{:else}
-						<Menu class="h-5 w-5" />
+						<FontAwesomeIcon icon={faBars} class="h-5 w-5" />
 					{/if}
 				</button>
 			</div>
@@ -306,7 +307,7 @@
 								: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 						)}
 					>
-						<item.icon class="h-5 w-5" />
+						<FontAwesomeIcon icon={item.icon} class="h-5 w-5" />
 						{item.label()}
 					</a>
 				{/each}
@@ -324,7 +325,7 @@
 									: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 							)}
 						>
-							<item.icon class="h-5 w-5" />
+							<FontAwesomeIcon icon={item.icon} class="h-5 w-5" />
 							{item.label()}
 						</a>
 					{/each}
@@ -339,16 +340,16 @@
 						class="text-muted-foreground hover:bg-accent flex h-9 w-9 items-center justify-center rounded-md"
 					>
 						{#if themeStore.isDark}
-							<Sun class="h-5 w-5" />
+							<FontAwesomeIcon icon={faSun} class="h-5 w-5" />
 						{:else}
-							<Moon class="h-5 w-5" />
+							<FontAwesomeIcon icon={faMoon} class="h-5 w-5" />
 						{/if}
 					</button>
 					<button
 						onclick={toggleLocale}
 						class="text-muted-foreground hover:bg-accent flex h-9 items-center gap-1.5 rounded-md px-3 text-sm"
 					>
-						<Globe class="h-4 w-4" />
+						<FontAwesomeIcon icon={faGlobe} class="h-4 w-4" />
 						{getLocaleLabel()}
 					</button>
 				</div>

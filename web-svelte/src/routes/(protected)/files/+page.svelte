@@ -1,23 +1,24 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		File as FileIcon,
-		FileText,
-		Upload,
-		Download,
-		Trash2,
-		RefreshCw,
-		Loader2,
-		MoreVertical,
-		CheckCircle,
-		Clock,
-		AlertCircle,
-		ChevronLeft,
-		ChevronRight,
-		Eye,
-		Search,
-		X
-	} from 'lucide-svelte';
+		faFile,
+		faFileLines,
+		faUpload,
+		faDownload,
+		faTrash,
+		faArrowsRotate,
+		faSpinner,
+		faEllipsisVertical,
+		faCircleCheck,
+		faClock,
+		faCircleExclamation,
+		faChevronLeft,
+		faChevronRight,
+		faEye,
+		faMagnifyingGlass,
+		faXmark
+	} from '@fortawesome/free-solid-svg-icons';
 	import { filesApi, type FileItem } from '$lib/api/files';
 	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -220,21 +221,21 @@
 
 	function getFileIcon(mimeType: string) {
 		if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) {
-			return FileText;
+			return faFileLines;
 		}
-		return FileIcon;
+		return faFile;
 	}
 
 	function getStatusBadge(status: string) {
 		switch (status) {
 			case 'completed':
-				return { icon: CheckCircle, class: 'text-green-500', label: 'Extracted' };
+				return { icon: faCircleCheck, class: 'text-green-500', label: 'Extracted' };
 			case 'pending':
-				return { icon: Clock, class: 'text-yellow-500', label: 'Pending' };
+				return { icon: faClock, class: 'text-yellow-500', label: 'Pending' };
 			case 'failed':
-				return { icon: AlertCircle, class: 'text-red-500', label: 'Failed' };
+				return { icon: faCircleExclamation, class: 'text-red-500', label: 'Failed' };
 			default:
-				return { icon: Clock, class: 'text-muted-foreground', label: status || 'Unknown' };
+				return { icon: faClock, class: 'text-muted-foreground', label: status || 'Unknown' };
 		}
 	}
 
@@ -270,7 +271,7 @@
 		aria-label="Drop zone"
 	>
 		<div class="rounded-xl border-2 border-dashed border-primary bg-background p-12 text-center">
-			<Upload class="mx-auto mb-4 h-16 w-16 text-primary" />
+			<FontAwesomeIcon icon={faUpload} class="mx-auto mb-4 h-16 w-16 text-primary" />
 			<p class="text-xl font-semibold">{m.files_drop_here()}</p>
 		</div>
 	</div>
@@ -291,11 +292,11 @@
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={() => loadFiles()}>
-				<RefreshCw class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faArrowsRotate} class="mr-2 h-4 w-4" />
 				{m.common_refresh()}
 			</Button>
 			<Button onclick={() => (showUploadModal = true)}>
-				<Upload class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faUpload} class="mr-2 h-4 w-4" />
 				{m.files_upload()}
 			</Button>
 		</div>
@@ -305,7 +306,7 @@
 	<div class="mb-4 flex flex-wrap gap-4">
 		<!-- Search -->
 		<div class="relative flex-1 min-w-[200px]">
-			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+			<FontAwesomeIcon icon={faMagnifyingGlass} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 			<input
 				type="text"
 				placeholder={m.files_search()}
@@ -342,7 +343,7 @@
 	<!-- Files Table -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if files.length === 0}
 		<div
@@ -355,11 +356,11 @@
 			ondrop={handleDrop}
 			role="region"
 		>
-			<FileIcon class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faFile} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-muted-foreground">{m.files_no_files()}</p>
 			<p class="mt-2 text-sm text-muted-foreground">{m.files_drag_drop()}</p>
 			<Button variant="outline" class="mt-4" onclick={() => (showUploadModal = true)}>
-				<Upload class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faUpload} class="mr-2 h-4 w-4" />
 				{m.files_upload_files()}
 			</Button>
 		</div>
@@ -395,7 +396,7 @@
 						<tr class="hover:bg-muted/30">
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
-									<FileIcon class="h-5 w-5 text-muted-foreground" />
+									<FontAwesomeIcon icon={FileIcon} class="h-5 w-5 text-muted-foreground" />
 									<span class="font-medium">{item.original_name || item.filename}</span>
 								</div>
 							</td>
@@ -409,7 +410,7 @@
 								{#if true}
 									{@const StatusIcon = status.icon}
 									<div class="flex items-center gap-1.5">
-										<StatusIcon class={cn('h-4 w-4', status.class)} />
+										<FontAwesomeIcon icon={StatusIcon} class={cn('h-4 w-4', status.class)} />
 										<span class="text-sm">{status.label}</span>
 									</div>
 								{/if}
@@ -423,7 +424,7 @@
 										onclick={(e) => { e.stopPropagation(); const id = String(item.id); showMenuFor = showMenuFor === id ? null : id; }}
 										class="rounded p-1.5 text-muted-foreground hover:bg-accent"
 									>
-										<MoreVertical class="h-4 w-4" />
+										<FontAwesomeIcon icon={faEllipsisVertical} class="h-4 w-4" />
 									</button>
 
 									{#if showMenuFor === String(item.id)}
@@ -433,7 +434,7 @@
 													onclick={() => handleViewText(item)}
 													class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 												>
-													<Eye class="h-4 w-4" />
+													<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 													{m.files_view_text()}
 												</button>
 											{/if}
@@ -441,14 +442,14 @@
 												onclick={() => { filesApi.download(String(item.id)); showMenuFor = null; }}
 												class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
 											>
-												<Download class="h-4 w-4" />
+												<FontAwesomeIcon icon={faDownload} class="h-4 w-4" />
 												{m.tooltip_download()}
 											</button>
 											<button
 												onclick={() => handleDelete(item)}
 												class="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
 											>
-												<Trash2 class="h-4 w-4" />
+												<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 												{m.common_delete()}
 											</button>
 										</div>
@@ -469,13 +470,13 @@
 				</p>
 				<div class="flex gap-2">
 					<Button variant="outline" size="sm" onclick={prevPage} disabled={currentPage === 0}>
-						<ChevronLeft class="h-4 w-4" />
+						<FontAwesomeIcon icon={faChevronLeft} class="h-4 w-4" />
 					</Button>
 					<span class="flex items-center px-3 text-sm">
 						Page {currentPage + 1} of {totalPages}
 					</span>
 					<Button variant="outline" size="sm" onclick={nextPage} disabled={currentPage >= totalPages - 1}>
-						<ChevronRight class="h-4 w-4" />
+						<FontAwesomeIcon icon={faChevronRight} class="h-4 w-4" />
 					</Button>
 				</div>
 			</div>
@@ -496,7 +497,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-lg font-semibold">Upload Files</h2>
 				<button onclick={() => { showUploadModal = false; uploadingFiles = []; }} class="text-muted-foreground hover:text-foreground">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 			<p class="mb-4 text-sm text-muted-foreground">
@@ -509,7 +510,7 @@
 					ondragover={(e) => e.preventDefault()}
 					ondrop={(e) => { e.preventDefault(); if (e.dataTransfer?.files) uploadingFiles = Array.from(e.dataTransfer.files); }}
 				>
-					<Upload class="mb-2 h-8 w-8 text-muted-foreground" />
+					<FontAwesomeIcon icon={faUpload} class="mb-2 h-8 w-8 text-muted-foreground" />
 					<span class="text-sm text-muted-foreground">Click to select or drag files here</span>
 					<input
 						type="file"
@@ -525,14 +526,14 @@
 				<div class="mb-4 max-h-48 space-y-2 overflow-y-auto">
 					{#each uploadingFiles as file, idx}
 						<div class="flex items-center gap-2 rounded bg-muted px-3 py-2 text-sm">
-							<FileIcon class="h-4 w-4 shrink-0" />
+							<FontAwesomeIcon icon={faFile} class="h-4 w-4 shrink-0" />
 							<span class="truncate">{file.name}</span>
 							<span class="ml-auto shrink-0 text-muted-foreground">{formatSize(file.size)}</span>
 							<button
 								onclick={() => { uploadingFiles = uploadingFiles.filter((_, i) => i !== idx); }}
 								class="text-muted-foreground hover:text-destructive"
 							>
-								<X class="h-4 w-4" />
+								<FontAwesomeIcon icon={faXmark} class="h-4 w-4" />
 							</button>
 						</div>
 					{/each}
@@ -545,7 +546,7 @@
 				</Button>
 				<Button onclick={handleUpload} disabled={uploadingFiles.length === 0 || isUploading}>
 					{#if isUploading}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					Upload {uploadingFiles.length > 0 ? `(${uploadingFiles.length})` : ''}
 				</Button>
@@ -571,7 +572,7 @@
 					<p class="text-sm text-muted-foreground">{viewingFile.original_name || viewingFile.filename}</p>
 				</div>
 				<button onclick={closeTextModal} class="text-muted-foreground hover:text-foreground">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -579,7 +580,7 @@
 			<div class="flex-1 overflow-y-auto p-6">
 				{#if isLoadingText}
 					<div class="flex items-center justify-center py-12">
-						<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+						<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 					</div>
 				{:else}
 					<pre class="whitespace-pre-wrap rounded-lg border border-border bg-muted/50 p-4 font-mono text-sm leading-relaxed">{extractedText}</pre>

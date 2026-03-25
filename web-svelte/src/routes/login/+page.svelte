@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Eye, EyeOff, LoaderCircle, KeyRound } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faEye, faEyeSlash, faSpinner, faKey } from '@fortawesome/free-solid-svg-icons';
 	import { goto } from '$app/navigation';
 	import { authApi } from '$lib/api';
 	import { authStore } from '$lib/stores/auth.svelte';
@@ -106,9 +107,9 @@
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 						>
 							{#if showPassword}
-								<EyeOff class="h-4 w-4" />
+								<FontAwesomeIcon icon={faEyeSlash} class="h-4 w-4" />
 							{:else}
-								<Eye class="h-4 w-4" />
+								<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 							{/if}
 						</button>
 					</div>
@@ -116,7 +117,7 @@
 
 				<Button type="submit" class="w-full" disabled={isLoading}>
 					{#if isLoading}
-						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{m.common_loading()}
 					{:else}
 						{m.auth_login()}
@@ -140,7 +141,7 @@
 						onclick={loginWithSSO}
 						disabled={isLoading}
 					>
-						<KeyRound class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faKey} class="mr-2 h-4 w-4" />
 						{m.auth_login_with_sso()}
 					</Button>
 				{/if}

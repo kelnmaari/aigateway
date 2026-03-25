@@ -6,6 +6,9 @@
 		deleteMyIntegration,
 		type GitLabIntegration
 	} from '$lib/api/gitlab-user';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faPlus, faBoxArchive, faTrash, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
+	import { faGitlab } from '@fortawesome/free-brands-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 
 	let integrations: GitLabIntegration[] = [];
@@ -105,9 +108,7 @@
 			on:click={() => (showCreateModal = true)}
 			class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition-colors hover:bg-indigo-700"
 		>
-			<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-			</svg>
+			<FontAwesomeIcon icon={faPlus} class="h-5 w-5" />
 			{m.gitlab_add_integration()}
 		</button>
 	</div>
@@ -126,19 +127,7 @@
 		</div>
 	{:else if integrations.length === 0}
 		<div class="rounded-xl border border-gray-700 bg-gray-800/50 py-16 text-center">
-			<svg
-				class="mx-auto mb-4 h-16 w-16 text-gray-600"
-				fill="none"
-				stroke="currentColor"
-				viewBox="0 0 24 24"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="1.5"
-					d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-				/>
-			</svg>
+			<FontAwesomeIcon icon={faBoxArchive} class="mx-auto mb-4 h-16 w-16 text-gray-600" />
 			<h3 class="mb-2 text-xl font-semibold text-gray-300">{m.gitlab_no_integrations()}</h3>
 			<p class="mb-6 text-gray-500">{m.gitlab_no_integrations_desc()}</p>
 			<button
@@ -157,11 +146,7 @@
 					<div class="flex items-start justify-between">
 						<div class="flex items-start gap-4">
 							<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-600">
-								<svg class="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-									<path
-										d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z"
-									/>
-								</svg>
+								<FontAwesomeIcon icon={faGitlab} class="h-7 w-7 text-white" />
 							</div>
 							<div>
 								<h3 class="text-lg font-semibold text-gray-100">{integration.name}</h3>
@@ -193,14 +178,7 @@
 								class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-900/30 hover:text-red-400"
 								title="Delete integration"
 							>
-								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-									/>
-								</svg>
+								<FontAwesomeIcon icon={faTrash} class="h-5 w-5" />
 							</button>
 						</div>
 					</div>
@@ -227,14 +205,7 @@
 					title={m.common_close()}
 					aria-label={m.common_close()}
 				>
-					<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M6 18L18 6M6 6l12 12"
-						/>
-					</svg>
+					<FontAwesomeIcon icon={faXmark} class="h-6 w-6" />
 				</button>
 			</div>
 
@@ -314,9 +285,7 @@
 						class="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-800"
 					>
 						{#if creating}
-							<div
-								class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-							></div>
+							<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 							Creating...
 						{:else}
 							Create Integration

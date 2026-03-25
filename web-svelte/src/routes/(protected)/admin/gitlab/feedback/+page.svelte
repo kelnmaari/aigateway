@@ -4,6 +4,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { api } from '$lib/api/client';
 	import GitLabNav from '$lib/components/gitlab-nav.svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faCheck, faXmark, faPenToSquare, faMinus } from '@fortawesome/free-solid-svg-icons';
 
 	interface FeedbackStats {
 		total_feedback: number;
@@ -103,13 +105,13 @@
 		}
 	}
 
-	function getFeedbackIcon(type: string): string {
+	function getFeedbackIcon(type: string) {
 		switch (type) {
-			case 'approve': return '✓';
-			case 'reject': return '✗';
-			case 'edit': return '✎';
-			case 'ignore': return '−';
-			default: return '?';
+			case 'approve': return faCheck;
+			case 'reject': return faXmark;
+			case 'edit': return faPenToSquare;
+			case 'ignore': return faMinus;
+			default: return faMinus;
 		}
 	}
 
@@ -211,9 +213,9 @@
 				</CardHeader>
 				<CardContent>
 					<div class="flex gap-2 text-sm">
-						<span class="px-2 py-1 rounded bg-green-500/10 text-green-500">✓ {stats.approved_count}</span>
-						<span class="px-2 py-1 rounded bg-red-500/10 text-red-500">✗ {stats.rejected_count}</span>
-						<span class="px-2 py-1 rounded bg-yellow-500/10 text-yellow-500">✎ {stats.edited_count}</span>
+						<span class="px-2 py-1 rounded bg-green-500/10 text-green-500"><FontAwesomeIcon icon={faCheck} class="inline h-3 w-3" /> {stats.approved_count}</span>
+						<span class="px-2 py-1 rounded bg-red-500/10 text-red-500"><FontAwesomeIcon icon={faXmark} class="inline h-3 w-3" /> {stats.rejected_count}</span>
+						<span class="px-2 py-1 rounded bg-yellow-500/10 text-yellow-500"><FontAwesomeIcon icon={faPenToSquare} class="inline h-3 w-3" /> {stats.edited_count}</span>
 					</div>
 				</CardContent>
 			</Card>
@@ -286,8 +288,8 @@
 									</div>
 									<div class="flex items-center gap-4">
 										<div class="text-center">
-											<div class="text-sm text-green-500">{model.approved_count} ✓</div>
-											<div class="text-sm text-red-500">{model.rejected_count} ✗</div>
+											<div class="text-sm text-green-500">{model.approved_count} <FontAwesomeIcon icon={faCheck} class="inline h-3 w-3" /></div>
+											<div class="text-sm text-red-500">{model.rejected_count} <FontAwesomeIcon icon={faXmark} class="inline h-3 w-3" /></div>
 										</div>
 										<div class="text-center">
 											<div class="text-2xl font-bold {model.accuracy_rate >= 0.8 ? 'text-green-500' : model.accuracy_rate >= 0.6 ? 'text-yellow-500' : 'text-red-500'}">
@@ -316,7 +318,7 @@
 									<div class="flex items-start justify-between">
 										<div class="flex items-center gap-2">
 											<span class="px-2 py-1 text-xs font-medium text-white rounded {getFeedbackColor(item.type)}">
-												{getFeedbackIcon(item.type)}
+												<FontAwesomeIcon icon={getFeedbackIcon(item.type)} class="h-3 w-3" />
 											</span>
 											<span class="font-medium capitalize">{item.issue_category}</span>
 											<span class={getSeverityColor(item.issue_severity)}>

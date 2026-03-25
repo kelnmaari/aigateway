@@ -2,30 +2,9 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import {
-		GitBranch,
-		Plus,
-		RefreshCw,
-		Loader2,
-		Trash2,
-		Settings,
-		X,
-		Search,
-		ExternalLink,
-		CheckCircle,
-		XCircle,
-		AlertCircle,
-		Play,
-		Eye,
-		ArrowLeft,
-		Webhook,
-		Bot,
-		FileCode,
-		Clock,
-		BarChart3
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faCodeBranch, faPlus, faArrowsRotate, faSpinner, faTrash, faGear, faXmark, faMagnifyingGlass, faArrowUpRightFromSquare, faCircleCheck, faCircleXmark, faCircleExclamation, faPlay, faEye, faArrowLeft, faTowerBroadcast, faRobot, faFileCode, faClock, faChartColumn, faShieldHalved, faBrain, faBox, faFilePen, faFlask } from '@fortawesome/free-solid-svg-icons';
 	import { gitlabApi, type GitLabIntegration, type GitLabProject, type GitLabReview, type SecretsScanResult, type SecretFinding, type DeepScanResult, type DeepFinding, type DependencyScanResult, type MultiEcosystemDependencyScanResult, type DependencyWithVulns, type QualityScore, type QualityCategory, type DeadCodeResult, type DocScanResult, type DocGenerationResult, type TestScanResult, type TestGenerationResult, type ChangelogAnalysis, type BreakingChange } from '$lib/api/gitlab';
-	import { Shield, Brain, Package, Trash2 as TrashIcon, FileEdit, TestTube } from 'lucide-svelte';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import { ActionButton } from '$lib/components/ui/action-button';
@@ -1292,14 +1271,14 @@
 	<!-- Header -->
 	<div class="flex items-center gap-4">
 		<a href="/admin/gitlab" class="rounded p-2 hover:bg-muted">
-			<ArrowLeft class="h-5 w-5" />
+			<FontAwesomeIcon icon={faArrowLeft} class="h-5 w-5" />
 		</a>
 		<div class="flex-1">
 			<h2 class="text-2xl font-bold text-foreground">{integration?.name || 'Loading...'}</h2>
 			{#if integration}
 				<a href={integration.base_url} target="_blank" class="text-sm text-primary hover:underline flex items-center gap-1">
 					{integration.base_url}
-					<ExternalLink class="h-3 w-3" />
+					<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-3 w-3" />
 				</a>
 			{/if}
 		</div>
@@ -1323,7 +1302,7 @@
 		{/if}
 		{#if activeTab === 'projects'}
 			<Button onclick={openAddProjectModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.common_add()} {m.admin_project_projects_tab()}
 			</Button>
 		{/if}
@@ -1340,7 +1319,7 @@
 					: 'border-transparent text-muted-foreground hover:text-foreground'
 			)}
 		>
-			<FileCode class="inline-block mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faFileCode} class="inline-block mr-2 h-4 w-4" />
 			{m.admin_project_projects_tab()} ({totalProjects})
 		</button>
 		<button
@@ -1352,7 +1331,7 @@
 					: 'border-transparent text-muted-foreground hover:text-foreground'
 			)}
 		>
-			<BarChart3 class="inline-block mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faChartColumn} class="inline-block mr-2 h-4 w-4" />
 			{m.admin_project_reviews_tab()} ({totalReviews})
 		</button>
 	</div>
@@ -1360,7 +1339,7 @@
 	<!-- Filters -->
 	<div class="flex flex-wrap items-center gap-4">
 		<div class="relative flex-1 min-w-[200px]">
-			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+			<FontAwesomeIcon icon={faMagnifyingGlass} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 			<input
 				type="text"
 				placeholder={activeTab === 'projects' ? 'Search projects...' : 'Search reviews...'}
@@ -1386,7 +1365,7 @@
 			{/if}
 		</select>
 		<Button variant="outline" onclick={() => { searchQuery = ''; statusFilter = ''; currentPage = 0; activeTab === 'projects' ? loadProjects() : loadReviews(); }}>
-			<RefreshCw class="mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faArrowsRotate} class="mr-2 h-4 w-4" />
 			{m.common_reset()}
 		</Button>
 	</div>
@@ -1395,17 +1374,17 @@
 	<div class="rounded-lg border bg-card">
 		{#if isLoading}
 			<div class="flex items-center justify-center py-12">
-				<Loader2 class="h-8 w-8 animate-spin text-primary" />
+				<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-primary" />
 			</div>
 		{:else if activeTab === 'projects'}
 			<!-- Projects Table -->
 			{#if projects.length === 0}
 				<div class="flex flex-col items-center justify-center py-12 text-center">
-					<FileCode class="h-12 w-12 text-muted-foreground/50" />
+					<FontAwesomeIcon icon={faFileCode} class="h-12 w-12 text-muted-foreground/50" />
 					<p class="mt-4 text-lg font-medium text-muted-foreground">No projects configured</p>
 					<p class="text-sm text-muted-foreground">Add a GitLab project to start AI reviews</p>
 					<Button class="mt-4" onclick={openAddProjectModal}>
-						<Plus class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 						Add Project
 					</Button>
 				</div>
@@ -1446,7 +1425,7 @@
 								<td class="px-4 py-3">
 									{#if project.webhook_id}
 										<span class="flex items-center gap-1 text-sm text-green-500">
-											<Webhook class="h-4 w-4" />
+											<FontAwesomeIcon icon={faTowerBroadcast} class="h-4 w-4" />
 											#{project.webhook_id}
 										</span>
 									{:else}
@@ -1454,7 +1433,7 @@
 											onclick={() => handleSetupWebhook(project)}
 											class="text-sm text-primary hover:underline flex items-center gap-1"
 										>
-											<Webhook class="h-4 w-4" />
+											<FontAwesomeIcon icon={faTowerBroadcast} class="h-4 w-4" />
 											Setup
 										</button>
 									{/if}
@@ -1462,13 +1441,13 @@
 								<td class="px-4 py-3">
 								{#if indexingProjects.has(project.id) || project.index_status === 'in_progress'}
 									<span class="flex items-center gap-1 text-sm text-yellow-500">
-										<Loader2 class="h-4 w-4 animate-spin" />
+										<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 										Indexing...
 									</span>
 								{:else if project.index_status === 'completed'}
 									<div class="flex flex-col">
 										<span class="flex items-center gap-1 text-sm text-green-500">
-											<CheckCircle class="h-4 w-4" />
+											<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4" />
 											{project.last_indexed_at ? formatRelativeTime(project.last_indexed_at) : 'Ready'}
 										</span>
 										{#if project.index_chunks && project.index_chunks > 0}
@@ -1477,12 +1456,12 @@
 									</div>
 								{:else if project.index_status === 'failed'}
 									<span class="flex items-center gap-1 text-sm text-red-500">
-										<XCircle class="h-4 w-4" />
+										<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4" />
 										Failed
 									</span>
 								{:else if project.index_status === 'pending'}
 									<span class="flex items-center gap-1 text-sm text-blue-500">
-										<Clock class="h-4 w-4" />
+										<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 										Pending
 									</span>
 								{:else}
@@ -1501,10 +1480,10 @@
 											loading={indexingProjects.has(project.id)}
 										>
 											{#snippet children()}
-												<RefreshCw class="h-4 w-4" />
+												<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<RefreshCw class="h-4 w-4 animate-spin" />
+												<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4 animate-spin" />
 											{/snippet}
 										</ActionButton>
 
@@ -1513,7 +1492,7 @@
 											onclick={() => viewProjectDetails(project)}
 										>
 											{#snippet children()}
-												<Eye class="h-4 w-4" />
+												<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 											{/snippet}
 										</ActionButton>
 
@@ -1524,10 +1503,10 @@
 											loading={scanningProjectId === project.id}
 										>
 											{#snippet children()}
-												<Shield class="h-4 w-4" />
+												<FontAwesomeIcon icon={faShieldHalved} class="h-4 w-4" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 											{/snippet}
 										</ActionButton>
 
@@ -1538,10 +1517,10 @@
 											loading={deepScanningProjectId === project.id}
 										>
 											{#snippet children()}
-												<Brain class="h-4 w-4 text-purple-500" />
+												<FontAwesomeIcon icon={faBrain} class="h-4 w-4 text-purple-500" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin text-purple-500" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-purple-500" />
 											{/snippet}
 										</ActionButton>
 
@@ -1552,10 +1531,10 @@
 											loading={checkingDependenciesProjectId === project.id}
 										>
 											{#snippet children()}
-												<Package class="h-4 w-4 text-blue-500" />
+												<FontAwesomeIcon icon={faBox} class="h-4 w-4 text-blue-500" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-blue-500" />
 											{/snippet}
 										</ActionButton>
 
@@ -1566,10 +1545,10 @@
 											loading={analyzingQualityProjectId === project.id}
 										>
 											{#snippet children()}
-												<BarChart3 class="h-4 w-4 text-indigo-500" />
+												<FontAwesomeIcon icon={faChartColumn} class="h-4 w-4 text-indigo-500" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin text-indigo-500" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-indigo-500" />
 											{/snippet}
 										</ActionButton>
 
@@ -1580,10 +1559,10 @@
 											loading={detectingDeadCodeProjectId === project.id}
 										>
 											{#snippet children()}
-												<FileCode class="h-4 w-4 text-orange-500" />
+												<FontAwesomeIcon icon={faFileCode} class="h-4 w-4 text-orange-500" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin text-orange-500" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-orange-500" />
 											{/snippet}
 										</ActionButton>
 
@@ -1594,10 +1573,10 @@
 											loading={generatingDocsProjectId === project.id}
 										>
 											{#snippet children()}
-												<FileEdit class="h-4 w-4 text-purple-500" />
+												<FontAwesomeIcon icon={faFilePen} class="h-4 w-4 text-purple-500" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin text-purple-500" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-purple-500" />
 											{/snippet}
 										</ActionButton>
 
@@ -1608,10 +1587,10 @@
 											loading={generatingTestsProjectId === project.id}
 										>
 											{#snippet children()}
-												<TestTube class="h-4 w-4 text-green-500" />
+												<FontAwesomeIcon icon={faFlask} class="h-4 w-4 text-green-500" />
 											{/snippet}
 											{#snippet loadingIcon()}
-												<Loader2 class="h-4 w-4 animate-spin text-green-500" />
+												<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-green-500" />
 											{/snippet}
 										</ActionButton>
 
@@ -1620,7 +1599,7 @@
 											onclick={() => openEditProject(project)}
 										>
 											{#snippet children()}
-												<Settings class="h-4 w-4" />
+												<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
 											{/snippet}
 										</ActionButton>
 
@@ -1630,7 +1609,7 @@
 											class="text-red-500 hover:bg-red-500/10"
 										>
 											{#snippet children()}
-												<Trash2 class="h-4 w-4" />
+												<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 											{/snippet}
 										</ActionButton>
 									</div>
@@ -1644,7 +1623,7 @@
 			<!-- Reviews Table -->
 			{#if reviews.length === 0}
 				<div class="flex flex-col items-center justify-center py-12 text-center">
-					<BarChart3 class="h-12 w-12 text-muted-foreground/50" />
+					<FontAwesomeIcon icon={faChartColumn} class="h-12 w-12 text-muted-foreground/50" />
 					<p class="mt-4 text-lg font-medium text-muted-foreground">No reviews yet</p>
 					<p class="text-sm text-muted-foreground">Reviews will appear here when MRs are analyzed</p>
 				</div>
@@ -1703,7 +1682,7 @@
 											class="rounded p-1.5 hover:bg-muted"
 											title="View Details"
 										>
-											<Eye class="h-4 w-4" />
+											<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 										</button>
 										<a
 											href={review.mr_url}
@@ -1711,7 +1690,7 @@
 											class="rounded p-1.5 hover:bg-muted"
 											title="Open in GitLab"
 										>
-											<ExternalLink class="h-4 w-4" />
+											<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-4 w-4" />
 										</a>
 										{#if review.status === 'failed'}
 											<button
@@ -1719,7 +1698,7 @@
 												class="rounded p-1.5 text-primary hover:bg-primary/10"
 												title="Retry"
 											>
-												<RefreshCw class="h-4 w-4" />
+												<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4" />
 											</button>
 										{/if}
 									</div>
@@ -1774,7 +1753,7 @@
 			<div class="flex items-center justify-between mb-4">
 				<h3 class="text-lg font-semibold">{m.modal_add_project()}</h3>
 				<button onclick={() => (showAddProjectModal = false)} class="rounded p-1 hover:bg-muted" title={m.common_close()}>
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -1889,7 +1868,7 @@
 					onclick={() => showAdvancedSettings = !showAdvancedSettings}
 					class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
 				>
-					<Settings class="h-4 w-4" />
+					<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
 					{showAdvancedSettings ? m.common_hide() : m.common_show()} {m.settings_title()}
 				</button>
 
@@ -1984,7 +1963,7 @@
 				</Button>
 				<Button onclick={handleAddProject} disabled={isAdding}>
 					{#if isAdding}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					Add Project
 				</Button>
@@ -2007,7 +1986,7 @@
 			<div class="flex items-center justify-between mb-4">
 				<h3 class="text-lg font-semibold">{selectedProject.name}</h3>
 				<button onclick={() => (showProjectDetailModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -2069,7 +2048,7 @@
 					{m.common_close()}
 				</Button>
 				<Button onclick={() => { showProjectDetailModal = false; if (selectedProject) openEditProject(selectedProject); }}>
-					<Settings class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faGear} class="mr-2 h-4 w-4" />
 					{m.common_edit()}
 				</Button>
 			</div>
@@ -2091,7 +2070,7 @@
 			<div class="flex items-center justify-between mb-4">
 				<h3 class="text-lg font-semibold">{m.modal_edit_project()}: {selectedProject.name}</h3>
 				<button onclick={() => (showEditProjectModal = false)} class="rounded p-1 hover:bg-muted" title={m.common_close()}>
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -2317,7 +2296,7 @@
 				</Button>
 				<Button onclick={saveProjectChanges} disabled={isSaving}>
 					{#if isSaving}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					{m.common_save()}
 				</Button>
@@ -2340,7 +2319,7 @@
 			<div class="flex items-center justify-between mb-4">
 				<h3 class="text-lg font-semibold">!{selectedReview.mr_iid}: {selectedReview.mr_title}</h3>
 				<button onclick={() => (showReviewDetailModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -2453,7 +2432,7 @@
 				</Button>
 				<a href={selectedReview.mr_url} target="_blank">
 					<Button>
-						<ExternalLink class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="mr-2 h-4 w-4" />
 						{m.table_open_gitlab()}
 					</Button>
 				</a>
@@ -2475,17 +2454,17 @@
 		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-xl">
 			<div class="mb-4 flex items-center justify-between">
 				<h3 class="text-xl font-semibold flex items-center gap-2">
-					<Shield class="h-5 w-5 text-primary" />
+					<FontAwesomeIcon icon={faShieldHalved} class="h-5 w-5 text-primary" />
 					{m.gitlab_secrets_scan_title?.() || 'Secrets Scan Results'}
 				</h3>
 				<button onclick={() => (showSecretsModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if isScanning}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-primary" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-primary" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_secrets?.() || 'Scanning for secrets...'}</p>
 				</div>
 			{:else if secretsScanResult}
@@ -2572,7 +2551,7 @@
 						</div>
 					{:else}
 						<div class="flex flex-col items-center justify-center py-12 text-center">
-							<CheckCircle class="h-16 w-16 text-green-500" />
+							<FontAwesomeIcon icon={faCircleCheck} class="h-16 w-16 text-green-500" />
 							<p class="mt-4 text-lg font-medium text-green-600 dark:text-green-400">
 								{m.gitlab_no_secrets_found?.() || 'No secrets found!'}
 							</p>
@@ -2592,10 +2571,10 @@
 						disabled={isCreatingSecretsIssue}
 					>
 						{#if isCreatingSecretsIssue}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<AlertCircle class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_issue?.() || 'Create Issue'}
 						{/if}
 					</Button>
@@ -2621,19 +2600,19 @@
 		<div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<Brain class="h-6 w-6 text-purple-500" />
+					<FontAwesomeIcon icon={faBrain} class="h-6 w-6 text-purple-500" />
 					<h3 class="text-lg font-semibold">
 						{m.gitlab_deep_scan_title?.() || 'Deep Scan Results (LLM Analysis)'}
 					</h3>
 				</div>
 				<button onclick={() => (showDeepScanModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if isDeepScanning}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-purple-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_deep_scanning?.() || 'Analyzing code with LLM...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_deep_scan_patience?.() || 'This may take several minutes for large repositories'}</p>
 				</div>
@@ -2670,7 +2649,7 @@
 					
 					<!-- Model info -->
 					<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{deepScanResult.model_id}</strong></span>
 					</div>
 
@@ -2705,7 +2684,7 @@
 												{finding.description}
 											</div>
 											<div class="mt-1 text-xs text-muted-foreground flex items-center gap-2">
-												<FileCode class="h-3 w-3" />
+												<FontAwesomeIcon icon={faFileCode} class="h-3 w-3" />
 												{finding.file_path}:{finding.start_line}-{finding.end_line}
 											</div>
 											{#if finding.code_snippet}
@@ -2723,7 +2702,7 @@
 						</div>
 					{:else}
 						<div class="flex flex-col items-center justify-center py-12 text-center">
-							<CheckCircle class="h-16 w-16 text-green-500" />
+							<FontAwesomeIcon icon={faCircleCheck} class="h-16 w-16 text-green-500" />
 							<p class="mt-4 text-lg font-medium text-green-600 dark:text-green-400">
 								{m.gitlab_no_secrets_found?.() || 'No secrets found!'}
 							</p>
@@ -2743,10 +2722,10 @@
 						disabled={isCreatingSecretsIssue}
 					>
 						{#if isCreatingSecretsIssue}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<AlertCircle class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_issue?.() || 'Create Issue'}
 						{/if}
 					</Button>
@@ -2772,19 +2751,19 @@
 		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<Package class="h-6 w-6 text-blue-500" />
+					<FontAwesomeIcon icon={faBox} class="h-6 w-6 text-blue-500" />
 					<h3 class="text-lg font-semibold">
 						{m.gitlab_dependencies_title?.() || 'Dependencies Check Results'}
 					</h3>
 				</div>
 				<button onclick={() => (showDependenciesModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if isCheckingDependencies}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-blue-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-blue-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_checking_dependencies?.() || 'Checking dependencies...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_deps_patience?.() || 'Fetching version info from registries'}</p>
 				</div>
@@ -2796,7 +2775,7 @@
 					</div>
 				{:else if dependenciesScanResult.ecosystems.length === 0}
 					<div class="flex flex-col items-center justify-center py-12 text-center">
-						<Package class="h-16 w-16 text-muted-foreground/50" />
+						<FontAwesomeIcon icon={faBox} class="h-16 w-16 text-muted-foreground/50" />
 						<p class="mt-4 text-lg font-medium text-muted-foreground">
 							{m.gitlab_no_dependencies?.() || 'No dependencies found'}
 						</p>
@@ -2807,7 +2786,7 @@
 				{:else}
 					<!-- Total Summary (all ecosystems) -->
 					<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
-						<Clock class="h-4 w-4" />
+						<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 						<span>{dependenciesScanResult.duration}</span>
 						<span class="mx-2">•</span>
 						<span>{dependenciesScanResult.ecosystems.length} ecosystem(s) scanned</span>
@@ -2873,10 +2852,10 @@
 					{#if selectedEcosystem}
 						<!-- File info -->
 						<div class="mb-4 text-sm text-muted-foreground flex items-center gap-2">
-							<FileCode class="h-4 w-4" />
+							<FontAwesomeIcon icon={faFileCode} class="h-4 w-4" />
 							<span>{selectedEcosystem.file_path}</span>
 							<span class="mx-2">•</span>
-							<Clock class="h-4 w-4" />
+							<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 							<span>{selectedEcosystem.duration}</span>
 						</div>
 
@@ -2919,7 +2898,7 @@
 										<div class="col-span-1">
 											{#if depWithVulns.is_vulnerable}
 												<span class="text-red-600" title={`${depWithVulns.vulnerabilities.length} vulnerabilities`}>
-													⚠️ {depWithVulns.vulnerabilities.length}
+													<FontAwesomeIcon icon={faTriangleExclamation} class="mr-0.5 h-3 w-3" /> {depWithVulns.vulnerabilities.length}
 												</span>
 											{:else}
 												<span class="text-green-600">✓</span>
@@ -2963,7 +2942,7 @@
 							</div>
 						{:else}
 							<div class="flex flex-col items-center justify-center py-8 text-center">
-								<Package class="h-12 w-12 text-muted-foreground/50" />
+								<FontAwesomeIcon icon={faBox} class="h-12 w-12 text-muted-foreground/50" />
 								<p class="mt-2 text-muted-foreground">No dependencies in this ecosystem</p>
 							</div>
 						{/if}
@@ -2979,10 +2958,10 @@
 						disabled={isCreatingDependencyIssue}
 					>
 						{#if isCreatingDependencyIssue}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<AlertCircle class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_issue?.() || 'Create Issue'}
 						{/if}
 					</Button>
@@ -3008,7 +2987,7 @@
 		<div class="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<FileCode class="h-6 w-6 text-blue-500" />
+					<FontAwesomeIcon icon={faFileCode} class="h-6 w-6 text-blue-500" />
 					<div>
 						<h3 class="text-lg font-semibold">
 							{m.gitlab_changelog_title?.() || 'Changelog Analysis'}
@@ -3021,13 +3000,13 @@
 					</div>
 				</div>
 				<button onclick={() => (showChangelogModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if isAnalyzingChangelog}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-blue-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-blue-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_analyzing_changelog?.() || 'Analyzing changelog...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_changelog_patience?.() || 'Fetching changelog and analyzing with LLM'}</p>
 				</div>
@@ -3052,7 +3031,7 @@
 				{#if changelogResult.breaking_changes?.length > 0}
 					<div class="mb-6">
 						<h4 class="font-semibold mb-2 text-red-600 flex items-center gap-2">
-							<AlertCircle class="h-5 w-5" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="h-5 w-5" />
 							{m.gitlab_breaking_changes?.() || 'Breaking Changes'} ({changelogResult.breaking_changes.length})
 						</h4>
 						<div class="space-y-2">
@@ -3164,19 +3143,19 @@
 		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<BarChart3 class="h-6 w-6 text-indigo-500" />
+					<FontAwesomeIcon icon={faChartColumn} class="h-6 w-6 text-indigo-500" />
 					<h3 class="text-lg font-semibold">
 						{m.gitlab_quality_title?.() || 'Code Quality Score'}
 					</h3>
 				</div>
 				<button onclick={() => (showQualityModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if isAnalyzingQuality}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-indigo-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-indigo-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_analyzing_quality?.() || 'Analyzing code quality...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_quality_patience?.() || 'This may take a few minutes for large projects'}</p>
 				</div>
@@ -3282,7 +3261,7 @@
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						{#if qualityResult.summary.best_scoring_files.length > 0}
 							<div class="rounded-lg border p-3">
-								<h4 class="text-sm font-semibold text-green-600 mb-2">✅ {m.gitlab_best_files?.() || 'Best Files'}</h4>
+								<h4 class="text-sm font-semibold text-green-600 mb-2"><FontAwesomeIcon icon={faCircleCheck} class="mr-1 h-3.5 w-3.5" /> {m.gitlab_best_files?.() || 'Best Files'}</h4>
 								<ul class="text-xs space-y-1">
 									{#each qualityResult.summary.best_scoring_files as file}
 										<li class="truncate font-mono">{file}</li>
@@ -3292,7 +3271,7 @@
 						{/if}
 						{#if qualityResult.summary.worst_scoring_files.length > 0}
 							<div class="rounded-lg border p-3">
-								<h4 class="text-sm font-semibold text-red-600 mb-2">⚠️ {m.gitlab_worst_files?.() || 'Needs Improvement'}</h4>
+								<h4 class="text-sm font-semibold text-red-600 mb-2"><FontAwesomeIcon icon={faTriangleExclamation} class="mr-1 h-3.5 w-3.5" /> {m.gitlab_worst_files?.() || 'Needs Improvement'}</h4>
 								<ul class="text-xs space-y-1">
 									{#each qualityResult.summary.worst_scoring_files as file}
 										<li class="truncate font-mono">{file}</li>
@@ -3304,10 +3283,10 @@
 
 					<!-- Model info -->
 					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{qualityResult.model_id}</strong></span>
 						<span class="mx-2">•</span>
-						<Clock class="h-4 w-4" />
+						<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 						<span>{qualityResult.duration}</span>
 					</div>
 				{/if}
@@ -3321,10 +3300,10 @@
 						disabled={isCreatingQualityIssue}
 					>
 						{#if isCreatingQualityIssue}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<AlertCircle class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_issue?.() || 'Create Issue'}
 						{/if}
 					</Button>
@@ -3350,19 +3329,19 @@
 		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<FileCode class="h-6 w-6 text-orange-500" />
+					<FontAwesomeIcon icon={faFileCode} class="h-6 w-6 text-orange-500" />
 					<h3 class="text-lg font-semibold">
 						{m.gitlab_dead_code_title?.() || 'Dead Code Detection'}
 					</h3>
 				</div>
 				<button onclick={() => (showDeadCodeModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if isDetectingDeadCode}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-orange-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-orange-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_detecting_dead_code?.() || 'Detecting unused code...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{m.gitlab_dead_code_patience?.() || 'Analyzing symbols and references...'}</p>
 				</div>
@@ -3444,7 +3423,7 @@
 						</div>
 					{:else}
 						<div class="text-center py-8 text-muted-foreground">
-							<CheckCircle class="h-12 w-12 mx-auto text-green-500 mb-3" />
+							<FontAwesomeIcon icon={faCircleCheck} class="h-12 w-12 mx-auto text-green-500 mb-3" />
 							<p class="font-medium">{m.gitlab_no_dead_code?.() || 'No dead code detected!'}</p>
 							<p class="text-sm">{m.gitlab_code_clean?.() || 'Your codebase looks clean.'}</p>
 						</div>
@@ -3467,10 +3446,10 @@
 
 					<!-- Model info -->
 					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 						<span>{m.gitlab_analyzed_by?.() || 'Analyzed by'}: <strong>{deadCodeResult.model_id}</strong></span>
 						<span class="mx-2">•</span>
-						<Clock class="h-4 w-4" />
+						<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 						<span>{deadCodeResult.duration}</span>
 					</div>
 				{/if}
@@ -3484,10 +3463,10 @@
 						disabled={isCreatingDeadCodeIssue}
 					>
 						{#if isCreatingDeadCodeIssue}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<AlertCircle class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCircleExclamation} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_issue?.() || 'Create Issue'}
 						{/if}
 					</Button>
@@ -3513,24 +3492,24 @@
 		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<FileEdit class="h-6 w-6 text-purple-500" />
+					<FontAwesomeIcon icon={faFilePen} class="h-6 w-6 text-purple-500" />
 					<h3 class="text-lg font-semibold">
 						{m.gitlab_auto_doc_title?.() || 'Auto-Documentation'}
 					</h3>
 				</div>
 				<button onclick={() => (showAutoDocModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if autoDocStep === 'scan'}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-purple-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_docs?.() || 'Scanning for undocumented code...'}</p>
 				</div>
 			{:else if autoDocStep === 'generate'}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-purple-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-purple-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_generating_docs?.() || 'Generating documentation...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{docScanResult?.summary.total_symbols || 0} {m.gitlab_symbols_to_document?.() || 'symbols to document'}</p>
 				</div>
@@ -3542,7 +3521,7 @@
 					</div>
 				{:else if docScanResult && docScanResult.symbols.length === 0}
 					<div class="text-center py-8 text-muted-foreground">
-						<CheckCircle class="h-12 w-12 mx-auto text-green-500 mb-3" />
+						<FontAwesomeIcon icon={faCircleCheck} class="h-12 w-12 mx-auto text-green-500 mb-3" />
 						<p class="font-medium">{m.gitlab_all_documented?.() || 'All code is documented!'}</p>
 						<p class="text-sm">{m.gitlab_no_undocumented?.() || 'No undocumented exported symbols found.'}</p>
 					</div>
@@ -3599,10 +3578,10 @@
 
 					<!-- Model info -->
 					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 						<span>{m.gitlab_analyzed_by?.() || 'Generated by'}: <strong>{docGenResult.model_id}</strong></span>
 						<span class="mx-2">•</span>
-						<Clock class="h-4 w-4" />
+						<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 						<span>{docGenResult.duration}</span>
 					</div>
 				{/if}
@@ -3616,10 +3595,10 @@
 						disabled={isCreatingDocsMR}
 					>
 						{#if isCreatingDocsMR}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<GitBranch class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCodeBranch} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_mr?.() || 'Create MR'}
 						{/if}
 					</Button>
@@ -3645,24 +3624,24 @@
 		<div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-6 shadow-lg">
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<TestTube class="h-6 w-6 text-green-500" />
+					<FontAwesomeIcon icon={faFlask} class="h-6 w-6 text-green-500" />
 					<h3 class="text-lg font-semibold">
 						{m.gitlab_test_gen_title?.() || 'Test Generation'}
 					</h3>
 				</div>
 				<button onclick={() => (showTestGenModal = false)} class="rounded p-1 hover:bg-muted">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
 			{#if testGenStep === 'scan'}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-green-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-green-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_scanning_tests?.() || 'Scanning for testable functions...'}</p>
 				</div>
 			{:else if testGenStep === 'generate'}
 				<div class="flex flex-col items-center justify-center py-12">
-					<Loader2 class="h-12 w-12 animate-spin text-green-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-12 w-12 animate-spin text-green-500" />
 					<p class="mt-4 text-muted-foreground">{m.gitlab_generating_tests?.() || 'Generating tests...'}</p>
 					<p class="mt-2 text-sm text-muted-foreground">{testScanResult?.summary.without_tests || 0} {m.gitlab_functions_to_test?.() || 'functions to test'}</p>
 				</div>
@@ -3674,7 +3653,7 @@
 					</div>
 				{:else if testScanResult && testScanResult.summary.without_tests === 0}
 					<div class="text-center py-8 text-muted-foreground">
-						<CheckCircle class="h-12 w-12 mx-auto text-green-500 mb-3" />
+						<FontAwesomeIcon icon={faCircleCheck} class="h-12 w-12 mx-auto text-green-500 mb-3" />
 						<p class="font-medium">{m.gitlab_all_tested?.() || 'All functions have tests!'}</p>
 						<p class="text-sm">{m.gitlab_good_coverage?.() || 'Great test coverage.'}</p>
 					</div>
@@ -3729,10 +3708,10 @@
 
 					<!-- Model info -->
 					<div class="mt-4 text-sm text-muted-foreground flex items-center gap-2">
-						<Bot class="h-4 w-4" />
+						<FontAwesomeIcon icon={faRobot} class="h-4 w-4" />
 						<span>{m.gitlab_analyzed_by?.() || 'Generated by'}: <strong>{testGenResult.model_id}</strong></span>
 						<span class="mx-2">•</span>
-						<Clock class="h-4 w-4" />
+						<FontAwesomeIcon icon={faClock} class="h-4 w-4" />
 						<span>{testGenResult.duration}</span>
 					</div>
 				{/if}
@@ -3746,10 +3725,10 @@
 						disabled={isCreatingTestsMR}
 					>
 						{#if isCreatingTestsMR}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 							{m.common_creating?.() || 'Creating...'}
 						{:else}
-							<GitBranch class="mr-2 h-4 w-4" />
+							<FontAwesomeIcon icon={faCodeBranch} class="mr-2 h-4 w-4" />
 							{m.gitlab_create_mr?.() || 'Create MR'}
 						{/if}
 					</Button>

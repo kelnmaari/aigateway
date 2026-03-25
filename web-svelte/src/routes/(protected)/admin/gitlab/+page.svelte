@@ -1,24 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		GitBranch,
-		Plus,
-		RefreshCw,
-		Loader2,
-		Trash2,
-		Settings,
-		X,
-		Search,
-		ExternalLink,
-		CheckCircle,
-		XCircle,
-		AlertCircle,
-		Play,
-		Eye,
-		Folder,
-		Activity,
-		Server
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faCodeBranch, faPlus, faArrowsRotate, faSpinner, faTrash, faGear, faXmark, faMagnifyingGlass, faArrowUpRightFromSquare, faCircleCheck, faCircleXmark, faCircleExclamation, faPlay, faEye, faFolder, faChartLine, faServer } from '@fortawesome/free-solid-svg-icons';
 	import { gitlabApi, type GitLabIntegration, type GitLabQueueStats } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime, debounce } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -238,11 +221,11 @@
 	function getStatusIcon(status: string) {
 		switch (status) {
 			case 'active':
-				return CheckCircle;
+				return faCircleCheck;
 			case 'error':
-				return XCircle;
+				return faCircleXmark;
 			default:
-				return AlertCircle;
+				return faCircleExclamation;
 		}
 	}
 
@@ -271,7 +254,7 @@
 			<p class="text-muted-foreground">{m.admin_gitlab_subtitle()}</p>
 		</div>
 		<Button onclick={openCreateModal}>
-			<Plus class="mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 			{m.admin_gitlab_add()}
 		</Button>
 	</div>
@@ -281,35 +264,35 @@
 		<div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
 			<div class="bg-card rounded-lg border p-4">
 				<div class="flex items-center gap-2">
-					<Activity class="h-4 w-4 text-yellow-500" />
+					<FontAwesomeIcon icon={faChartLine} class="h-4 w-4 text-yellow-500" />
 					<span class="text-muted-foreground text-sm">{m.admin_gitlab_pending()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.pending}</p>
 			</div>
 			<div class="bg-card rounded-lg border p-4">
 				<div class="flex items-center gap-2">
-					<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+					<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-blue-500" />
 					<span class="text-muted-foreground text-sm">{m.admin_gitlab_processing()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.processing}</p>
 			</div>
 			<div class="bg-card rounded-lg border p-4">
 				<div class="flex items-center gap-2">
-					<CheckCircle class="h-4 w-4 text-green-500" />
+					<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4 text-green-500" />
 					<span class="text-muted-foreground text-sm">{m.admin_gitlab_completed_today()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.completed_today}</p>
 			</div>
 			<div class="bg-card rounded-lg border p-4">
 				<div class="flex items-center gap-2">
-					<XCircle class="h-4 w-4 text-red-500" />
+					<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4 text-red-500" />
 					<span class="text-muted-foreground text-sm">{m.admin_gitlab_failed()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.failed}</p>
 			</div>
 			<div class="bg-card rounded-lg border p-4">
 				<div class="flex items-center gap-2">
-					<Server class="h-4 w-4 text-purple-500" />
+					<FontAwesomeIcon icon={faServer} class="h-4 w-4 text-purple-500" />
 					<span class="text-muted-foreground text-sm">{m.admin_gitlab_workers()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">
@@ -318,7 +301,7 @@
 			</div>
 			<div class="bg-card rounded-lg border p-4">
 				<div class="flex items-center gap-2">
-					<Activity class="h-4 w-4 text-cyan-500" />
+					<FontAwesomeIcon icon={faChartLine} class="h-4 w-4 text-cyan-500" />
 					<span class="text-muted-foreground text-sm">{m.admin_gitlab_last_24h()}</span>
 				</div>
 				<p class="mt-1 text-2xl font-bold">{queueStats.jobs_last_24_hours}</p>
@@ -329,7 +312,7 @@
 	<!-- Filters -->
 	<div class="flex flex-wrap items-center gap-4">
 		<div class="relative min-w-[200px] flex-1">
-			<Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+			<FontAwesomeIcon icon={faMagnifyingGlass} class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
 			<input
 				type="text"
 				placeholder={m.admin_gitlab_search()}
@@ -352,7 +335,7 @@
 			<option value="error">{m.common_error()}</option>
 		</select>
 		<Button variant="outline" onclick={clearFilters}>
-			<RefreshCw class="mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faArrowsRotate} class="mr-2 h-4 w-4" />
 			{m.common_reset()}
 		</Button>
 	</div>
@@ -361,17 +344,17 @@
 	<div class="bg-card rounded-lg border">
 		{#if isLoading}
 			<div class="flex items-center justify-center py-12">
-				<Loader2 class="text-primary h-8 w-8 animate-spin" />
+				<FontAwesomeIcon icon={faSpinner} class="text-primary h-8 w-8 animate-spin" />
 			</div>
 		{:else if integrations.length === 0}
 			<div class="flex flex-col items-center justify-center py-12 text-center">
-				<GitBranch class="text-muted-foreground/50 h-12 w-12" />
+				<FontAwesomeIcon icon={faCodeBranch} class="text-muted-foreground/50 h-12 w-12" />
 				<p class="text-muted-foreground mt-4 text-lg font-medium">
 					{m.admin_gitlab_no_integrations()}
 				</p>
 				<p class="text-muted-foreground text-sm">{m.admin_gitlab_no_integrations_desc()}</p>
 				<Button class="mt-4" onclick={openCreateModal}>
-					<Plus class="mr-2 h-4 w-4" />
+					<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 					{m.admin_gitlab_add()}
 				</Button>
 			</div>
@@ -401,14 +384,14 @@
 									class="text-primary flex items-center gap-1 text-sm hover:underline"
 								>
 									{integration.base_url}
-									<ExternalLink class="h-3 w-3" />
+									<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-3 w-3" />
 								</a>
 							</td>
 							<td class="px-4 py-3">
 								{#if true}
 									{@const StatusIcon = getStatusIcon(integration.status)}
 									<div class="flex items-center gap-2">
-										<StatusIcon class={cn('h-4 w-4', getStatusColor(integration.status))} />
+										<FontAwesomeIcon icon={StatusIcon} class={cn('h-4 w-4', getStatusColor(integration.status))} />
 										<span class="text-sm capitalize">{integration.status}</span>
 									</div>
 								{/if}
@@ -438,28 +421,28 @@
 										class="hover:bg-muted rounded p-1.5"
 										title="Test Connection"
 									>
-										<Play class="h-4 w-4" />
+										<FontAwesomeIcon icon={faPlay} class="h-4 w-4" />
 									</button>
 									<a
 										href={`/admin/gitlab/${integration.id}`}
 										class="hover:bg-muted rounded p-1.5"
 										title="View Projects"
 									>
-										<Folder class="h-4 w-4" />
+										<FontAwesomeIcon icon={faFolder} class="h-4 w-4" />
 									</a>
 									<button
 										onclick={() => openEditModal(integration)}
 										class="hover:bg-muted rounded p-1.5"
 										title="Edit Settings"
 									>
-										<Settings class="h-4 w-4" />
+										<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
 									</button>
 									<button
 										onclick={() => handleDelete(integration)}
 										class="rounded p-1.5 text-red-500 hover:bg-red-500/10"
 										title="Delete"
 									>
-										<Trash2 class="h-4 w-4" />
+										<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 									</button>
 								</div>
 							</td>
@@ -521,7 +504,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h3 class="text-lg font-semibold">Add GitLab Integration</h3>
 				<button onclick={() => (showCreateModal = false)} class="hover:bg-muted rounded p-1">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -592,7 +575,7 @@
 				<Button variant="outline" onclick={() => (showCreateModal = false)}>Cancel</Button>
 				<Button onclick={handleCreate} disabled={isCreating}>
 					{#if isCreating}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					Create Integration
 				</Button>
@@ -615,7 +598,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h3 class="text-lg font-semibold">{selectedIntegration.name}</h3>
 				<button onclick={() => (showDetailModal = false)} class="hover:bg-muted rounded p-1">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -641,7 +624,7 @@
 				<!-- Test Result -->
 				{#if isTesting}
 					<div class="bg-muted flex items-center gap-2 rounded-md p-4">
-						<Loader2 class="h-5 w-5 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="h-5 w-5 animate-spin" />
 						<span>Testing connection...</span>
 					</div>
 				{:else if testResult}
@@ -650,7 +633,7 @@
 					>
 						{#if testResult.success}
 							<div class="flex items-center gap-2 text-green-500">
-								<CheckCircle class="h-5 w-5" />
+								<FontAwesomeIcon icon={faCircleCheck} class="h-5 w-5" />
 								<span class="font-medium">Connection successful!</span>
 							</div>
 							{#if testResult.user}
@@ -666,7 +649,7 @@
 							{/if}
 						{:else}
 							<div class="flex items-center gap-2 text-red-500">
-								<XCircle class="h-5 w-5" />
+								<FontAwesomeIcon icon={faCircleXmark} class="h-5 w-5" />
 								<span class="font-medium">Connection failed</span>
 							</div>
 							{#if testResult.error}
@@ -681,7 +664,7 @@
 				<Button variant="outline" onclick={() => (showDetailModal = false)}>Close</Button>
 				<a href={`/admin/gitlab/${selectedIntegration.id}`}>
 					<Button>
-						<Folder class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faFolder} class="mr-2 h-4 w-4" />
 						View Projects
 					</Button>
 				</a>
@@ -704,7 +687,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h3 class="text-lg font-semibold">Edit GitLab Integration</h3>
 				<button onclick={() => (showEditModal = false)} class="hover:bg-muted rounded p-1">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -761,7 +744,7 @@
 				<Button variant="outline" onclick={() => (showEditModal = false)}>Cancel</Button>
 				<Button onclick={handleUpdate} disabled={isUpdating}>
 					{#if isUpdating}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					Save Changes
 				</Button>

@@ -1,18 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		FileText,
-		RefreshCw,
-		Loader2,
-		AlertCircle,
-		Info,
-		AlertTriangle,
-		Bug,
-		Download,
-		Play,
-		Square,
-		Radio
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faFileLines, faArrowsRotate, faSpinner, faCircleExclamation, faCircleInfo, faTriangleExclamation, faBug, faDownload, faPlay, faSquare, faTowerBroadcast } from '@fortawesome/free-solid-svg-icons';
 	import { adminApi, type LogEntry, type AuditEntry } from '$lib/api/admin';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -190,15 +179,15 @@
 		switch (level.toLowerCase()) {
 			case 'error':
 			case 'fatal':
-				return AlertCircle;
+				return faCircleExclamation;
 			case 'warn':
 			case 'warning':
-				return AlertTriangle;
+				return faTriangleExclamation;
 			case 'debug':
 			case 'trace':
-				return Bug;
+				return faBug;
 			default:
-				return Info;
+				return faCircleInfo;
 		}
 	}
 
@@ -331,28 +320,28 @@
 					title={m.tooltip_live()}
 				>
 					{#if isRealtime}
-						<Radio class="h-3.5 w-3.5 animate-pulse" />
-						<Square class="h-3.5 w-3.5" />
+						<FontAwesomeIcon icon={faTowerBroadcast} class="h-3.5 w-3.5 animate-pulse" />
+						<FontAwesomeIcon icon={faSquare} class="h-3.5 w-3.5" />
 						{m.admin_logs_stop()}
 					{:else}
-						<Play class="h-3.5 w-3.5" />
+						<FontAwesomeIcon icon={faPlay} class="h-3.5 w-3.5" />
 						{m.admin_logs_realtime()}
 					{/if}
 				</Button>
 
 				<!-- Download -->
 				<Button variant="outline" size="sm" onclick={downloadLog} disabled={!selectedFile} title={m.admin_logs_download()}>
-					<Download class="h-4 w-4" />
+					<FontAwesomeIcon icon={faDownload} class="h-4 w-4" />
 				</Button>
 
 				<!-- Refresh -->
 				<Button variant="outline" size="sm" onclick={loadLogs} disabled={isLoading || isRealtime} title={m.common_refresh()}>
-					<RefreshCw class={cn('h-4 w-4', isLoading && 'animate-spin')} />
+					<FontAwesomeIcon icon={faArrowsRotate} class={cn('h-4 w-4', isLoading && 'animate-spin')} />
 				</Button>
 			</div>
 		{:else}
 			<Button variant="outline" size="sm" onclick={loadAuditLogs} disabled={isLoading}>
-				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				{m.common_refresh()}
 			</Button>
 		{/if}
@@ -391,12 +380,12 @@
 	<!-- Content -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if activeTab === 'logs'}
 		{#if logsError}
 			<div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-8 text-center">
-				<AlertTriangle class="mx-auto h-10 w-10 text-amber-500" />
+				<FontAwesomeIcon icon={faTriangleExclamation} class="mx-auto h-10 w-10 text-amber-500" />
 				<p class="mt-3 font-medium text-amber-600 dark:text-amber-400">{logsError}</p>
 				<p class="mt-1 text-sm text-muted-foreground">
 					Application logs are available via stdout/stderr or your log aggregation system.
@@ -404,7 +393,7 @@
 			</div>
 		{:else if filteredLogs.length === 0}
 			<div class="rounded-lg border border-dashed border-border py-16 text-center">
-				<FileText class="mx-auto h-12 w-12 text-muted-foreground/40" />
+				<FontAwesomeIcon icon={faFileLines} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 				<p class="mt-4 text-muted-foreground">
 					{logs.length === 0 ? 'No logs found in selected file' : 'No logs match selected filter'}
 				</p>
@@ -456,7 +445,7 @@
 		<!-- Audit Logs -->
 		{#if auditLogs.length === 0}
 			<div class="rounded-lg border border-dashed border-border py-16 text-center">
-				<FileText class="mx-auto h-12 w-12 text-muted-foreground/40" />
+				<FontAwesomeIcon icon={faFileLines} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 				<p class="mt-4 text-muted-foreground">No audit events found</p>
 			</div>
 		{:else}

@@ -1,23 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Info,
-		Loader2,
-		ExternalLink,
-		Github,
-		ChevronDown,
-		ChevronRight,
-		Tag,
-		Calendar,
-		Code,
-		Plus,
-		RefreshCw,
-		Bug,
-		Shield,
-		Wrench,
-		Trash2,
-		AlertTriangle
-	} from 'lucide-svelte';
+		faCircleInfo,
+		faSpinner,
+		faArrowUpRightFromSquare,
+		faChevronDown,
+		faChevronRight,
+		faTag,
+		faCalendar,
+		faCode,
+		faPlus,
+		faArrowsRotate,
+		faBug,
+		faShield,
+		faWrench,
+		faTrash,
+		faTriangleExclamation,
+		faRobot
+	} from '@fortawesome/free-solid-svg-icons';
+	import { faGitlab } from '@fortawesome/free-brands-svg-icons';
 	import { api } from '$lib/api/client';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
@@ -168,58 +170,59 @@
 		return 'other';
 	}
 
+	const sectionConfigs = {
+		added: {
+			bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+			border: 'border-emerald-500/30',
+			text: 'text-emerald-700 dark:text-emerald-400',
+			icon: faPlus
+		},
+		changed: {
+			bg: 'bg-blue-500/10 dark:bg-blue-500/20',
+			border: 'border-blue-500/30',
+			text: 'text-blue-700 dark:text-blue-400',
+			icon: faArrowsRotate
+		},
+		fixed: {
+			bg: 'bg-amber-500/10 dark:bg-amber-500/20',
+			border: 'border-amber-500/30',
+			text: 'text-amber-700 dark:text-amber-400',
+			icon: faBug
+		},
+		security: {
+			bg: 'bg-red-500/10 dark:bg-red-500/20',
+			border: 'border-red-500/30',
+			text: 'text-red-700 dark:text-red-400',
+			icon: faShield
+		},
+		technical: {
+			bg: 'bg-purple-500/10 dark:bg-purple-500/20',
+			border: 'border-purple-500/30',
+			text: 'text-purple-700 dark:text-purple-400',
+			icon: faWrench
+		},
+		removed: {
+			bg: 'bg-gray-500/10 dark:bg-gray-500/20',
+			border: 'border-gray-500/30',
+			text: 'text-gray-700 dark:text-gray-400',
+			icon: faTrash
+		},
+		deprecated: {
+			bg: 'bg-orange-500/10 dark:bg-orange-500/20',
+			border: 'border-orange-500/30',
+			text: 'text-orange-700 dark:text-orange-400',
+			icon: faTriangleExclamation
+		},
+		other: {
+			bg: 'bg-slate-500/10 dark:bg-slate-500/20',
+			border: 'border-slate-500/30',
+			text: 'text-slate-700 dark:text-slate-400',
+			icon: faCircleInfo
+		}
+	};
+
 	function getSectionConfig(type: ParsedSection['type']) {
-		const configs = {
-			added: {
-				bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
-				border: 'border-emerald-500/30',
-				text: 'text-emerald-700 dark:text-emerald-400',
-				icon: Plus
-			},
-			changed: {
-				bg: 'bg-blue-500/10 dark:bg-blue-500/20',
-				border: 'border-blue-500/30',
-				text: 'text-blue-700 dark:text-blue-400',
-				icon: RefreshCw
-			},
-			fixed: {
-				bg: 'bg-amber-500/10 dark:bg-amber-500/20',
-				border: 'border-amber-500/30',
-				text: 'text-amber-700 dark:text-amber-400',
-				icon: Bug
-			},
-			security: {
-				bg: 'bg-red-500/10 dark:bg-red-500/20',
-				border: 'border-red-500/30',
-				text: 'text-red-700 dark:text-red-400',
-				icon: Shield
-			},
-			technical: {
-				bg: 'bg-purple-500/10 dark:bg-purple-500/20',
-				border: 'border-purple-500/30',
-				text: 'text-purple-700 dark:text-purple-400',
-				icon: Wrench
-			},
-			removed: {
-				bg: 'bg-gray-500/10 dark:bg-gray-500/20',
-				border: 'border-gray-500/30',
-				text: 'text-gray-700 dark:text-gray-400',
-				icon: Trash2
-			},
-			deprecated: {
-				bg: 'bg-orange-500/10 dark:bg-orange-500/20',
-				border: 'border-orange-500/30',
-				text: 'text-orange-700 dark:text-orange-400',
-				icon: AlertTriangle
-			},
-			other: {
-				bg: 'bg-slate-500/10 dark:bg-slate-500/20',
-				border: 'border-slate-500/30',
-				text: 'text-slate-700 dark:text-slate-400',
-				icon: Info
-			}
-		};
-		return configs[type];
+		return sectionConfigs[type];
 	}
 
 	function formatItemText(text: string): string {
@@ -240,13 +243,13 @@
 <div class="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else}
 		<!-- Header -->
 		<div class="mb-8 text-center">
 			<div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary text-4xl text-primary-foreground">
-				🤖
+				<FontAwesomeIcon icon={faRobot} class="h-10 w-10" />
 			</div>
 			<h1 class="text-3xl font-bold text-foreground">AI Gateway</h1>
 			<p class="mt-2 text-muted-foreground">OpenAI-compatible API Gateway for Local LLMs</p>
@@ -256,13 +259,13 @@
 		{#if systemInfo}
 			<div class="mb-8 rounded-xl border border-border bg-card p-6">
 				<h2 class="mb-4 flex items-center gap-2 font-semibold">
-					<Info class="h-5 w-5" />
+					<FontAwesomeIcon icon={faCircleInfo} class="h-5 w-5" />
 					System Information
 				</h2>
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div class="flex items-center gap-3">
-						<Tag class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faTag} class="h-5 w-5 text-muted-foreground" />
 						<div>
 							<p class="text-sm text-muted-foreground">Version</p>
 							<p class="font-mono font-medium">{systemInfo.version}</p>
@@ -270,7 +273,7 @@
 					</div>
 
 					<div class="flex items-center gap-3">
-						<Code class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faCode} class="h-5 w-5 text-muted-foreground" />
 						<div>
 							<p class="text-sm text-muted-foreground">Git Commit</p>
 							<p class="font-mono font-medium">{systemInfo.git_commit || 'N/A'}</p>
@@ -278,7 +281,7 @@
 					</div>
 
 					<div class="flex items-center gap-3">
-						<Calendar class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faCalendar} class="h-5 w-5 text-muted-foreground" />
 						<div>
 							<p class="text-sm text-muted-foreground">Build Date</p>
 							<p class="font-mono font-medium">{systemInfo.build_date || 'N/A'}</p>
@@ -286,7 +289,7 @@
 					</div>
 
 					<div class="flex items-center gap-3">
-						<Code class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faCode} class="h-5 w-5 text-muted-foreground" />
 						<div>
 							<p class="text-sm text-muted-foreground">Go Version</p>
 							<p class="font-mono font-medium">{systemInfo.go_version || 'N/A'}</p>
@@ -304,9 +307,9 @@
 				rel="noopener noreferrer"
 				class="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
 			>
-				<Github class="h-4 w-4" />
+				<FontAwesomeIcon icon={faGitlab} class="h-4 w-4" />
 				GitLab
-				<ExternalLink class="h-3 w-3" />
+				<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-3 w-3" />
 			</a>
 			<a
 				href="https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy/-/issues"
@@ -315,7 +318,7 @@
 				class="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
 			>
 				Report Issue
-				<ExternalLink class="h-3 w-3" />
+				<FontAwesomeIcon icon={faArrowUpRightFromSquare} class="h-3 w-3" />
 			</a>
 		</div>
 
@@ -342,9 +345,9 @@
 									</span>
 								</div>
 								{#if expandedVersions.has(changelog.version)}
-									<ChevronDown class="h-4 w-4 text-muted-foreground" />
+									<FontAwesomeIcon icon={faChevronDown} class="h-4 w-4 text-muted-foreground" />
 								{:else}
-									<ChevronRight class="h-4 w-4 text-muted-foreground" />
+									<FontAwesomeIcon icon={faChevronRight} class="h-4 w-4 text-muted-foreground" />
 								{/if}
 							</button>
 
@@ -353,10 +356,9 @@
 									<div class="space-y-4">
 										{#each parseChangelog(changelog.content) as section}
 											{@const config = getSectionConfig(section.type)}
-											{@const Icon = config.icon}
 											<div class="rounded-lg border {config.border} {config.bg} overflow-hidden">
 												<div class="flex items-center gap-2 px-4 py-2.5 border-b {config.border}">
-													<Icon class="h-4 w-4 {config.text}" />
+													<FontAwesomeIcon icon={config.icon} class="h-4 w-4 {config.text}" />
 													<h4 class="font-semibold {config.text}">{section.title}</h4>
 												</div>
 												<div class="px-4 py-3">
@@ -381,4 +383,3 @@
 		{/if}
 	{/if}
 </div>
-

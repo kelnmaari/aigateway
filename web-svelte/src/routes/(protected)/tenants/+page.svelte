@@ -1,17 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Building2,
-		Plus,
-		Users,
-		Settings,
-		Trash2,
-		X,
-		Loader2,
-		Crown,
-		Shield,
-		User
-	} from 'lucide-svelte';
+		faBuilding,
+		faPlus,
+		faUsers,
+		faGear,
+		faTrash,
+		faXmark,
+		faSpinner,
+		faCrown,
+		faShield,
+		faUser
+	} from '@fortawesome/free-solid-svg-icons';
 	import {
 		tenantsApi,
 		type Tenant,
@@ -234,11 +235,11 @@
 	function getRoleIcon(role: string) {
 		switch (role) {
 			case 'owner':
-				return Crown;
+				return faCrown;
 			case 'admin':
-				return Shield;
+				return faShield;
 			default:
-				return User;
+				return faUser;
 		}
 	}
 
@@ -266,7 +267,7 @@
 			<p class="text-muted-foreground mt-1">{m.tenants_subtitle()}</p>
 		</div>
 		<Button onclick={openCreateModal}>
-			<Plus class="mr-2 h-4 w-4" />
+			<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 			{m.tenants_create()}
 		</Button>
 	</div>
@@ -274,15 +275,15 @@
 	<!-- Tenants Grid -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="text-muted-foreground h-8 w-8 animate-spin" />
+			<FontAwesomeIcon icon={faSpinner} class="text-muted-foreground h-8 w-8 animate-spin" />
 		</div>
 	{:else if tenants.length === 0}
 		<div class="border-border rounded-lg border border-dashed py-16 text-center">
-			<Building2 class="text-muted-foreground/40 mx-auto h-12 w-12" />
+			<FontAwesomeIcon icon={faBuilding} class="text-muted-foreground/40 mx-auto h-12 w-12" />
 			<p class="text-foreground mt-4 text-lg font-medium">{m.tenants_noTenants()}</p>
 			<p class="text-muted-foreground mt-1">{m.tenants_createFirst()}</p>
 			<Button variant="outline" class="mt-6" onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.tenants_create()}
 			</Button>
 		</div>
@@ -300,7 +301,7 @@
 						<div
 							class="bg-primary/10 text-primary flex h-12 w-12 items-center justify-center rounded-lg"
 						>
-							<Building2 class="h-6 w-6" />
+							<FontAwesomeIcon icon={faBuilding} class="h-6 w-6" />
 						</div>
 						<span
 							class={cn(
@@ -323,7 +324,7 @@
 
 					<div class="text-muted-foreground mt-4 flex items-center gap-4 text-xs">
 						<span class="flex items-center gap-1">
-							<Users class="h-3.5 w-3.5" />
+							<FontAwesomeIcon icon={faUsers} class="h-3.5 w-3.5" />
 							{tenant.member_count || 1} members
 						</span>
 						<span>{formatRelativeTime(tenant.created_at)}</span>
@@ -351,7 +352,7 @@
 					onclick={() => (showCreateModal = false)}
 					class="text-muted-foreground hover:bg-accent rounded p-1"
 				>
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -428,7 +429,7 @@
 					</Button>
 					<Button type="submit" disabled={isCreating}>
 						{#if isCreating}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
 						{m.common_create()}
 					</Button>
@@ -455,7 +456,7 @@
 					<div
 						class="bg-primary/10 text-primary flex h-12 w-12 items-center justify-center rounded-lg"
 					>
-						<Building2 class="h-6 w-6" />
+						<FontAwesomeIcon icon={faBuilding} class="h-6 w-6" />
 					</div>
 					<div>
 						<h2 class="text-lg font-semibold">{selectedTenant.name}</h2>
@@ -468,13 +469,13 @@
 						class="text-destructive hover:bg-destructive/10 rounded p-2"
 						title="Delete organization"
 					>
-						<Trash2 class="h-5 w-5" />
+						<FontAwesomeIcon icon={faTrash} class="h-5 w-5" />
 					</button>
 					<button
 						onclick={() => (showDetailModal = false)}
 						class="text-muted-foreground hover:bg-accent rounded p-2"
 					>
-						<X class="h-5 w-5" />
+						<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 					</button>
 				</div>
 			</div>
@@ -488,7 +489,7 @@
 				<!-- Members -->
 				<div>
 					<h3 class="mb-0 flex items-center gap-2 font-semibold">
-						<Users class="h-5 w-5" />
+						<FontAwesomeIcon icon={faUsers} class="h-5 w-5" />
 						Members
 					</h3>
 					<Button
@@ -501,7 +502,7 @@
 							addMemberError = '';
 						}}
 					>
-						<Plus class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 						Add Member
 					</Button>
 				</div>
@@ -509,7 +510,7 @@
 				<div class="mt-4">
 					{#if loadingMembers}
 						<div class="flex items-center justify-center py-8">
-							<Loader2 class="text-muted-foreground h-6 w-6 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="text-muted-foreground h-6 w-6 animate-spin" />
 						</div>
 					{:else if members.length === 0}
 						<p class="text-muted-foreground py-4 text-center">No members yet</p>
@@ -520,7 +521,7 @@
 								<div class="border-border flex items-center justify-between rounded-lg border p-3">
 									<div class="flex items-center gap-3">
 										<div class="bg-muted flex h-9 w-9 items-center justify-center rounded-full">
-											<User class="text-muted-foreground h-4 w-4" />
+											<FontAwesomeIcon icon={faUser} class="text-muted-foreground h-4 w-4" />
 										</div>
 										<div>
 											<p class="text-foreground font-medium">
@@ -536,7 +537,7 @@
 												getRoleBadgeClass(member.role)
 											)}
 										>
-											<RoleIcon class="h-3 w-3" />
+											<FontAwesomeIcon icon={RoleIcon} class="h-3 w-3" />
 											{member.role}
 										</span>
 										{#if member.role !== 'owner'}
@@ -545,14 +546,14 @@
 												class="text-muted-foreground hover:bg-accent rounded p-1"
 												title="Change role"
 											>
-												<Settings class="h-4 w-4" />
+												<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
 											</button>
 											<button
 												onclick={() => handleRemoveMember(member)}
 												class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded p-1"
 												title="Remove member"
 											>
-												<X class="h-4 w-4" />
+												<FontAwesomeIcon icon={faXmark} class="h-4 w-4" />
 											</button>
 										{/if}
 									</div>
@@ -583,7 +584,7 @@
 					onclick={() => (showAddMember = false)}
 					class="text-muted-foreground hover:bg-accent rounded p-1"
 				>
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -616,7 +617,7 @@
 							disabled={isSearching || memberSearchQuery.length < 2}
 						>
 							{#if isSearching}
-								<Loader2 class="h-4 w-4 animate-spin" />
+								<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 							{:else}
 								Search
 							{/if}
@@ -629,7 +630,7 @@
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-3">
 								<div class="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
-									<User class="text-muted-foreground h-5 w-5" />
+									<FontAwesomeIcon icon={faUser} class="text-muted-foreground h-5 w-5" />
 								</div>
 								<div>
 									<p class="text-foreground font-medium">
@@ -664,7 +665,7 @@
 								<Button variant="outline" onclick={() => (searchResult = null)}>Clear</Button>
 								<Button onclick={handleAddMember} disabled={isAddingMember}>
 									{#if isAddingMember}
-										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 									{/if}
 									Add to Organization
 								</Button>

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faLock, faShieldHalved, faChartBar, faBox, faSkull, faFileLines, faFlask, faMagnifyingGlass, faGear, faTriangleExclamation, faFolder, faStopwatch, faCalendar, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 	import {
 		type UserJob,
 		type JobStatus,
@@ -104,15 +106,15 @@
 	<div class="job-header">
 		<div class="job-type">
 			<span class="type-icon">
-				{#if job.job_type.includes('secrets')}🔐
-				{:else if job.job_type.includes('sast')}🛡️
-				{:else if job.job_type.includes('quality')}📊
-				{:else if job.job_type.includes('dependency')}📦
-				{:else if job.job_type.includes('deadcode')}💀
-				{:else if job.job_type.includes('docs')}📝
-				{:else if job.job_type.includes('test')}🧪
-				{:else if job.job_type.includes('index')}🔍
-				{:else}⚙️
+				{#if job.job_type.includes('secrets')}<FontAwesomeIcon icon={faLock} />
+				{:else if job.job_type.includes('sast')}<FontAwesomeIcon icon={faShieldHalved} />
+				{:else if job.job_type.includes('quality')}<FontAwesomeIcon icon={faChartBar} />
+				{:else if job.job_type.includes('dependency')}<FontAwesomeIcon icon={faBox} />
+				{:else if job.job_type.includes('deadcode')}<FontAwesomeIcon icon={faSkull} />
+				{:else if job.job_type.includes('docs')}<FontAwesomeIcon icon={faFileLines} />
+				{:else if job.job_type.includes('test')}<FontAwesomeIcon icon={faFlask} />
+				{:else if job.job_type.includes('index')}<FontAwesomeIcon icon={faMagnifyingGlass} />
+				{:else}<FontAwesomeIcon icon={faGear} />
 				{/if}
 			</span>
 			<span class="type-name">{jobTypeName}</span>
@@ -137,18 +139,18 @@
 
 	{#if error}
 		<div class="job-error">
-			<span class="error-icon">⚠️</span>
+			<span class="error-icon"><FontAwesomeIcon icon={faTriangleExclamation} /></span>
 			<span class="error-text">{error}</span>
 		</div>
 	{/if}
 
 	<div class="job-meta">
 		{#if job.project_name}
-			<span class="meta-item">📁 {job.project_name}</span>
+			<span class="meta-item"><FontAwesomeIcon icon={faFolder} class="inline" /> {job.project_name}</span>
 		{/if}
-		<span class="meta-item">⏱️ {getElapsedTime()}</span>
+		<span class="meta-item"><FontAwesomeIcon icon={faStopwatch} class="inline" /> {getElapsedTime()}</span>
 		<span class="meta-item" title={formatTime(job.created_at)}>
-			📅 {new Date(job.created_at).toLocaleDateString()}
+			<FontAwesomeIcon icon={faCalendar} class="inline" /> {new Date(job.created_at).toLocaleDateString()}
 		</span>
 	</div>
 
@@ -162,7 +164,7 @@
 
 	{#if job.result_url}
 		<div class="job-result">
-			<a href={job.result_url} target="_blank" rel="noopener noreferrer"> View Result → </a>
+			<a href={job.result_url} target="_blank" rel="noopener noreferrer"> View Result <FontAwesomeIcon icon={faArrowRight} class="inline h-3 w-3" /> </a>
 		</div>
 	{/if}
 </div>

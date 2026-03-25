@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Key, Search, Loader2, Trash2, Eye, EyeOff, MoreVertical, X, Copy } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faKey, faMagnifyingGlass, faSpinner, faTrash, faEye, faEyeSlash, faEllipsisVertical, faXmark, faCopy } from '@fortawesome/free-solid-svg-icons';
 	import { api } from '$lib/api/client';
 	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -71,7 +72,7 @@
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<h2 class="text-lg font-semibold">{m.admin_apikeys_title()}</h2>
 		<form onsubmit={(e) => { e.preventDefault(); handleSearch(); }} class="relative">
-			<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+			<FontAwesomeIcon icon={faMagnifyingGlass} class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 			<input
 				type="text"
 				bind:value={search}
@@ -83,11 +84,11 @@
 
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if keys.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Key class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faKey} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-muted-foreground">{m.admin_apikeys_empty()}</p>
 		</div>
 	{:else}
@@ -132,7 +133,7 @@
 										title="Copy prefix"
 										onclick={() => copyToClipboard(key.key_prefix || '')}
 									>
-										<Copy class="h-3.5 w-3.5" />
+										<FontAwesomeIcon icon={faCopy} class="h-3.5 w-3.5" />
 									</button>
 								</div>
 							</td>
@@ -165,7 +166,7 @@
 									onclick={() => (showMenuFor = showMenuFor === key.id ? null : key.id)}
 									class="rounded p-1.5 text-muted-foreground hover:bg-accent"
 								>
-									<MoreVertical class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEllipsisVertical} class="h-4 w-4" />
 								</button>
 
 								{#if showMenuFor === key.id}
@@ -174,7 +175,7 @@
 											onclick={() => handleRevokeKey(key)}
 											class="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
 										>
-											<Trash2 class="h-4 w-4" />
+											<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 											{m.admin_apikeys_revoke()}
 										</button>
 									</div>

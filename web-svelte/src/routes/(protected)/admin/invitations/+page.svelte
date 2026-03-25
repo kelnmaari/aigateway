@@ -1,17 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Mail,
-		Plus,
-		Copy,
-		Trash2,
-		Loader2,
-		RefreshCw,
-		Check,
-		X,
-		Calendar,
-		User
-	} from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faEnvelope, faPlus, faCopy, faTrash, faSpinner, faArrowsRotate, faCheck, faXmark, faCalendar, faUser } from '@fortawesome/free-solid-svg-icons';
 	import { adminApi, type Invitation } from '$lib/api/admin';
 	import { cn, formatRelativeTime, copyToClipboard } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -151,11 +141,11 @@
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={loadInvitations} disabled={isLoading}>
-				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				{m.common_refresh()}
 			</Button>
 			<Button onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.admin_invitations_create()}
 			</Button>
 		</div>
@@ -164,15 +154,15 @@
 	<!-- Invitations List -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if invitations.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Mail class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faEnvelope} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium">{m.admin_invitations_empty()}</p>
 			<p class="mt-1 text-muted-foreground">{m.admin_invitations_empty_desc()}</p>
 			<Button class="mt-6" onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.admin_invitations_create()}
 			</Button>
 		</div>
@@ -195,7 +185,7 @@
 							<td class="px-4 py-3">
 								{#if invitation.email}
 									<div class="flex items-center gap-2">
-										<Mail class="h-4 w-4 text-muted-foreground" />
+										<FontAwesomeIcon icon={faEnvelope} class="h-4 w-4 text-muted-foreground" />
 										<span>{invitation.email}</span>
 									</div>
 								{:else if invitation.token}
@@ -226,9 +216,9 @@
 											title="Copy link"
 										>
 											{#if copiedId === invitation.id}
-												<Check class="h-4 w-4 text-green-500" />
+												<FontAwesomeIcon icon={faCheck} class="h-4 w-4 text-green-500" />
 											{:else}
-												<Copy class="h-4 w-4" />
+												<FontAwesomeIcon icon={faCopy} class="h-4 w-4" />
 											{/if}
 										</button>
 									{/if}
@@ -238,7 +228,7 @@
 											class="rounded p-1.5 text-destructive hover:bg-destructive/10"
 											title="Revoke"
 										>
-											<Trash2 class="h-4 w-4" />
+											<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 										</button>
 									{/if}
 								</div>
@@ -265,7 +255,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-lg font-semibold">Create Invitation</h2>
 				<button onclick={() => (showCreateModal = false)} class="rounded p-1 text-muted-foreground hover:bg-accent">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -328,7 +318,7 @@
 					</Button>
 					<Button type="submit" disabled={isCreating}>
 						{#if isCreating}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
 						{m.common_create()}
 					</Button>

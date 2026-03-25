@@ -4,7 +4,16 @@
 	import { authStore } from '$lib';
 	import { authApi } from '$lib/api';
 	import { cn } from '$lib/utils';
-	import { Eye, EyeOff, Loader2, Shield, CheckCircle, XCircle } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import {
+		faEye,
+		faEyeSlash,
+		faSpinner,
+		faShield,
+		faCircleCheck,
+		faCircleXmark,
+		faTriangleExclamation
+	} from '@fortawesome/free-solid-svg-icons';
 	import * as m from '$lib/paraglide/messages';
 
 	let bootstrapToken = $state('');
@@ -101,7 +110,7 @@
 			<div
 				class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-3xl text-primary-foreground"
 			>
-				<Shield class="h-8 w-8" />
+				<FontAwesomeIcon icon={faShield} class="h-8 w-8" />
 			</div>
 			<h1 class="text-2xl font-bold text-foreground">{m.bootstrap_title()}</h1>
 			<p class="mt-2 text-muted-foreground">{m.bootstrap_subtitle()}</p>
@@ -111,12 +120,12 @@
 		<div class="rounded-xl border border-border bg-card p-6 shadow-sm">
 			{#if checkingStatus}
 				<div class="flex items-center justify-center gap-2 py-8 text-muted-foreground">
-					<Loader2 class="h-5 w-5 animate-spin" />
+					<FontAwesomeIcon icon={faSpinner} class="h-5 w-5 animate-spin" />
 					{m.bootstrap_checking()}
 				</div>
 			{:else if alreadyInitialized}
 				<div class="py-8 text-center">
-					<CheckCircle class="mx-auto mb-4 h-12 w-12 text-green-500" />
+					<FontAwesomeIcon icon={faCircleCheck} class="mx-auto mb-4 h-12 w-12 text-green-500" />
 					<h2 class="mb-2 text-lg font-semibold text-foreground">{m.bootstrap_already_init()}</h2>
 					<p class="mb-6 text-muted-foreground">
 						{m.bootstrap_already_init_desc()}
@@ -133,7 +142,7 @@
 				</div>
 			{:else}
 				<div class="mb-6 rounded-lg bg-amber-500/10 p-4 text-sm text-amber-600 dark:text-amber-400">
-					<p class="font-medium">⚠️ {m.bootstrap_important()}</p>
+					<p class="font-medium"><FontAwesomeIcon icon={faTriangleExclamation} class="mr-1 h-4 w-4" /> {m.bootstrap_important()}</p>
 					<p class="mt-1">
 						{m.bootstrap_important_desc()}
 					</p>
@@ -226,9 +235,9 @@
 								class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 							>
 								{#if showPassword}
-									<EyeOff class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEyeSlash} class="h-4 w-4" />
 								{:else}
-									<Eye class="h-4 w-4" />
+									<FontAwesomeIcon icon={faEye} class="h-4 w-4" />
 								{/if}
 							</button>
 						</div>
@@ -237,9 +246,9 @@
 						<div class="mt-2 space-y-1 text-xs">
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.minLength}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.minLength ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_min_length()}
@@ -247,9 +256,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasUppercase}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasUppercase ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_uppercase()}
@@ -257,9 +266,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasLowercase}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasLowercase ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_lowercase()}
@@ -267,9 +276,9 @@
 							</div>
 							<div class="flex items-center gap-1.5">
 								{#if passwordRequirements.hasNumber}
-									<CheckCircle class="h-3.5 w-3.5 text-green-500" />
+									<FontAwesomeIcon icon={faCircleCheck} class="h-3.5 w-3.5 text-green-500" />
 								{:else}
-									<XCircle class="h-3.5 w-3.5 text-muted-foreground" />
+									<FontAwesomeIcon icon={faCircleXmark} class="h-3.5 w-3.5 text-muted-foreground" />
 								{/if}
 								<span class={passwordRequirements.hasNumber ? 'text-green-500' : 'text-muted-foreground'}>
 									{m.auth_pass_number()}
@@ -312,10 +321,10 @@
 						)}
 					>
 						{#if loading}
-							<Loader2 class="h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 							{m.bootstrap_creating()}
 						{:else}
-							<Shield class="h-4 w-4" />
+							<FontAwesomeIcon icon={faShield} class="h-4 w-4" />
 							{m.bootstrap_create()}
 						{/if}
 					</button>
@@ -328,4 +337,3 @@
 		</div>
 	</div>
 </div>
-

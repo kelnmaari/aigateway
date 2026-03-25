@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Send, Square, Loader2 } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faPaperPlane, faSquare, faSpinner } from '@fortawesome/free-solid-svg-icons';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
 
@@ -82,7 +83,7 @@
 					class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-colors hover:bg-destructive/90"
 					title={m.chat_stop_generating()}
 				>
-					<Square class="h-4 w-4" />
+					<FontAwesomeIcon icon={faSquare} class="h-4 w-4" />
 				</button>
 			{:else}
 				<button
@@ -97,9 +98,9 @@
 					title={m.chat_sendMessage()}
 				>
 					{#if disabled && !isStreaming}
-						<Loader2 class="h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin" />
 					{:else}
-						<Send class="h-4 w-4" />
+						<FontAwesomeIcon icon={faPaperPlane} class="h-4 w-4" />
 					{/if}
 				</button>
 			{/if}
@@ -110,4 +111,3 @@
 		</p>
 	</div>
 </form>
-

@@ -1,17 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Settings,
-		Bell,
-		Globe,
-		Moon,
-		Sun,
-		Monitor,
-		Palette,
-		Save,
-		Loader2,
-		Check
-	} from 'lucide-svelte';
+		faGear,
+		faBell,
+		faGlobe,
+		faMoon,
+		faSun,
+		faDesktop,
+		faPalette,
+		faFloppyDisk,
+		faSpinner,
+		faCheck
+	} from '@fortawesome/free-solid-svg-icons';
 	import { themeStore } from '$lib';
 	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
 	import { cn } from '$lib/utils';
@@ -105,7 +106,7 @@
 			<div class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-						<Palette class="h-5 w-5" />
+						<FontAwesomeIcon icon={faPalette} class="h-5 w-5" />
 					</div>
 					<div>
 						<h2 class="font-semibold text-foreground">{m.settings_appearance()}</h2>
@@ -125,7 +126,7 @@
 									theme === 'light' ? 'border-primary bg-primary/10 text-primary' : 'border-input hover:bg-accent'
 								)}
 							>
-								<Sun class="h-4 w-4" />
+								<FontAwesomeIcon icon={faSun} class="h-4 w-4" />
 								{m.theme_light()}
 							</button>
 							<button
@@ -135,7 +136,7 @@
 									theme === 'dark' ? 'border-primary bg-primary/10 text-primary' : 'border-input hover:bg-accent'
 								)}
 							>
-								<Moon class="h-4 w-4" />
+								<FontAwesomeIcon icon={faMoon} class="h-4 w-4" />
 								{m.theme_dark()}
 							</button>
 							<button
@@ -145,7 +146,7 @@
 									theme === 'system' ? 'border-primary bg-primary/10 text-primary' : 'border-input hover:bg-accent'
 								)}
 							>
-								<Monitor class="h-4 w-4" />
+								<FontAwesomeIcon icon={faDesktop} class="h-4 w-4" />
 								{m.theme_system()}
 							</button>
 						</div>
@@ -163,7 +164,7 @@
 										locale === loc ? 'border-primary bg-primary/10 text-primary' : 'border-input hover:bg-accent'
 									)}
 								>
-									<Globe class="h-4 w-4" />
+									<FontAwesomeIcon icon={faGlobe} class="h-4 w-4" />
 									{getLocaleLabel(loc)}
 								</button>
 							{/each}
@@ -179,7 +180,7 @@
 			<div class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-						<Bell class="h-5 w-5" />
+						<FontAwesomeIcon icon={faBell} class="h-5 w-5" />
 					</div>
 					<div>
 						<h2 class="font-semibold text-foreground">{m.settings_notifications()}</h2>
@@ -233,7 +234,7 @@
 			<div class="rounded-xl border border-border bg-card p-6">
 				<div class="mb-4 flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-						<Settings class="h-5 w-5" />
+						<FontAwesomeIcon icon={faGear} class="h-5 w-5" />
 					</div>
 					<div>
 						<h2 class="font-semibold text-foreground">{m.settings_chat()}</h2>
@@ -284,13 +285,13 @@
 			<div class="flex justify-end">
 				<Button onclick={saveSettings} disabled={isSaving}>
 					{#if isSaving}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{m.common_saving()}
 					{:else if saved}
-						<Check class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faCheck} class="mr-2 h-4 w-4" />
 						{m.success_saved()}
 					{:else}
-						<Save class="mr-2 h-4 w-4" />
+						<FontAwesomeIcon icon={faFloppyDisk} class="mr-2 h-4 w-4" />
 						{m.common_save()}
 					{/if}
 				</Button>

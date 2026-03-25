@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { themeStore } from '$lib/stores/theme.svelte';
-	import { Sun, Moon } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 	import { cn } from '$lib/utils';
 
 	interface Props {
@@ -21,10 +22,9 @@
 	title={themeStore.isDark ? 'Switch to light mode' : 'Switch to dark mode'}
 >
 	{#if themeStore.isDark}
-		<Sun class="h-5 w-5" />
+		<FontAwesomeIcon icon={faSun} class="h-5 w-5" />
 	{:else}
-		<Moon class="h-5 w-5" />
+		<FontAwesomeIcon icon={faMoon} class="h-5 w-5" />
 	{/if}
 	<span class="sr-only">Toggle theme</span>
 </button>
-

@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Activity,
-		Cpu,
-		HardDrive,
-		Loader2,
-		RefreshCw,
-		Server,
-		Zap,
-		MemoryStick,
-		Gauge
-	} from 'lucide-svelte';
+		faChartLine,
+		faMicrochip,
+		faHardDrive,
+		faSpinner,
+		faArrowsRotate,
+		faServer,
+		faBolt,
+		faMemory,
+		faGauge
+	} from '@fortawesome/free-solid-svg-icons';
 	import { api } from '$lib/api/client';
 	import { cn, formatNumber, formatBytes } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -94,14 +95,14 @@
 			<p class="mt-1 text-muted-foreground">{m.monitor_subtitle()}</p>
 		</div>
 		<Button variant="outline" onclick={loadMetrics} disabled={isLoading}>
-			<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+			<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 			{m.common_refresh()}
 		</Button>
 	</div>
 
 	{#if isLoading && !metrics}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if metrics}
 		<!-- Main Stats Grid -->
@@ -110,7 +111,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="mb-3 flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<Cpu class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faMicrochip} class="h-5 w-5 text-muted-foreground" />
 						<span class="font-medium">CPU</span>
 					</div>
 					<span class={cn('text-2xl font-bold', getStatusColor(metrics.cpu_percent))}>
@@ -129,7 +130,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="mb-3 flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<MemoryStick class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faMemory} class="h-5 w-5 text-muted-foreground" />
 						<span class="font-medium">Memory</span>
 					</div>
 					<span class={cn('text-2xl font-bold', getStatusColor(metrics.memory_percent))}>
@@ -151,7 +152,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-						<Zap class="h-5 w-5" />
+						<FontAwesomeIcon icon={faBolt} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Requests/sec</p>
@@ -164,7 +165,7 @@
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
-						<Activity class="h-5 w-5" />
+						<FontAwesomeIcon icon={faChartLine} class="h-5 w-5" />
 					</div>
 					<div>
 						<p class="text-sm text-muted-foreground">Uptime</p>
@@ -178,7 +179,7 @@
 		<div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
-					<Server class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faServer} class="h-5 w-5 text-muted-foreground" />
 					<div>
 						<p class="text-sm text-muted-foreground">Goroutines</p>
 						<p class="text-xl font-bold">{formatNumber(metrics.goroutines)}</p>
@@ -188,7 +189,7 @@
 
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
-					<Activity class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faChartLine} class="h-5 w-5 text-muted-foreground" />
 					<div>
 						<p class="text-sm text-muted-foreground">Active Connections</p>
 						<p class="text-xl font-bold">{formatNumber(metrics.active_connections)}</p>
@@ -198,7 +199,7 @@
 
 			<div class="rounded-xl border border-border bg-card p-5">
 				<div class="flex items-center gap-3">
-					<Gauge class="h-5 w-5 text-muted-foreground" />
+					<FontAwesomeIcon icon={faGauge} class="h-5 w-5 text-muted-foreground" />
 					<div>
 						<p class="text-sm text-muted-foreground">Health Status</p>
 						<p class="text-xl font-bold text-green-500">Healthy</p>
@@ -211,7 +212,7 @@
 		{#if metrics.gpu}
 			<div class="rounded-xl border border-border bg-card p-6">
 				<h2 class="mb-4 flex items-center gap-2 font-semibold">
-					<HardDrive class="h-5 w-5" />
+					<FontAwesomeIcon icon={faHardDrive} class="h-5 w-5" />
 					GPU: {metrics.gpu.name}
 				</h2>
 
@@ -255,7 +256,7 @@
 		{/if}
 	{:else}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Server class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faServer} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium">Unable to load metrics</p>
 			<p class="mt-1 text-muted-foreground">Check server connection</p>
 		</div>

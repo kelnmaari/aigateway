@@ -4,19 +4,20 @@
 	import { api } from '$lib/api';
 	import { cn, formatNumber, formatRelativeTime } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		MessageSquare,
-		Key,
-		Cpu,
-		Activity,
-		Plus,
-		ArrowRight,
-		Loader2,
-		Building2,
-		Download,
-		X,
-		Sparkles
-	} from 'lucide-svelte';
+		faComments,
+		faKey,
+		faMicrochip,
+		faChartLine,
+		faPlus,
+		faArrowRight,
+		faSpinner,
+		faBuilding,
+		faDownload,
+		faXmark,
+		faWandMagicSparkles
+	} from '@fortawesome/free-solid-svg-icons';
 	import * as Card from '$lib/components/ui/card';
 
 	// Dashboard data
@@ -160,28 +161,28 @@
 		{
 			label: 'Conversations',
 			value: stats.conversations,
-			icon: MessageSquare,
+			icon: faComments,
 			href: '/chat',
 			color: 'text-blue-500'
 		},
 		{
 			label: 'API Keys',
 			value: stats.apiKeys,
-			icon: Key,
+			icon: faKey,
 			href: '/api-keys',
 			color: 'text-emerald-500'
 		},
 		{
 			label: 'Models',
 			value: stats.models,
-			icon: Cpu,
+			icon: faMicrochip,
 			href: '/chat',
 			color: 'text-purple-500'
 		},
 		{
 			label: 'Requests',
 			value: stats.requests,
-			icon: Activity,
+			icon: faChartLine,
 			href: '/api-keys',
 			color: 'text-orange-500'
 		}
@@ -200,7 +201,7 @@
 			<div class="relative flex items-center justify-between">
 				<div class="flex items-center gap-4">
 					<div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500">
-						<Sparkles class="h-6 w-6" />
+						<FontAwesomeIcon icon={faWandMagicSparkles} class="h-6 w-6" />
 					</div>
 					<div>
 						<h3 class="font-semibold text-foreground flex items-center gap-2">
@@ -219,7 +220,7 @@
 						href="/admin/about" 
 						class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
 					>
-						<Download class="h-4 w-4" />
+						<FontAwesomeIcon icon={faDownload} class="h-4 w-4" />
 						{m.dashboard_update_view_changelog()}
 					</a>
 					<button 
@@ -227,7 +228,7 @@
 						class="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
 						title={m.common_close()}
 					>
-						<X class="h-5 w-5" />
+						<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 					</button>
 				</div>
 			</div>
@@ -244,7 +245,7 @@
 
 	{#if loading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else}
 		<!-- Stats Grid -->
@@ -254,7 +255,7 @@
 					<Card.Root class="transition-shadow hover:shadow-md">
 						<Card.Content class="flex items-center gap-4 p-6">
 							<div class={cn('rounded-lg bg-background p-3', stat.color)}>
-								<stat.icon class="h-6 w-6" />
+								<FontAwesomeIcon icon={stat.icon} class="h-6 w-6" />
 							</div>
 							<div>
 								<p class="text-sm text-muted-foreground">{stat.label}</p>
@@ -280,14 +281,14 @@
 					>
 						<div class="flex items-center gap-3">
 							<div class="rounded-lg bg-primary/10 p-2 text-primary">
-								<Plus class="h-5 w-5" />
+								<FontAwesomeIcon icon={faPlus} class="h-5 w-5" />
 							</div>
 							<div>
 								<p class="font-medium text-foreground">New Chat</p>
 								<p class="text-sm text-muted-foreground">Start a conversation with AI</p>
 							</div>
 						</div>
-						<ArrowRight class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faArrowRight} class="h-5 w-5 text-muted-foreground" />
 					</a>
 
 					<a
@@ -296,14 +297,14 @@
 					>
 						<div class="flex items-center gap-3">
 							<div class="rounded-lg bg-emerald-500/10 p-2 text-emerald-500">
-								<Key class="h-5 w-5" />
+								<FontAwesomeIcon icon={faKey} class="h-5 w-5" />
 							</div>
 							<div>
 								<p class="font-medium text-foreground">Create API Key</p>
 								<p class="text-sm text-muted-foreground">Generate a new API key</p>
 							</div>
 						</div>
-						<ArrowRight class="h-5 w-5 text-muted-foreground" />
+						<FontAwesomeIcon icon={faArrowRight} class="h-5 w-5 text-muted-foreground" />
 					</a>
 
 					{#if authStore.isAdmin}
@@ -313,14 +314,14 @@
 						>
 							<div class="flex items-center gap-3">
 								<div class="rounded-lg bg-purple-500/10 p-2 text-purple-500">
-									<Activity class="h-5 w-5" />
+									<FontAwesomeIcon icon={faChartLine} class="h-5 w-5" />
 								</div>
 								<div>
 									<p class="font-medium text-foreground">Admin Panel</p>
 									<p class="text-sm text-muted-foreground">Manage users and settings</p>
 								</div>
 							</div>
-							<ArrowRight class="h-5 w-5 text-muted-foreground" />
+							<FontAwesomeIcon icon={faArrowRight} class="h-5 w-5 text-muted-foreground" />
 						</a>
 					{/if}
 				</Card.Content>
@@ -335,13 +336,13 @@
 				<Card.Content>
 					{#if recentConversations.length === 0}
 						<div class="py-8 text-center">
-							<MessageSquare class="mx-auto h-12 w-12 text-muted-foreground/50" />
+							<FontAwesomeIcon icon={faComments} class="mx-auto h-12 w-12 text-muted-foreground/50" />
 							<p class="mt-2 text-sm text-muted-foreground">No conversations yet</p>
 							<a
 								href="/chat"
 								class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
 							>
-								<Plus class="h-4 w-4" />
+								<FontAwesomeIcon icon={faPlus} class="h-4 w-4" />
 								Start your first chat
 							</a>
 						</div>
@@ -353,7 +354,7 @@
 									class="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-accent"
 								>
 									<div class="flex items-center gap-3">
-										<MessageSquare class="h-5 w-5 text-muted-foreground" />
+										<FontAwesomeIcon icon={faComments} class="h-5 w-5 text-muted-foreground" />
 										<div>
 											<p class="font-medium text-foreground">
 												{conversation.title || 'Untitled'}
@@ -363,7 +364,7 @@
 											</p>
 										</div>
 									</div>
-									<ArrowRight class="h-4 w-4 text-muted-foreground" />
+									<FontAwesomeIcon icon={faArrowRight} class="h-4 w-4 text-muted-foreground" />
 								</a>
 							{/each}
 						</div>
@@ -372,7 +373,7 @@
 							class="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
 						>
 							View all conversations
-							<ArrowRight class="h-4 w-4" />
+							<FontAwesomeIcon icon={faArrowRight} class="h-4 w-4" />
 						</a>
 					{/if}
 				</Card.Content>
@@ -387,14 +388,14 @@
 				<Card.Content>
 					{#if availableModels.length === 0}
 						<div class="py-8 text-center">
-							<Cpu class="mx-auto h-12 w-12 text-muted-foreground/50" />
+							<FontAwesomeIcon icon={faMicrochip} class="mx-auto h-12 w-12 text-muted-foreground/50" />
 							<p class="mt-2 text-sm text-muted-foreground">No models available</p>
 						</div>
 					{:else}
 						<div class="grid gap-2 sm:grid-cols-2">
 							{#each availableModels as model}
 								<div class="flex items-center gap-2 rounded-lg border border-border p-3">
-									<Cpu class="h-4 w-4 text-muted-foreground" />
+									<FontAwesomeIcon icon={faMicrochip} class="h-4 w-4 text-muted-foreground" />
 									<span class="truncate text-sm text-foreground">{model.name || model.id}</span>
 								</div>
 							{/each}
@@ -412,13 +413,13 @@
 				<Card.Content>
 					{#if tenants.length === 0}
 						<div class="py-8 text-center">
-							<Building2 class="mx-auto h-12 w-12 text-muted-foreground/50" />
+							<FontAwesomeIcon icon={faBuilding} class="mx-auto h-12 w-12 text-muted-foreground/50" />
 							<p class="mt-2 text-sm text-muted-foreground">No organizations yet</p>
 							<a
 								href="/tenants"
 								class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
 							>
-								<Plus class="h-4 w-4" />
+								<FontAwesomeIcon icon={faPlus} class="h-4 w-4" />
 								Create organization
 							</a>
 						</div>
@@ -430,13 +431,13 @@
 									class="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-accent"
 								>
 									<div class="flex items-center gap-3">
-										<Building2 class="h-5 w-5 text-muted-foreground" />
+										<FontAwesomeIcon icon={faBuilding} class="h-5 w-5 text-muted-foreground" />
 										<div>
 											<p class="font-medium text-foreground">{tenant.name}</p>
 											<p class="text-xs text-muted-foreground capitalize">{tenant.role}</p>
 										</div>
 									</div>
-									<ArrowRight class="h-4 w-4 text-muted-foreground" />
+									<FontAwesomeIcon icon={faArrowRight} class="h-4 w-4 text-muted-foreground" />
 								</a>
 							{/each}
 						</div>

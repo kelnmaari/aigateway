@@ -1,28 +1,31 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		History,
-		RefreshCw,
-		Loader2,
-		Search,
-		Eye,
-		CheckCircle,
-		XCircle,
-		AlertCircle,
-		AlertTriangle,
-		Clock,
-		Filter,
-		ChevronLeft,
-		ChevronRight,
-		FileCode,
-		Shield,
-		Bug,
-		BookOpen,
-		TestTube,
-		LayoutGrid,
-		Package,
-		Activity
-	} from 'lucide-svelte';
+		faClockRotateLeft,
+		faArrowsRotate,
+		faSpinner,
+		faMagnifyingGlass,
+		faEye,
+		faCircleCheck,
+		faCircleXmark,
+		faCircleExclamation,
+		faTriangleExclamation,
+		faClock,
+		faFilter,
+		faChevronLeft,
+		faChevronRight,
+		faFileCode,
+		faShield,
+		faBug,
+		faBookOpen,
+		faFlask,
+		faTableCells,
+		faBoxOpen,
+		faChartLine,
+		faLightbulb,
+		faXmark
+	} from '@fortawesome/free-solid-svg-icons';
 	import { gitlabApi, type ScanHistoryItem, type ScanTypeInfo } from '$lib/api/gitlab';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -103,21 +106,21 @@
 		switch (type) {
 			case 'secrets':
 			case 'secrets_deep':
-				return Shield;
+				return faShield;
 			case 'dependencies':
-				return Package;
+				return faBoxOpen;
 			case 'quality':
-				return FileCode;
+				return faFileCode;
 			case 'deadcode':
-				return Bug;
+				return faBug;
 			case 'autodocs':
-				return BookOpen;
+				return faBookOpen;
 			case 'testgen':
-				return TestTube;
+				return faFlask;
 			case 'architecture':
-				return LayoutGrid;
+				return faTableCells;
 			default:
-				return History;
+				return faClockRotateLeft;
 		}
 	}
 
@@ -151,11 +154,11 @@
 
 	function getStatusIcon(status: string) {
 		switch (status) {
-			case 'completed': return CheckCircle;
-			case 'failed': return XCircle;
-			case 'running': return Loader2;
-			case 'pending': return Clock;
-			default: return AlertCircle;
+			case 'completed': return faCircleCheck;
+			case 'failed': return faCircleXmark;
+			case 'running': return faSpinner;
+			case 'pending': return faClock;
+			default: return faCircleExclamation;
 		}
 	}
 
@@ -198,7 +201,7 @@
 
 	<div class="mb-6">
 		<h1 class="text-2xl font-bold flex items-center gap-2">
-			<History class="h-6 w-6" />
+			<FontAwesomeIcon icon={faClockRotateLeft} class="h-6 w-6" />
 			{m.admin_gitlab_scan_history?.() || 'Scan History'}
 		</h1>
 		<p class="text-muted-foreground mt-1">
@@ -210,7 +213,7 @@
 	<div class="bg-card rounded-lg border p-4 mb-6">
 		<div class="flex flex-wrap items-center gap-4">
 			<div class="flex items-center gap-2">
-				<Filter class="h-4 w-4 text-muted-foreground" />
+				<FontAwesomeIcon icon={faFilter} class="h-4 w-4 text-muted-foreground" />
 				<span class="text-sm font-medium">Filters:</span>
 			</div>
 
@@ -246,9 +249,9 @@
 			<div class="ml-auto">
 				<Button variant="outline" size="sm" onclick={loadResults} disabled={isLoading}>
 					{#if isLoading}
-						<Loader2 class="h-4 w-4 mr-2 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 mr-2 animate-spin" />
 					{:else}
-						<RefreshCw class="h-4 w-4 mr-2" />
+						<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4 mr-2" />
 					{/if}
 					Refresh
 				</Button>
@@ -260,12 +263,12 @@
 	<div class="bg-card rounded-lg border overflow-hidden">
 		{#if isLoading && results.length === 0}
 			<div class="p-12 text-center">
-				<Loader2 class="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+				<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
 				<p class="mt-2 text-muted-foreground">Loading scan history...</p>
 			</div>
 		{:else if results.length === 0}
 			<div class="p-12 text-center">
-				<History class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+				<FontAwesomeIcon icon={faClockRotateLeft} class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
 				<h3 class="text-lg font-medium">No scan results found</h3>
 				<p class="text-muted-foreground mt-1">
 					{hasFilters ? 'Try adjusting your filters' : 'Run some scans to see results here'}
@@ -286,12 +289,10 @@
 				</thead>
 				<tbody class="divide-y">
 					{#each results as result (result.id)}
-						{@const TypeIcon = getScanTypeIcon(result.scan_type)}
-						{@const StatusIcon = getStatusIcon(result.status)}
 						<tr class="hover:bg-muted/50 transition-colors">
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-2">
-									<TypeIcon class="h-4 w-4 text-muted-foreground" />
+									<FontAwesomeIcon icon={getScanTypeIcon(result.scan_type)} class="h-4 w-4 text-muted-foreground" />
 									<span class="font-medium">{getScanTypeLabel(result.scan_type)}</span>
 								</div>
 							</td>
@@ -300,7 +301,7 @@
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-2">
-									<StatusIcon class={cn("h-4 w-4", getStatusColor(result.status), result.status === 'running' && 'animate-spin')} />
+									<FontAwesomeIcon icon={getStatusIcon(result.status)} class={cn("h-4 w-4", getStatusColor(result.status), result.status === 'running' && 'animate-spin')} />
 									<span class={cn("text-sm capitalize", getStatusColor(result.status))}>
 										{result.status}
 									</span>
@@ -327,7 +328,7 @@
 							</td>
 							<td class="px-4 py-3">
 								<Button variant="ghost" size="sm" onclick={() => viewDetails(result)}>
-									<Eye class="h-4 w-4 mr-1" />
+									<FontAwesomeIcon icon={faEye} class="h-4 w-4 mr-1" />
 									View
 								</Button>
 							</td>
@@ -349,7 +350,7 @@
 							onclick={() => handlePageChange('prev')}
 							disabled={currentPage === 0}
 						>
-							<ChevronLeft class="h-4 w-4" />
+							<FontAwesomeIcon icon={faChevronLeft} class="h-4 w-4" />
 							Previous
 						</Button>
 						<span class="text-sm">
@@ -362,7 +363,7 @@
 							disabled={(currentPage + 1) * pageSize >= total}
 						>
 							Next
-							<ChevronRight class="h-4 w-4" />
+							<FontAwesomeIcon icon={faChevronRight} class="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
@@ -373,12 +374,11 @@
 
 <!-- Detail Modal -->
 {#if showDetailModal && selectedResult}
-	{@const ModalTypeIcon = getScanTypeIcon(selectedResult.scan_type)}
 	<div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
 		<div class="bg-card border rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
 			<div class="flex items-center justify-between p-4 border-b">
 				<div class="flex items-center gap-3">
-					<ModalTypeIcon class="h-5 w-5" />
+					<FontAwesomeIcon icon={getScanTypeIcon(selectedResult.scan_type)} class="h-5 w-5" />
 					<div>
 						<h2 class="font-semibold">{getScanTypeLabel(selectedResult.scan_type)} Results</h2>
 						<p class="text-sm text-muted-foreground">
@@ -386,13 +386,13 @@
 						</p>
 					</div>
 				</div>
-				<Button variant="ghost" size="sm" onclick={() => showDetailModal = false}>×</Button>
+				<Button variant="ghost" size="sm" onclick={() => showDetailModal = false}><FontAwesomeIcon icon={faXmark} /></Button>
 			</div>
 
 			<div class="flex-1 overflow-auto p-4">
 				{#if isLoadingDetail}
 					<div class="flex items-center justify-center py-8">
-						<Loader2 class="h-6 w-6 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="h-6 w-6 animate-spin" />
 					</div>
 				{:else}
 					<!-- Summary -->
@@ -433,7 +433,7 @@
 						{#if parsedResults.summary}
 							<div class="mb-6">
 								<h3 class="font-medium mb-3 flex items-center gap-2">
-									<Activity class="h-4 w-4" />
+									<FontAwesomeIcon icon={faChartLine} class="h-4 w-4" />
 									Summary
 								</h3>
 								<div class="grid grid-cols-2 gap-4">
@@ -504,7 +504,7 @@
 						{#if parsedResults.findings && parsedResults.findings.length > 0}
 							<div class="mb-6">
 								<h3 class="font-medium mb-3 flex items-center gap-2">
-									<AlertTriangle class="h-4 w-4" />
+									<FontAwesomeIcon icon={faTriangleExclamation} class="h-4 w-4" />
 									Findings ({parsedResults.findings.length})
 								</h3>
 								<div class="space-y-2 max-h-72 overflow-auto">
@@ -545,7 +545,7 @@
 						{#if parsedResults.issues && parsedResults.issues.length > 0}
 							<div class="mb-6">
 								<h3 class="font-medium mb-3 flex items-center gap-2">
-									<AlertTriangle class="h-4 w-4" />
+									<FontAwesomeIcon icon={faTriangleExclamation} class="h-4 w-4" />
 									Issues ({parsedResults.issues.length})
 								</h3>
 								<div class="space-y-2 max-h-72 overflow-auto">
@@ -572,7 +572,7 @@
 											{/if}
 											{#if issue.suggestion}
 												<div class="text-xs text-green-500 mt-1">
-													💡 {issue.suggestion}
+													<FontAwesomeIcon icon={faLightbulb} class="inline h-3 w-3" /> {issue.suggestion}
 												</div>
 											{/if}
 										</div>
@@ -584,7 +584,7 @@
 						<!-- Raw JSON (collapsible) -->
 						<details class="group">
 							<summary class="cursor-pointer text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
-								<ChevronRight class="h-4 w-4 transition-transform group-open:rotate-90" />
+								<FontAwesomeIcon icon={faChevronRight} class="h-4 w-4 transition-transform group-open:rotate-90" />
 								View Raw JSON
 							</summary>
 							<pre class="bg-muted/50 rounded-lg p-4 text-xs overflow-auto max-h-64 mt-2 whitespace-pre-wrap">{JSON.stringify(parsedResults, null, 2)}</pre>

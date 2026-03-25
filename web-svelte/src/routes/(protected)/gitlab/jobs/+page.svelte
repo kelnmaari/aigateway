@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faHourglass, faArrowsRotate, faTriangleExclamation, faInbox, faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 	import { JobProgressCard } from '$lib/components/gitlab';
 	import {
 		listMyJobs,
@@ -128,7 +130,7 @@
 			<p class="subtitle">Monitor and manage your scanning tasks</p>
 		</div>
 		<button class="refresh-btn" on:click={refresh} disabled={loading}>
-			{loading ? '⏳' : '🔄'} Refresh
+			{#if loading}<FontAwesomeIcon icon={faHourglass} class="inline" />{:else}<FontAwesomeIcon icon={faArrowsRotate} class="inline" />{/if} Refresh
 		</button>
 	</header>
 
@@ -182,7 +184,7 @@
 
 	{#if error}
 		<div class="error-banner">
-			<span class="error-icon">⚠️</span>
+			<span class="error-icon"><FontAwesomeIcon icon={faTriangleExclamation} /></span>
 			<span>{error}</span>
 		</div>
 	{/if}
@@ -194,7 +196,7 @@
 		</div>
 	{:else if jobs.length === 0}
 		<div class="empty-state">
-			<span class="empty-icon">📭</span>
+			<span class="empty-icon"><FontAwesomeIcon icon={faInbox} class="h-12 w-12" /></span>
 			<h3>No jobs found</h3>
 			<p>Start a scan from a project page to see it here.</p>
 			<a href="/gitlab" class="btn-primary">Go to Projects</a>
@@ -215,7 +217,7 @@
 					disabled={page_num === 1}
 					on:click={() => handlePageChange(page_num - 1)}
 				>
-					← Previous
+					<FontAwesomeIcon icon={faArrowLeft} class="inline h-3 w-3" /> Previous
 				</button>
 				<span class="page-info">
 					Page {page_num} of {totalPages}
@@ -225,7 +227,7 @@
 					disabled={page_num === totalPages}
 					on:click={() => handlePageChange(page_num + 1)}
 				>
-					Next →
+					Next <FontAwesomeIcon icon={faArrowRight} class="inline h-3 w-3" />
 				</button>
 			</div>
 		{/if}

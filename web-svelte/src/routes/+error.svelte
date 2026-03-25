@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { AlertTriangle, Home, ArrowLeft } from 'lucide-svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
+	import { faTriangleExclamation, faHouse, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 	import { Button } from '$lib/components/ui/button';
 	import * as m from '$lib/paraglide/messages';
 </script>
@@ -13,7 +14,7 @@
 <div class="flex min-h-screen items-center justify-center bg-background px-4">
 	<div class="text-center">
 		<div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10">
-			<AlertTriangle class="h-10 w-10 text-destructive" />
+			<FontAwesomeIcon icon={faTriangleExclamation} class="h-10 w-10 text-destructive" />
 		</div>
 
 		<h1 class="mb-2 text-6xl font-bold text-foreground">{$page.status}</h1>
@@ -44,14 +45,13 @@
 
 		<div class="flex justify-center gap-4">
 			<Button variant="outline" onclick={() => history.back()}>
-				<ArrowLeft class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faArrowLeft} class="mr-2 h-4 w-4" />
 				{m.common_back()}
 			</Button>
 			<Button onclick={() => goto('/dashboard')}>
-				<Home class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faHouse} class="mr-2 h-4 w-4" />
 				{m.nav_dashboard()}
 			</Button>
 		</div>
 	</div>
 </div>
-

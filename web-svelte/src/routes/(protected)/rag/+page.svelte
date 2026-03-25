@@ -1,23 +1,24 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
 	import {
-		Database,
-		Plus,
-		RefreshCw,
-		Loader2,
-		Trash2,
-		Play,
-		FileText,
-		Globe,
-		Server,
-		X,
-		Search,
-		Settings,
-		CheckCircle,
-		AlertCircle,
-		Clock,
-		Zap
-	} from 'lucide-svelte';
+		faDatabase,
+		faPlus,
+		faArrowsRotate,
+		faSpinner,
+		faTrash,
+		faPlay,
+		faFileLines,
+		faGlobe,
+		faServer,
+		faXmark,
+		faMagnifyingGlass,
+		faGear,
+		faCircleCheck,
+		faCircleExclamation,
+		faClock,
+		faBolt
+	} from '@fortawesome/free-solid-svg-icons';
 	import { ragApi, type RAGSource } from '$lib/api/rag';
 	import { cn, formatRelativeTime } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
@@ -251,30 +252,30 @@
 	function getTypeIcon(type: string) {
 		switch (type) {
 			case 'file':
-				return FileText;
+				return faFileLines;
 			case 'web':
-				return Globe;
+				return faGlobe;
 			case 'api':
-				return Zap;
+				return faBolt;
 			case 'database':
-				return Database;
+				return faDatabase;
 			default:
-				return Server;
+				return faServer;
 		}
 	}
 
 	function getStatusInfo(status: string) {
 		switch (status) {
 			case 'active':
-				return { icon: CheckCircle, class: 'text-green-500', bg: 'bg-green-500/10', label: 'Active' };
+				return { icon: faCircleCheck, class: 'text-green-500', bg: 'bg-green-500/10', label: 'Active' };
 			case 'indexing':
-				return { icon: Loader2, class: 'text-amber-500', bg: 'bg-amber-500/10', label: 'Indexing' };
+				return { icon: faSpinner, class: 'text-amber-500', bg: 'bg-amber-500/10', label: 'Indexing' };
 			case 'error':
-				return { icon: AlertCircle, class: 'text-red-500', bg: 'bg-red-500/10', label: 'Error' };
+				return { icon: faCircleExclamation, class: 'text-red-500', bg: 'bg-red-500/10', label: 'Error' };
 			case 'pending':
-				return { icon: Clock, class: 'text-blue-500', bg: 'bg-blue-500/10', label: 'Pending' };
+				return { icon: faClock, class: 'text-blue-500', bg: 'bg-blue-500/10', label: 'Pending' };
 			default:
-				return { icon: Clock, class: 'text-muted-foreground', bg: 'bg-muted', label: status };
+				return { icon: faClock, class: 'text-muted-foreground', bg: 'bg-muted', label: status };
 		}
 	}
 
@@ -299,11 +300,11 @@
 		</div>
 		<div class="flex gap-2">
 			<Button variant="outline" onclick={loadSources} disabled={isLoading}>
-				<RefreshCw class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
+				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')} />
 				{m.common_refresh()}
 			</Button>
 			<Button onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.rag_add_source()}
 			</Button>
 		</div>
@@ -312,15 +313,15 @@
 	<!-- Sources Table -->
 	{#if isLoading}
 		<div class="flex items-center justify-center py-20">
-			<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
+			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
 	{:else if sources.length === 0}
 		<div class="rounded-lg border border-dashed border-border py-16 text-center">
-			<Database class="mx-auto h-12 w-12 text-muted-foreground/40" />
+			<FontAwesomeIcon icon={faDatabase} class="mx-auto h-12 w-12 text-muted-foreground/40" />
 			<p class="mt-4 text-lg font-medium">{m.rag_no_sources()}</p>
 			<p class="mt-1 text-muted-foreground">{m.rag_no_sources_desc()}</p>
 			<Button class="mt-6" onclick={openCreateModal}>
-				<Plus class="mr-2 h-4 w-4" />
+				<FontAwesomeIcon icon={faPlus} class="mr-2 h-4 w-4" />
 				{m.rag_add_source()}
 			</Button>
 		</div>
@@ -346,7 +347,7 @@
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
 									<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-										<TypeIcon class="h-4 w-4" />
+										<FontAwesomeIcon icon={TypeIcon} class="h-4 w-4" />
 									</div>
 									<div>
 										<p class="font-medium">{source.name}</p>
@@ -361,7 +362,7 @@
 								{#if true}
 								{@const StatusIcon = statusInfo.icon}
 								<span class={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium', statusInfo.bg, statusInfo.class)}>
-									<StatusIcon class={cn('h-3 w-3', source.status === 'indexing' && 'animate-spin')} />
+									<FontAwesomeIcon icon={StatusIcon} class={cn('h-3 w-3', source.status === 'indexing' && 'animate-spin')} />
 									{statusInfo.label}
 								</span>
 							{/if}
@@ -380,7 +381,7 @@
 										disabled={source.status === 'indexing'}
 										title="Reindex"
 									>
-										<RefreshCw class="h-4 w-4" />
+										<FontAwesomeIcon icon={faArrowsRotate} class="h-4 w-4" />
 									</Button>
 									<Button
 										variant="ghost"
@@ -389,7 +390,7 @@
 										class="text-destructive hover:bg-destructive/10"
 										title="Delete"
 									>
-										<Trash2 class="h-4 w-4" />
+										<FontAwesomeIcon icon={faTrash} class="h-4 w-4" />
 									</Button>
 								</div>
 							</td>
@@ -414,7 +415,7 @@
 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
 				<h2 class="text-lg font-semibold">Add Data Source</h2>
 				<button onclick={() => (showCreateModal = false)} class="rounded p-1 text-muted-foreground hover:bg-accent">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 
@@ -467,7 +468,7 @@
 				{#if sourceType === 'api'}
 					<div class="mt-6 rounded-lg border border-border p-4">
 						<h3 class="mb-4 flex items-center gap-2 font-medium">
-							<Zap class="h-4 w-4" />
+							<FontAwesomeIcon icon={faBolt} class="h-4 w-4" />
 							API Configuration
 						</h3>
 						<div class="space-y-4">
@@ -530,7 +531,7 @@
 				{#if sourceType === 'database'}
 					<div class="mt-6 rounded-lg border border-border p-4">
 						<h3 class="mb-4 flex items-center gap-2 font-medium">
-							<Database class="h-4 w-4" />
+							<FontAwesomeIcon icon={faDatabase} class="h-4 w-4" />
 							Database Configuration
 						</h3>
 						<div class="space-y-4">
@@ -576,12 +577,12 @@
 				{#if sourceType === 'file'}
 					<div class="mt-6 rounded-lg border border-border p-4">
 						<h3 class="mb-4 flex items-center gap-2 font-medium">
-							<FileText class="h-4 w-4" />
+							<FontAwesomeIcon icon={faFileLines} class="h-4 w-4" />
 							File Configuration
 						</h3>
 						<div>
 							<label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-8 transition-colors hover:border-primary hover:bg-primary/5">
-								<FileText class="mb-2 h-8 w-8 text-muted-foreground" />
+								<FontAwesomeIcon icon={faFileLines} class="mb-2 h-8 w-8 text-muted-foreground" />
 								<span class="text-sm text-muted-foreground">Click to select files</span>
 								<span class="mt-1 text-xs text-muted-foreground">Supported: TXT, PDF, DOC, DOCX, MD</span>
 								<input
@@ -596,7 +597,7 @@
 								<div class="mt-3 space-y-2">
 									{#each selectedFiles as file}
 										<div class="flex items-center gap-2 rounded bg-muted px-3 py-2 text-sm">
-											<FileText class="h-4 w-4" />
+											<FontAwesomeIcon icon={faFileLines} class="h-4 w-4" />
 											<span>{file.name}</span>
 											<span class="ml-auto text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</span>
 										</div>
@@ -611,7 +612,7 @@
 				{#if sourceType === 'web'}
 					<div class="mt-6 rounded-lg border border-border p-4">
 						<h3 class="mb-4 flex items-center gap-2 font-medium">
-							<Globe class="h-4 w-4" />
+							<FontAwesomeIcon icon={faGlobe} class="h-4 w-4" />
 							Web Scraping Configuration
 						</h3>
 						<div class="space-y-4">
@@ -644,7 +645,7 @@
 				<!-- Indexing Settings -->
 				<div class="mt-6 rounded-lg border border-border p-4">
 					<h3 class="mb-4 flex items-center gap-2 font-medium">
-						<Settings class="h-4 w-4" />
+						<FontAwesomeIcon icon={faGear} class="h-4 w-4" />
 						Indexing Settings
 					</h3>
 					<div class="grid grid-cols-2 gap-4">
@@ -696,14 +697,14 @@
 				{#if sourceType !== 'file'}
 					<Button variant="outline" type="button" onclick={handleTestConnection} disabled={isTesting}>
 						{#if isTesting}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
 						Test Connection
 					</Button>
 				{/if}
 				<Button onclick={handleCreateSource} disabled={isCreating}>
 					{#if isCreating}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					Save
 				</Button>
@@ -725,7 +726,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<h2 class="text-lg font-semibold">Confirm Delete</h2>
 				<button onclick={() => (showDeleteModal = false)} class="rounded p-1 text-muted-foreground hover:bg-accent">
-					<X class="h-5 w-5" />
+					<FontAwesomeIcon icon={faXmark} class="h-5 w-5" />
 				</button>
 			</div>
 			<p class="text-muted-foreground">

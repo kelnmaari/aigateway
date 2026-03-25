@@ -166,7 +166,7 @@ func (pm *PerformanceMonitor) collectMetrics() {
 	if m.NumGC > 0 {
 		totalPause := uint64(0)
 		count := min(int(m.NumGC), 256)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			totalPause += m.PauseNs[(m.NumGC-uint32(i)+255)%256]
 		}
 		pm.metrics.GCPauseMS = float64(totalPause) / float64(count) / 1e6

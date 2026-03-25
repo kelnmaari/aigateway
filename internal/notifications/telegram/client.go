@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -21,7 +20,7 @@ type Client struct {
 
 // Config holds Telegram client configuration
 type Config struct {
-	BotToken string `json:"bot_token" yaml:"bot_token"`
+	BotToken string        `json:"bot_token" yaml:"bot_token"`
 	Timeout  time.Duration `json:"timeout" yaml:"timeout"`
 }
 
@@ -43,7 +42,7 @@ func NewClient(config Config) *Client {
 
 // SendMessage sends a message to a chat
 func (c *Client) SendMessage(ctx context.Context, chatID string, text string, opts *MessageOptions) (*Message, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"chat_id":    chatID,
 		"text":       text,
 		"parse_mode": "HTML",
@@ -90,7 +89,7 @@ func (c *Client) SendMessage(ctx context.Context, chatID string, text string, op
 
 // EditMessage edits an existing message
 func (c *Client) EditMessage(ctx context.Context, chatID string, messageID int64, text string) (*Message, error) {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"chat_id":    chatID,
 		"message_id": messageID,
 		"text":       text,
@@ -126,8 +125,8 @@ func (c *Client) GetMe(ctx context.Context) (*User, error) {
 	}
 
 	var result struct {
-		OK     bool  `json:"ok"`
-		Result User  `json:"result"`
+		OK     bool   `json:"ok"`
+		Result User   `json:"result"`
 		Error  string `json:"description"`
 	}
 	if err := json.Unmarshal(resp, &result); err != nil {
@@ -143,7 +142,7 @@ func (c *Client) GetMe(ctx context.Context) (*User, error) {
 
 // SetWebhook sets the webhook URL for receiving updates
 func (c *Client) SetWebhook(ctx context.Context, url string, opts *WebhookOptions) error {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"url": url,
 	}
 
@@ -204,7 +203,7 @@ func (c *Client) DeleteWebhook(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) doRequest(ctx context.Context, method string, payload interface{}) ([]byte, error) {
+func (c *Client) doRequest(ctx context.Context, method string, payload any) ([]byte, error) {
 	url := c.baseURL + c.token + "/" + method
 
 	var body io.Reader
@@ -271,11 +270,11 @@ type Chat struct {
 
 // MessageOptions contains optional message parameters
 type MessageOptions struct {
-	ParseMode           string      `json:"parse_mode,omitempty"`
-	DisableWebPreview   bool        `json:"disable_web_page_preview,omitempty"`
-	DisableNotification bool        `json:"disable_notification,omitempty"`
-	ReplyToMessageID    int64       `json:"reply_to_message_id,omitempty"`
-	ReplyMarkup         interface{} `json:"reply_markup,omitempty"`
+	ParseMode           string `json:"parse_mode,omitempty"`
+	DisableWebPreview   bool   `json:"disable_web_page_preview,omitempty"`
+	DisableNotification bool   `json:"disable_notification,omitempty"`
+	ReplyToMessageID    int64  `json:"reply_to_message_id,omitempty"`
+	ReplyMarkup         any    `json:"reply_markup,omitempty"`
 }
 
 // WebhookOptions contains webhook configuration
@@ -297,4 +296,3 @@ type InlineKeyboardButton struct {
 	URL          string `json:"url,omitempty"`
 	CallbackData string `json:"callback_data,omitempty"`
 }
-

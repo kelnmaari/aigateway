@@ -124,7 +124,7 @@ func (h *DashboardHandler) GetDashboardStats(c *gin.Context) {
 		// Convert to summaries (top 3 recent)
 		limitTenants := min(len(tenants), 3)
 		res.tenants = make([]TenantSummary, 0, limitTenants)
-		for i := 0; i < limitTenants; i++ {
+		for i := range limitTenants {
 			tenant := tenants[i]
 			res.tenants = append(res.tenants, TenantSummary{
 				ID:          tenant.ID,

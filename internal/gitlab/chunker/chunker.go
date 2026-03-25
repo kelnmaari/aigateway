@@ -201,18 +201,9 @@ func (c *CodeChunker) chunkByLines(filePath, content, lang, changeType string) (
 
 	// Calculate lines per chunk based on max chunk size
 	avgLineLen := len(content) / max(len(lines), 1)
-	linesPerChunk := c.config.MaxChunkSize / max(avgLineLen, 50)
-	if linesPerChunk < 10 {
-		linesPerChunk = 10
-	}
-	if linesPerChunk > 100 {
-		linesPerChunk = 100
-	}
+	linesPerChunk := min(max(c.config.MaxChunkSize/max(avgLineLen, 50), 10), 100)
 
-	overlapLines := c.config.ChunkOverlap / max(avgLineLen, 50)
-	if overlapLines < 2 {
-		overlapLines = 2
-	}
+	overlapLines := max(c.config.ChunkOverlap/max(avgLineLen, 50), 2)
 
 	var chunks []Chunk
 	chunkIndex := 0

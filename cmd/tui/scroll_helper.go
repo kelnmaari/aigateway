@@ -24,10 +24,7 @@ func applyScroll(content string, scrollOffset int, visibleHeight int) string {
 	}
 
 	// Вырезаем видимую часть
-	endLine := scrollOffset + visibleHeight
-	if endLine > len(lines) {
-		endLine = len(lines)
-	}
+	endLine := min(scrollOffset+visibleHeight, len(lines))
 
 	visibleLines := lines[scrollOffset:endLine]
 
@@ -60,10 +57,7 @@ func splitIntoColumns(content string, columns int, columnWidth int) string {
 	cols := make([][]string, columns)
 	for i := range columns {
 		start := i * linesPerColumn
-		end := start + linesPerColumn
-		if end > len(lines) {
-			end = len(lines)
-		}
+		end := min(start+linesPerColumn, len(lines))
 		if start < len(lines) {
 			cols[i] = lines[start:end]
 		}

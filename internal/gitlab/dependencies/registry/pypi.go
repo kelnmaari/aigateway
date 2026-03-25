@@ -137,7 +137,7 @@ func comparePyPIVersion(a, b string) int {
 
 	maxLen := max(len(bParts), len(aParts))
 
-	for i := 0; i < maxLen; i++ {
+	for i := range maxLen {
 		av := 0
 		bv := 0
 		if i < len(aParts) {

@@ -13,8 +13,10 @@ import (
 	"aigateway/internal/utils"
 )
 
-// Mock Database
+// Mock Database — embeds storage.Database to satisfy interface,
+// only implements methods actually used in tests
 type mockDatabase struct {
+	storage.Database
 	sources   map[string]*models.RAGDataSource
 	testConn  error
 	syncError error
@@ -62,13 +64,9 @@ func (m *mockDatabase) ListRAGDataSources(ctx context.Context, filter *storage.R
 	return result, len(result), nil
 }
 
-// Implement minimal interface methods (not used in tests but required)
-func (m *mockDatabase) Connect(ctx context.Context) error                                 { return nil }
-func (m *mockDatabase) Close() error                                                      { return nil }
-func (m *mockDatabase) Ping(ctx context.Context) error                                    { return nil }
-func (m *mockDatabase) Migrate(ctx context.Context) error                                 { return nil }
-func (m *mockDatabase) GetMigrationVersion(ctx context.Context) (int, error)              { return 0, nil }
-func (m *mockDatabase) BeginTx(ctx context.Context) (storage.Tx, error)                   { return nil, nil }
+// Minimal interface stubs not covered by embedding
+func (m *mockDatabase) Connect(ctx context.Context) error { return nil }
+func (m *mockDatabase) Close() error                      { return nil }
 
 func TestNewDataSourceService(t *testing.T) {
 	db := newMockDatabase()

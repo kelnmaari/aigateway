@@ -94,13 +94,13 @@ type ModelParameters struct {
 func DefaultParameters() ModelParameters {
 	return ModelParameters{
 		// Predict options defaults
-		Temperature:      Float32Ptr(0.7),
-		TopP:             Float32Ptr(0.9),
+		Temperature:      new(float32(0.7)),
+		TopP:             new(float32(0.9)),
 		TopK:             new(40),
 		NumPredict:       new(-1), // unlimited
-		RepeatPenalty:    Float32Ptr(1.1),
-		PresencePenalty:  Float32Ptr(0.0),
-		FrequencyPenalty: Float32Ptr(0.0),
+		RepeatPenalty:    new(float32(1.1)),
+		PresencePenalty:  new(float32(0.0)),
+		FrequencyPenalty: new(float32(0.0)),
 
 		// Runner options defaults
 		NumCtx: new(4096),
@@ -110,11 +110,11 @@ func DefaultParameters() ModelParameters {
 // PresetCreative возвращает preset для творческой генерации
 func PresetCreative() ModelParameters {
 	return ModelParameters{
-		Temperature:   Float32Ptr(1.2),
-		TopP:          Float32Ptr(0.95),
+		Temperature:   new(float32(1.2)),
+		TopP:          new(float32(0.95)),
 		TopK:          new(50),
 		NumPredict:    new(-1),
-		RepeatPenalty: Float32Ptr(1.0),
+		RepeatPenalty: new(float32(1.0)),
 		NumCtx:        new(4096),
 	}
 }
@@ -127,11 +127,11 @@ func PresetBalanced() ModelParameters {
 // PresetPrecise возвращает preset для точной генерации
 func PresetPrecise() ModelParameters {
 	return ModelParameters{
-		Temperature:   Float32Ptr(0.3),
-		TopP:          Float32Ptr(0.8),
+		Temperature:   new(float32(0.3)),
+		TopP:          new(float32(0.8)),
 		TopK:          new(20),
 		NumPredict:    new(2048),
-		RepeatPenalty: Float32Ptr(1.15),
+		RepeatPenalty: new(float32(1.15)),
 		NumCtx:        new(2048),
 	}
 }
@@ -139,11 +139,11 @@ func PresetPrecise() ModelParameters {
 // PresetCoding возвращает preset для генерации кода
 func PresetCoding() ModelParameters {
 	return ModelParameters{
-		Temperature:   Float32Ptr(0.2),
-		TopP:          Float32Ptr(0.95),
+		Temperature:   new(float32(0.2)),
+		TopP:          new(float32(0.95)),
 		TopK:          new(40),
 		NumPredict:    new(4096),
-		RepeatPenalty: Float32Ptr(1.05),
+		RepeatPenalty: new(float32(1.05)),
 		NumCtx:        new(8192),
 	}
 }
@@ -242,12 +242,3 @@ func IntPtr(v int) *int {
 	return new(v)
 }
 
-//go:fix inline
-func Float32Ptr(v float32) *float32 {
-	return new(v)
-}
-
-//go:fix inline
-func BoolPtr(v bool) *bool {
-	return new(v)
-}

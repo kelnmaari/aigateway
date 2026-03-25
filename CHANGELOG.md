@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.0.2] - 2026-03-26
+
+### Changed
+
+- **Go 1.26.1**: Upgraded to Go 1.26.1, ran `go fix ./...` across entire codebase
+- **Modern Go Idioms**: `go fix` automatically modernized code patterns:
+  - Replaced manual `if x > y { x = y }` with builtin `min()`/`max()` (6 occurrences)
+  - Replaced `for i := 0; i < N; i++` with `for i := range N` (3 occurrences)
+  - Replaced `Float32Ptr()` helper with `new(float32(...))` composite literal (14 occurrences)
+- **Removed Dead Code**: Removed unused `Float32Ptr()` and `BoolPtr()` helper functions from `models/model_config.go` — all call sites inlined by `go fix`
+- **WebUI Cleanup**: Removed unused `faClipboard` import from admin/models page
+
+### Fixed
+
+- **Unused Import**: Removed unused `"strings"` import in `internal/notifications/telegram/client.go`
+- **RAG Mock Test**: Fixed `mockDatabase` in `datasource_service_test.go` — embedded `storage.Database` interface to auto-satisfy growing interface, removed brittle manual stubs
+
+### Technical
+
+- Files modified by `go fix`: `cmd/tui/scroll_helper.go`, `internal/api/handlers/dashboard.go`, `internal/gitlab/chunker/chunker.go`, `internal/gitlab/dependencies/registry/pypi.go`, `internal/models/model_config.go`, `internal/observability/perfmon.go`
+- Remaining `go fix` warnings are pre-existing WIP code: `models.RAGVector`, `web.StaticFiles`, `storage.Storage` (undefined types in RAG/WebUI modules)
+
+---
+
 ## [5.0.1] - 2026-03-25
 
 ### Fixed

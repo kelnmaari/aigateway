@@ -36,6 +36,9 @@ type SavedModel struct {
 	VLLMEnablePrefixCaching bool    `json:"vllm_enable_prefix_caching,omitempty"`
 	VLLMEnableChunkedPrefill bool   `json:"vllm_enable_chunked_prefill,omitempty"`
 	VLLMSwapSpace           int     `json:"vllm_swap_space,omitempty"`
+	VLLMEnableAutoToolChoice bool   `json:"vllm_enable_auto_tool_choice,omitempty"`
+	VLLMToolCallParser       string `json:"vllm_tool_call_parser,omitempty"`
+	VLLMChatTemplate         string `json:"vllm_chat_template,omitempty"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
@@ -52,6 +55,7 @@ type SavedModel struct {
 	LlamaCacheTypeK  string `json:"llama_cache_type_k,omitempty"`
 	LlamaCacheTypeV  string `json:"llama_cache_type_v,omitempty"`
 	LlamaMlock       bool   `json:"llama_mlock,omitempty"`
+	LlamaChatTemplate string `json:"llama_chat_template,omitempty"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
@@ -59,6 +63,7 @@ type SavedModel struct {
 	SGLangQuantization     string  `json:"sglang_quantization,omitempty"`
 	SGLangAttentionBackend string  `json:"sglang_attention_backend,omitempty"`
 	SGLangExtraArgs        string  `json:"sglang_extra_args,omitempty"`
+	SGLangToolCallParser   string  `json:"sglang_tool_call_parser,omitempty"`
 
 	// TGI options
 	TGINumShard           int     `json:"tgi_num_shard,omitempty"`
@@ -170,6 +175,11 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		LlamaCacheTypeK:         spec.LlamaCacheTypeK,
 		LlamaCacheTypeV:         spec.LlamaCacheTypeV,
 		LlamaMlock:              spec.LlamaMlock,
+		LlamaChatTemplate:       spec.LlamaChatTemplate,
+		VLLMEnableAutoToolChoice: spec.VLLMEnableAutoToolChoice,
+		VLLMToolCallParser:       spec.VLLMToolCallParser,
+		VLLMChatTemplate:         spec.VLLMChatTemplate,
+		SGLangToolCallParser:     spec.SGLangToolCallParser,
 		AutoStart:               autoStart,
 	}
 	return s.Save(saved)
@@ -301,6 +311,11 @@ func (m SavedModel) ToSpec() ModelSpec {
 		LlamaCacheTypeK:         m.LlamaCacheTypeK,
 		LlamaCacheTypeV:         m.LlamaCacheTypeV,
 		LlamaMlock:              m.LlamaMlock,
+		LlamaChatTemplate:       m.LlamaChatTemplate,
+		VLLMEnableAutoToolChoice: m.VLLMEnableAutoToolChoice,
+		VLLMToolCallParser:       m.VLLMToolCallParser,
+		VLLMChatTemplate:         m.VLLMChatTemplate,
+		SGLangToolCallParser:     m.SGLangToolCallParser,
 	}
 }
 

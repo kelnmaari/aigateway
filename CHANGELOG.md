@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.1] - 2026-03-26
+
+### Added
+
+- **Tool Calling Section**: Dedicated "Tool Calling" UI subsection for vLLM, SGLang, llama.cpp with dedicated controls instead of requiring `extra_args`
+- **vLLM Tool Calling**: `enable_auto_tool_choice` (checkbox), `tool_call_parser` (dropdown: hermes, mistral, llama3_json, llama4_json, deepseek_v3, pythonic, jamba, granite, internlm, phi4_mini_json), `chat_template` (path to custom Jinja template)
+- **SGLang Tool Calling**: `tool_call_parser` (dropdown: pythonic, qwen25, qwen, glm47, glm45, deepseekv3, minimax-m2)
+- **llama.cpp Tool Calling**: `chat_template` (dropdown: chatml, mistral, deepseek, deepseek2, deepseek3, llama2, llama3, chatglm3, chatglm4, command-r, zephyr, gemma, monarch)
+- **TGI Tool Calling Note**: Informational message that TGI supports tool calling at API level without CLI flags
+
+### Technical
+
+- Added `VLLMEnableAutoToolChoice`, `VLLMToolCallParser`, `VLLMChatTemplate`, `LlamaChatTemplate`, `SGLangToolCallParser` to `ModelSpec`, `SavedModel`, `LoadRequest`, `CreateSavedRequest`, `UpdateSavedRequest`
+- Updated `BuildVLLMRequest`, `BuildSGLangRequest`, `BuildLlamaCPPRequest` to emit tool calling CLI args
+- Frontend: Tool Calling subsection with border divider in both load form and edit saved modal
+
+---
+
 ## [5.1.0] - 2026-03-26
 
 ### Added

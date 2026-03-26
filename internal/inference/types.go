@@ -60,6 +60,9 @@ type ModelSpec struct {
 	VLLMEnablePrefixCaching bool    // --enable-prefix-caching
 	VLLMEnableChunkedPrefill bool   // --enable-chunked-prefill
 	VLLMSwapSpace           int     // --swap-space (GiB)
+	VLLMEnableAutoToolChoice bool  // --enable-auto-tool-choice (enable tool calling)
+	VLLMToolCallParser       string // --tool-call-parser (hermes, mistral, llama3_json, llama4_json, deepseek_v3, pythonic, jamba, granite, internlm)
+	VLLMChatTemplate         string // --chat-template (path to Jinja template for tool calling)
 
 	// llama.cpp server-specific
 	LlamaMainGPU     int    // --main-gpu
@@ -76,6 +79,7 @@ type ModelSpec struct {
 	LlamaCacheTypeK  string // --cache-type-k (f16, q8_0, q4_0)
 	LlamaCacheTypeV  string // --cache-type-v (f16, q8_0, q4_0)
 	LlamaMlock       bool   // --mlock
+	LlamaChatTemplate string // --chat-template (built-in template name, e.g. chatml, mistral, deepseek, llama2)
 
 	// SGLang-specific
 	SGLangTensorParallel int     // --tp (tensor parallel)
@@ -86,6 +90,7 @@ type ModelSpec struct {
 	SGLangQuantization     string  // --quantization (awq, fp8, gptq, marlin)
 	SGLangAttentionBackend string  // --attention-backend (flashinfer, triton, torch_native)
 	SGLangExtraArgs        string  // extra CLI args
+	SGLangToolCallParser   string  // --tool-call-parser (pythonic, qwen25, qwen, glm47, deepseekv3, minimax-m2)
 
 	// TGI-specific
 	TGINumShard          int // --num-shard

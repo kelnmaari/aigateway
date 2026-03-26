@@ -56,6 +56,9 @@ export interface ModelInfo {
 	vllm_enable_prefix_caching?: boolean;
 	vllm_enable_chunked_prefill?: boolean;
 	vllm_swap_space?: number;
+	vllm_enable_auto_tool_choice?: boolean;
+	vllm_tool_call_parser?: string;
+	vllm_chat_template?: string;
 
 	// llama.cpp params
 	llama_main_gpu?: number;
@@ -72,6 +75,7 @@ export interface ModelInfo {
 	llama_cache_type_k?: string;
 	llama_cache_type_v?: string;
 	llama_mlock?: boolean;
+	llama_chat_template?: string;
 
 	// SGLang params
 	sglang_tensor_parallel?: number;
@@ -81,6 +85,7 @@ export interface ModelInfo {
 	sglang_chunked_prefill?: boolean;
 	sglang_quantization?: string;
 	sglang_attention_backend?: string;
+	sglang_tool_call_parser?: string;
 	sglang_extra_args?: string;
 
 	// TGI params
@@ -184,6 +189,9 @@ export interface SavedModel {
 	vllm_enable_prefix_caching?: boolean;
 	vllm_enable_chunked_prefill?: boolean;
 	vllm_swap_space?: number;
+	vllm_enable_auto_tool_choice?: boolean;
+	vllm_tool_call_parser?: string;
+	vllm_chat_template?: string;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
 	llama_ctx_size?: number;
@@ -198,6 +206,7 @@ export interface SavedModel {
 	llama_cache_type_k?: string;
 	llama_cache_type_v?: string;
 	llama_mlock?: boolean;
+	llama_chat_template?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	sglang_data_parallel?: number;
@@ -205,6 +214,7 @@ export interface SavedModel {
 	sglang_chunked_prefill?: boolean;
 	sglang_quantization?: string;
 	sglang_attention_backend?: string;
+	sglang_tool_call_parser?: string;
 	sglang_extra_args?: string;
 	tgi_num_shard?: number;
 	tgi_max_concurrent_reqs?: number;
@@ -235,6 +245,9 @@ export interface UpdateSavedRequest {
 	vllm_enable_prefix_caching?: boolean;
 	vllm_enable_chunked_prefill?: boolean;
 	vllm_swap_space?: number;
+	vllm_enable_auto_tool_choice?: boolean;
+	vllm_tool_call_parser?: string;
+	vllm_chat_template?: string;
 	llama_main_gpu?: number;
 	llama_n_gpu_layers?: number;
 	llama_ctx_size?: number;
@@ -249,6 +262,7 @@ export interface UpdateSavedRequest {
 	llama_cache_type_k?: string;
 	llama_cache_type_v?: string;
 	llama_mlock?: boolean;
+	llama_chat_template?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	sglang_data_parallel?: number;
@@ -256,6 +270,7 @@ export interface UpdateSavedRequest {
 	sglang_chunked_prefill?: boolean;
 	sglang_quantization?: string;
 	sglang_attention_backend?: string;
+	sglang_tool_call_parser?: string;
 	sglang_extra_args?: string;
 	tgi_num_shard?: number;
 	tgi_max_concurrent_reqs?: number;
@@ -295,6 +310,9 @@ export interface CreateSavedRequest {
 	vllm_enable_prefix_caching?: boolean;
 	vllm_enable_chunked_prefill?: boolean;
 	vllm_swap_space?: number;
+	vllm_enable_auto_tool_choice?: boolean;
+	vllm_tool_call_parser?: string;
+	vllm_chat_template?: string;
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
@@ -309,6 +327,7 @@ export interface CreateSavedRequest {
 	llama_cache_type_k?: string;
 	llama_cache_type_v?: string;
 	llama_mlock?: boolean;
+	llama_chat_template?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	sglang_data_parallel?: number;
@@ -316,6 +335,7 @@ export interface CreateSavedRequest {
 	sglang_chunked_prefill?: boolean;
 	sglang_quantization?: string;
 	sglang_attention_backend?: string;
+	sglang_tool_call_parser?: string;
 	sglang_extra_args?: string;
 	tgi_num_shard?: number;
 	tgi_max_concurrent_reqs?: number;
@@ -357,6 +377,9 @@ export interface LoadRequest {
 	vllm_enable_prefix_caching?: boolean;
 	vllm_enable_chunked_prefill?: boolean;
 	vllm_swap_space?: number;
+	vllm_enable_auto_tool_choice?: boolean;
+	vllm_tool_call_parser?: string;
+	vllm_chat_template?: string;
 	llama_main_gpu?: number;
 	llama_tensor_split?: string;
 	llama_n_gpu_layers?: number;
@@ -371,6 +394,7 @@ export interface LoadRequest {
 	llama_cache_type_k?: string;
 	llama_cache_type_v?: string;
 	llama_mlock?: boolean;
+	llama_chat_template?: string;
 	sglang_tensor_parallel?: number;
 	sglang_mem_fraction?: number;
 	sglang_data_parallel?: number;
@@ -378,6 +402,7 @@ export interface LoadRequest {
 	sglang_chunked_prefill?: boolean;
 	sglang_quantization?: string;
 	sglang_attention_backend?: string;
+	sglang_tool_call_parser?: string;
 	sglang_extra_args?: string;
 	tgi_num_shard?: number;
 	tgi_max_concurrent_reqs?: number;

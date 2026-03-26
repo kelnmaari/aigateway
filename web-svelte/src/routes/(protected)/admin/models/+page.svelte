@@ -308,6 +308,9 @@
 		vllm_enable_prefix_caching: boolean;
 		vllm_enable_chunked_prefill: boolean;
 		vllm_swap_space: number;
+		vllm_enable_auto_tool_choice: boolean;
+		vllm_tool_call_parser: string;
+		vllm_chat_template: string;
 		llama_main_gpu: number;
 		llama_n_gpu_layers: number;
 		llama_ctx_size: number;
@@ -322,6 +325,7 @@
 		llama_cache_type_k: string;
 		llama_cache_type_v: string;
 		llama_mlock: boolean;
+		llama_chat_template: string;
 		sglang_tensor_parallel: number;
 		sglang_mem_fraction: number;
 		sglang_data_parallel: number;
@@ -329,6 +333,7 @@
 		sglang_chunked_prefill: boolean;
 		sglang_quantization: string;
 		sglang_attention_backend: string;
+		sglang_tool_call_parser: string;
 		sglang_extra_args: string;
 		tgi_num_shard: number;
 		tgi_max_concurrent_reqs: number;
@@ -358,6 +363,9 @@
 		vllm_enable_prefix_caching: false,
 		vllm_enable_chunked_prefill: false,
 		vllm_swap_space: 0,
+		vllm_enable_auto_tool_choice: false,
+		vllm_tool_call_parser: '',
+		vllm_chat_template: '',
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
 		llama_ctx_size: 0,
@@ -372,6 +380,7 @@
 		llama_cache_type_k: '',
 		llama_cache_type_v: '',
 		llama_mlock: false,
+		llama_chat_template: '',
 		sglang_tensor_parallel: 1,
 		sglang_mem_fraction: 0.9,
 		sglang_data_parallel: 0,
@@ -379,6 +388,7 @@
 		sglang_chunked_prefill: false,
 		sglang_quantization: '',
 		sglang_attention_backend: '',
+		sglang_tool_call_parser: '',
 		sglang_extra_args: '',
 		tgi_num_shard: 1,
 		tgi_max_concurrent_reqs: 0,
@@ -417,6 +427,9 @@
 		vllm_enable_prefix_caching: false,
 		vllm_enable_chunked_prefill: false,
 		vllm_swap_space: 0,
+		vllm_enable_auto_tool_choice: false,
+		vllm_tool_call_parser: '',
+		vllm_chat_template: '',
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
@@ -431,6 +444,7 @@
 		llama_cache_type_k: '',
 		llama_cache_type_v: '',
 		llama_mlock: false,
+		llama_chat_template: '',
 		sglang_tensor_parallel: 0,
 		sglang_mem_fraction: 0.8,
 		sglang_data_parallel: 0,
@@ -438,6 +452,7 @@
 		sglang_chunked_prefill: false,
 		sglang_quantization: '',
 		sglang_attention_backend: '',
+		sglang_tool_call_parser: '',
 		sglang_extra_args: '',
 		tgi_num_shard: 1,
 		tgi_max_concurrent_reqs: 0,
@@ -984,6 +999,9 @@
 				vllm_enable_prefix_caching: form.vllm_enable_prefix_caching,
 				vllm_enable_chunked_prefill: form.vllm_enable_chunked_prefill,
 				vllm_swap_space: form.vllm_swap_space,
+				vllm_enable_auto_tool_choice: form.vllm_enable_auto_tool_choice,
+				vllm_tool_call_parser: form.vllm_tool_call_parser,
+				vllm_chat_template: form.vllm_chat_template,
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
@@ -998,6 +1016,7 @@
 				llama_cache_type_k: form.llama_cache_type_k,
 				llama_cache_type_v: form.llama_cache_type_v,
 				llama_mlock: form.llama_mlock,
+				llama_chat_template: form.llama_chat_template,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
 				sglang_data_parallel: form.sglang_data_parallel,
@@ -1005,6 +1024,7 @@
 				sglang_chunked_prefill: form.sglang_chunked_prefill,
 				sglang_quantization: form.sglang_quantization,
 				sglang_attention_backend: form.sglang_attention_backend,
+				sglang_tool_call_parser: form.sglang_tool_call_parser,
 				sglang_extra_args: form.sglang_extra_args,
 				tgi_num_shard: form.tgi_num_shard,
 				tgi_max_concurrent_reqs: form.tgi_max_concurrent_reqs,
@@ -1074,6 +1094,9 @@
 				vllm_enable_prefix_caching: form.vllm_enable_prefix_caching,
 				vllm_enable_chunked_prefill: form.vllm_enable_chunked_prefill,
 				vllm_swap_space: form.vllm_swap_space,
+				vllm_enable_auto_tool_choice: form.vllm_enable_auto_tool_choice,
+				vllm_tool_call_parser: form.vllm_tool_call_parser,
+				vllm_chat_template: form.vllm_chat_template,
 				llama_main_gpu: form.llama_main_gpu,
 				llama_tensor_split: form.llama_tensor_split,
 				llama_n_gpu_layers: form.llama_n_gpu_layers,
@@ -1088,6 +1111,7 @@
 				llama_cache_type_k: form.llama_cache_type_k,
 				llama_cache_type_v: form.llama_cache_type_v,
 				llama_mlock: form.llama_mlock,
+				llama_chat_template: form.llama_chat_template,
 				sglang_tensor_parallel: form.sglang_tensor_parallel,
 				sglang_mem_fraction: form.sglang_mem_fraction,
 				sglang_data_parallel: form.sglang_data_parallel,
@@ -1095,6 +1119,7 @@
 				sglang_chunked_prefill: form.sglang_chunked_prefill,
 				sglang_quantization: form.sglang_quantization,
 				sglang_attention_backend: form.sglang_attention_backend,
+				sglang_tool_call_parser: form.sglang_tool_call_parser,
 				sglang_extra_args: form.sglang_extra_args,
 				tgi_num_shard: form.tgi_num_shard,
 				tgi_max_concurrent_reqs: form.tgi_max_concurrent_reqs,
@@ -1218,6 +1243,9 @@
 				vllm_enable_prefix_caching: m.vllm_enable_prefix_caching,
 				vllm_enable_chunked_prefill: m.vllm_enable_chunked_prefill,
 				vllm_swap_space: m.vllm_swap_space,
+				vllm_enable_auto_tool_choice: m.vllm_enable_auto_tool_choice,
+				vllm_tool_call_parser: m.vllm_tool_call_parser,
+				vllm_chat_template: m.vllm_chat_template,
 				llama_main_gpu: m.llama_main_gpu,
 				llama_tensor_split: m.llama_tensor_split,
 				llama_n_gpu_layers: m.llama_n_gpu_layers,
@@ -1232,6 +1260,7 @@
 				llama_cache_type_k: m.llama_cache_type_k,
 				llama_cache_type_v: m.llama_cache_type_v,
 				llama_mlock: m.llama_mlock,
+				llama_chat_template: m.llama_chat_template,
 				sglang_tensor_parallel: m.sglang_tensor_parallel,
 				sglang_mem_fraction: m.sglang_mem_fraction,
 				sglang_data_parallel: m.sglang_data_parallel,
@@ -1239,6 +1268,7 @@
 				sglang_chunked_prefill: m.sglang_chunked_prefill,
 				sglang_quantization: m.sglang_quantization,
 				sglang_attention_backend: m.sglang_attention_backend,
+				sglang_tool_call_parser: m.sglang_tool_call_parser,
 				sglang_extra_args: m.sglang_extra_args,
 				tgi_num_shard: m.tgi_num_shard,
 				tgi_max_concurrent_reqs: m.tgi_max_concurrent_reqs,
@@ -1346,6 +1376,9 @@
 			vllm_enable_prefix_caching: saved.vllm_enable_prefix_caching || false,
 			vllm_enable_chunked_prefill: saved.vllm_enable_chunked_prefill || false,
 			vllm_swap_space: saved.vllm_swap_space || 0,
+			vllm_enable_auto_tool_choice: saved.vllm_enable_auto_tool_choice || false,
+			vllm_tool_call_parser: saved.vllm_tool_call_parser || '',
+			vllm_chat_template: saved.vllm_chat_template || '',
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
 			llama_ctx_size: saved.llama_ctx_size || 0,
@@ -1360,6 +1393,7 @@
 			llama_cache_type_k: saved.llama_cache_type_k || '',
 			llama_cache_type_v: saved.llama_cache_type_v || '',
 			llama_mlock: saved.llama_mlock || false,
+			llama_chat_template: saved.llama_chat_template || '',
 			sglang_tensor_parallel: saved.sglang_tensor_parallel || 1,
 			sglang_mem_fraction: saved.sglang_mem_fraction || 0.9,
 			sglang_data_parallel: saved.sglang_data_parallel || 0,
@@ -1367,6 +1401,7 @@
 			sglang_chunked_prefill: saved.sglang_chunked_prefill || false,
 			sglang_quantization: saved.sglang_quantization || '',
 			sglang_attention_backend: saved.sglang_attention_backend || '',
+			sglang_tool_call_parser: saved.sglang_tool_call_parser || '',
 			sglang_extra_args: saved.sglang_extra_args || '',
 			tgi_num_shard: saved.tgi_num_shard || 1,
 			tgi_max_concurrent_reqs: saved.tgi_max_concurrent_reqs || 0,
@@ -1442,6 +1477,9 @@
 				vllm_enable_prefix_caching: saved.vllm_enable_prefix_caching,
 				vllm_enable_chunked_prefill: saved.vllm_enable_chunked_prefill,
 				vllm_swap_space: saved.vllm_swap_space,
+				vllm_enable_auto_tool_choice: saved.vllm_enable_auto_tool_choice,
+				vllm_tool_call_parser: saved.vllm_tool_call_parser,
+				vllm_chat_template: saved.vllm_chat_template,
 				llama_main_gpu: saved.llama_main_gpu,
 				llama_n_gpu_layers: saved.llama_n_gpu_layers,
 				llama_ctx_size: saved.llama_ctx_size,
@@ -1455,6 +1493,7 @@
 				llama_cache_type_k: saved.llama_cache_type_k,
 				llama_cache_type_v: saved.llama_cache_type_v,
 				llama_mlock: saved.llama_mlock,
+				llama_chat_template: saved.llama_chat_template,
 				llama_tensor_split: saved.llama_tensor_split,
 				sglang_tensor_parallel: saved.sglang_tensor_parallel,
 				sglang_mem_fraction: saved.sglang_mem_fraction,
@@ -1463,6 +1502,7 @@
 				sglang_chunked_prefill: saved.sglang_chunked_prefill,
 				sglang_quantization: saved.sglang_quantization,
 				sglang_attention_backend: saved.sglang_attention_backend,
+				sglang_tool_call_parser: saved.sglang_tool_call_parser,
 				sglang_extra_args: saved.sglang_extra_args,
 				tgi_num_shard: saved.tgi_num_shard,
 				tgi_max_concurrent_reqs: saved.tgi_max_concurrent_reqs,
@@ -1999,6 +2039,36 @@
 								<FormLabel label="Chunked Prefill" description="Process long prompts in chunks to reduce memory spikes" />
 							</label>
 						</div>
+						<!-- Tool Calling -->
+						<div class="col-span-full mt-2 border-t border-border pt-3">
+							<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+							<div class="grid gap-3 sm:grid-cols-2">
+								<div class="flex items-center gap-2">
+									<input type="checkbox" bind:checked={form.vllm_enable_auto_tool_choice} class="h-4 w-4 rounded border-input" />
+									<FormLabel label="Auto Tool Choice" description="Allow model to autonomously generate tool calls. Required for function calling support" />
+								</div>
+								<div>
+									<FormLabel label="Tool Call Parser" description="Parser for model's native tool call format. Must match model family: hermes (Hermes/Qwen), mistral, llama3_json (Llama-3.x), deepseek_v3, etc." />
+									<select bind:value={form.vllm_tool_call_parser} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+										<option value="">None</option>
+										<option value="hermes">hermes (Hermes/Qwen)</option>
+										<option value="mistral">mistral</option>
+										<option value="llama3_json">llama3_json (Llama-3.x)</option>
+										<option value="llama4_json">llama4_json (Llama-4)</option>
+										<option value="deepseek_v3">deepseek_v3</option>
+										<option value="pythonic">pythonic</option>
+										<option value="jamba">jamba</option>
+										<option value="granite">granite</option>
+										<option value="internlm">internlm</option>
+										<option value="phi4_mini_json">phi4_mini_json</option>
+									</select>
+								</div>
+								<div class="sm:col-span-2">
+									<FormLabel label="Chat Template" description="Path to custom Jinja chat template file for tool calling. Leave empty to use model default" />
+									<input type="text" bind:value={form.vllm_chat_template} placeholder="/path/to/template.jinja" class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+								</div>
+							</div>
+						</div>
 						<div class="mt-3">
 							<label class="flex flex-col gap-1 text-sm">
 								<FormLabel label="Extra Args" description="Additional CLI flags for vLLM, space-separated" />
@@ -2125,6 +2195,34 @@
 								<FormLabel label="mlock" description="Lock model in memory to prevent pageouts" />
 							</label>
 						</div>
+						<!-- Tool Calling -->
+						<div class="col-span-full mt-2 border-t border-border pt-3">
+							<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+							<div class="grid gap-3 sm:grid-cols-2">
+								<div>
+									<FormLabel label="Chat Template" description="Built-in chat template name for tool calling. Leave empty to use model default. jinja flag must be enabled" />
+									<select bind:value={form.llama_chat_template} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+										<option value="">Auto (model default)</option>
+										<option value="chatml">chatml</option>
+										<option value="mistral">mistral</option>
+										<option value="deepseek">deepseek</option>
+										<option value="deepseek2">deepseek2</option>
+										<option value="deepseek3">deepseek3</option>
+										<option value="llama2">llama2</option>
+										<option value="llama3">llama3</option>
+										<option value="chatglm3">chatglm3</option>
+										<option value="chatglm4">chatglm4</option>
+										<option value="command-r">command-r</option>
+										<option value="zephyr">zephyr</option>
+										<option value="monarch">monarch</option>
+										<option value="gemma">gemma</option>
+									</select>
+								</div>
+								<div class="flex items-end">
+									<p class="text-xs text-muted-foreground">Enable the <strong>Jinja</strong> checkbox above for function calling support</p>
+								</div>
+							</div>
+						</div>
 						<div class="mt-3">
 							<label class="flex flex-col gap-1 text-sm">
 								<FormLabel label="Extra Args" description="Additional CLI flags for llama.cpp, space-separated" />
@@ -2195,6 +2293,23 @@
 								<input type="checkbox" class="h-4 w-4" bind:checked={form.sglang_chunked_prefill} />
 								<FormLabel label="Chunked Prefill" description="Enable chunked prefill (size 8192) for long-context throughput" />
 							</label>
+						</div>
+						<!-- Tool Calling -->
+						<div class="col-span-full mt-2 border-t border-border pt-3">
+							<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+							<div>
+								<FormLabel label="Tool Call Parser" description="Parser for model's tool call format. pythonic for Llama models, qwen25 for Qwen, deepseekv3 for DeepSeek" />
+								<select bind:value={form.sglang_tool_call_parser} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+									<option value="">None</option>
+									<option value="pythonic">pythonic (Llama)</option>
+									<option value="qwen25">qwen25 (Qwen 2.5)</option>
+									<option value="qwen">qwen</option>
+									<option value="glm47">glm47 (GLM-4)</option>
+									<option value="glm45">glm45</option>
+									<option value="deepseekv3">deepseekv3</option>
+									<option value="minimax-m2">minimax-m2</option>
+								</select>
+							</div>
 						</div>
 						<div class="mt-3">
 							<label class="flex flex-col gap-1 text-sm">
@@ -2268,6 +2383,11 @@
 									bind:value={form.tgi_cuda_memory_fraction}
 								/>
 							</label>
+						</div>
+						<!-- Tool Calling -->
+						<div class="col-span-full mt-2 border-t border-border pt-3">
+							<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+							<p class="text-xs text-muted-foreground">TGI supports tool calling at the API level — no additional CLI flags needed. Pass tools in the /v1/chat/completions request.</p>
 						</div>
 						<div class="mt-3">
 							<label class="flex flex-col gap-1 text-sm">
@@ -3392,6 +3512,36 @@
 							</label>
 						</div>
 					</div>
+					<!-- Tool Calling -->
+					<div class="col-span-full mt-2 border-t border-border pt-3">
+						<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+						<div class="grid gap-3 sm:grid-cols-2">
+							<div class="flex items-center gap-2">
+								<input type="checkbox" bind:checked={editSavedForm.vllm_enable_auto_tool_choice} class="h-4 w-4 rounded border-input" />
+								<FormLabel label="Auto Tool Choice" description="Allow model to autonomously generate tool calls. Required for function calling support" />
+							</div>
+							<div>
+								<FormLabel label="Tool Call Parser" description="Parser for model's native tool call format. Must match model family: hermes (Hermes/Qwen), mistral, llama3_json (Llama-3.x), deepseek_v3, etc." />
+								<select bind:value={editSavedForm.vllm_tool_call_parser} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+									<option value="">None</option>
+									<option value="hermes">hermes (Hermes/Qwen)</option>
+									<option value="mistral">mistral</option>
+									<option value="llama3_json">llama3_json (Llama-3.x)</option>
+									<option value="llama4_json">llama4_json (Llama-4)</option>
+									<option value="deepseek_v3">deepseek_v3</option>
+									<option value="pythonic">pythonic</option>
+									<option value="jamba">jamba</option>
+									<option value="granite">granite</option>
+									<option value="internlm">internlm</option>
+									<option value="phi4_mini_json">phi4_mini_json</option>
+								</select>
+							</div>
+							<div class="sm:col-span-2">
+								<FormLabel label="Chat Template" description="Path to custom Jinja chat template file for tool calling. Leave empty to use model default" />
+								<input type="text" bind:value={editSavedForm.vllm_chat_template} placeholder="/path/to/template.jinja" class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+							</div>
+						</div>
+					</div>
 					<div>
 						<FormLabel label="Extra Args" description="Additional CLI flags for vLLM, space-separated" />
 						<input
@@ -3468,6 +3618,23 @@
 							</label>
 						</div>
 					</div>
+					<!-- Tool Calling -->
+					<div class="col-span-full mt-2 border-t border-border pt-3">
+						<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+						<div>
+							<FormLabel label="Tool Call Parser" description="Parser for model's tool call format. pythonic for Llama models, qwen25 for Qwen, deepseekv3 for DeepSeek" />
+							<select bind:value={editSavedForm.sglang_tool_call_parser} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+								<option value="">None</option>
+								<option value="pythonic">pythonic (Llama)</option>
+								<option value="qwen25">qwen25 (Qwen 2.5)</option>
+								<option value="qwen">qwen</option>
+								<option value="glm47">glm47 (GLM-4)</option>
+								<option value="glm45">glm45</option>
+								<option value="deepseekv3">deepseekv3</option>
+								<option value="minimax-m2">minimax-m2</option>
+							</select>
+						</div>
+					</div>
 					<div>
 						<FormLabel label="Extra Args" description="Additional CLI flags for SGLang, space-separated" />
 						<input
@@ -3537,6 +3704,11 @@
 								bind:value={editSavedForm.tgi_cuda_memory_fraction}
 							/>
 						</div>
+					</div>
+					<!-- Tool Calling -->
+					<div class="col-span-full mt-2 border-t border-border pt-3">
+						<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+						<p class="text-xs text-muted-foreground">TGI supports tool calling at the API level — no additional CLI flags needed. Pass tools in the /v1/chat/completions request.</p>
 					</div>
 					<div>
 						<FormLabel label="Extra Args" description="Additional CLI flags for TGI, space-separated" />
@@ -3718,6 +3890,34 @@
 								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.llama_mlock} />
 								<FormLabel label="mlock" description="Lock model in memory to prevent pageouts" />
 							</label>
+						</div>
+					</div>
+					<!-- Tool Calling -->
+					<div class="col-span-full mt-2 border-t border-border pt-3">
+						<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
+						<div class="grid gap-3 sm:grid-cols-2">
+							<div>
+								<FormLabel label="Chat Template" description="Built-in chat template name for tool calling. Leave empty to use model default. jinja flag must be enabled" />
+								<select bind:value={editSavedForm.llama_chat_template} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+									<option value="">Auto (model default)</option>
+									<option value="chatml">chatml</option>
+									<option value="mistral">mistral</option>
+									<option value="deepseek">deepseek</option>
+									<option value="deepseek2">deepseek2</option>
+									<option value="deepseek3">deepseek3</option>
+									<option value="llama2">llama2</option>
+									<option value="llama3">llama3</option>
+									<option value="chatglm3">chatglm3</option>
+									<option value="chatglm4">chatglm4</option>
+									<option value="command-r">command-r</option>
+									<option value="zephyr">zephyr</option>
+									<option value="monarch">monarch</option>
+									<option value="gemma">gemma</option>
+								</select>
+							</div>
+							<div class="flex items-end">
+								<p class="text-xs text-muted-foreground">Enable the <strong>Jinja</strong> checkbox above for function calling support</p>
+							</div>
 						</div>
 					</div>
 					<div>

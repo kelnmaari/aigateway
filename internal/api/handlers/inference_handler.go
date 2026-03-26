@@ -59,6 +59,9 @@ type LoadRequest struct {
 	VLLMEnablePrefixCaching bool    `json:"vllm_enable_prefix_caching"`
 	VLLMEnableChunkedPrefill bool   `json:"vllm_enable_chunked_prefill"`
 	VLLMSwapSpace           int     `json:"vllm_swap_space"`
+	VLLMEnableAutoToolChoice bool   `json:"vllm_enable_auto_tool_choice"`
+	VLLMToolCallParser       string `json:"vllm_tool_call_parser"`
+	VLLMChatTemplate         string `json:"vllm_chat_template"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
@@ -75,6 +78,7 @@ type LoadRequest struct {
 	LlamaCacheTypeK  string `json:"llama_cache_type_k"`
 	LlamaCacheTypeV  string `json:"llama_cache_type_v"`
 	LlamaMlock       bool   `json:"llama_mlock"`
+	LlamaChatTemplate string `json:"llama_chat_template"`
 
 	// SGLang options
 	SGLangTensorParallel int     `json:"sglang_tensor_parallel"`
@@ -85,6 +89,7 @@ type LoadRequest struct {
 	SGLangQuantization     string  `json:"sglang_quantization"`
 	SGLangAttentionBackend string  `json:"sglang_attention_backend"`
 	SGLangExtraArgs        string  `json:"sglang_extra_args"`
+	SGLangToolCallParser   string  `json:"sglang_tool_call_parser"`
 
 	// TGI options
 	TGINumShard          int `json:"tgi_num_shard"`
@@ -215,16 +220,21 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		VLLMEnablePrefixCaching: req.VLLMEnablePrefixCaching,
 		VLLMEnableChunkedPrefill: req.VLLMEnableChunkedPrefill,
 		VLLMSwapSpace:           req.VLLMSwapSpace,
+		VLLMEnableAutoToolChoice: req.VLLMEnableAutoToolChoice,
+		VLLMToolCallParser:       req.VLLMToolCallParser,
+		VLLMChatTemplate:         req.VLLMChatTemplate,
 		// SGLang new fields
 		SGLangQuantization:     req.SGLangQuantization,
 		SGLangAttentionBackend: req.SGLangAttentionBackend,
 		SGLangExtraArgs:        req.SGLangExtraArgs,
+		SGLangToolCallParser:   req.SGLangToolCallParser,
 		// llama.cpp new fields
 		LlamaBatchSize:  req.LlamaBatchSize,
 		LlamaUBatchSize: req.LlamaUBatchSize,
 		LlamaCacheTypeK: req.LlamaCacheTypeK,
 		LlamaCacheTypeV: req.LlamaCacheTypeV,
 		LlamaMlock:      req.LlamaMlock,
+		LlamaChatTemplate: req.LlamaChatTemplate,
 	}
 
 	// Always use the provided spec from the request, not a cached one from registry.
@@ -821,6 +831,9 @@ type UpdateSavedRequest struct {
 	VLLMEnablePrefixCaching  *bool    `json:"vllm_enable_prefix_caching,omitempty"`
 	VLLMEnableChunkedPrefill *bool    `json:"vllm_enable_chunked_prefill,omitempty"`
 	VLLMSwapSpace            *int     `json:"vllm_swap_space,omitempty"`
+	VLLMEnableAutoToolChoice *bool    `json:"vllm_enable_auto_tool_choice,omitempty"`
+	VLLMToolCallParser       *string  `json:"vllm_tool_call_parser,omitempty"`
+	VLLMChatTemplate         *string  `json:"vllm_chat_template,omitempty"`
 	SGLangQuantization       *string  `json:"sglang_quantization,omitempty"`
 	SGLangAttentionBackend   *string  `json:"sglang_attention_backend,omitempty"`
 	SGLangExtraArgs          *string  `json:"sglang_extra_args,omitempty"`
@@ -829,6 +842,8 @@ type UpdateSavedRequest struct {
 	LlamaCacheTypeK          *string  `json:"llama_cache_type_k,omitempty"`
 	LlamaCacheTypeV          *string  `json:"llama_cache_type_v,omitempty"`
 	LlamaMlock               *bool    `json:"llama_mlock,omitempty"`
+	LlamaChatTemplate        *string  `json:"llama_chat_template,omitempty"`
+	SGLangToolCallParser     *string  `json:"sglang_tool_call_parser,omitempty"`
 	GPUDevice                *string  `json:"gpu_device,omitempty"`
 	AutoStart                *bool    `json:"auto_start,omitempty"` // Whether to auto-start on boot
 }
@@ -950,6 +965,15 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.VLLMSwapSpace != nil {
 			m.VLLMSwapSpace = *req.VLLMSwapSpace
 		}
+		if req.VLLMEnableAutoToolChoice != nil {
+			m.VLLMEnableAutoToolChoice = *req.VLLMEnableAutoToolChoice
+		}
+		if req.VLLMToolCallParser != nil {
+			m.VLLMToolCallParser = *req.VLLMToolCallParser
+		}
+		if req.VLLMChatTemplate != nil {
+			m.VLLMChatTemplate = *req.VLLMChatTemplate
+		}
 		if req.SGLangQuantization != nil {
 			m.SGLangQuantization = *req.SGLangQuantization
 		}
@@ -973,6 +997,12 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		}
 		if req.LlamaMlock != nil {
 			m.LlamaMlock = *req.LlamaMlock
+		}
+		if req.LlamaChatTemplate != nil {
+			m.LlamaChatTemplate = *req.LlamaChatTemplate
+		}
+		if req.SGLangToolCallParser != nil {
+			m.SGLangToolCallParser = *req.SGLangToolCallParser
 		}
 		if req.GPUDevice != nil {
 			m.GPUDevice = *req.GPUDevice
@@ -1045,11 +1075,16 @@ type CreateSavedRequest struct {
 	VLLMEnablePrefixCaching bool    `json:"vllm_enable_prefix_caching"`
 	VLLMEnableChunkedPrefill bool   `json:"vllm_enable_chunked_prefill"`
 	VLLMSwapSpace           int     `json:"vllm_swap_space"`
+	VLLMEnableAutoToolChoice bool   `json:"vllm_enable_auto_tool_choice"`
+	VLLMToolCallParser       string `json:"vllm_tool_call_parser"`
+	VLLMChatTemplate         string `json:"vllm_chat_template"`
 	LlamaBatchSize   int    `json:"llama_batch_size"`
 	LlamaUBatchSize  int    `json:"llama_ubatch_size"`
 	LlamaCacheTypeK  string `json:"llama_cache_type_k"`
 	LlamaCacheTypeV  string `json:"llama_cache_type_v"`
 	LlamaMlock       bool   `json:"llama_mlock"`
+	LlamaChatTemplate string `json:"llama_chat_template"`
+	SGLangToolCallParser string `json:"sglang_tool_call_parser"`
 }
 
 // PostCreateSaved creates a new saved model configuration directly from form data.
@@ -1119,11 +1154,16 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		VLLMEnablePrefixCaching: req.VLLMEnablePrefixCaching,
 		VLLMEnableChunkedPrefill: req.VLLMEnableChunkedPrefill,
 		VLLMSwapSpace:           req.VLLMSwapSpace,
+		VLLMEnableAutoToolChoice: req.VLLMEnableAutoToolChoice,
+		VLLMToolCallParser:       req.VLLMToolCallParser,
+		VLLMChatTemplate:         req.VLLMChatTemplate,
 		LlamaBatchSize:          req.LlamaBatchSize,
 		LlamaUBatchSize:         req.LlamaUBatchSize,
 		LlamaCacheTypeK:         req.LlamaCacheTypeK,
 		LlamaCacheTypeV:         req.LlamaCacheTypeV,
 		LlamaMlock:              req.LlamaMlock,
+		LlamaChatTemplate:       req.LlamaChatTemplate,
+		SGLangToolCallParser:    req.SGLangToolCallParser,
 	}
 
 	if err := h.modelStore.Save(saved); err != nil {

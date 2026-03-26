@@ -91,6 +91,17 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 		cmd = append(cmd, "--swap-space", fmt.Sprintf("%d", spec.VLLMSwapSpace))
 	}
 
+	// Tool calling support
+	if spec.VLLMEnableAutoToolChoice {
+		cmd = append(cmd, "--enable-auto-tool-choice")
+	}
+	if spec.VLLMToolCallParser != "" {
+		cmd = append(cmd, "--tool-call-parser", spec.VLLMToolCallParser)
+	}
+	if spec.VLLMChatTemplate != "" {
+		cmd = append(cmd, "--chat-template", spec.VLLMChatTemplate)
+	}
+
 	// Extra args: split by whitespace and append as raw CLI args
 	// e.g. "--enable-auto-tool-choice --tool-call-parser hermes"
 	if spec.VLLMExtraArgs != "" {
@@ -181,6 +192,10 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 	}
 	if spec.SGLangAttentionBackend != "" {
 		cmd = append(cmd, "--attention-backend", spec.SGLangAttentionBackend)
+	}
+	// Tool calling support
+	if spec.SGLangToolCallParser != "" {
+		cmd = append(cmd, "--tool-call-parser", spec.SGLangToolCallParser)
 	}
 	// SGLang extra args
 	if spec.SGLangExtraArgs != "" {
@@ -447,6 +462,9 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	}
 	if spec.LlamaMlock {
 		cmd = append(cmd, "--mlock")
+	}
+	if spec.LlamaChatTemplate != "" {
+		cmd = append(cmd, "--chat-template", spec.LlamaChatTemplate)
 	}
 	// Extra args: split by whitespace and append as raw CLI args
 	if spec.LlamaExtraArgs != "" {

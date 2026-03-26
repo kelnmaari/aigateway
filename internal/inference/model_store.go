@@ -58,8 +58,11 @@ type SavedModel struct {
 	LlamaChatTemplate string `json:"llama_chat_template,omitempty"`
 
 	// SGLang options
-	SGLangTensorParallel int     `json:"sglang_tensor_parallel,omitempty"`
+	SGLangTensorParallel   int     `json:"sglang_tensor_parallel,omitempty"`
+	SGLangDataParallel     int     `json:"sglang_data_parallel,omitempty"`
 	SGLangMemFraction      float64 `json:"sglang_mem_fraction,omitempty"`
+	SGLangContextLen       int     `json:"sglang_context_len,omitempty"`
+	SGLangChunkedPrefill   bool    `json:"sglang_chunked_prefill,omitempty"`
 	SGLangQuantization     string  `json:"sglang_quantization,omitempty"`
 	SGLangAttentionBackend string  `json:"sglang_attention_backend,omitempty"`
 	SGLangExtraArgs        string  `json:"sglang_extra_args,omitempty"`
@@ -67,6 +70,9 @@ type SavedModel struct {
 
 	// TGI options
 	TGINumShard           int     `json:"tgi_num_shard,omitempty"`
+	TGIMaxConcurrentReqs  int     `json:"tgi_max_concurrent_reqs,omitempty"`
+	TGIMaxInputLen        int     `json:"tgi_max_input_len,omitempty"`
+	TGIMaxTotalTokens     int     `json:"tgi_max_total_tokens,omitempty"`
 	TGIQuantize           string  `json:"tgi_quantize,omitempty"`
 	TGICudaMemoryFraction float64 `json:"tgi_cuda_memory_fraction,omitempty"`
 	TGIExtraArgs          string  `json:"tgi_extra_args,omitempty"`
@@ -149,14 +155,20 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		LlamaCacheReuse:      spec.LlamaCacheReuse,
 		LlamaExtraArgs:       spec.LlamaExtraArgs,
 		SGLangTensorParallel:    spec.SGLangTensorParallel,
-		SGLangMemFraction:       spec.SGLangMemFraction,
-		SGLangQuantization:      spec.SGLangQuantization,
-		SGLangAttentionBackend:  spec.SGLangAttentionBackend,
-		SGLangExtraArgs:         spec.SGLangExtraArgs,
-		TGINumShard:             spec.TGINumShard,
-		TGIQuantize:             spec.TGIQuantize,
-		TGICudaMemoryFraction:   spec.TGICudaMemoryFraction,
-		TGIExtraArgs:            spec.TGIExtraArgs,
+		SGLangDataParallel:     spec.SGLangDataParallel,
+		SGLangMemFraction:      spec.SGLangMemFraction,
+		SGLangContextLen:       spec.SGLangContextLen,
+		SGLangChunkedPrefill:   spec.SGLangChunkedPrefill,
+		SGLangQuantization:     spec.SGLangQuantization,
+		SGLangAttentionBackend: spec.SGLangAttentionBackend,
+		SGLangExtraArgs:        spec.SGLangExtraArgs,
+		TGINumShard:            spec.TGINumShard,
+		TGIMaxConcurrentReqs:   spec.TGIMaxConcurrentReqs,
+		TGIMaxInputLen:         spec.TGIMaxInputLen,
+		TGIMaxTotalTokens:      spec.TGIMaxTotalTokens,
+		TGIQuantize:            spec.TGIQuantize,
+		TGICudaMemoryFraction:  spec.TGICudaMemoryFraction,
+		TGIExtraArgs:           spec.TGIExtraArgs,
 		TEIMaxBatchTokens:       spec.TEIMaxBatchTokens,
 		TEIMaxConcurrentReqs:    spec.TEIMaxConcurrentReqs,
 		TEIPooling:              spec.TEIPooling,
@@ -285,14 +297,20 @@ func (m SavedModel) ToSpec() ModelSpec {
 		LlamaCacheReuse:      m.LlamaCacheReuse,
 		LlamaExtraArgs:       m.LlamaExtraArgs,
 		SGLangTensorParallel:    m.SGLangTensorParallel,
-		SGLangMemFraction:       m.SGLangMemFraction,
-		SGLangQuantization:      m.SGLangQuantization,
-		SGLangAttentionBackend:  m.SGLangAttentionBackend,
-		SGLangExtraArgs:         m.SGLangExtraArgs,
-		TGINumShard:             m.TGINumShard,
-		TGIQuantize:             m.TGIQuantize,
-		TGICudaMemoryFraction:   m.TGICudaMemoryFraction,
-		TGIExtraArgs:            m.TGIExtraArgs,
+		SGLangDataParallel:     m.SGLangDataParallel,
+		SGLangMemFraction:      m.SGLangMemFraction,
+		SGLangContextLen:       m.SGLangContextLen,
+		SGLangChunkedPrefill:   m.SGLangChunkedPrefill,
+		SGLangQuantization:     m.SGLangQuantization,
+		SGLangAttentionBackend: m.SGLangAttentionBackend,
+		SGLangExtraArgs:        m.SGLangExtraArgs,
+		TGINumShard:            m.TGINumShard,
+		TGIMaxConcurrentReqs:   m.TGIMaxConcurrentReqs,
+		TGIMaxInputLen:         m.TGIMaxInputLen,
+		TGIMaxTotalTokens:      m.TGIMaxTotalTokens,
+		TGIQuantize:            m.TGIQuantize,
+		TGICudaMemoryFraction:  m.TGICudaMemoryFraction,
+		TGIExtraArgs:           m.TGIExtraArgs,
 		TEIMaxBatchTokens:       m.TEIMaxBatchTokens,
 		TEIMaxConcurrentReqs:    m.TEIMaxConcurrentReqs,
 		TEIPooling:              m.TEIPooling,

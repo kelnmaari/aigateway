@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.2] - 2026-03-26
+
+### Fixed
+
+- **Saved Model Parameters Not Returned by API**: `SavedModelResponse` struct was missing all v5.1.0/v5.1.1 fields — parameters were saved to disk but not returned in GET `/api/system/inference/saved`, so UI showed zeros on reload. Added all 40+ fields to `SavedModelResponse` and `GetSavedModels` mapping.
+- **SavedModel Missing SGLang/TGI Fields**: `SavedModel` struct was missing `SGLangDataParallel`, `SGLangContextLen`, `SGLangChunkedPrefill`, `TGIMaxConcurrentReqs`, `TGIMaxInputLen`, `TGIMaxTotalTokens` — these fields existed in `ModelSpec` and UI but were never persisted.
+- **SaveFromSpec/ToSpec Incomplete Mapping**: Added missing fields to both `SaveFromSpec()` and `ToSpec()` in model_store.go.
+
+### Technical
+
+- Updated `SavedModelResponse` struct from 23 fields to 65+ fields (all provider params)
+- Updated `GetSavedModels` handler mapping to include all SavedModel fields in response
+- Added 6 missing fields to `SavedModel` struct and both mapping functions
+
+---
+
 ## [5.1.1] - 2026-03-26
 
 ### Added

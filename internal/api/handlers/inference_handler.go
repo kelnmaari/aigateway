@@ -656,19 +656,67 @@ type SavedModelResponse struct {
 	GPUDevice            string                 `json:"gpu_device,omitempty"`
 	AutoStart            bool                   `json:"auto_start"`
 	SavedAt              string                 `json:"saved_at,omitempty"`
-	VLLMTensorParallel   int                    `json:"vllm_tensor_parallel,omitempty"`
-	VLLMMaxModelLen      int                    `json:"vllm_max_model_len,omitempty"`
-	VLLMGPUUtilization   float64                `json:"vllm_gpu_utilization,omitempty"`
-	LlamaMainGPU         int                    `json:"llama_main_gpu,omitempty"`
-	LlamaNGPULayers      int                    `json:"llama_n_gpu_layers,omitempty"`
-	LlamaCtxSize         int                    `json:"llama_ctx_size,omitempty"`
-	LlamaNParallel       int                    `json:"llama_n_parallel,omitempty"`
-	LlamaFlashAttn       bool                   `json:"llama_flash_attn,omitempty"`
-	LlamaJinja           bool                   `json:"llama_jinja,omitempty"`
-	LlamaTensorSplit     string                 `json:"llama_tensor_split,omitempty"`
-	SGLangTensorParallel int                    `json:"sglang_tensor_parallel,omitempty"`
-	SGLangMemFraction    float64                `json:"sglang_mem_fraction,omitempty"`
-	TGINumShard          int                    `json:"tgi_num_shard,omitempty"`
+
+	// vLLM
+	VLLMTensorParallel       int     `json:"vllm_tensor_parallel,omitempty"`
+	VLLMMaxModelLen          int     `json:"vllm_max_model_len,omitempty"`
+	VLLMGPUUtilization       float64 `json:"vllm_gpu_utilization,omitempty"`
+	VLLMExtraArgs            string  `json:"vllm_extra_args,omitempty"`
+	VLLMQuantization         string  `json:"vllm_quantization,omitempty"`
+	VLLMDtype                string  `json:"vllm_dtype,omitempty"`
+	VLLMKVCacheDtype         string  `json:"vllm_kv_cache_dtype,omitempty"`
+	VLLMMaxNumSeqs           int     `json:"vllm_max_num_seqs,omitempty"`
+	VLLMEnforceEager         bool    `json:"vllm_enforce_eager,omitempty"`
+	VLLMEnablePrefixCaching  bool    `json:"vllm_enable_prefix_caching,omitempty"`
+	VLLMEnableChunkedPrefill bool    `json:"vllm_enable_chunked_prefill,omitempty"`
+	VLLMSwapSpace            int     `json:"vllm_swap_space,omitempty"`
+	VLLMEnableAutoToolChoice bool    `json:"vllm_enable_auto_tool_choice,omitempty"`
+	VLLMToolCallParser       string  `json:"vllm_tool_call_parser,omitempty"`
+	VLLMChatTemplate         string  `json:"vllm_chat_template,omitempty"`
+
+	// llama.cpp
+	LlamaMainGPU      int    `json:"llama_main_gpu,omitempty"`
+	LlamaNGPULayers   int    `json:"llama_n_gpu_layers,omitempty"`
+	LlamaCtxSize      int    `json:"llama_ctx_size,omitempty"`
+	LlamaNParallel    int    `json:"llama_n_parallel,omitempty"`
+	LlamaFlashAttn    bool   `json:"llama_flash_attn,omitempty"`
+	LlamaJinja        bool   `json:"llama_jinja,omitempty"`
+	LlamaTensorSplit  string `json:"llama_tensor_split,omitempty"`
+	LlamaCacheReuse   int    `json:"llama_cache_reuse,omitempty"`
+	LlamaExtraArgs    string `json:"llama_extra_args,omitempty"`
+	LlamaBatchSize    int    `json:"llama_batch_size,omitempty"`
+	LlamaUBatchSize   int    `json:"llama_ubatch_size,omitempty"`
+	LlamaCacheTypeK   string `json:"llama_cache_type_k,omitempty"`
+	LlamaCacheTypeV   string `json:"llama_cache_type_v,omitempty"`
+	LlamaMlock        bool   `json:"llama_mlock,omitempty"`
+	LlamaChatTemplate string `json:"llama_chat_template,omitempty"`
+
+	// SGLang
+	SGLangTensorParallel   int     `json:"sglang_tensor_parallel,omitempty"`
+	SGLangMemFraction      float64 `json:"sglang_mem_fraction,omitempty"`
+	SGLangDataParallel     int     `json:"sglang_data_parallel,omitempty"`
+	SGLangContextLen       int     `json:"sglang_context_len,omitempty"`
+	SGLangChunkedPrefill   bool    `json:"sglang_chunked_prefill,omitempty"`
+	SGLangQuantization     string  `json:"sglang_quantization,omitempty"`
+	SGLangAttentionBackend string  `json:"sglang_attention_backend,omitempty"`
+	SGLangExtraArgs        string  `json:"sglang_extra_args,omitempty"`
+	SGLangToolCallParser   string  `json:"sglang_tool_call_parser,omitempty"`
+
+	// TGI
+	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
+	TGIMaxConcurrentReqs int     `json:"tgi_max_concurrent_reqs,omitempty"`
+	TGIMaxInputLen       int     `json:"tgi_max_input_len,omitempty"`
+	TGIMaxTotalTokens    int     `json:"tgi_max_total_tokens,omitempty"`
+	TGIQuantize          string  `json:"tgi_quantize,omitempty"`
+	TGICudaMemoryFraction float64 `json:"tgi_cuda_memory_fraction,omitempty"`
+	TGIExtraArgs         string  `json:"tgi_extra_args,omitempty"`
+
+	// TEI
+	TEIMaxBatchTokens    int    `json:"tei_max_batch_tokens,omitempty"`
+	TEIMaxConcurrentReqs int    `json:"tei_max_concurrent_reqs,omitempty"`
+	TEIPooling           string `json:"tei_pooling,omitempty"`
+	TEIDtype             string `json:"tei_dtype,omitempty"`
+	TEIExtraArgs         string `json:"tei_extra_args,omitempty"`
 }
 
 // GetSavedModels returns list of saved model configurations.
@@ -683,29 +731,72 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 	resp := make([]SavedModelResponse, 0, len(saved))
 	for _, m := range saved {
 		resp = append(resp, SavedModelResponse{
-			Alias:                m.Alias,
-			Provider:             m.Provider,
-			Format:               m.Format,
-			Capabilities:         m.Capabilities,
-			HFRepo:               m.HFRepo,
-			HFFile:               m.HFFile,
-			GGUFURL:              m.GGUFURL,
-			GPUDevice:            m.GPUDevice,
-			AutoStart:            m.AutoStart,
-			SavedAt:              m.SavedAt.Format(time.RFC3339),
-			VLLMTensorParallel:   m.VLLMTensorParallel,
-			VLLMMaxModelLen:      m.VLLMMaxModelLen,
-			VLLMGPUUtilization:   m.VLLMGPUUtilization,
-			LlamaMainGPU:         m.LlamaMainGPU,
-			LlamaNGPULayers:      m.LlamaNGPULayers,
-			LlamaCtxSize:         m.LlamaCtxSize,
-			LlamaNParallel:       m.LlamaNParallel,
-			LlamaFlashAttn:       m.LlamaFlashAttn,
-			LlamaJinja:           m.LlamaJinja,
-			LlamaTensorSplit:     m.LlamaTensorSplit,
-			SGLangTensorParallel: m.SGLangTensorParallel,
-			SGLangMemFraction:    m.SGLangMemFraction,
+			Alias:        m.Alias,
+			Provider:     m.Provider,
+			Format:       m.Format,
+			Capabilities: m.Capabilities,
+			HFRepo:       m.HFRepo,
+			HFFile:       m.HFFile,
+			GGUFURL:      m.GGUFURL,
+			GPUDevice:    m.GPUDevice,
+			AutoStart:    m.AutoStart,
+			SavedAt:      m.SavedAt.Format(time.RFC3339),
+			// vLLM
+			VLLMTensorParallel:       m.VLLMTensorParallel,
+			VLLMMaxModelLen:          m.VLLMMaxModelLen,
+			VLLMGPUUtilization:       m.VLLMGPUUtilization,
+			VLLMExtraArgs:            m.VLLMExtraArgs,
+			VLLMQuantization:         m.VLLMQuantization,
+			VLLMDtype:                m.VLLMDtype,
+			VLLMKVCacheDtype:         m.VLLMKVCacheDtype,
+			VLLMMaxNumSeqs:           m.VLLMMaxNumSeqs,
+			VLLMEnforceEager:         m.VLLMEnforceEager,
+			VLLMEnablePrefixCaching:  m.VLLMEnablePrefixCaching,
+			VLLMEnableChunkedPrefill: m.VLLMEnableChunkedPrefill,
+			VLLMSwapSpace:            m.VLLMSwapSpace,
+			VLLMEnableAutoToolChoice: m.VLLMEnableAutoToolChoice,
+			VLLMToolCallParser:       m.VLLMToolCallParser,
+			VLLMChatTemplate:         m.VLLMChatTemplate,
+			// llama.cpp
+			LlamaMainGPU:      m.LlamaMainGPU,
+			LlamaNGPULayers:   m.LlamaNGPULayers,
+			LlamaCtxSize:      m.LlamaCtxSize,
+			LlamaNParallel:    m.LlamaNParallel,
+			LlamaFlashAttn:    m.LlamaFlashAttn,
+			LlamaJinja:        m.LlamaJinja,
+			LlamaTensorSplit:  m.LlamaTensorSplit,
+			LlamaCacheReuse:   m.LlamaCacheReuse,
+			LlamaExtraArgs:    m.LlamaExtraArgs,
+			LlamaBatchSize:    m.LlamaBatchSize,
+			LlamaUBatchSize:   m.LlamaUBatchSize,
+			LlamaCacheTypeK:   m.LlamaCacheTypeK,
+			LlamaCacheTypeV:   m.LlamaCacheTypeV,
+			LlamaMlock:        m.LlamaMlock,
+			LlamaChatTemplate: m.LlamaChatTemplate,
+			// SGLang
+			SGLangTensorParallel:   m.SGLangTensorParallel,
+			SGLangMemFraction:      m.SGLangMemFraction,
+			SGLangDataParallel:     m.SGLangDataParallel,
+			SGLangContextLen:       m.SGLangContextLen,
+			SGLangChunkedPrefill:   m.SGLangChunkedPrefill,
+			SGLangQuantization:     m.SGLangQuantization,
+			SGLangAttentionBackend: m.SGLangAttentionBackend,
+			SGLangExtraArgs:        m.SGLangExtraArgs,
+			SGLangToolCallParser:   m.SGLangToolCallParser,
+			// TGI
 			TGINumShard:          m.TGINumShard,
+			TGIMaxConcurrentReqs: m.TGIMaxConcurrentReqs,
+			TGIMaxInputLen:       m.TGIMaxInputLen,
+			TGIMaxTotalTokens:    m.TGIMaxTotalTokens,
+			TGIQuantize:          m.TGIQuantize,
+			TGICudaMemoryFraction: m.TGICudaMemoryFraction,
+			TGIExtraArgs:         m.TGIExtraArgs,
+			// TEI
+			TEIMaxBatchTokens:    m.TEIMaxBatchTokens,
+			TEIMaxConcurrentReqs: m.TEIMaxConcurrentReqs,
+			TEIPooling:           m.TEIPooling,
+			TEIDtype:             m.TEIDtype,
+			TEIExtraArgs:         m.TEIExtraArgs,
 		})
 	}
 	c.JSON(http.StatusOK, resp)

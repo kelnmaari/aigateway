@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.3] - 2026-03-30
+
+### Fixed
+
+- **HuggingFace Search Broken**: `Search` icon component (lucide-svelte) was not imported on Models Management page, causing `ReferenceError: Search is not defined` when switching to HuggingFace tab. Replaced with already-imported `FontAwesomeIcon` `faMagnifyingGlass`.
+
+---
+
 ## [5.1.2] - 2026-03-26
 
 ### Fixed

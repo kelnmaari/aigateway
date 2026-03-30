@@ -107,6 +107,9 @@ type LoadRequest struct {
 	TEIPooling           string `json:"tei_pooling"`
 	TEIDtype             string `json:"tei_dtype"`
 	TEIExtraArgs         string `json:"tei_extra_args"`
+
+	// Custom Docker image override (overrides the provider default)
+	DockerImage string `json:"docker_image"`
 }
 
 // ModelsResponse describes current tracked models.
@@ -237,6 +240,7 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		LlamaCacheTypeV: req.LlamaCacheTypeV,
 		LlamaMlock:      req.LlamaMlock,
 		LlamaChatTemplate: req.LlamaChatTemplate,
+		DockerImage:     req.DockerImage,
 	}
 
 	// Always use the provided spec from the request, not a cached one from registry.
@@ -780,6 +784,9 @@ type SavedModelResponse struct {
 	TEIPooling           string `json:"tei_pooling,omitempty"`
 	TEIDtype             string `json:"tei_dtype,omitempty"`
 	TEIExtraArgs         string `json:"tei_extra_args,omitempty"`
+
+	// Custom Docker image override
+	DockerImage string `json:"docker_image,omitempty"`
 }
 
 // GetSavedModels returns list of saved model configurations.
@@ -861,6 +868,7 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 			TEIPooling:           m.TEIPooling,
 			TEIDtype:             m.TEIDtype,
 			TEIExtraArgs:         m.TEIExtraArgs,
+			DockerImage:          m.DockerImage,
 		})
 	}
 	c.JSON(http.StatusOK, resp)
@@ -1002,6 +1010,7 @@ type UpdateSavedRequest struct {
 	SGLangToolCallParser     *string  `json:"sglang_tool_call_parser,omitempty"`
 	GPUDevice                *string  `json:"gpu_device,omitempty"`
 	AutoStart                *bool    `json:"auto_start,omitempty"` // Whether to auto-start on boot
+	DockerImage              *string  `json:"docker_image,omitempty"`
 }
 
 // PostUpdateSaved updates a saved model configuration.
@@ -1177,6 +1186,9 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.AutoStart != nil {
 			m.AutoStart = *req.AutoStart
 		}
+		if req.DockerImage != nil {
+			m.DockerImage = *req.DockerImage
+		}
 	})
 
 	if err != nil {
@@ -1227,6 +1239,7 @@ type CreateSavedRequest struct {
 	TEIPooling             string   `json:"tei_pooling"`
 	TEIDtype               string   `json:"tei_dtype"`
 	TEIExtraArgs           string   `json:"tei_extra_args"`
+	DockerImage            string   `json:"docker_image"`
 	VLLMQuantization        string  `json:"vllm_quantization"`
 	VLLMDtype               string  `json:"vllm_dtype"`
 	VLLMKVCacheDtype        string  `json:"vllm_kv_cache_dtype"`
@@ -1325,6 +1338,7 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		LlamaMlock:              req.LlamaMlock,
 		LlamaChatTemplate:       req.LlamaChatTemplate,
 		SGLangToolCallParser:    req.SGLangToolCallParser,
+		DockerImage:             req.DockerImage,
 	}
 
 	if err := h.modelStore.Save(saved); err != nil {

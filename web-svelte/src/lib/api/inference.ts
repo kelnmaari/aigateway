@@ -230,6 +230,7 @@ export interface SavedModel {
 	tei_pooling?: string;
 	tei_dtype?: string;
 	tei_extra_args?: string;
+	docker_image?: string;
 }
 
 export interface UpdateSavedRequest {
@@ -288,6 +289,7 @@ export interface UpdateSavedRequest {
 	tei_dtype?: string;
 	tei_extra_args?: string;
 	gpu_device?: string;
+	docker_image?: string;
 }
 
 export interface CreateSavedRequest {
@@ -353,6 +355,7 @@ export interface CreateSavedRequest {
 	tei_pooling?: string;
 	tei_dtype?: string;
 	tei_extra_args?: string;
+	docker_image?: string;
 }
 
 export interface LoadRequest {
@@ -421,6 +424,7 @@ export interface LoadRequest {
 	tei_pooling?: string;
 	tei_dtype?: string;
 	tei_extra_args?: string;
+	docker_image?: string;
 }
 
 import { api } from './client';

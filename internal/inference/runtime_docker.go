@@ -110,18 +110,29 @@ func (r *DockerRuntime) Start(ctx context.Context, req ContainerStartRequest) (*
 		req.Ports[name] = cport
 	}
 
-	// Use background context for Docker operations to prevent cancellation from HTTP request
-	pullCtx, pullCancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer pullCancel()
+	// Skip pull if the image already exists locally.
+	// This prevents unnecessary network round-trips and allows locally-built
+	// (e.g. patched) images to be used without a registry push.
+	imageExists, _ := r.ImageExists(req.Image)
+	if !imageExists {
+		pullCtx, pullCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer pullCancel()
+
+		if r.useAPI && r.api != nil {
+			if err := r.pullImageAPI(pullCtx, req.Image); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := r.pullImageCLI(pullCtx, req.Image); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		r.logger.WithField("image", req.Image).Info("Docker image already exists locally, skipping pull")
+	}
 
 	if r.useAPI && r.api != nil {
-		if err := r.pullImageAPI(pullCtx, req.Image); err != nil {
-			return nil, err
-		}
 		return r.startAPI(ctx, containerName, req, hostPorts)
-	}
-	if err := r.pullImageCLI(pullCtx, req.Image); err != nil {
-		return nil, err
 	}
 	return r.startCLI(ctx, containerName, req, hostPorts)
 }

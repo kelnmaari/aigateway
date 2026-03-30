@@ -407,6 +407,7 @@
 		tei_dtype: string;
 		tei_extra_args: string;
 		gpu_device: string;
+		docker_image: string;
 	}>({
 		capabilities: ['chat'],
 		auto_start: false,
@@ -462,7 +463,8 @@
 		tei_pooling: '',
 		tei_dtype: '',
 		tei_extra_args: '',
-		gpu_device: ''
+		gpu_device: '',
+		docker_image: ''
 	});
 
 	let form = $state<LoadRequest>({
@@ -526,7 +528,8 @@
 		tei_max_concurrent_reqs: 0,
 		tei_pooling: '',
 		tei_dtype: '',
-		tei_extra_args: ''
+		tei_extra_args: '',
+		docker_image: ''
 	});
 
 	// TRT conversion form
@@ -1551,7 +1554,8 @@
 			tei_pooling: saved.tei_pooling || '',
 			tei_dtype: saved.tei_dtype || '',
 			tei_extra_args: saved.tei_extra_args || '',
-			gpu_device: saved.gpu_device || ''
+			gpu_device: saved.gpu_device || '',
+			docker_image: saved.docker_image || ''
 		};
 	}
 
@@ -1652,7 +1656,8 @@
 				tei_max_concurrent_reqs: saved.tei_max_concurrent_reqs,
 				tei_pooling: saved.tei_pooling,
 				tei_dtype: saved.tei_dtype,
-				tei_extra_args: saved.tei_extra_args
+				tei_extra_args: saved.tei_extra_args,
+				docker_image: saved.docker_image
 			};
 			await inferenceApi.load(req);
 			showMsg(`Модель ${saved.alias} запускается`, 'success');
@@ -2009,6 +2014,19 @@
 								>GPU list unavailable. Enter index manually.</span
 							>
 						{/if}
+					</div>
+
+					<!-- Docker Image Override -->
+					<div class="flex flex-col gap-2 text-sm">
+						<span class="font-medium">Docker Image Override</span>
+						<input
+							class="bg-background rounded border px-3 py-2 font-mono text-sm"
+							bind:value={form.docker_image}
+							placeholder="Leave empty for default (e.g., vllm-custom:patched)"
+						/>
+						<span class="text-muted-foreground text-xs">
+							Override the default provider image. Local images are used without pull. Useful for locally-built or patched images.
+						</span>
 					</div>
 
 					<!-- Capabilities -->
@@ -3580,6 +3598,24 @@
 						bind:value={editSavedForm.gpu_device}
 					/>
 					<p class="text-muted-foreground mt-1 text-xs">Comma-separated GPU indices</p>
+				</div>
+
+				<!-- Custom Docker Image -->
+				<div>
+					<label for="edit-docker-image" class="mb-1 block text-sm font-medium">
+						Docker Image Override
+					</label>
+					<input
+						id="edit-docker-image"
+						type="text"
+						class="bg-background w-full rounded border px-3 py-2 font-mono text-sm"
+						placeholder="e.g., vllm-custom:patched (leave empty for default)"
+						bind:value={editSavedForm.docker_image}
+					/>
+					<p class="text-muted-foreground mt-1 text-xs">
+						Override the default provider image. Local images are used as-is (no pull). Useful for
+						locally-built images with patched dependencies.
+					</p>
 				</div>
 
 				<!-- Provider-specific settings -->

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.1] - 2026-03-30
+
+### Added
+
+- **Custom Docker Image Override**: New `docker_image` field in model configuration. Set any image name to override the provider default (e.g. `vllm-custom:patched`, `my-sglang:latest`). Works for all providers: vLLM, SGLang, TGI, TEI, llama.cpp, TensorRT-LLM. Available in Add Model form and Edit Saved Model modal.
+
+### Changed
+
+- **Skip pull if image exists locally**: Docker runtime no longer pulls an image if it already exists on the local machine. Images are pulled only on first use or when the image is absent. This allows using locally-built custom images without a Docker registry. The existing "Pull Image" button on the Images tab still works for explicit updates.
+
+### Technical
+
+- `internal/inference/types.go` — `DockerImage string` field in `ModelSpec`
+- `internal/inference/model_store.go` — `DockerImage` in `SavedModel`, `SaveFromSpec`, `ToSpec`
+- `internal/inference/provider_builders.go` — `DockerImage` override in all 6 provider builders
+- `internal/inference/runtime_docker.go` — `ImageExists` check before pull; skips pull when image is present locally
+- `internal/api/handlers/inference_handler.go` — `docker_image` in `LoadRequest`, `UpdateSavedRequest`, `CreateSavedRequest`, `SavedModelResponse`
+- `web-svelte/src/lib/api/inference.ts` — `docker_image` in all 4 request/response interfaces
+- `web-svelte/src/routes/(protected)/admin/models/+page.svelte` — Docker Image input in Add Model form and Edit Saved Model modal
+
+---
+
 ## [5.2.0] - 2026-03-30
 
 ### Added

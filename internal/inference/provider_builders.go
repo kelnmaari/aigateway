@@ -152,10 +152,14 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 	if hfToken != "" && !useLocalModel {
 		env["HF_TOKEN"] = hfToken
 	}
+	image := DefaultVLLMImage
+	if spec.DockerImage != "" {
+		image = spec.DockerImage
+	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
 		Provider:   ProviderVLLM,
-		Image:      DefaultVLLMImage,
+		Image:      image,
 		Command:    cmd,
 		Env:        env,
 		Ports:      map[string]int{"http": defaultVLLMPort},
@@ -242,10 +246,14 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 	if hfToken != "" && !useLocalModel {
 		env["HF_TOKEN"] = hfToken
 	}
+	sglangImage := DefaultSGLangImage
+	if spec.DockerImage != "" {
+		sglangImage = spec.DockerImage
+	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
 		Provider:   ProviderSGLang,
-		Image:      DefaultSGLangImage,
+		Image:      sglangImage,
 		Command:    cmd,
 		Env:        env,
 		Ports:      map[string]int{"http": defaultSGLangPort},
@@ -317,10 +325,14 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 		cmd = append(cmd, splitArgs(spec.TGIExtraArgs)...)
 	}
 
+	tgiImage := DefaultTGIImage
+	if spec.DockerImage != "" {
+		tgiImage = spec.DockerImage
+	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
 		Provider:   ProviderTGI,
-		Image:      DefaultTGIImage,
+		Image:      tgiImage,
 		Command:    cmd,
 		Env:        env,
 		Ports:      map[string]int{"http": defaultTGIPort},
@@ -387,12 +399,16 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	// Image and GPU selection:
 	// - CPU mode (TEICPUMode=true OR no GPUDevice): use cpu-* image, no GPU passthrough
 	// - GPU mode: use GPU-specific image (89-1.8 for cc8.9 by default)
+	// - DockerImage override takes priority over all defaults
 	cpuMode := spec.TEICPUMode || spec.GPUDevice == ""
 	image := DefaultTEIImage
 	gpuDevice := spec.GPUDevice
 	if cpuMode {
 		image = DefaultTEICPUImage
 		gpuDevice = "" // no GPU passthrough for CPU container
+	}
+	if spec.DockerImage != "" {
+		image = spec.DockerImage
 	}
 
 	return ContainerStartRequest{
@@ -422,10 +438,14 @@ func BuildTRTLLMRequest(spec ModelSpec, enginesDir, _ string) (ContainerStartReq
 	}
 	// Placeholder command: rely on image entrypoint; users may need to override via HF repo config.
 	cmd := []string{}
+	trtImage := DefaultTRTLLMImage
+	if spec.DockerImage != "" {
+		trtImage = spec.DockerImage
+	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
 		Provider:   ProviderTRTLLM,
-		Image:      DefaultTRTLLMImage,
+		Image:      trtImage,
 		Command:    cmd,
 		Env:        env,
 		Ports:      map[string]int{"http": defaultTRTPort},
@@ -503,10 +523,14 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 		cmd = append(cmd, splitArgs(spec.LlamaExtraArgs)...)
 	}
 
+	llamaImage := DefaultLlamaImage
+	if spec.DockerImage != "" {
+		llamaImage = spec.DockerImage
+	}
 	return ContainerStartRequest{
 		ModelAlias: spec.Alias,
 		Provider:   ProviderLlamaCPP,
-		Image:      DefaultLlamaImage,
+		Image:      llamaImage,
 		Command:    cmd,
 		Env:        map[string]string{"CUDA_DEVICE_ORDER": "PCI_BUS_ID"},
 		Ports:      map[string]int{"http": defaultLlamaServPort},

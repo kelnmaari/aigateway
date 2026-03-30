@@ -85,6 +85,9 @@ type SavedModel struct {
 	TEIDtype             string `json:"tei_dtype,omitempty"`
 	TEIExtraArgs         string `json:"tei_extra_args,omitempty"`
 
+	// Custom Docker image override
+	DockerImage string `json:"docker_image,omitempty"`
+
 	// Meta
 	AutoStart bool      `json:"auto_start"` // Start on server boot
 	SavedAt   time.Time `json:"saved_at"`
@@ -194,6 +197,7 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		VLLMToolCallParser:       spec.VLLMToolCallParser,
 		VLLMChatTemplate:         spec.VLLMChatTemplate,
 		SGLangToolCallParser:     spec.SGLangToolCallParser,
+		DockerImage:              spec.DockerImage,
 		AutoStart:               autoStart,
 	}
 	return s.Save(saved)
@@ -337,6 +341,7 @@ func (m SavedModel) ToSpec() ModelSpec {
 		VLLMToolCallParser:       m.VLLMToolCallParser,
 		VLLMChatTemplate:         m.VLLMChatTemplate,
 		SGLangToolCallParser:     m.SGLangToolCallParser,
+		DockerImage:              m.DockerImage,
 	}
 }
 

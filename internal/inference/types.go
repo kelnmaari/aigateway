@@ -108,6 +108,11 @@ type ModelSpec struct {
 	TEIPooling           string // --pooling (cls, mean, splade, last-token)
 	TEIDtype             string // --dtype (float16, float32)
 	TEIExtraArgs         string // extra CLI args
+
+	// Custom Docker image override (overrides the provider default image)
+	// Use this to run a locally-built or patched image, e.g. "vllm-custom:patched"
+	// When set, the image is assumed to exist locally — pull is skipped automatically.
+	DockerImage string
 }
 
 // ModelStatus represents container+artifact state.

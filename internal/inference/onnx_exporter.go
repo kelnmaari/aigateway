@@ -161,8 +161,8 @@ set -e
 
 echo "=== [1/3] Installing optimum + onnxruntime ==="
 # optimum 2.x renamed [exporters] to [onnxruntime]; install both notations for compatibility
-pip install "optimum[onnxruntime]" onnx --quiet --no-cache-dir 2>&1 || \
-pip install "optimum[exporters]" onnx --quiet --no-cache-dir 2>&1
+pip install "optimum[onnxruntime]" onnx einops --quiet --no-cache-dir 2>&1 || \
+pip install "optimum[exporters]" onnx einops --quiet --no-cache-dir 2>&1
 # Verify optimum installed (2.x dropped __version__, use importlib.metadata)
 python3 -c "import importlib.metadata; print('optimum', importlib.metadata.version('optimum'))"
 

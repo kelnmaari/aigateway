@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.7] - 2026-03-30
+
+### Fixed
+
+- **ONNX Export: missing `einops` dependency**: Added `einops` to the pip install step. Required by models with MoE or custom attention architectures (e.g. `nomic-embed-text-v2-moe`). Without it export fails with `ImportError: No module named 'einops'`.
+
+### Technical
+
+- `internal/inference/onnx_exporter.go` — added `einops` to pip install command
+
+---
+
 ## [5.2.6] - 2026-03-30
 
 ### Fixed

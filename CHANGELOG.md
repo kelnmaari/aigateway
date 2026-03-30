@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.5] - 2026-03-30
+
+### Fixed
+
+- **ONNX Export dtype options**: Removed `int8`/`uint8` (unsupported in optimum 2.x `--dtype`). Now shows only `fp32`, `fp16`, `bf16`. Default changed to `fp32` (recommended for CPU).
+- **ONNX Export task/dtype descriptions**: Both dropdowns now include human-readable explanations of each option. Task options reordered by typical use frequency.
+
+### Technical
+
+- `web-svelte/.../models/+page.svelte` — updated ONNX modal Task and Dtype `<select>` options
+
+---
+
 ## [5.2.4] - 2026-03-30
 
 ### Fixed

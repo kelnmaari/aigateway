@@ -193,7 +193,7 @@
 	let onnxModalJob = $state<OnnxExportJob | null>(null);
 	let onnxModalHfRepo = $state('');
 	let onnxModalTask = $state('feature-extraction');
-	let onnxModalDtype = $state('float32');
+	let onnxModalDtype = $state('fp32');
 	let onnxModalStarting = $state(false);
 	let onnxModalInterval: ReturnType<typeof setInterval> | null = null;
 	let onnxLogsEl: HTMLDivElement | null = $state(null);
@@ -1297,7 +1297,7 @@
 	function openOnnxModal(hfRepo: string) {
 		onnxModalHfRepo = hfRepo;
 		onnxModalTask = 'feature-extraction';
-		onnxModalDtype = 'float32';
+		onnxModalDtype = 'fp32';
 		onnxModalJob = null;
 		onnxModalStarting = false;
 		onnxModalOpen = true;
@@ -4273,20 +4273,19 @@
 						<div class="flex flex-col gap-1">
 							<label class="text-sm font-medium">Task</label>
 							<select class="bg-background rounded border px-2 py-1.5 text-sm" bind:value={onnxModalTask}>
-								<option value="feature-extraction">feature-extraction (embeddings)</option>
-								<option value="text-classification">text-classification (rerank)</option>
-								<option value="token-classification">token-classification</option>
-								<option value="fill-mask">fill-mask</option>
-								<option value="sentence-similarity">sentence-similarity</option>
+								<option value="feature-extraction">feature-extraction — векторные embeddings (BGE, E5, nomic…)</option>
+								<option value="text-classification">text-classification — reranking, классификация текста</option>
+								<option value="sentence-similarity">sentence-similarity — семантическое сходство пар предложений</option>
+								<option value="token-classification">token-classification — NER, POS-теги, разметка токенов</option>
+								<option value="fill-mask">fill-mask — MLM, заполнение пропущенных токенов</option>
 							</select>
 						</div>
 						<div class="flex flex-col gap-1">
 							<label class="text-sm font-medium">Dtype</label>
 							<select class="bg-background rounded border px-2 py-1.5 text-sm" bind:value={onnxModalDtype}>
-								<option value="float32">float32 (safest)</option>
-								<option value="float16">float16 (faster GPU)</option>
-								<option value="int8">int8 (quantized CPU)</option>
-								<option value="uint8">uint8 (quantized CPU)</option>
+								<option value="fp32">fp32 — рекомендован для CPU, максимальная совместимость</option>
+								<option value="fp16">fp16 — быстрее на GPU (CUDA), не все CPU поддерживают</option>
+								<option value="bf16">bf16 — bfloat16, новые CPU (Sapphire Rapids+) и A100/H100</option>
 							</select>
 						</div>
 					</div>

@@ -93,8 +93,10 @@ func (h *ChatToolsHandler) HandleChatWithTools(c *gin.Context) {
 	endpoint := inst.Handle.Endpoint + "/v1/chat/completions"
 	providerModel := h.resolveProviderModelName(inst)
 
+	// Normalize Anthropic-format tool messages → OpenAI format (no-op for OpenAI clients)
+	normalized := normalizeMessagesInJSON(rawBody)
 	// Rewrite model name in raw body preserving all other fields
-	forwardBody := rewriteModelInJSON(rawBody, providerModel)
+	forwardBody := rewriteModelInJSON(normalized, providerModel)
 
 	// If tools not requested or not available, forward original body as-is
 	if !req.UseTools || h.toolsReg == nil || !h.toolsReg.HasTavily() {

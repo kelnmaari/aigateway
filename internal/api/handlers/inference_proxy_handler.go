@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"aigateway/internal/inference"
-	"aigateway/internal/models"
 )
 
 // InferenceProxyHandler proxies OpenAI-compatible requests to running inference providers.
@@ -35,9 +34,22 @@ func NewInferenceProxyHandler(router *inference.Router, logger *logrus.Logger) *
 }
 
 // HandleChatCompletions proxies /v1/chat/completions to provider container.
+// Automatically converts Anthropic-format tool messages (tool_use / tool_result content blocks)
+// to OpenAI format before forwarding.  Purely OpenAI-format requests pass through unchanged.
 func (h *InferenceProxyHandler) HandleChatCompletions(c *gin.Context) {
-	var req models.ChatCompletionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// Read raw body so we can (a) preserve ALL original fields and (b) normalize message format
+	rawBody, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "failed to read request body")
+		return
+	}
+
+	// Parse only the routing-relevant fields
+	var req struct {
+		Model  string `json:"model"`
+		Stream bool   `json:"stream"`
+	}
+	if err := json.Unmarshal(rawBody, &req); err != nil {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
@@ -74,15 +86,10 @@ func (h *InferenceProxyHandler) HandleChatCompletions(c *gin.Context) {
 		"stream":         req.Stream,
 	}).Debug("proxying chat completion request")
 
-	// Rewrite model in request to match provider's expected name
-	req.Model = providerModel
-
-	// Re-encode request body
-	bodyBytes, err := json.Marshal(req)
-	if err != nil {
-		h.errorResponse(c, http.StatusInternalServerError, "internal_error", "failed to encode request")
-		return
-	}
+	// Normalize Anthropic-format tool messages → OpenAI format (no-op for OpenAI clients)
+	normalized := normalizeMessagesInJSON(rawBody)
+	// Rewrite model field, preserving all other fields
+	bodyBytes := rewriteModelInJSON(normalized, providerModel)
 
 	proxyReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
 	if err != nil {

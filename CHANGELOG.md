@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.6] - 2026-03-30
+
+### Fixed
+
+- **ONNX Export: custom architecture models**: Added `--trust-remote-code` flag to `optimum-cli export onnx`. Required for models with non-standard architectures (e.g. `nomic-embed-text-v2-moe` uses `nomic-bert-2048`). Without it the export fails with `ValueError: Please pass trust_remote_code=True`.
+
+### Technical
+
+- `internal/inference/onnx_exporter.go` — added `--trust-remote-code` to optimum-cli export command
+
+---
+
 ## [5.2.5] - 2026-03-30
 
 ### Fixed

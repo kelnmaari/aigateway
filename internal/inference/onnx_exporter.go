@@ -186,6 +186,7 @@ optimum-cli export onnx \
   --model %q \
   --task %q \
   --dtype %q \
+  --trust-remote-code \
   "$SNAPSHOT_PATH/onnx/"
 
 echo ""

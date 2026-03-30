@@ -134,6 +134,7 @@ type ContainerHandle struct {
 type ContainerRuntime interface {
 	Start(ctx context.Context, req ContainerStartRequest) (*ContainerHandle, error)
 	Stop(ctx context.Context, handleID string) error
+	IsRunning(ctx context.Context, handleID string) (bool, error)
 	Logs(ctx context.Context, handleID string, tailLines int) (string, error)
 }
 

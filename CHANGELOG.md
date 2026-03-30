@@ -6,11 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.5] - 2026-03-30
+
+### Fixed
+
+- **Container Crash Not Detected During Health Check**: When a container crashed (OOM, SGLang memory balance error), `waitForHealth` kept polling the dead endpoint until timeout, leaving the model stuck in "Starting" status. Added `IsRunning()` to `ContainerRuntime` interface and `waitForHealthWithContainer()` that checks container liveness each health check cycle — fails fast with clear error on container exit.
+- **Model Reload Deadlock After Evict**: Loading a model after Evict caused the UI to hang indefinitely. Root cause: `StartModel` health check used independent `context.Background()` — Evict killed the container but the health check loop kept running, holding the per-alias mutex. Added per-alias cancellation context (`cancelMap`) to `Orchestrator`; `Evict` calls `CancelStart()` to abort in-flight health checks and release the lock.
+
+---
+
 ## [5.1.4] - 2026-03-30
 
 ### Fixed
 
-- **Model Reload Deadlock After Evict**: Loading a model after Evict caused the UI to hang indefinitely. Root cause: `StartModel` health check used independent `context.Background()` — Evict killed the container but the health check loop kept running, holding the per-alias mutex. Added per-alias cancellation context (`cancelMap`) to `Orchestrator`; `Evict` calls `CancelStart()` to abort in-flight health checks and release the lock.
+- **Model Reload Deadlock After Evict**: (superseded by 5.1.5)
 
 ---
 

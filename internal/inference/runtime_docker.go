@@ -343,6 +343,23 @@ func (r *DockerRuntime) Stop(ctx context.Context, handleID string) error {
 	return nil
 }
 
+// IsRunning checks if a container is still running (not exited/dead).
+func (r *DockerRuntime) IsRunning(ctx context.Context, handleID string) (bool, error) {
+	if r.useAPI && r.api != nil {
+		info, err := r.api.ContainerInspect(ctx, handleID)
+		if err != nil {
+			return false, nil // container gone
+		}
+		return info.State.Running, nil
+	}
+	cmd := exec.CommandContext(ctx, r.dockerBin, "inspect", "-f", "{{.State.Running}}", handleID)
+	out, err := cmd.Output()
+	if err != nil {
+		return false, nil // container gone
+	}
+	return strings.TrimSpace(string(out)) == "true", nil
+}
+
 func pickFreePort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -287,7 +287,7 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 		healthCtx, healthCancel := context.WithTimeout(opCtx, o.healthCheckTimeout)
 		defer healthCancel()
 		healthURL := providerHealthURL(handle.Provider, handle.Endpoint)
-		if err := waitForHealth(healthCtx, healthURL, 2*time.Second); err != nil {
+		if err := waitForHealthWithContainer(healthCtx, healthURL, 2*time.Second, o.runtime, handle.ID); err != nil {
 			o.updateOrCreateInstance(inst, func(i *ModelInstance) {
 				i.Status = StatusFailed
 				i.Error = fmt.Sprintf("health check failed: %v", err)
@@ -424,6 +424,29 @@ func waitForHealth(ctx context.Context, url string, interval time.Duration) erro
 	for {
 		if err := HealthCheckHTTP(ctx, url); err == nil {
 			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-t.C:
+		}
+	}
+}
+
+// waitForHealthWithContainer polls health endpoint and also checks if the container is still alive.
+// If the container exits (e.g. OOM, crash), returns immediately instead of waiting for timeout.
+func waitForHealthWithContainer(ctx context.Context, url string, interval time.Duration, runtime ContainerRuntime, containerID string) error {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		if err := HealthCheckHTTP(ctx, url); err == nil {
+			return nil
+		}
+		// Check if container is still alive — fail fast on crash/OOM
+		if runtime != nil && containerID != "" {
+			if running, _ := runtime.IsRunning(ctx, containerID); !running {
+				return fmt.Errorf("container exited unexpectedly (possible OOM or crash)")
+			}
 		}
 		select {
 		case <-ctx.Done():

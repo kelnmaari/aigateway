@@ -16,3 +16,11 @@ func (NoopRuntime) Stop(ctx context.Context, handleID string) error {
 	return fmt.Errorf("container runtime not configured")
 }
 
+func (NoopRuntime) IsRunning(ctx context.Context, handleID string) (bool, error) {
+	return false, nil
+}
+
+func (NoopRuntime) Logs(ctx context.Context, handleID string, tailLines int) (string, error) {
+	return "", fmt.Errorf("container runtime not configured")
+}
+

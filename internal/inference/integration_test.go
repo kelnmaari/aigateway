@@ -101,6 +101,10 @@ func (m *MockContainerRuntime) Logs(ctx context.Context, containerID string, tai
 	return fmt.Sprintf("Mock logs for %s (tail %d)", containerID, tailLines), nil
 }
 
+func (m *MockContainerRuntime) IsRunning(ctx context.Context, handleID string) (bool, error) {
+	return true, nil
+}
+
 func (m *MockContainerRuntime) Stats() map[string]int {
 	m.mu.Lock()
 	defer m.mu.Unlock()

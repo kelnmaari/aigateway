@@ -59,8 +59,16 @@ type ChatMessage struct {
 // HandleChatWithTools handles chat completions with tool calling support.
 // POST /api/chat/completions
 func (h *ChatToolsHandler) HandleChatWithTools(c *gin.Context) {
+	// Read raw body first — preserves ALL original fields (tools, tool_choice, etc.)
+	rawBody, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request", "failed to read request body")
+		return
+	}
+
+	// Parse only routing-relevant fields; other fields remain in rawBody untouched
 	var req ChatRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := json.Unmarshal(rawBody, &req); err != nil {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
@@ -85,13 +93,16 @@ func (h *ChatToolsHandler) HandleChatWithTools(c *gin.Context) {
 	endpoint := inst.Handle.Endpoint + "/v1/chat/completions"
 	providerModel := h.resolveProviderModelName(inst)
 
-	// If tools not requested or not available, forward as-is
+	// Rewrite model name in raw body preserving all other fields
+	forwardBody := rewriteModelInJSON(rawBody, providerModel)
+
+	// If tools not requested or not available, forward original body as-is
 	if !req.UseTools || h.toolsReg == nil || !h.toolsReg.HasTavily() {
-		h.forwardRequest(c, endpoint, providerModel, req)
+		h.forwardRawRequest(c, endpoint, forwardBody, req.Stream)
 		return
 	}
 
-	// Handle with tool support
+	// Handle with tool support (agentic loop)
 	h.handleWithTools(c, endpoint, providerModel, req, inst)
 }
 
@@ -309,21 +320,9 @@ func (h *ChatToolsHandler) sendToolEvent(c *gin.Context, flusher http.Flusher, e
 	flusher.Flush()
 }
 
-func (h *ChatToolsHandler) forwardRequest(c *gin.Context, endpoint, providerModel string, req ChatRequest) {
-	// Forward as-is to the LLM
-	llmReq := map[string]any{
-		"model":    providerModel,
-		"messages": req.Messages,
-		"stream":   req.Stream,
-	}
-	if req.Temperature > 0 {
-		llmReq["temperature"] = req.Temperature
-	}
-	if req.MaxTokens > 0 {
-		llmReq["max_tokens"] = req.MaxTokens
-	}
-
-	bodyBytes, _ := json.Marshal(llmReq)
+// forwardRawRequest forwards the original request body (with model already rewritten) to the provider.
+// This preserves ALL fields the client sent: tools, tool_choice, top_p, frequency_penalty, etc.
+func (h *ChatToolsHandler) forwardRawRequest(c *gin.Context, endpoint string, bodyBytes []byte, stream bool) {
 	proxyReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
 	if err != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "internal_error", err.Error())
@@ -338,7 +337,7 @@ func (h *ChatToolsHandler) forwardRequest(c *gin.Context, endpoint, providerMode
 	}
 	defer resp.Body.Close()
 
-	if req.Stream {
+	if stream {
 		h.streamForward(c, resp)
 		return
 	}
@@ -346,10 +345,27 @@ func (h *ChatToolsHandler) forwardRequest(c *gin.Context, endpoint, providerMode
 	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
 }
 
+// rewriteModelInJSON rewrites the "model" field in a JSON object without touching any other fields.
+func rewriteModelInJSON(body []byte, model string) []byte {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		// If parse fails, return original body unchanged
+		return body
+	}
+	modelJSON, _ := json.Marshal(model)
+	raw["model"] = modelJSON
+	result, err := json.Marshal(raw)
+	if err != nil {
+		return body
+	}
+	return result
+}
+
 func (h *ChatToolsHandler) streamForward(c *gin.Context, resp *http.Response) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
+	c.Header("Transfer-Encoding", "chunked")
 	c.Status(resp.StatusCode)
 
 	flusher, ok := c.Writer.(http.Flusher)

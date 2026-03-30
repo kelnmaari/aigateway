@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.3] - 2026-03-30
+
+### Fixed
+
+- **Tool calls broken through AIGateway proxy**: `ChatToolsHandler` was parsing the request into a limited 6-field struct, silently dropping `tools`, `tool_choice`, `top_p`, `frequency_penalty`, `presence_penalty`, `stop`, and all other OpenAI-compatible parameters before forwarding to vLLM. Clients using tool-calling (e.g. Kilo Code, Claude Code, Continue) received raw XML output instead of structured tool call responses. Fix: raw request body is now preserved and only the `model` field is rewritten before forwarding.
+- **Missing `Transfer-Encoding: chunked` header** in `streamForward` path of `ChatToolsHandler`.
+
+### Technical
+
+- `internal/api/handlers/chat_tools_handler.go` — `HandleChatWithTools` reads raw body, passes it through `forwardRawRequest`; new `rewriteModelInJSON` helper rewrites only the model field preserving all other fields via `map[string]json.RawMessage`
+
+---
+
 ## [5.2.2] - 2026-03-30
 
 ### Fixed

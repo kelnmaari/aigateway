@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.4] - 2026-03-30
+
+### Fixed
+
+- **ONNX Export version check**: `optimum 2.x` removed `__version__` as a direct module attribute. Verification now uses `importlib.metadata.version('optimum')` which works with all versions.
+
+### Technical
+
+- `internal/inference/onnx_exporter.go` — replaced `optimum.__version__` with `importlib.metadata.version('optimum')`
+
+---
+
 ## [5.2.3] - 2026-03-30
 
 ### Fixed

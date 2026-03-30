@@ -78,6 +78,7 @@ type SavedModel struct {
 	TGIExtraArgs          string  `json:"tgi_extra_args,omitempty"`
 
 	// TEI options
+	TEICPUMode           bool   `json:"tei_cpu_mode,omitempty"`
 	TEIMaxBatchTokens    int    `json:"tei_max_batch_tokens,omitempty"`
 	TEIMaxConcurrentReqs int    `json:"tei_max_concurrent_reqs,omitempty"`
 	TEIPooling           string `json:"tei_pooling,omitempty"`
@@ -169,6 +170,7 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		TGIQuantize:            spec.TGIQuantize,
 		TGICudaMemoryFraction:  spec.TGICudaMemoryFraction,
 		TGIExtraArgs:           spec.TGIExtraArgs,
+		TEICPUMode:              spec.TEICPUMode,
 		TEIMaxBatchTokens:       spec.TEIMaxBatchTokens,
 		TEIMaxConcurrentReqs:    spec.TEIMaxConcurrentReqs,
 		TEIPooling:              spec.TEIPooling,
@@ -311,6 +313,7 @@ func (m SavedModel) ToSpec() ModelSpec {
 		TGIQuantize:            m.TGIQuantize,
 		TGICudaMemoryFraction:  m.TGICudaMemoryFraction,
 		TGIExtraArgs:           m.TGIExtraArgs,
+		TEICPUMode:              m.TEICPUMode,
 		TEIMaxBatchTokens:       m.TEIMaxBatchTokens,
 		TEIMaxConcurrentReqs:    m.TEIMaxConcurrentReqs,
 		TEIPooling:              m.TEIPooling,

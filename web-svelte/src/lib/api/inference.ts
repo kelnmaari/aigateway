@@ -98,6 +98,7 @@ export interface ModelInfo {
 	tgi_extra_args?: string;
 
 	// TEI params
+	tei_cpu_mode?: boolean;
 	tei_max_batch_tokens?: number;
 	tei_max_concurrent_reqs?: number;
 	tei_pooling?: string;
@@ -223,6 +224,7 @@ export interface SavedModel {
 	tgi_quantize?: string;
 	tgi_cuda_memory_fraction?: number;
 	tgi_extra_args?: string;
+	tei_cpu_mode?: boolean;
 	tei_max_batch_tokens?: number;
 	tei_max_concurrent_reqs?: number;
 	tei_pooling?: string;
@@ -279,6 +281,7 @@ export interface UpdateSavedRequest {
 	tgi_quantize?: string;
 	tgi_cuda_memory_fraction?: number;
 	tgi_extra_args?: string;
+	tei_cpu_mode?: boolean;
 	tei_max_batch_tokens?: number;
 	tei_max_concurrent_reqs?: number;
 	tei_pooling?: string;
@@ -344,6 +347,7 @@ export interface CreateSavedRequest {
 	tgi_quantize?: string;
 	tgi_cuda_memory_fraction?: number;
 	tgi_extra_args?: string;
+	tei_cpu_mode?: boolean;
 	tei_max_batch_tokens?: number;
 	tei_max_concurrent_reqs?: number;
 	tei_pooling?: string;
@@ -411,6 +415,7 @@ export interface LoadRequest {
 	tgi_quantize?: string;
 	tgi_cuda_memory_fraction?: number;
 	tgi_extra_args?: string;
+	tei_cpu_mode?: boolean;
 	tei_max_batch_tokens?: number;
 	tei_max_concurrent_reqs?: number;
 	tei_pooling?: string;

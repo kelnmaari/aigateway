@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.8] - 2026-03-30
+
+### Fixed
+
+- **Log Viewer Freeze / PC Hang**: Container log modal caused browser main thread to block and freeze the entire OS when logs were large (SGLang, vLLM produce thousands of verbose lines). Four root causes fixed:
+  1. **Colorization on every render**: `{@html colorizeLogs(logsModalContent)}` was called on every Svelte render cycle — any state change (scroll position, button hover, etc.) triggered full re-processing of all log lines. Moved to `fetchLogsForModal` — computed once per fetch tick only.
+  2. **No cache**: Identical log content was fully reprocessed on every 2-second poll tick. Added single-entry cache — same raw string returns pre-built HTML immediately.
+  3. **ANSI escape codes not stripped**: SGLang/vLLM output raw terminal ANSI color codes (`\x1b[32m...\x1b[0m`). These confused regexes and produced broken `<span>` HTML with garbage content. Now stripped before processing.
+  4. **Cascading regexes on already-HTML content**: Each regex ran against the HTML output of the previous one, causing later patterns (file paths, HTTP codes) to match inside `style="color:#..."` attribute values and create nested/duplicate spans. Replaced with segment-based colorizer — all patterns collect `{start, end, color}` ranges on the PLAIN text, then one final pass builds HTML with no overlap.
+  - Added line cap: displays last 2000 lines max with "N earlier lines not shown" notice.
+
+---
+
+## [5.1.7] - 2026-03-30
+
+### Added
+
+- **TEI CPU Mode**: Text Embeddings Inference now supports CPU-only execution. New `tei_cpu_mode` checkbox in the model form — when enabled, uses `ghcr.io/huggingface/text-embeddings-inference:cpu-1.8` image with no GPU passthrough. Useful when GPU is fully occupied by LLM inference models and embeddings can run on CPU.
+
+### Fixed
+
+- **TEI Image Selection Bug**: Default `DefaultTEIImage` was `89-1.8` (GPU-specific image for compute capability 8.9), but the GPU conditional branch also set the same `89-1.8` — CPU path never used a CPU image. Fixed: empty `GPUDevice` or `TEICPUMode=true` now correctly selects `cpu-1.8` and clears GPU device passthrough.
+
+---
+
 ## [5.1.6] - 2026-03-30
 
 ### Fixed

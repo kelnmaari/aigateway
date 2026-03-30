@@ -46,7 +46,8 @@ const (
 	DefaultLlamaImage    = "ghcr.io/ggml-org/llama.cpp:server-cuda"
 	DefaultSGLangImage   = "lmsysorg/sglang:latest"
 	DefaultTGIImage      = "ghcr.io/huggingface/text-generation-inference:latest"
-	DefaultTEIImage      = "ghcr.io/huggingface/text-embeddings-inference:89-1.8" // Use 1.7 for stability, GPU: :1.7
+	DefaultTEIImage      = "ghcr.io/huggingface/text-embeddings-inference:89-1.8" // GPU cc 8.9 (RTX 4090, L4)
+	DefaultTEICPUImage   = "ghcr.io/huggingface/text-embeddings-inference:cpu-1.8" // CPU-only variant
 	DefaultTRTLLMImage   = "nvcr.io/nvidia/tritonserver:24.12-trtllm-python-py3"
 	defaultVLLMPort      = 8000
 	defaultLlamaServPort = 8080
@@ -383,11 +384,15 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 		cmd = append(cmd, splitArgs(spec.TEIExtraArgs)...)
 	}
 
-	// Determine if GPU is available - use GPU image variant
+	// Image and GPU selection:
+	// - CPU mode (TEICPUMode=true OR no GPUDevice): use cpu-* image, no GPU passthrough
+	// - GPU mode: use GPU-specific image (89-1.8 for cc8.9 by default)
+	cpuMode := spec.TEICPUMode || spec.GPUDevice == ""
 	image := DefaultTEIImage
-	if spec.GPUDevice != "" {
-		// Use GPU variant for better performance
-		image = "ghcr.io/huggingface/text-embeddings-inference:89-1.8"
+	gpuDevice := spec.GPUDevice
+	if cpuMode {
+		image = DefaultTEICPUImage
+		gpuDevice = "" // no GPU passthrough for CPU container
 	}
 
 	return ContainerStartRequest{
@@ -400,7 +405,7 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 		Mounts: []VolumeMount{
 			{HostPath: hfCacheDir, ContainerPath: "/data", ReadOnly: false},
 		},
-		GPUDevice: spec.GPUDevice,
+		GPUDevice: gpuDevice,
 	}
 }
 

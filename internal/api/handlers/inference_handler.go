@@ -101,6 +101,7 @@ type LoadRequest struct {
 	TGIExtraArgs          string  `json:"tgi_extra_args"`
 
 	// TEI options
+	TEICPUMode           bool   `json:"tei_cpu_mode"`
 	TEIMaxBatchTokens    int    `json:"tei_max_batch_tokens"`
 	TEIMaxConcurrentReqs int    `json:"tei_max_concurrent_reqs"`
 	TEIPooling           string `json:"tei_pooling"`
@@ -206,6 +207,7 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		TGICudaMemoryFraction: req.TGICudaMemoryFraction,
 		TGIExtraArgs:         req.TGIExtraArgs,
 		// TEI
+		TEICPUMode:           req.TEICPUMode,
 		TEIMaxBatchTokens:    req.TEIMaxBatchTokens,
 		TEIMaxConcurrentReqs: req.TEIMaxConcurrentReqs,
 		TEIPooling:           req.TEIPooling,
@@ -712,6 +714,7 @@ type SavedModelResponse struct {
 	TGIExtraArgs         string  `json:"tgi_extra_args,omitempty"`
 
 	// TEI
+	TEICPUMode           bool   `json:"tei_cpu_mode,omitempty"`
 	TEIMaxBatchTokens    int    `json:"tei_max_batch_tokens,omitempty"`
 	TEIMaxConcurrentReqs int    `json:"tei_max_concurrent_reqs,omitempty"`
 	TEIPooling           string `json:"tei_pooling,omitempty"`
@@ -792,6 +795,7 @@ func (h *InferenceHandler) GetSavedModels(c *gin.Context) {
 			TGICudaMemoryFraction: m.TGICudaMemoryFraction,
 			TGIExtraArgs:         m.TGIExtraArgs,
 			// TEI
+			TEICPUMode:           m.TEICPUMode,
 			TEIMaxBatchTokens:    m.TEIMaxBatchTokens,
 			TEIMaxConcurrentReqs: m.TEIMaxConcurrentReqs,
 			TEIPooling:           m.TEIPooling,
@@ -909,6 +913,7 @@ type UpdateSavedRequest struct {
 	TGIQuantize              *string  `json:"tgi_quantize,omitempty"`
 	TGICudaMemoryFraction    *float64 `json:"tgi_cuda_memory_fraction,omitempty"`
 	TGIExtraArgs             *string  `json:"tgi_extra_args,omitempty"`
+	TEICPUMode               *bool    `json:"tei_cpu_mode,omitempty"`
 	TEIMaxBatchTokens        *int     `json:"tei_max_batch_tokens,omitempty"`
 	TEIMaxConcurrentReqs     *int     `json:"tei_max_concurrent_reqs,omitempty"`
 	TEIPooling               *string  `json:"tei_pooling,omitempty"`
@@ -1016,6 +1021,9 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		}
 		if req.TGIExtraArgs != nil {
 			m.TGIExtraArgs = *req.TGIExtraArgs
+		}
+		if req.TEICPUMode != nil {
+			m.TEICPUMode = *req.TEICPUMode
 		}
 		if req.TEIMaxBatchTokens != nil {
 			m.TEIMaxBatchTokens = *req.TEIMaxBatchTokens
@@ -1153,6 +1161,7 @@ type CreateSavedRequest struct {
 	TGIQuantize            string   `json:"tgi_quantize"`
 	TGICudaMemoryFraction  float64  `json:"tgi_cuda_memory_fraction"`
 	TGIExtraArgs           string   `json:"tgi_extra_args"`
+	TEICPUMode             bool     `json:"tei_cpu_mode"`
 	TEIMaxBatchTokens      int      `json:"tei_max_batch_tokens"`
 	TEIMaxConcurrentReqs   int      `json:"tei_max_concurrent_reqs"`
 	TEIPooling             string   `json:"tei_pooling"`
@@ -1232,6 +1241,7 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		TGIQuantize:             req.TGIQuantize,
 		TGICudaMemoryFraction:   req.TGICudaMemoryFraction,
 		TGIExtraArgs:            req.TGIExtraArgs,
+		TEICPUMode:              req.TEICPUMode,
 		TEIMaxBatchTokens:       req.TEIMaxBatchTokens,
 		TEIMaxConcurrentReqs:    req.TEIMaxConcurrentReqs,
 		TEIPooling:              req.TEIPooling,

@@ -102,6 +102,7 @@ type ModelSpec struct {
 	TGIExtraArgs         string  // extra CLI args
 
 	// TEI-specific
+	TEICPUMode           bool   // force CPU-only image (ghcr.io/.../text-embeddings-inference:cpu-*)
 	TEIMaxBatchTokens    int    // --max-batch-tokens
 	TEIMaxConcurrentReqs int    // --max-concurrent-requests
 	TEIPooling           string // --pooling (cls, mean, splade, last-token)

@@ -181,114 +181,161 @@
 	let logsModalOpen = $state(false);
 	let logsModalAlias = $state('');
 	let logsModalContent = $state('');
+	let logsModalHtml = $state(''); // pre-computed colorized HTML, updated only on fetch
 	let logsModalLoading = $state(false);
 	let logsModalInterval: ReturnType<typeof setInterval> | null = null;
 	let logsModalAutoScroll = $state(true);
 	let logsContainer: HTMLDivElement | null = $state(null);
 
-	// Colorize log lines
-	function colorizeLogs(logs: string): string {
-		if (!logs) return '';
+	// ── Log colorizer ─────────────────────────────────────────────────────────
+	// Rules:
+	//  1. ANSI escape codes are stripped before processing (SGLang outputs raw ANSI).
+	//  2. All regexes run on PLAIN escaped text, never on already-HTML content.
+	//     We collect segments (ranges + colors) and build HTML in one final pass
+	//     to avoid cascading regex matches inside <span style="..."> attributes.
+	//  3. Result is cached by raw content — repeated calls with same string are free.
+	//  4. Lines are capped at MAX_LOG_LINES to prevent DOM explosion.
 
-		// Use inline styles because Tailwind JIT doesn't see dynamically generated classes
-		const colors = {
-			gray: '#6b7280',
-			red: '#ef4444',
-			yellow: '#eab308',
-			blue: '#60a5fa',
-			green: '#4ade80',
-			cyan: '#22d3ee',
-			purple: '#a78bfa',
-			orange: '#fb923c',
-			teal: '#2dd4bf',
-			pink: '#f472b6',
-			lime: '#a3e635'
-		};
+	const MAX_LOG_LINES = 2000;
+	// eslint-disable-next-line no-control-regex
+	const ANSI_RE = /\x1b\[[0-9;]*[mGKHFABCDJMsuhlp]/g;
 
-		return logs
-			.split('\n')
-			.map((line) => {
-				let html = escapeHtml(line);
+	// Single-entry cache: same raw string → same HTML
+	let _cacheRaw = '';
+	let _cacheHtml = '';
 
-				// Timestamps: time="..." or [2025-...] or 2025-01-01T...
-				html = html.replace(
-					/(time=&quot;[^&]*&quot;|^\[\d{4}-[^\]]+\]|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*)/g,
-					`<span style="color:${colors.gray}">$1</span>`
-				);
-
-				// Log levels with colors
-				html = html.replace(
-					/\b(level=error|ERROR|ERRO|FATAL|CRITICAL)\b/gi,
-					`<span style="color:${colors.red};font-weight:bold">$1</span>`
-				);
-				html = html.replace(
-					/\b(level=warn|WARNING|WARN)\b/gi,
-					`<span style="color:${colors.yellow};font-weight:bold">$1</span>`
-				);
-				html = html.replace(
-					/\b(level=info|INFO)\b/gi,
-					`<span style="color:${colors.blue}">$1</span>`
-				);
-				html = html.replace(
-					/\b(level=debug|DEBUG)\b/gi,
-					`<span style="color:${colors.gray}">$1</span>`
-				);
-
-				// Success messages
-				html = html.replace(
-					/\b(SUCCESS|OK|READY|LOADED|STARTED|COMPLETED|loaded|started)\b/g,
-					`<span style="color:${colors.green};font-weight:bold">$1</span>`
-				);
-
-				// msg="..." content (escaped quotes)
-				html = html.replace(
-					/msg=&quot;([^&]*)&quot;/g,
-					`msg=&quot;<span style="color:${colors.cyan}">$1</span>&quot;`
-				);
-
-				// Key=value pairs (highlight keys) - avoid already colored spans
-				html = html.replace(/\b([a-z_]+)=([^\s<]+)/gi, (match, key, value) => {
-					if (
-						key === 'level' ||
-						key === 'msg' ||
-						key === 'time' ||
-						key === 'style' ||
-						key === 'color'
-					)
-						return match;
-					return `<span style="color:${colors.purple}">${key}</span>=<span style="color:${colors.orange}">${value}</span>`;
-				});
-
-				// Numbers with units
-				html = html.replace(
-					/\b(\d+\.?\d*)(ms|s|MB|GB|KB|MiB|GiB|B|%)\b/g,
-					`<span style="color:${colors.yellow}">$1$2</span>`
-				);
-
-				// File paths
-				html = html.replace(
-					/(\/[a-zA-Z0-9_.\/-]+)/g,
-					`<span style="color:${colors.teal}">$1</span>`
-				);
-
-				// HTTP methods
-				html = html.replace(
-					/\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g,
-					`<span style="color:${colors.pink};font-weight:bold">$1</span>`
-				);
-
-				// HTTP status codes
-				html = html.replace(/\b(2\d{2})\b/g, `<span style="color:${colors.green}">$1</span>`);
-				html = html.replace(/\b(4\d{2})\b/g, `<span style="color:${colors.yellow}">$1</span>`);
-				html = html.replace(/\b(5\d{2})\b/g, `<span style="color:${colors.red}">$1</span>`);
-
-				return html;
-			})
-			.join('\n');
-	}
+	// Use inline styles because Tailwind JIT doesn't see dynamically generated classes
+	const C = {
+		gray:   '#6b7280',
+		red:    '#ef4444',
+		yellow: '#eab308',
+		blue:   '#60a5fa',
+		green:  '#4ade80',
+		cyan:   '#22d3ee',
+		purple: '#a78bfa',
+		orange: '#fb923c',
+		teal:   '#2dd4bf',
+		pink:   '#f472b6'
+	};
 
 	function escapeHtml(text: string): string {
 		return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	}
+
+	/** Apply all coloring rules to a single PLAIN (escaped-HTML, no existing spans) line.
+	 *  Uses a segment-based approach so regexes never see their own output. */
+	function colorizeOneLine(plain: string): string {
+		// Collect (start, end, color, bold) segments from the plain text.
+		// Later we build the HTML string in one pass, avoiding cascading.
+		type Seg = { s: number; e: number; color: string; bold?: boolean };
+		const segs: Seg[] = [];
+
+		function addSegs(re: RegExp, color: string, bold?: boolean) {
+			let m: RegExpExecArray | null;
+			re.lastIndex = 0;
+			while ((m = re.exec(plain)) !== null) {
+				segs.push({ s: m.index, e: m.index + m[0].length, color, bold });
+			}
+		}
+
+		// ── Timestamps ──────────────────────────────────────────────────────────
+		addSegs(/time="[^"]*"|^\[\d{4}-[^\]]+\]|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*/gm, C.gray);
+
+		// ── Log levels ──────────────────────────────────────────────────────────
+		addSegs(/\b(level=error|ERROR|ERRO|FATAL|CRITICAL)\b/gi, C.red, true);
+		addSegs(/\b(level=warn|WARNING|WARN)\b/gi, C.yellow, true);
+		addSegs(/\b(level=info|INFO)\b/gi, C.blue);
+		addSegs(/\b(level=debug|DEBUG)\b/gi, C.gray);
+
+		// ── Success keywords ────────────────────────────────────────────────────
+		addSegs(/\b(SUCCESS|READY|LOADED|STARTED|COMPLETED|loaded|started)\b/g, C.green, true);
+
+		// ── HTTP methods ────────────────────────────────────────────────────────
+		addSegs(/\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g, C.pink, true);
+
+		// ── HTTP status codes ───────────────────────────────────────────────────
+		addSegs(/\b2\d{2}\b/g, C.green);
+		addSegs(/\b4\d{2}\b/g, C.yellow);
+		addSegs(/\b5\d{2}\b/g, C.red);
+
+		// ── Numbers with units ──────────────────────────────────────────────────
+		addSegs(/\b\d+\.?\d*(?:ms|s|MB|GB|KB|MiB|GiB|B|%)\b/g, C.yellow);
+
+		// ── File paths ───────────────────────────────────────────────────────────
+		addSegs(/\/[a-zA-Z0-9_./-]{2,}/g, C.teal);
+
+		// ── key=value pairs ──────────────────────────────────────────────────────
+		// Match key=value but skip reserved keys that are handled above
+		const KV_SKIP = new Set(['level', 'msg', 'time']);
+		{
+			const kvRe = /\b([a-z_]\w*)=(\S+)/gi;
+			let m: RegExpExecArray | null;
+			kvRe.lastIndex = 0;
+			while ((m = kvRe.exec(plain)) !== null) {
+				const key = m[1].toLowerCase();
+				if (KV_SKIP.has(key)) continue;
+				// key part
+				segs.push({ s: m.index, e: m.index + m[1].length, color: C.purple });
+				// value part (after '=')
+				const valStart = m.index + m[1].length + 1;
+				segs.push({ s: valStart, e: valStart + m[2].length, color: C.orange });
+			}
+		}
+
+		// ── msg="…" content ──────────────────────────────────────────────────────
+		{
+			const msgRe = /msg="([^"]*)"/g;
+			let m: RegExpExecArray | null;
+			msgRe.lastIndex = 0;
+			while ((m = msgRe.exec(plain)) !== null) {
+				// color just the inner content (group 1)
+				const innerStart = m.index + 5; // len('msg="') = 5
+				segs.push({ s: innerStart, e: innerStart + m[1].length, color: C.cyan });
+			}
+		}
+
+		if (segs.length === 0) return escapeHtml(plain);
+
+		// Sort by start position; for overlapping segments keep the earliest-starting
+		segs.sort((a, b) => a.s - b.s || a.e - b.e);
+
+		// Build output, skipping overlapping segments
+		let out = '';
+		let pos = 0;
+		for (const seg of segs) {
+			if (seg.s < pos) continue; // overlaps with a previous segment — skip
+			if (seg.s > pos) out += escapeHtml(plain.slice(pos, seg.s));
+			const content = escapeHtml(plain.slice(seg.s, seg.e));
+			const style = seg.bold ? `color:${seg.color};font-weight:bold` : `color:${seg.color}`;
+			out += `<span style="${style}">${content}</span>`;
+			pos = seg.e;
+		}
+		if (pos < plain.length) out += escapeHtml(plain.slice(pos));
+		return out;
+	}
+
+	function colorizeLogs(logs: string): string {
+		if (!logs) return '';
+		// Cache: if same raw content, return cached HTML immediately
+		if (logs === _cacheRaw) return _cacheHtml;
+
+		// Strip ANSI escape codes (SGLang / vLLM output raw terminal colors)
+		const stripped = logs.replace(ANSI_RE, '');
+
+		const allLines = stripped.split('\n');
+		let headerHtml = '';
+		let lines = allLines;
+
+		if (allLines.length > MAX_LOG_LINES) {
+			const hidden = allLines.length - MAX_LOG_LINES;
+			lines = allLines.slice(-MAX_LOG_LINES);
+			headerHtml = `<span style="color:${C.gray};font-style:italic">... ${hidden} earlier lines not shown ...\n</span>`;
+		}
+
+		const html = headerHtml + lines.map(colorizeOneLine).join('\n');
+		_cacheRaw = logs;
+		_cacheHtml = html;
+		return html;
 	}
 
 	// Edit saved model modal state
@@ -342,6 +389,7 @@
 		tgi_quantize: string;
 		tgi_cuda_memory_fraction: number;
 		tgi_extra_args: string;
+		tei_cpu_mode: boolean;
 		tei_max_batch_tokens: number;
 		tei_max_concurrent_reqs: number;
 		tei_pooling: string;
@@ -397,6 +445,7 @@
 		tgi_quantize: '',
 		tgi_cuda_memory_fraction: 0,
 		tgi_extra_args: '',
+		tei_cpu_mode: false,
 		tei_max_batch_tokens: 0,
 		tei_max_concurrent_reqs: 0,
 		tei_pooling: '',
@@ -461,6 +510,7 @@
 		tgi_quantize: '',
 		tgi_cuda_memory_fraction: 0,
 		tgi_extra_args: '',
+		tei_cpu_mode: false,
 		tei_max_batch_tokens: 0,
 		tei_max_concurrent_reqs: 0,
 		tei_pooling: '',
@@ -1033,6 +1083,7 @@
 				tgi_quantize: form.tgi_quantize,
 				tgi_cuda_memory_fraction: form.tgi_cuda_memory_fraction,
 				tgi_extra_args: form.tgi_extra_args,
+				tei_cpu_mode: form.tei_cpu_mode,
 				tei_max_batch_tokens: form.tei_max_batch_tokens,
 				tei_max_concurrent_reqs: form.tei_max_concurrent_reqs,
 				tei_pooling: form.tei_pooling,
@@ -1128,6 +1179,7 @@
 				tgi_quantize: form.tgi_quantize,
 				tgi_cuda_memory_fraction: form.tgi_cuda_memory_fraction,
 				tgi_extra_args: form.tgi_extra_args,
+				tei_cpu_mode: form.tei_cpu_mode,
 				tei_max_batch_tokens: form.tei_max_batch_tokens,
 				tei_max_concurrent_reqs: form.tei_max_concurrent_reqs,
 				tei_pooling: form.tei_pooling,
@@ -1192,7 +1244,10 @@
 	async function fetchLogsForModal() {
 		try {
 			const resp = await inferenceApi.logs(logsModalAlias, 500);
-			logsModalContent = resp.logs || '';
+			const raw = resp.logs || '';
+			logsModalContent = raw;
+			// Colorize once per fetch, not on every Svelte render cycle
+			logsModalHtml = colorizeLogs(raw);
 
 			// Auto-scroll to bottom
 			if (logsModalAutoScroll && logsContainer) {
@@ -1204,6 +1259,7 @@
 			}
 		} catch (e: any) {
 			logsModalContent = `Error loading logs: ${e?.message || 'Unknown error'}`;
+			logsModalHtml = escapeHtml(logsModalContent);
 		} finally {
 			logsModalLoading = false;
 		}
@@ -1213,6 +1269,9 @@
 		logsModalOpen = false;
 		logsModalAlias = '';
 		logsModalContent = '';
+		logsModalHtml = '';
+		_cacheRaw = '';
+		_cacheHtml = '';
 		if (logsModalInterval) {
 			clearInterval(logsModalInterval);
 			logsModalInterval = null;
@@ -1277,6 +1336,7 @@
 				tgi_quantize: m.tgi_quantize,
 				tgi_cuda_memory_fraction: m.tgi_cuda_memory_fraction,
 				tgi_extra_args: m.tgi_extra_args,
+				tei_cpu_mode: m.tei_cpu_mode ?? false,
 				tei_max_batch_tokens: m.tei_max_batch_tokens,
 				tei_max_concurrent_reqs: m.tei_max_concurrent_reqs,
 				tei_pooling: m.tei_pooling,
@@ -1410,6 +1470,7 @@
 			tgi_quantize: saved.tgi_quantize || '',
 			tgi_cuda_memory_fraction: saved.tgi_cuda_memory_fraction || 0,
 			tgi_extra_args: saved.tgi_extra_args || '',
+			tei_cpu_mode: saved.tei_cpu_mode ?? false,
 			tei_max_batch_tokens: saved.tei_max_batch_tokens || 0,
 			tei_max_concurrent_reqs: saved.tei_max_concurrent_reqs || 0,
 			tei_pooling: saved.tei_pooling || '',
@@ -1511,6 +1572,7 @@
 				tgi_quantize: saved.tgi_quantize,
 				tgi_cuda_memory_fraction: saved.tgi_cuda_memory_fraction,
 				tgi_extra_args: saved.tgi_extra_args,
+				tei_cpu_mode: saved.tei_cpu_mode,
 				tei_max_batch_tokens: saved.tei_max_batch_tokens,
 				tei_max_concurrent_reqs: saved.tei_max_concurrent_reqs,
 				tei_pooling: saved.tei_pooling,
@@ -2401,6 +2463,13 @@
 							</label>
 						</div>
 					{:else if form.provider === 'tei'}
+						<div class="border-t pt-2">
+							<label class="flex cursor-pointer items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.tei_cpu_mode} />
+								<span class="font-medium">CPU Mode</span>
+								<span class="text-muted-foreground text-xs">Use CPU-only image (<code>cpu-1.8</code>). Frees GPU for LLMs. Slower, but no CUDA required.</span>
+							</label>
+						</div>
 						<div class="grid gap-3 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
 							<label class="flex flex-col gap-1 text-sm">
 								<FormLabel label="Max Batch Tokens" description="Max tokens per batch. Higher = more throughput, more VRAM. 0 = default (16384)" />
@@ -3721,6 +3790,13 @@
 						/>
 					</div>
 				{:else if editingSavedModel.provider === 'tei'}
+					<div class="mb-3">
+						<label class="flex cursor-pointer items-center gap-2 text-sm">
+							<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.tei_cpu_mode} />
+							<span class="font-medium">CPU Mode</span>
+							<span class="text-muted-foreground text-xs">Use CPU-only image. Frees GPU for LLMs.</span>
+						</label>
+					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
 							<FormLabel label="Max Batch Tokens" description="Max tokens per batch. Higher = more throughput, more VRAM. 0 = default (16384)" />
@@ -4007,10 +4083,8 @@
 				class="flex-1 overflow-auto bg-black/95 p-4 font-mono text-sm text-gray-300"
 				bind:this={logsContainer}
 			>
-				{#if logsModalContent}
-					<pre class="leading-relaxed break-words whitespace-pre-wrap">{@html colorizeLogs(
-							logsModalContent
-						)}</pre>
+				{#if logsModalHtml}
+					<pre class="leading-relaxed break-words whitespace-pre-wrap">{@html logsModalHtml}</pre>
 				{:else if logsModalLoading}
 					<div class="text-muted-foreground">{m.admin_models_logs_loading()}</div>
 				{:else}

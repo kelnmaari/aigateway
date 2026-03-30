@@ -37,6 +37,7 @@ type Service struct {
 	dockerRuntime  *DockerRuntime // Direct reference for discovery
 	downloader     *ModelDownloader
 	trtConverter   *TRTConverter
+	onnxExporter   *OnnxExporter
 	logger         *logrus.Logger
 	registry       *SpecRegistry
 	providerLogger *ProviderLogger
@@ -129,6 +130,7 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 		dockerRuntime:  runtime,
 		downloader:     dl,
 		trtConverter:   trtConv,
+		onnxExporter:   NewOnnxExporter(cfg.HFCacheDir, cfg.HFToken, cfg.Logger),
 		logger:         cfg.Logger,
 		registry:       NewSpecRegistry(),
 		providerLogger: provLogger,
@@ -487,6 +489,11 @@ func (s *Service) ListArtifacts() ([]ArtifactInfo, error) {
 // TRTConverter returns the TensorRT-LLM converter instance (may be nil if not configured).
 func (s *Service) TRTConverter() *TRTConverter {
 	return s.trtConverter
+}
+
+// OnnxExporter returns the ONNX export manager.
+func (s *Service) OnnxExporter() *OnnxExporter {
+	return s.onnxExporter
 }
 
 // ClearCache removes all cached model files from HF and GGUF cache directories.

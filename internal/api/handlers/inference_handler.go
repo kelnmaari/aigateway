@@ -596,6 +596,66 @@ func (h *InferenceHandler) ConvertTRT(c *gin.Context) {
 	})
 }
 
+// ── ONNX Export ───────────────────────────────────────────────────────────────
+
+// PostStartOnnxExport starts an ONNX model export job.
+// POST /api/system/inference/onnx-export
+func (h *InferenceHandler) PostStartOnnxExport(c *gin.Context) {
+	exporter := h.router.OnnxExporter()
+	if exporter == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ONNX exporter not available"})
+		return
+	}
+
+	var req inference.OnnxExportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+
+	job, err := exporter.StartExport(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	snap := job.Snapshot()
+	c.JSON(http.StatusOK, snap)
+}
+
+// GetOnnxExportJob returns status and logs for a single export job.
+// GET /api/system/inference/onnx-export/:id
+func (h *InferenceHandler) GetOnnxExportJob(c *gin.Context) {
+	exporter := h.router.OnnxExporter()
+	if exporter == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ONNX exporter not available"})
+		return
+	}
+
+	id := c.Param("id")
+	snap, ok := exporter.GetJob(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, snap)
+}
+
+// GetOnnxExportJobs lists all ONNX export jobs.
+// GET /api/system/inference/onnx-export
+func (h *InferenceHandler) GetOnnxExportJobs(c *gin.Context) {
+	exporter := h.router.OnnxExporter()
+	if exporter == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+
+	c.JSON(http.StatusOK, exporter.ListJobs())
+}
+
+// ── TRT Engines ───────────────────────────────────────────────────────────────
+
 // ListTRTEngines returns all cached TRT engines.
 // GET /api/system/inference/trt-engines
 func (h *InferenceHandler) ListTRTEngines(c *gin.Context) {

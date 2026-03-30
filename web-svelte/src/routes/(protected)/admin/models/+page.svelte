@@ -12,6 +12,7 @@
 		type GPUDevice,
 		type SavedModel,
 		type RepoDownload,
+		type OnnxExportJob,
 		CHAT_IMPLIED_CAPABILITIES,
 		EMBEDDING_IMPLIED_CAPABILITIES
 	} from '$lib/api/inference';
@@ -186,6 +187,16 @@
 	let logsModalInterval: ReturnType<typeof setInterval> | null = null;
 	let logsModalAutoScroll = $state(true);
 	let logsContainer: HTMLDivElement | null = $state(null);
+
+	// ONNX Export modal state
+	let onnxModalOpen = $state(false);
+	let onnxModalJob = $state<OnnxExportJob | null>(null);
+	let onnxModalHfRepo = $state('');
+	let onnxModalTask = $state('feature-extraction');
+	let onnxModalDtype = $state('float32');
+	let onnxModalStarting = $state(false);
+	let onnxModalInterval: ReturnType<typeof setInterval> | null = null;
+	let onnxLogsEl: HTMLDivElement | null = $state(null);
 
 	// ── Log colorizer ─────────────────────────────────────────────────────────
 	// Rules:
@@ -538,6 +549,7 @@
 		if (logsInterval) clearInterval(logsInterval);
 		if (repoDownloadsInterval) clearInterval(repoDownloadsInterval);
 		if (logsModalInterval) clearInterval(logsModalInterval);
+		if (onnxModalInterval) clearInterval(onnxModalInterval);
 	});
 
 	// Auto-refresh downloads when tab is active
@@ -1275,6 +1287,69 @@
 		if (logsModalInterval) {
 			clearInterval(logsModalInterval);
 			logsModalInterval = null;
+		}
+	}
+
+	// ONNX Export modal functions
+	function openOnnxModal(hfRepo: string) {
+		onnxModalHfRepo = hfRepo;
+		onnxModalTask = 'feature-extraction';
+		onnxModalDtype = 'float32';
+		onnxModalJob = null;
+		onnxModalStarting = false;
+		onnxModalOpen = true;
+	}
+
+	function closeOnnxModal() {
+		onnxModalOpen = false;
+		onnxModalJob = null;
+		onnxModalHfRepo = '';
+		if (onnxModalInterval) {
+			clearInterval(onnxModalInterval);
+			onnxModalInterval = null;
+		}
+	}
+
+	async function startOnnxExport() {
+		if (!onnxModalHfRepo) return;
+		onnxModalStarting = true;
+		try {
+			const job = await inferenceApi.startOnnxExport({
+				hf_repo: onnxModalHfRepo,
+				task: onnxModalTask,
+				dtype: onnxModalDtype
+			});
+			onnxModalJob = job;
+			// Poll every 2s while running/pending
+			if (onnxModalInterval) clearInterval(onnxModalInterval);
+			onnxModalInterval = setInterval(pollOnnxJob, 2000);
+		} catch (e: any) {
+			showMsg(e?.message || 'Failed to start ONNX export', 'error');
+		} finally {
+			onnxModalStarting = false;
+		}
+	}
+
+	async function pollOnnxJob() {
+		if (!onnxModalJob) return;
+		try {
+			const job = await inferenceApi.getOnnxExportJob(onnxModalJob.id);
+			onnxModalJob = job;
+			// Auto-scroll logs
+			if (onnxLogsEl) {
+				setTimeout(() => {
+					if (onnxLogsEl) onnxLogsEl.scrollTop = onnxLogsEl.scrollHeight;
+				}, 30);
+			}
+			// Stop polling when terminal state reached
+			if (job.status === 'done' || job.status === 'failed') {
+				if (onnxModalInterval) {
+					clearInterval(onnxModalInterval);
+					onnxModalInterval = null;
+				}
+			}
+		} catch {
+			// ignore poll errors
 		}
 	}
 
@@ -2612,6 +2687,15 @@
 												<FontAwesomeIcon icon={faArrowsRotate} class="h-3 w-3" />
 											</button>
 										{/if}
+										{#if saved.provider === 'tei' && saved.hf_repo}
+											<button
+												class="rounded border px-2 py-1 text-xs text-purple-500 hover:bg-purple-500/10"
+												onclick={() => openOnnxModal(saved.hf_repo!)}
+												title="Export model to ONNX format for CPU inference"
+											>
+												ONNX
+											</button>
+										{/if}
 										<button
 											class="hover:bg-muted rounded border px-2 py-1 text-xs"
 											onclick={() => toggleAutoStart(saved)}
@@ -2703,6 +2787,18 @@
 												}}
 												title={m.admin_models_logs_title()}>{m.admin_models_logs()}</button
 											>
+											{#if mdl.provider === 'tei' && mdl.hf_repo}
+												<button
+													class="rounded border px-2 py-1 text-xs text-purple-500 hover:bg-purple-500/10"
+													onclick={(e) => {
+														e.stopPropagation();
+														openOnnxModal(mdl.hf_repo!);
+													}}
+													title="Export model to ONNX format for CPU inference"
+												>
+													ONNX
+												</button>
+											{/if}
 										{:else}
 											<button
 												class="rounded border bg-green-500/10 px-2 py-1 text-xs text-green-600 hover:bg-green-500/20"
@@ -4089,6 +4185,146 @@
 					<div class="text-muted-foreground">{m.admin_models_logs_loading()}</div>
 				{:else}
 					<div class="text-muted-foreground">{m.admin_models_logs_no_logs()}</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ONNX Export Modal -->
+{#if onnxModalOpen}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+		onclick={closeOnnxModal}
+		onkeydown={(e) => e.key === 'Escape' && closeOnnxModal()}
+		tabindex="-1"
+		role="dialog"
+		aria-modal="true"
+	>
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div
+			class="bg-card flex flex-col rounded-lg border shadow-2xl"
+			style="width: 700px; max-width: 95vw; max-height: 90vh;"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			role="document"
+		>
+			<!-- Header -->
+			<div class="bg-muted/50 flex flex-shrink-0 items-center justify-between border-b px-4 py-3">
+				<div class="flex items-center gap-2">
+					<h2 class="text-lg font-semibold">Export ONNX</h2>
+					<span class="text-muted-foreground max-w-xs truncate text-sm">{onnxModalHfRepo}</span>
+				</div>
+				<button
+					class="text-muted-foreground hover:text-foreground hover:bg-muted flex h-8 w-8 items-center justify-center rounded"
+					onclick={closeOnnxModal}
+					title="Close"
+				>
+					<FontAwesomeIcon icon={faXmark} class="h-4 w-4" />
+				</button>
+			</div>
+
+			<!-- Body -->
+			<div class="flex flex-col gap-4 overflow-y-auto p-4">
+				{#if !onnxModalJob}
+					<!-- Config form -->
+					<p class="text-muted-foreground text-sm">
+						Exports the HuggingFace model to ONNX format using <code>optimum-cli</code> inside a
+						Docker container. The result is saved alongside the model snapshot so TEI can use it
+						directly in CPU mode.
+					</p>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="flex flex-col gap-1">
+							<label class="text-sm font-medium">Task</label>
+							<select class="bg-background rounded border px-2 py-1.5 text-sm" bind:value={onnxModalTask}>
+								<option value="feature-extraction">feature-extraction (embeddings)</option>
+								<option value="text-classification">text-classification (rerank)</option>
+								<option value="token-classification">token-classification</option>
+								<option value="fill-mask">fill-mask</option>
+								<option value="sentence-similarity">sentence-similarity</option>
+							</select>
+						</div>
+						<div class="flex flex-col gap-1">
+							<label class="text-sm font-medium">Dtype</label>
+							<select class="bg-background rounded border px-2 py-1.5 text-sm" bind:value={onnxModalDtype}>
+								<option value="float32">float32 (safest)</option>
+								<option value="float16">float16 (faster GPU)</option>
+								<option value="int8">int8 (quantized CPU)</option>
+								<option value="uint8">uint8 (quantized CPU)</option>
+							</select>
+						</div>
+					</div>
+					<div class="flex justify-end gap-2">
+						<button
+							class="hover:bg-muted rounded border px-4 py-2 text-sm"
+							onclick={closeOnnxModal}>Cancel</button
+						>
+						<button
+							class="rounded border bg-purple-500/10 px-4 py-2 text-sm text-purple-500 hover:bg-purple-500/20 disabled:opacity-50"
+							onclick={startOnnxExport}
+							disabled={onnxModalStarting}
+						>
+							{#if onnxModalStarting}
+								<FontAwesomeIcon icon={faSpinner} class="mr-1 h-3 w-3 animate-spin" />
+							{/if}
+							Start Export
+						</button>
+					</div>
+				{:else}
+					<!-- Job status & logs -->
+					<div class="flex items-center gap-3">
+						<span class="text-sm font-medium">Status:</span>
+						{#if onnxModalJob.status === 'pending' || onnxModalJob.status === 'running'}
+							<FontAwesomeIcon icon={faSpinner} class="h-4 w-4 animate-spin text-blue-400" />
+							<span class="text-sm text-blue-400 capitalize">{onnxModalJob.status}</span>
+						{:else if onnxModalJob.status === 'done'}
+							<FontAwesomeIcon icon={faCircleCheck} class="h-4 w-4 text-green-400" />
+							<span class="text-sm text-green-400">Done</span>
+						{:else}
+							<FontAwesomeIcon icon={faCircleXmark} class="h-4 w-4 text-red-400" />
+							<span class="text-sm text-red-400">Failed</span>
+						{/if}
+						{#if onnxModalJob.output_dir}
+							<span class="text-muted-foreground ml-auto max-w-xs truncate text-xs"
+								title={onnxModalJob.output_dir}
+								>{onnxModalJob.output_dir}</span
+							>
+						{/if}
+					</div>
+
+					{#if onnxModalJob.error}
+						<div class="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+							{onnxModalJob.error}
+						</div>
+					{/if}
+
+					<!-- Log output -->
+					<div
+						class="h-72 overflow-auto rounded bg-black/90 p-3 font-mono text-xs text-gray-300"
+						bind:this={onnxLogsEl}
+					>
+						{#each onnxModalJob.logs || [] as line}
+							<div class="leading-relaxed">{line}</div>
+						{/each}
+						{#if (onnxModalJob.logs || []).length === 0}
+							<span class="text-muted-foreground">Waiting for output...</span>
+						{/if}
+					</div>
+
+					<div class="flex justify-end gap-2">
+						{#if onnxModalJob.status === 'done' || onnxModalJob.status === 'failed'}
+							<button
+								class="rounded border bg-purple-500/10 px-4 py-2 text-sm text-purple-500 hover:bg-purple-500/20"
+								onclick={() => { onnxModalJob = null; }}
+							>
+								New Export
+							</button>
+						{/if}
+						<button
+							class="hover:bg-muted rounded border px-4 py-2 text-sm"
+							onclick={closeOnnxModal}>Close</button
+						>
+					</div>
 				{/if}
 			</div>
 		</div>

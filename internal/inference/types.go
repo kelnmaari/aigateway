@@ -148,7 +148,8 @@ type ContainerStartRequest struct {
 	Env        map[string]string
 	Ports      map[string]int
 	Mounts     []VolumeMount
-	GPUDevice  string // GPU device(s) to use, e.g., "0", "1", "0,1", empty = all
+	GPUDevice  string // GPU device(s) to use, e.g., "0", "1", "0,1", empty = all GPUs
+	CPUOnly    bool   // if true, no GPU is passed to Docker at all (CPU-only containers)
 }
 
 // VolumeMount describes a host->container mount.

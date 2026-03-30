@@ -406,6 +406,7 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 			{HostPath: hfCacheDir, ContainerPath: "/data", ReadOnly: false},
 		},
 		GPUDevice: gpuDevice,
+		CPUOnly:   cpuMode,
 	}
 }
 

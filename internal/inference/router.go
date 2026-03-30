@@ -352,6 +352,11 @@ func (r *Router) TRTConverter() *TRTConverter {
 	return r.mgr.TRTConverter()
 }
 
+// OnnxExporter returns the ONNX export manager.
+func (r *Router) OnnxExporter() *OnnxExporter {
+	return r.mgr.OnnxExporter()
+}
+
 // GetRuntime returns the underlying DockerRuntime for image management.
 // Returns nil if runtime is not DockerRuntime.
 func (r *Router) GetRuntime() *DockerRuntime {

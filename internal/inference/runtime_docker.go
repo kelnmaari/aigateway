@@ -159,30 +159,33 @@ func (r *DockerRuntime) startAPI(ctx context.Context, containerName string, req 
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	// Build GPU device request - specific device(s) or all
-	gpuRequest := container.DeviceRequest{
-		Capabilities: [][]string{{"gpu"}},
-	}
-	if req.GPUDevice != "" {
-		// Use specific GPU(s), e.g., "0" or "0,1"
-		gpuRequest.DeviceIDs = strings.Split(req.GPUDevice, ",")
-	} else {
-		// Use all GPUs
-		gpuRequest.Count = -1
-	}
-
-	// Build host config with GPU and multi-GPU support
+	// Build host config; CPUOnly containers get no GPU device requests at all
 	hostConfig := &container.HostConfig{
 		PortBindings: portBindings,
 		Mounts:       mounts,
 		AutoRemove:   true,
-		Resources: container.Resources{
+	}
+
+	if !req.CPUOnly {
+		// Build GPU device request - specific device(s) or all
+		gpuRequest := container.DeviceRequest{
+			Capabilities: [][]string{{"gpu"}},
+		}
+		if req.GPUDevice != "" {
+			// Use specific GPU(s), e.g., "0" or "0,1"
+			gpuRequest.DeviceIDs = strings.Split(req.GPUDevice, ",")
+		} else {
+			// Use all GPUs
+			gpuRequest.Count = -1
+		}
+		hostConfig.Resources = container.Resources{
 			DeviceRequests: []container.DeviceRequest{gpuRequest},
-		},
+		}
 	}
 
 	// For multi-GPU setups (tensor parallel > 1), add NCCL requirements
-	if strings.Contains(req.GPUDevice, ",") || req.GPUDevice == "" {
+	// CPUOnly containers don't need NCCL
+	if !req.CPUOnly && (strings.Contains(req.GPUDevice, ",") || req.GPUDevice == "") {
 		// IPC host mode required for NCCL inter-GPU communication
 		hostConfig.IpcMode = "host"
 		// Increase shared memory for NCCL (16GB)
@@ -243,20 +246,23 @@ func (r *DockerRuntime) startCLI(ctx context.Context, containerName string, req 
 
 	args := []string{"run", "-d", "--rm", "--name", containerName}
 
-	// GPU access via --gpus all + NVIDIA_VISIBLE_DEVICES for specific devices
-	// This avoids the "cannot set both Count and DeviceIDs" error
-	isMultiGPU := strings.Contains(req.GPUDevice, ",") || req.GPUDevice == ""
-	args = append(args, "--gpus", "all")
-	if req.GPUDevice != "" {
-		// Restrict to specific GPUs via environment variable
-		args = append(args, "-e", fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", req.GPUDevice))
-	}
+	// GPU access: skip entirely for CPU-only containers
+	if !req.CPUOnly {
+		// GPU access via --gpus all + NVIDIA_VISIBLE_DEVICES for specific devices
+		// This avoids the "cannot set both Count and DeviceIDs" error
+		args = append(args, "--gpus", "all")
+		if req.GPUDevice != "" {
+			// Restrict to specific GPUs via environment variable
+			args = append(args, "-e", fmt.Sprintf("NVIDIA_VISIBLE_DEVICES=%s", req.GPUDevice))
+		}
 
-	// For multi-GPU setups, add NCCL requirements
-	if isMultiGPU {
-		args = append(args, "--ipc=host")                // Required for NCCL inter-GPU communication
-		args = append(args, "--shm-size=16g")            // Increase shared memory for NCCL
-		args = append(args, "--ulimit", "memlock=-1:-1") // Remove memlock limits
+		// For multi-GPU setups, add NCCL requirements
+		isMultiGPU := strings.Contains(req.GPUDevice, ",") || req.GPUDevice == ""
+		if isMultiGPU {
+			args = append(args, "--ipc=host")                // Required for NCCL inter-GPU communication
+			args = append(args, "--shm-size=16g")            // Increase shared memory for NCCL
+			args = append(args, "--ulimit", "memlock=-1:-1") // Remove memlock limits
+		}
 	}
 
 	for name, cport := range req.Ports {

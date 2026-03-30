@@ -376,3 +376,8 @@ func (m *Manager) EvictCacheSize(limitBytes int64) error {
 func (m *Manager) TRTConverter() *TRTConverter {
 	return m.svc.TRTConverter()
 }
+
+// OnnxExporter returns the ONNX export manager.
+func (m *Manager) OnnxExporter() *OnnxExporter {
+	return m.svc.OnnxExporter()
+}

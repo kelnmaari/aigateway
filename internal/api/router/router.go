@@ -598,6 +598,10 @@ func (r *Router) setupInferenceRoutes() {
 		group.GET("/trt-engines", r.inferenceHandler.ListTRTEngines)
 		group.POST("/convert-trt", r.inferenceHandler.ConvertTRT)
 		group.POST("/delete-trt-engine", r.inferenceHandler.DeleteTRTEngine)
+		// ONNX export
+		group.POST("/onnx-export", r.inferenceHandler.PostStartOnnxExport)
+		group.GET("/onnx-export", r.inferenceHandler.GetOnnxExportJobs)
+		group.GET("/onnx-export/:id", r.inferenceHandler.GetOnnxExportJob)
 		// Saved models (persist config between restarts)
 		group.GET("/saved", r.inferenceHandler.GetSavedModels)
 		group.POST("/save", r.inferenceHandler.PostSaveModel)

@@ -516,7 +516,36 @@ export const inferenceApi = {
 	// Refresh saved model (re-download missing/corrupted files)
 	refreshSaved: (alias: string) =>
 		api.post<RepoDownloadResponse>(`/api/system/inference/refresh-saved?alias=${encodeURIComponent(alias)}`),
+
+	// ONNX export
+	startOnnxExport: (req: OnnxExportRequest) =>
+		api.post<OnnxExportJob>('/api/system/inference/onnx-export', req),
+	getOnnxExportJob: (id: string) =>
+		api.get<OnnxExportJob>(`/api/system/inference/onnx-export/${id}`),
+	listOnnxExportJobs: () =>
+		api.get<OnnxExportJob[]>('/api/system/inference/onnx-export'),
 };
+
+// ── ONNX Export types ─────────────────────────────────────────────────────────
+
+export interface OnnxExportRequest {
+	hf_repo: string;
+	task?: string;   // "feature-extraction" | "text-classification"
+	dtype?: string;  // "float32" | "float16" | "int8"
+}
+
+export interface OnnxExportJob {
+	id: string;
+	hf_repo: string;
+	task: string;
+	dtype: string;
+	status: 'pending' | 'running' | 'done' | 'failed';
+	output_dir?: string;
+	logs: string[];
+	error?: string;
+	started_at: string;
+	done_at?: string;
+}
 
 // Repository download types
 export interface RepoDownload {

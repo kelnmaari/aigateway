@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.4] - 2026-03-30
+
+### Fixed
+
+- **Model Reload Deadlock After Evict**: Loading a model after Evict caused the UI to hang indefinitely. Root cause: `StartModel` health check used independent `context.Background()` — Evict killed the container but the health check loop kept running, holding the per-alias mutex. Added per-alias cancellation context (`cancelMap`) to `Orchestrator`; `Evict` calls `CancelStart()` to abort in-flight health checks and release the lock.
+
+---
+
 ## [5.1.3] - 2026-03-30
 
 ### Fixed

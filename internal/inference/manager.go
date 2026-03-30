@@ -93,6 +93,9 @@ func (m *Manager) Evict(ctx context.Context, alias string) error {
 	if m.isPinned(alias) {
 		return fmt.Errorf("model is pinned: %s", alias)
 	}
+	// Cancel any in-flight StartModel first — this unblocks health check loops
+	// and releases the alias lock so subsequent Load requests don't deadlock.
+	m.svc.orch.CancelStart(alias)
 	// Stop container if running (ignore error if not running)
 	_ = m.svc.Stop(ctx, alias)
 	// Remove from in-memory registry

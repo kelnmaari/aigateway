@@ -20,6 +20,9 @@ type Orchestrator struct {
 
 	mu      sync.RWMutex
 	models  map[string]*ModelInstance // alias -> instance
+
+	cancelMu  sync.Mutex
+	cancelMap map[string]context.CancelFunc // alias -> cancel for in-flight StartModel
 }
 
 // ModelInstance tracks current state of a model/container.
@@ -58,6 +61,7 @@ func NewOrchestrator(runtime ContainerRuntime, downloader *ModelDownloader, logg
 		healthCheckTimeout: hcTimeout,
 		startupTimeout:     startTimeout,
 		models:             make(map[string]*ModelInstance),
+		cancelMap:          make(map[string]context.CancelFunc),
 	}
 }
 
@@ -217,15 +221,26 @@ func (o *Orchestrator) PrepareModel(ctx context.Context, spec ModelSpec) (*Model
 func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq ContainerStartRequest) (*ModelInstance, error) {
 	// Use background context with startup timeout to prevent cancellation from HTTP request
 	// This allows model loading to continue even if user refreshes the page
-	var opCtx context.Context
-	var cancel context.CancelFunc
-	if o.startupTimeout > 0 {
-		opCtx, cancel = context.WithTimeout(context.Background(), o.startupTimeout)
-	} else {
-		opCtx, cancel = context.WithTimeout(context.Background(), 60*time.Minute)
+	timeout := o.startupTimeout
+	if timeout <= 0 {
+		timeout = 60 * time.Minute
 	}
+	opCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	_ = ctx // original HTTP context ignored to prevent cancellation on page refresh
+
+	// Store cancel func so Evict can abort this startup
+	o.cancelMu.Lock()
+	if prevCancel, ok := o.cancelMap[spec.Alias]; ok {
+		prevCancel() // cancel any previous in-flight startup
+	}
+	o.cancelMap[spec.Alias] = cancel
+	o.cancelMu.Unlock()
+	defer func() {
+		o.cancelMu.Lock()
+		delete(o.cancelMap, spec.Alias)
+		o.cancelMu.Unlock()
+	}()
 
 	inst, err := o.PrepareModel(opCtx, spec)
 	if err != nil {
@@ -267,10 +282,10 @@ func (o *Orchestrator) StartModel(ctx context.Context, spec ModelSpec, startReq 
 	})
 
 	// Health wait with configurable timeout
-	// Use background context to prevent cancellation from HTTP request refresh
+	// Derive from opCtx so Evict's CancelStart can abort the health check loop
 	if handle.Endpoint != "" {
-		healthCtx, cancel := context.WithTimeout(context.Background(), o.healthCheckTimeout)
-		defer cancel()
+		healthCtx, healthCancel := context.WithTimeout(opCtx, o.healthCheckTimeout)
+		defer healthCancel()
 		healthURL := providerHealthURL(handle.Provider, handle.Endpoint)
 		if err := waitForHealth(healthCtx, healthURL, 2*time.Second); err != nil {
 			o.updateOrCreateInstance(inst, func(i *ModelInstance) {
@@ -330,6 +345,18 @@ func (o *Orchestrator) StopModel(ctx context.Context, alias string) error {
 		i.Handle = nil
 	})
 	return nil
+}
+
+// CancelStart cancels any in-flight StartModel for the given alias.
+// This unblocks health check loops and allows the alias lock to be released.
+func (o *Orchestrator) CancelStart(alias string) {
+	o.cancelMu.Lock()
+	defer o.cancelMu.Unlock()
+	if cancel, ok := o.cancelMap[alias]; ok {
+		cancel()
+		delete(o.cancelMap, alias)
+		o.logger.WithField("alias", alias).Info("Cancelled in-flight model startup")
+	}
 }
 
 // ForgetModel removes model from in-memory registry (after stop).

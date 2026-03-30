@@ -10,6 +10,37 @@ import (
 	"time"
 )
 
+// splitArgs splits a CLI argument string into tokens, respecting single and double quotes.
+// This allows passing JSON values like: --hf-overrides '{"key": "value"}'
+// Unquoted spaces separate tokens; quoted spaces are preserved.
+func splitArgs(s string) []string {
+	var args []string
+	var cur strings.Builder
+	inSingle := false
+	inDouble := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '\'' && !inDouble:
+			inSingle = !inSingle
+		case c == '"' && !inSingle:
+			inDouble = !inDouble
+		case (c == ' ' || c == '\t') && !inSingle && !inDouble:
+			if cur.Len() > 0 {
+				args = append(args, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteByte(c)
+		}
+	}
+	if cur.Len() > 0 {
+		args = append(args, cur.String())
+	}
+	return args
+}
+
 const (
 	DefaultVLLMImage     = "vllm/vllm-openai:latest"
 	DefaultLlamaImage    = "ghcr.io/ggml-org/llama.cpp:server-cuda"
@@ -104,8 +135,9 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 
 	// Extra args: split by whitespace and append as raw CLI args
 	// e.g. "--enable-auto-tool-choice --tool-call-parser hermes"
+	// Supports quoted JSON values: --hf-overrides '{"key":"val"}'
 	if spec.VLLMExtraArgs != "" {
-		cmd = append(cmd, strings.Fields(spec.VLLMExtraArgs)...)
+		cmd = append(cmd, splitArgs(spec.VLLMExtraArgs)...)
 	}
 
 	env := map[string]string{
@@ -197,11 +229,9 @@ func BuildSGLangRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerSta
 	if spec.SGLangToolCallParser != "" {
 		cmd = append(cmd, "--tool-call-parser", spec.SGLangToolCallParser)
 	}
-	// SGLang extra args
+	// SGLang extra args (supports quoted JSON values)
 	if spec.SGLangExtraArgs != "" {
-		for _, arg := range strings.Fields(spec.SGLangExtraArgs) {
-			cmd = append(cmd, arg)
-		}
+		cmd = append(cmd, splitArgs(spec.SGLangExtraArgs)...)
 	}
 
 	env := map[string]string{
@@ -281,11 +311,9 @@ func BuildTGIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	if spec.TGICudaMemoryFraction > 0 && spec.TGICudaMemoryFraction < 1.0 {
 		cmd = append(cmd, "--cuda-memory-fraction", fmt.Sprintf("%.2f", spec.TGICudaMemoryFraction))
 	}
-	// TGI extra args
+	// TGI extra args (supports quoted JSON values)
 	if spec.TGIExtraArgs != "" {
-		for _, arg := range strings.Fields(spec.TGIExtraArgs) {
-			cmd = append(cmd, arg)
-		}
+		cmd = append(cmd, splitArgs(spec.TGIExtraArgs)...)
 	}
 
 	return ContainerStartRequest{
@@ -350,11 +378,9 @@ func BuildTEIRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStartR
 	if spec.TEIDtype != "" {
 		cmd = append(cmd, "--dtype", spec.TEIDtype)
 	}
-	// TEI extra args
+	// TEI extra args (supports quoted JSON values)
 	if spec.TEIExtraArgs != "" {
-		for _, arg := range strings.Fields(spec.TEIExtraArgs) {
-			cmd = append(cmd, arg)
-		}
+		cmd = append(cmd, splitArgs(spec.TEIExtraArgs)...)
 	}
 
 	// Determine if GPU is available - use GPU image variant
@@ -466,9 +492,9 @@ func BuildLlamaCPPRequest(spec ModelSpec) (ContainerStartRequest, error) {
 	if spec.LlamaChatTemplate != "" {
 		cmd = append(cmd, "--chat-template", spec.LlamaChatTemplate)
 	}
-	// Extra args: split by whitespace and append as raw CLI args
+	// Extra args: split by whitespace and append as raw CLI args (supports quoted values)
 	if spec.LlamaExtraArgs != "" {
-		cmd = append(cmd, strings.Fields(spec.LlamaExtraArgs)...)
+		cmd = append(cmd, splitArgs(spec.LlamaExtraArgs)...)
 	}
 
 	return ContainerStartRequest{

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.1.6] - 2026-03-30
+
+### Fixed
+
+- **Extra Args JSON Parsing**: `strings.Fields()` split CLI arguments by whitespace only, breaking JSON values passed to `--hf-overrides` and similar flags. Replaced with a shell-like `splitArgs()` parser that respects single and double quoted strings. Now you can pass `--hf-overrides '{"key":"value"}'` in the Extra Args field of any inference provider (vLLM, SGLang, TGI, TEI, llama.cpp).
+
+---
+
 ## [5.1.5] - 2026-03-30
 
 ### Fixed

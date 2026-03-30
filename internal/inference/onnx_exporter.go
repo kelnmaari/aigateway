@@ -159,8 +159,12 @@ func (e *OnnxExporter) runExport(job *OnnxExportJob) {
 	script := fmt.Sprintf(`#!/bin/bash
 set -e
 
-echo "=== [1/3] Installing optimum[exporters] ==="
-pip install "optimum[exporters]" --quiet --no-cache-dir 2>&1
+echo "=== [1/3] Installing optimum + onnxruntime ==="
+# optimum 2.x renamed [exporters] to [onnxruntime]; install both notations for compatibility
+pip install "optimum[onnxruntime]" onnx --quiet --no-cache-dir 2>&1 || \
+pip install "optimum[exporters]" onnx --quiet --no-cache-dir 2>&1
+# Ensure optimum-cli is available
+python3 -c "import optimum; print('optimum', optimum.__version__)"
 
 echo "=== [2/3] Locating model snapshot ==="
 SNAPSHOT_PATH=$(python3 - <<'PYEOF'

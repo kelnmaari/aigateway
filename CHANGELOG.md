@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.2] - 2026-03-30
+
+### Fixed
+
+- **ONNX Export: optimum 2.x compatibility**: `optimum[exporters]` extra was renamed to `optimum[onnxruntime]` in optimum 2.x. Install script now tries `optimum[onnxruntime]` first, falls back to `optimum[exporters]` for older versions. Also explicitly installs `onnx` package.
+
+---
+
 ## [5.2.1] - 2026-03-30
 
 ### Added

@@ -339,7 +339,9 @@ func (h *ChatToolsHandler) forwardRawRequest(c *gin.Context, endpoint string, bo
 	}
 	defer resp.Body.Close()
 
-	if stream {
+	// Only use SSE streaming on success; forward errors as plain JSON
+	// so clients (Kilo Code, etc.) can read the error body correctly.
+	if stream && resp.StatusCode == http.StatusOK {
 		h.streamForward(c, resp)
 		return
 	}

@@ -106,13 +106,14 @@ func (h *InferenceProxyHandler) HandleChatCompletions(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	// Handle streaming response
-	if req.Stream {
+	// Handle streaming response — only stream on success; forward errors as plain JSON
+	// so the client can parse the error body (streaming error responses confuse SSE parsers).
+	if req.Stream && resp.StatusCode == http.StatusOK {
 		h.streamResponse(c, resp)
 		return
 	}
 
-	// Non-streaming: forward response as-is
+	// Non-streaming or upstream error: forward response as-is
 	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
 }
 

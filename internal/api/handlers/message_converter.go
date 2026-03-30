@@ -101,10 +101,17 @@ func convertAnthropicMessages(messages []map[string]json.RawMessage) ([]map[stri
 				}
 			}
 		case "user":
-			// Expand tool_result blocks into separate role:"tool" messages
+			// Expand tool_result blocks into separate role:"tool" messages.
+			// Any text/image blocks in the same message are preserved as a
+			// follow-up role:"user" message so the client's instructions are
+			// not silently dropped (e.g. Kilo Code injects environment_details
+			// and user instructions alongside tool results).
 			if firstBlock.Type == "tool_result" {
-				if toolMsgs, ok := convertToolResultMessages(blocks); ok {
+				if toolMsgs, extraUser, ok := convertToolResultMessages(blocks); ok {
 					result = append(result, toolMsgs...)
+					if extraUser != nil {
+						result = append(result, extraUser)
+					}
 					changed = true
 					continue
 				}
@@ -192,37 +199,64 @@ func convertAssistantMessage(orig map[string]json.RawMessage, blocks []json.RawM
 }
 
 // convertToolResultMessages converts an Anthropic user message with tool_result blocks into
-// one role:"tool" message per block.
+// one role:"tool" message per block.  Non-tool_result blocks (type:"text", environment_details,
+// follow-up instructions, etc.) are collected and returned as an additional role:"user" message
+// so that nothing from the original message is silently dropped.
 //
-//	Input:  {"role":"user","content":[{"type":"tool_result","tool_use_id":"...","content":[{"type":"text","text":"..."}]}]}
-//	Output: [{"role":"tool","content":"...","tool_call_id":"..."}]
-func convertToolResultMessages(blocks []json.RawMessage) ([]map[string]json.RawMessage, bool) {
-	var results []map[string]json.RawMessage
+//	Input:  {"role":"user","content":[
+//	          {"type":"tool_result","tool_use_id":"...","content":[{"type":"text","text":"result"}]},
+//	          {"type":"text","text":"follow-up instruction"}
+//	        ]}
+//	Output: toolMsgs = [{"role":"tool","content":"result","tool_call_id":"..."}]
+//	        extraUser = {"role":"user","content":"follow-up instruction"}  (nil if no text blocks)
+func convertToolResultMessages(blocks []json.RawMessage) (toolMsgs []map[string]json.RawMessage, extraUser map[string]json.RawMessage, ok bool) {
+	var textParts []string
 
 	for _, blockRaw := range blocks {
 		var b struct {
 			Type      string          `json:"type"`
 			ToolUseID string          `json:"tool_use_id"`
 			Content   json.RawMessage `json:"content"`
+			Text      string          `json:"text"`
 		}
-		if err := json.Unmarshal(blockRaw, &b); err != nil || b.Type != "tool_result" {
+		if err := json.Unmarshal(blockRaw, &b); err != nil {
 			continue
 		}
 
-		contentStr := extractToolResultContent(b.Content)
-
-		roleJSON, _ := json.Marshal("tool")
-		contentJSON, _ := json.Marshal(contentStr)
-		toolIDJSON, _ := json.Marshal(b.ToolUseID)
-
-		results = append(results, map[string]json.RawMessage{
-			"role":         roleJSON,
-			"content":      contentJSON,
-			"tool_call_id": toolIDJSON,
-		})
+		switch b.Type {
+		case "tool_result":
+			contentStr := extractToolResultContent(b.Content)
+			roleJSON, _ := json.Marshal("tool")
+			contentJSON, _ := json.Marshal(contentStr)
+			toolIDJSON, _ := json.Marshal(b.ToolUseID)
+			toolMsgs = append(toolMsgs, map[string]json.RawMessage{
+				"role":         roleJSON,
+				"content":      contentJSON,
+				"tool_call_id": toolIDJSON,
+			})
+		case "text":
+			if b.Text != "" {
+				textParts = append(textParts, b.Text)
+			}
+		}
 	}
 
-	return results, len(results) > 0
+	if len(toolMsgs) == 0 {
+		return nil, nil, false
+	}
+
+	// Preserve any non-tool_result text as a follow-up user message
+	if len(textParts) > 0 {
+		joined := strings.Join(textParts, "\n")
+		roleJSON, _ := json.Marshal("user")
+		contentJSON, _ := json.Marshal(joined)
+		extraUser = map[string]json.RawMessage{
+			"role":    roleJSON,
+			"content": contentJSON,
+		}
+	}
+
+	return toolMsgs, extraUser, true
 }
 
 // extractToolResultContent extracts plain text from Anthropic tool_result content, which can be:

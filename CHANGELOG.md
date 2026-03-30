@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.2.9] - 2026-03-30
+
+### Fixed
+
+- **Streaming error forwarding**: When vLLM returns a non-200 response on a streaming request, it is now forwarded as a plain JSON response instead of being wrapped in `text/event-stream`. Previously, Kilo Code and similar clients received `Content-Type: text/event-stream` with a raw JSON error body — the SSE parser found no events and reported "400 status code (no body)".
+- **Mixed Anthropic content blocks preserved**: User messages combining `type:"tool_result"` and `type:"text"` blocks (common in Kilo Code: environment_details + follow-up instructions alongside tool results) no longer silently drop text blocks. Text blocks are now forwarded as a separate `role:"user"` message after the converted `role:"tool"` messages.
+
+### Technical
+
+- `internal/api/handlers/inference_proxy_handler.go` — stream only on HTTP 200; errors forwarded as plain JSON via `DataFromReader`
+- `internal/api/handlers/chat_tools_handler.go` — same fix in `forwardRawRequest`
+- `internal/api/handlers/message_converter.go` — `convertToolResultMessages` returns an optional extra `role:"user"` message containing non-tool_result text blocks
+
+---
+
 ## [5.2.8] - 2026-03-30
 
 ### Fixed

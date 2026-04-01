@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.3.0] - 2026-04-01
+
+### Security
+- **CVE-2024-41110 (CRITICAL)**: обновлён `github.com/docker/docker` v25.0.5 → v25.0.13 (AuthZ bypass + firewalld bridge isolation)
+- **CVE-2025-66630 (CRITICAL)**: обновлён `github.com/gofiber/fiber/v2` v2.52.9 → v2.52.11 (предсказуемые UUID при ошибке crypto/rand)
+- **CVE-2026-24051 (HIGH)**: обновлён `go.opentelemetry.io/otel/sdk` v1.38.0 → v1.40.0 + все связанные otel-пакеты (PATH hijacking на macOS)
+- **CVE-2024-24792 / GO-2026-4815 (HIGH)**: обновлён `golang.org/x/image` v0.0.0-20191009 → v0.38.0 (OOM при декодировании TIFF с невалидным IFD offset)
+- **GO-2025-3829**: исправлен firewalld reload в `github.com/docker/docker` — снятие изоляции bridge-сети (фикс в v25.0.13)
+- **CVE-2025-67647 + CVE-2026-22803**: обновлён `@sveltejs/kit` 2.49.2 → 2.49.5+ (SSRF + DoS в prerendering)
+- **CVE-2026-22774 + CVE-2026-22775**: обновлён `devalue` 5.6.1 → 5.6.2 (DoS при десериализации typed arrays)
+- **CVE-2026-32763 + CVE-2026-33468**: обновлён `kysely` 0.27.6 → 0.28.14 (SQL injection в JSON path и строковых литералах)
+- **CVE-2026-33671**: обновлён `picomatch` 4.0.3 → 4.0.4 (ReDoS в extglob-паттернах)
+- **CVE-2026-27606**: обновлён `rollup` 4.54.0 → 4.59.0 (path traversal / RCE в build tool)
+
+### Added
+- **Security CI stage**: добавлены два параллельных job-а между `test` и `build`
+  - `security:trivy` — Aqua Trivy filesystem scan (Go + npm), SARIF-отчёт → GitLab Security Dashboard и MR Security tab
+  - `security:govulncheck` — Go callgraph-анализ (vuln.go.dev), только реально достижимые CVE
+
+### Fixed
+- **Inference Evict**: `StopByAlias` добавлен в `ContainerRuntime` interface; `Manager.Evict` теперь убивает все `aigw-{alias}-*` контейнеры (orphan cleanup при StatusStarting race); `Router.Evict` держит alias lock
+
+### Technical
+- `go mod tidy` после всех обновлений Go-зависимостей
+- npm `overrides` для принудительного обновления транзитивных зависимостей (`devalue`, `kysely`, `picomatch`, `rollup`)
+- `npm audit` — 0 уязвимостей
+
 ## [5.2.9] - 2026-03-30
 
 ### Fixed

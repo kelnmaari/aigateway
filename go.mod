@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/disintegration/imaging v1.6.2
-	github.com/docker/docker v25.0.6+incompatible
+	github.com/docker/docker v25.0.13+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
 	github.com/gin-contrib/sessions v1.0.4
@@ -39,9 +39,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/crypto v0.47.0
-	golang.org/x/mod v0.31.0
+	golang.org/x/mod v0.33.0
 	golang.org/x/oauth2 v0.34.0
-	golang.org/x/text v0.33.0
+	golang.org/x/text v0.35.0
 	golang.org/x/time v0.14.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -155,9 +155,9 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678 // indirect
-	golang.org/x/image v0.26.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect

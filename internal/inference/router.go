@@ -11,6 +11,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// RemoteModelResolver is implemented by agent.Manager to resolve models
+// running on remote worker nodes. Defined here to avoid circular imports.
+type RemoteModelResolver interface {
+	// FindRunningModel looks for a model alias on any remote agent.
+	// Returns (nodeAddr, providerKind, found).
+	FindRemoteModel(ctx context.Context, alias string) (nodeAddr string, provider ProviderKind, found bool)
+}
+
 // Router resolves specs by alias or capability and ensures model is prepared/launched.
 type Router struct {
 	mgr *Manager
@@ -18,6 +26,9 @@ type Router struct {
 	// Per-alias locks to prevent concurrent container starts for same model
 	aliasLocks   map[string]*sync.Mutex
 	aliasLocksMu sync.Mutex
+
+	// Optional: remote model resolver for Agent Mode
+	remoteResolver RemoteModelResolver
 }
 
 // NewRouter creates a Router for a Manager.
@@ -26,6 +37,11 @@ func NewRouter(mgr *Manager) *Router {
 		mgr:        mgr,
 		aliasLocks: make(map[string]*sync.Mutex),
 	}
+}
+
+// SetRemoteResolver sets the agent manager for resolving remote models.
+func (r *Router) SetRemoteResolver(resolver RemoteModelResolver) {
+	r.remoteResolver = resolver
 }
 
 // getAliasLock returns or creates a mutex for the given alias
@@ -58,23 +74,44 @@ func (r *Router) EnsureBySpec(ctx context.Context, spec ModelSpec) (*ModelInstan
 }
 
 // EnsureByAlias resolves alias and ensures container is running.
+// Checks local models first, then remote agents if configured.
 // Uses per-alias locking to prevent multiple container starts for the same model.
 func (r *Router) EnsureByAlias(ctx context.Context, alias string) (*ModelInstance, error) {
+	// 1. Try local resolution
 	spec, err := r.mgr.ResolveByAlias(alias)
-	if err != nil {
-		return nil, err
-	}
-
-	// Serialize access per alias
-	lock := r.getAliasLock(alias)
-	lock.Lock()
-	defer lock.Unlock()
-
-	inst, err := r.mgr.LoadAndStart(ctx, spec)
 	if err == nil {
-		r.mgr.touch(alias)
+		// Serialize access per alias
+		lock := r.getAliasLock(alias)
+		lock.Lock()
+		defer lock.Unlock()
+
+		inst, loadErr := r.mgr.LoadAndStart(ctx, spec)
+		if loadErr == nil {
+			r.mgr.touch(alias)
+		}
+		return inst, loadErr
 	}
-	return inst, err
+
+	// 2. Try remote agent resolution (Agent Mode)
+	if r.remoteResolver != nil {
+		if nodeAddr, provider, found := r.remoteResolver.FindRemoteModel(ctx, alias); found && nodeAddr != "" {
+			return &ModelInstance{
+				Spec: ModelSpec{
+					Alias:    alias,
+					Provider: provider,
+				},
+				Status: StatusRunning,
+				Handle: &ContainerHandle{
+					ID:         "agent:" + alias,
+					Provider:   provider,
+					ModelAlias: alias,
+					Endpoint:   nodeAddr, // https://agent-host:9090
+				},
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("model not found: %s", alias)
 }
 
 // EnsureByCapability picks first spec with capability and ensures it runs.
@@ -195,6 +232,17 @@ func (r *Router) GetModel(alias string) (endpoint string, running bool) {
 				"endpoint": modelEndpoint,
 			}).Debug("GetModel: model found but not running or no endpoint")
 			return "", false
+		}
+	}
+
+	// Check remote agent models if local not found
+	if r.remoteResolver != nil {
+		if nodeAddr, _, found := r.remoteResolver.FindRemoteModel(context.Background(), alias); found && nodeAddr != "" {
+			logger.WithFields(logrus.Fields{
+				"alias":    alias,
+				"endpoint": nodeAddr,
+			}).Debug("GetModel: found on remote agent")
+			return nodeAddr, true
 		}
 	}
 

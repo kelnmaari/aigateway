@@ -547,6 +547,31 @@ type Database interface {
 	
 	// ListLoadedModels возвращает список всех сохраненных моделей
 	ListLoadedModels(ctx context.Context, autoLoadOnly bool) ([]*models.LoadedModel, error)
+
+	// ========================================
+	// Worker Nodes (v5.4.0+: Agent Mode — Remote Inference Workers)
+	// ========================================
+
+	// CreateWorkerNode registers a new remote inference worker node
+	CreateWorkerNode(ctx context.Context, node *models.WorkerNode) error
+
+	// GetWorkerNode retrieves a worker node by ID
+	GetWorkerNode(ctx context.Context, id string) (*models.WorkerNode, error)
+
+	// GetWorkerNodeByName retrieves a worker node by its unique name
+	GetWorkerNodeByName(ctx context.Context, name string) (*models.WorkerNode, error)
+
+	// UpdateWorkerNode updates worker node configuration
+	UpdateWorkerNode(ctx context.Context, node *models.WorkerNode) error
+
+	// DeleteWorkerNode removes a worker node
+	DeleteWorkerNode(ctx context.Context, id string) error
+
+	// ListWorkerNodes returns all registered worker nodes
+	ListWorkerNodes(ctx context.Context) ([]*models.WorkerNode, error)
+
+	// UpdateWorkerNodeHealth updates health check timestamp, status, and error
+	UpdateWorkerNodeHealth(ctx context.Context, id string, status string, gpuInfo, cpuInfo, memoryInfo, modelsRunning []byte, lastError string) error
 }
 
 // AuditFilters фильтры для запроса audit events (Version 1.11.4+)

@@ -51,6 +51,7 @@ import (
 	gitlabWorker "aigateway/internal/gitlab/worker"
 	"aigateway/internal/health"
 	"aigateway/internal/huggingface"
+	"aigateway/internal/agent"
 	"aigateway/internal/inference"
 	internalLogger "aigateway/internal/logger"
 	"aigateway/internal/metrics"
@@ -229,6 +230,10 @@ type Router struct {
 	chatToolsHandler      *handlers.ChatToolsHandler     // Chat with tools support (v4.0.3+)
 	externalProxyHandler  *handlers.ExternalProxyHandler // External provider proxy (v4.11.0+)
 	inferenceModelStore   *inference.ModelStore
+
+	// Agent Mode — Remote Workers (v5.4.0+)
+	agentManager  *agent.Manager
+	workerHandler *handlers.WorkerHandler
 
 	// Agent Service (v2.5.0+)
 	agentService *agentService.AgentService // Conversational agent with tools
@@ -564,6 +569,7 @@ func (r *Router) setupRoutes() {
 	r.setupUIRoutes()          // HTMX UI Routes (v2.6.0)
 	r.setupGitLabRoutes()      // GitLab Integration routes (v3.1.0)
 	r.setupInferenceRoutes()   // Inference v4 system routes
+	r.setupWorkerRoutes()      // Agent Mode: Worker management routes (v5.4.0+)
 }
 
 // setupInferenceRoutes registers minimal inference v4 endpoints (system).
@@ -628,6 +634,37 @@ func (r *Router) setupInferenceRoutes() {
 
 	// HuggingFace JSON API for model browser (v3.3.0+)
 	r.setupHuggingFaceAPIRoutes()
+}
+
+// setupWorkerRoutes registers admin API endpoints for managing remote inference workers (Agent Mode).
+func (r *Router) setupWorkerRoutes() {
+	if r.workerHandler == nil || r.engine == nil {
+		return
+	}
+	group := r.engine.Group("/api/admin/workers")
+
+	// Use JWT authentication with admin role check
+	if r.jwtManager != nil && r.db != nil {
+		group.Use(authMiddleware.JWTAuth(r.jwtManager, r.logger))
+		group.Use(middleware.RequireAdmin(r.db, r.logger))
+	}
+	{
+		group.GET("", r.workerHandler.ListWorkers)
+		group.POST("", r.workerHandler.CreateWorker)
+		group.POST("/generate-config", r.workerHandler.GenerateConfig)
+		group.GET("/:id", r.workerHandler.GetWorker)
+		group.PUT("/:id", r.workerHandler.UpdateWorker)
+		group.DELETE("/:id", r.workerHandler.DeleteWorker)
+		group.PUT("/:id/status", r.workerHandler.SetWorkerStatus)
+		group.GET("/:id/gpu", r.workerHandler.GetWorkerGPU)
+		group.GET("/:id/models", r.workerHandler.ListWorkerModels)
+		group.POST("/:id/models/load", r.workerHandler.LoadModelOnWorker)
+		group.POST("/:id/models/stop", r.workerHandler.StopModelOnWorker)
+		// Docker image management
+		group.GET("/:id/images", r.workerHandler.ListWorkerImages)
+		group.POST("/:id/images/push", r.workerHandler.PushImageToWorker)
+	}
+	r.logger.Info("Worker management routes configured (Agent Mode)")
 }
 
 // setupHuggingFaceAPIRoutes registers JSON API endpoints for HuggingFace model browser.
@@ -1797,14 +1834,16 @@ func (r *Router) setupOpenAIRoutes() {
 
 	}
 
-	// /v1/models endpoint - returns models from inference manager + model registry
+	// /v1/models endpoint - returns models from inference manager + agents + model registry
 	v1.GET("/models", func(c *gin.Context) {
 		var data []gin.H
+		seen := make(map[string]bool) // dedup: alias → already added
 
-		// 1. Inference models (Docker-based)
+		// 1. Inference models (Docker-based, local — highest priority)
 		if r.inferenceRouter != nil {
 			inferenceList := r.inferenceRouter.ListModels()
 			for _, m := range inferenceList {
+				seen[m.Spec.Alias] = true
 				data = append(data, gin.H{
 					"id":       m.Spec.Alias,
 					"object":   "model",
@@ -1814,7 +1853,23 @@ func (r *Router) setupOpenAIRoutes() {
 			}
 		}
 
-		// 2. Model Registry models (external providers: OpenAI, DeepSeek, Anthropic, Gemini, etc.)
+		// 2. Remote agent models (Agent Mode workers — skip if already local)
+		if r.agentManager != nil {
+			remoteModels := r.agentManager.ListAllModels()
+			for _, rm := range remoteModels {
+				if rm.Status == inference.StatusRunning && !seen[rm.Alias] {
+					seen[rm.Alias] = true
+					data = append(data, gin.H{
+						"id":       rm.Alias,
+						"object":   "model",
+						"owned_by": string(rm.Provider) + "@" + rm.NodeName,
+						"created":  0,
+					})
+				}
+			}
+		}
+
+		// 3. Model Registry models (external providers: OpenAI, DeepSeek, Anthropic, Gemini, etc.)
 		if r.db != nil && r.registryHandler != nil {
 			filter := &models.ModelRegistryFilter{
 				Status: models.ModelStatusActive,
@@ -2865,6 +2920,23 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 			"max_download": maxConcurrent,
 			"use_docker":   true,
 		}).Info("Inference v4 service initialized")
+	}
+
+	// Agent Mode — Remote Inference Workers (v5.4.0+)
+	if cfg.Workers.Enabled && r.db != nil && r.inferenceRouter != nil {
+		agentMgrCfg := agent.ManagerConfig{
+			HealthCheckInterval: cfg.Workers.HealthCheckInterval,
+			HealthCheckTimeout:  cfg.Workers.HealthCheckTimeout,
+			MaxConsecFailures:   cfg.Workers.MaxConsecutiveFailures,
+			TLSSkipVerify:       cfg.Workers.TLS.SkipVerify,
+			CACertPath:          cfg.Workers.TLS.CACert,
+		}
+		r.agentManager = agent.NewManager(r.db, logger, agentMgrCfg)
+		r.inferenceRouter.SetRemoteResolver(r.agentManager)
+		r.agentManager.StartHealthChecks(context.Background())
+		r.workerHandler = handlers.NewWorkerHandler(r.agentManager, logger)
+		r.workerHandler.SetInferenceRouter(r.inferenceRouter)
+		logger.Info("Agent Mode: worker manager initialized with health checks")
 	}
 
 	// External Provider Proxy (v4.11.0+)

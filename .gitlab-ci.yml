@@ -331,6 +331,42 @@ build:binary:
   rules:
   - if: "$CI_COMMIT_BRANCH"
   - if: "$CI_COMMIT_TAG"
+# Build Agent binary (no WebUI needed, parallel with build:binary)
+build:agent:
+  stage: build
+  image: golang:${GO_VERSION}
+  before_script:
+    - apt-get update && apt-get install -y git
+    - mkdir -p .go
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+  script:
+    - *compute_version
+    - BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    - GIT_COMMIT=${CI_COMMIT_SHORT_SHA}
+    - echo "Building agent version $BUILD_VERSION"
+    - |
+      go build -ldflags "\
+        -X aigateway/internal/version.Version=${BUILD_VERSION} \
+        -X aigateway/internal/version.BuildDate=${BUILD_TIME} \
+        -X aigateway/internal/version.GitCommit=${GIT_COMMIT} \
+        -s -w" \
+        -o bin/aigateway-agent-linux-amd64 \
+        cmd/agent/main.go
+    - chmod +x bin/aigateway-agent-linux-amd64
+    - echo "$BUILD_VERSION" > bin/BUILD_VERSION
+    - echo "$RPM_VERSION" > bin/RPM_VERSION
+    - echo "$RPM_RELEASE" > bin/RPM_RELEASE
+  artifacts:
+    paths:
+      - bin/aigateway-agent-linux-amd64
+      - bin/BUILD_VERSION
+      - bin/RPM_VERSION
+      - bin/RPM_RELEASE
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 package:rpm:
   stage: package
   image: rockylinux:9
@@ -366,6 +402,38 @@ package:rpm:
     expire_in: 4 weeks
   rules:
   - if: "$CI_COMMIT_TAG"
+
+# Package Agent RPM (tags only)
+package:agent-rpm:
+  stage: package
+  image: rockylinux:9
+  needs:
+    - build:agent
+  before_script:
+    - dnf install -y rpm-build rpmdevtools
+    - rpmdev-setuptree
+  script:
+    - RPM_VERSION=$(cat bin/RPM_VERSION 2>/dev/null || cat VERSION 2>/dev/null || echo "0.0.0")
+    - RPM_RELEASE=$(cat bin/RPM_RELEASE 2>/dev/null || echo "1")
+    - echo "Building Agent RPM version=$RPM_VERSION release=$RPM_RELEASE"
+    - cp bin/aigateway-agent-linux-amd64 ~/rpmbuild/SOURCES/
+    - cp packaging/agent/aigateway-agent.service ~/rpmbuild/SOURCES/
+    - cp packaging/agent/aigateway-agent.spec ~/rpmbuild/SPECS/
+    - |
+      rpmbuild \
+        --define "version $RPM_VERSION" \
+        --define "release $RPM_RELEASE" \
+        -bb ~/rpmbuild/SPECS/aigateway-agent.spec
+    - mkdir -p dist
+    - cp ~/rpmbuild/RPMS/*/*.rpm dist/
+    - ls -la dist/*agent*
+  artifacts:
+    paths:
+      - dist/*agent*.rpm
+    expire_in: 4 weeks
+  rules:
+    - if: $CI_COMMIT_TAG
+
 publish:rpm:
   stage: release
   image: curlimages/curl:latest
@@ -550,6 +618,43 @@ publish:rpm:
     echo ""
     echo "  ${CI_PROJECT_URL}/-/packages"
     echo ""
+# Publish Agent RPM to GitLab Generic Package Registry (tags only)
+publish:agent-rpm:
+  stage: release
+  image: curlimages/curl:latest
+  needs:
+    - package:agent-rpm
+    - job: build:agent
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - BUILD_VERSION=$(cat bin/BUILD_VERSION)
+    - |
+      echo "Publishing Agent RPM to Package Registry"
+      for RPM_FILE in dist/*agent*.rpm; do
+        if [ -f "$RPM_FILE" ]; then
+          RPM_NAME=$(basename ${RPM_FILE})
+          echo "Uploading: ${RPM_NAME}"
+          curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+               --upload-file "${RPM_FILE}" \
+               "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/aigateway-agent/${BUILD_VERSION}/${RPM_NAME}"
+        fi
+      done
+    # Upload agent install script
+    - |
+      echo "Uploading: agent install.sh (latest)"
+      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file "packaging/agent/install-agent.sh" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/aigateway-agent/latest/install.sh"
+    - |
+      echo ""
+      echo "✓ Agent RPM published!"
+      echo ""
+      echo "Install agent:"
+      echo "  curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/aigateway-agent/latest/install.sh | sudo bash"
+      echo ""
+
 update:install-script:
   stage: scripts
   image: alpine:latest

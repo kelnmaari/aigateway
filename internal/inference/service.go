@@ -486,6 +486,12 @@ func (s *Service) ListArtifacts() ([]ArtifactInfo, error) {
 	return artifacts, nil
 }
 
+// GetDockerRuntime returns the Docker runtime for direct image operations (save/load/login).
+// Returns nil if runtime is not DockerRuntime (e.g., NoopRuntime).
+func (s *Service) GetDockerRuntime() *DockerRuntime {
+	return s.dockerRuntime
+}
+
 // TRTConverter returns the TensorRT-LLM converter instance (may be nil if not configured).
 func (s *Service) TRTConverter() *TRTConverter {
 	return s.trtConverter

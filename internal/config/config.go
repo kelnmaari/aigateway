@@ -34,6 +34,22 @@ type Config struct {
 	Agent         AgentConfig         `mapstructure:"agent"`          // Version 2.5.0+: Agentic AI configuration
 	HuggingFace   HuggingFaceConfig   `mapstructure:"huggingface"`    // Version 3.0.0+: Hugging Face integration
 	GitLab        GitLabConfig        `mapstructure:"gitlab"`         // Version 3.1.0+: GitLab MR Review integration
+	Workers       WorkersConfig       `mapstructure:"workers"`        // Version 5.4.0+: Remote inference workers (Agent Mode)
+}
+
+// WorkersConfig configures remote inference worker management (Agent Mode).
+type WorkersConfig struct {
+	Enabled              bool          `mapstructure:"enabled"`
+	HealthCheckInterval  time.Duration `mapstructure:"health_check_interval"`
+	HealthCheckTimeout   time.Duration `mapstructure:"health_check_timeout"`
+	MaxConsecutiveFailures int         `mapstructure:"max_consecutive_failures"`
+	TLS                  WorkersTLSConfig `mapstructure:"tls"`
+}
+
+// WorkersTLSConfig holds TLS settings for communicating with agents.
+type WorkersTLSConfig struct {
+	CACert     string `mapstructure:"ca_cert"`
+	SkipVerify bool   `mapstructure:"skip_verify"`
 }
 
 // GitLabConfig configures GitLab MR Review integration (v3.1.0+)
@@ -866,6 +882,14 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("observability.performance.gc_percentage", 100)
 	v.SetDefault("observability.performance.leak_detection", true)
 	v.SetDefault("observability.performance.pprof_enabled", true)
+
+	// Workers (Agent Mode) defaults (Version 5.4.0+)
+	v.SetDefault("workers.enabled", false)
+	v.SetDefault("workers.health_check_interval", "30s")
+	v.SetDefault("workers.health_check_timeout", "10s")
+	v.SetDefault("workers.max_consecutive_failures", 3)
+	v.SetDefault("workers.tls.ca_cert", "")
+	v.SetDefault("workers.tls.skip_verify", false)
 }
 
 // PromptsConfig конфигурация промптов и системных сообщений

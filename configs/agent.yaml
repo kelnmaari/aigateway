@@ -1,0 +1,49 @@
+# AIGateway Agent Configuration
+# This file configures a remote inference worker node.
+# The agent manages Docker containers (vLLM, SGLang, TGI, llama.cpp, TEI)
+# and exposes an API for the main AIGateway server to control them.
+
+agent:
+  # Network
+  listen_addr: "0.0.0.0:9090"
+
+  # Authentication — shared secret between main server and this agent
+  # Generate with: openssl rand -hex 32
+  api_key: "CHANGE-ME-generate-a-secure-key"
+
+  # Node identity
+  node_name: "gpu-worker-1"       # human-friendly name (shown in admin panel)
+  node_type: "gpu"                 # gpu | cpu | mixed
+
+  # Model artifact cache directories
+  hf_cache_dir: "./data/models/hf"
+  gguf_cache_dir: "./data/models/gguf"
+
+  # HuggingFace token for gated models (optional)
+  hf_token: ""
+
+  # Docker settings
+  docker_bin: "docker"
+  max_running_models: 2
+  default_provider: "vllm"         # vllm | sglang | tgi | tei | llama.cpp
+
+  # Timeouts
+  health_check_timeout: "60s"      # how long to wait for container health
+  startup_timeout: "10m"           # overall model startup timeout
+
+  # Private Docker registries (optional)
+  # Agent will authenticate before pulling images from these registries
+  docker_registries: []
+  # docker_registries:
+  #   - registry: "registry.gitlab.com"
+  #     username: "deploy-token"
+  #     password: "glpat-xxxxxxxxxxxx"
+  #   - registry: "harbor.example.com"
+  #     username: "robot$aigateway"
+  #     password: "secret"
+
+  # TLS (recommended for production)
+  tls:
+    enabled: false
+    cert_file: "certs/agent.crt"
+    key_file: "certs/agent.key"

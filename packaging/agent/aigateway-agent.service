@@ -1,0 +1,33 @@
+[Unit]
+Description=AIGateway Remote Inference Agent
+Documentation=https://github.com/kelnmaari/ollama-openai-proxy
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/aigateway-agent
+ExecStart=/opt/aigateway-agent/bin/aigateway-agent -config /opt/aigateway-agent/configs/agent.yaml
+
+# Environment
+Environment="GIN_MODE=release"
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=1800s
+StartLimitBurst=3
+
+# Resource limits
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aigateway-agent
+
+[Install]
+WantedBy=multi-user.target

@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.0] - 2026-04-02
+
+### Added
+- **Agent Mode**: Remote inference workers — запуск LLM-моделей на удалённых GPU/CPU машинах с управлением через основной сервер
+  - Новый бинарник `aigateway-agent` (`cmd/agent/main.go`) — минимальный HTTP-сервер с inference subsystem, без PostgreSQL и WebUI
+  - Agent API: load/stop/evict модели, health, system info (GPU/CPU/RAM), container logs, inference proxy (streaming)
+  - Agent client (`internal/agent/client.go`) — HTTP-клиент для main→agent с TLS и API key auth
+  - Worker node manager (`internal/agent/manager.go`) — регистрация, health check loop (30s), model sync, per-node locks
+  - Inference Router integration — `RemoteModelResolver` interface, `EnsureByAlias` проверяет local → agent → not found
+  - `/v1/models` merge — agent-модели видны в Chat UI с `owned_by: "vllm@gpu-worker-1"`, дедупликация через seen map
+  - Admin API: 13 endpoints для CRUD workers, load/stop model on worker, GPU metrics, config generation
+  - Database migration 198: `worker_nodes` table (id, name, address, api_key, status, node_type, gpu_info, cpu_info, memory_info)
+- **Docker image transfer**: перенос кастомных Docker-образов на агенты
+  - `DockerRuntime.SaveImage()` — docker save → tar stream (API + CLI)
+  - `DockerRuntime.LoadImage()` — docker load из tar stream
+  - Agent endpoint `POST /api/agent/images/push` — приём образа от main server
+  - Admin endpoint `POST /api/admin/workers/:id/images/push` — push образа на конкретного воркера
+  - `GET /api/agent/images` и `GET /api/admin/workers/:id/images` — список образов на воркере
+- **Private Docker registry auth**: поддержка приватных реестров на агентах
+  - `DockerRuntime.DockerLogin()` — авторизация через API (RegistryLogin) или CLI (docker login --password-stdin)
+  - `DockerRuntime.PullImageWithAuth()` — pull с credentials (JSON-safe encoding через json.Marshal)
+  - Agent config: `docker_registries` — список приватных реестров с username/password, login при старте
+- **RPM packaging для агента**: `packaging/agent/` — spec, systemd service, install-agent.sh
+  - CI pipeline: `build:agent` → `package:agent-rpm` → `publish:agent-rpm`
+  - Установка: `curl -fsSL .../aigateway-agent/latest/install.sh | sudo bash`
+- **Config generator**: `POST /api/admin/workers/generate-config` — генерация agent.yaml + API key из Admin UI
+
+### Changed
+- `internal/inference/router.go` — `EnsureByAlias` проверяет remote agents после local; `GetModel` fallback на remote
+- `internal/config/config.go` — `WorkersConfig` с defaults (health_check_interval: 30s, max_consecutive_failures: 3)
+- `internal/storage/database.go` — 7 новых методов для worker_nodes CRUD
+- `.gitlab-ci.yml` — 3 новых CI job для agent binary + RPM + publish
+
+### Technical
+- TRT-LLM provider добавлен в agent `buildContainerStartRequest`
+- `Service.GetDockerRuntime()` — getter для прямых image-операций
+- Per-node locks в agent manager для безопасных health checks
+- Model deduplication в `/v1/models` — local > agent > registry приоритет
+
 ## [5.3.1] - 2026-04-02
 
 ### Improved

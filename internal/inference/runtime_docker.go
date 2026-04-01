@@ -3,6 +3,7 @@ package inference
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	dockerregistry "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
@@ -824,6 +826,157 @@ func (r *DockerRuntime) PullImage(image string) error {
 func (r *DockerRuntime) IsPulling(image string) bool {
 	_, ok := r.pullingImages.Load(image)
 	return ok
+}
+
+// SaveImage exports a Docker image as a gzip-compressed tar stream.
+// The caller must close the returned reader when done.
+func (r *DockerRuntime) SaveImage(ctx context.Context, image string) (io.ReadCloser, error) {
+	if r.useAPI && r.api != nil {
+		reader, err := r.api.ImageSave(ctx, []string{image})
+		if err != nil {
+			return nil, fmt.Errorf("docker api image save: %w", err)
+		}
+		return reader, nil
+	}
+
+	// CLI fallback: docker save <image>
+	cmd := exec.CommandContext(ctx, r.dockerBin, "save", image)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("docker save pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("docker save start: %w", err)
+	}
+
+	// Wrap to wait for command completion on close
+	return &cmdReadCloser{ReadCloser: stdout, cmd: cmd}, nil
+}
+
+// LoadImage imports a Docker image from a tar stream (output of docker save).
+func (r *DockerRuntime) LoadImage(ctx context.Context, reader io.Reader) error {
+	if r.useAPI && r.api != nil {
+		resp, err := r.api.ImageLoad(ctx, reader, true)
+		if err != nil {
+			return fmt.Errorf("docker api image load: %w", err)
+		}
+		defer resp.Body.Close()
+		// Drain the response to ensure the load completes
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return nil
+	}
+
+	// CLI fallback: docker load
+	cmd := exec.CommandContext(ctx, r.dockerBin, "load")
+	cmd.Stdin = reader
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker load failed: %w: %s", err, string(out))
+	}
+	r.logger.WithField("output", strings.TrimSpace(string(out))).Info("Docker image loaded")
+	return nil
+}
+
+// cmdReadCloser wraps a pipe reader and waits for the command to finish on Close.
+type cmdReadCloser struct {
+	io.ReadCloser
+	cmd *exec.Cmd
+}
+
+func (c *cmdReadCloser) Close() error {
+	err := c.ReadCloser.Close()
+	_ = c.cmd.Wait()
+	return err
+}
+
+// PullImageWithAuth pulls a Docker image with registry authentication.
+func (r *DockerRuntime) PullImageWithAuth(ctx context.Context, image, username, password string) error {
+	if r.useAPI && r.api != nil {
+		// Encode auth for Docker API — use json.Marshal for safe escaping
+		authMap := map[string]string{"username": username, "password": password}
+		authBytes, _ := json.Marshal(authMap)
+		encodedAuth := base64Encode(string(authBytes))
+
+		out, err := r.api.ImagePull(ctx, image, types.ImagePullOptions{
+			RegistryAuth: encodedAuth,
+		})
+		if err != nil {
+			return fmt.Errorf("docker api pull with auth: %w", err)
+		}
+		defer out.Close()
+		// Drain progress stream
+		_, _ = io.Copy(io.Discard, out)
+		return nil
+	}
+
+	// CLI fallback: docker login + docker pull
+	// Extract registry from image name
+	registry := extractRegistry(image)
+	if registry != "" && username != "" {
+		loginCmd := exec.CommandContext(ctx, r.dockerBin, "login", registry,
+			"--username", username, "--password-stdin")
+		loginCmd.Stdin = strings.NewReader(password)
+		if loginOut, loginErr := loginCmd.CombinedOutput(); loginErr != nil {
+			return fmt.Errorf("docker login failed: %w: %s", loginErr, string(loginOut))
+		}
+	}
+
+	return r.pullImageCLI(ctx, image)
+}
+
+// base64Encode encodes a string to base64.
+func base64Encode(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
+}
+
+// extractRegistry extracts the registry hostname from an image reference.
+// e.g., "registry.example.com/org/image:tag" → "registry.example.com"
+// Returns empty string for Docker Hub images.
+func extractRegistry(image string) string {
+	parts := strings.SplitN(image, "/", 2)
+	if len(parts) < 2 {
+		return "" // Docker Hub (no registry prefix)
+	}
+	// Check if first part looks like a hostname (contains . or :)
+	if strings.Contains(parts[0], ".") || strings.Contains(parts[0], ":") {
+		return parts[0]
+	}
+	return "" // Docker Hub org/image format
+}
+
+// DockerLogin authenticates with a Docker registry.
+// For API mode, credentials are stored in Docker daemon config.
+// For CLI mode, runs `docker login`.
+func (r *DockerRuntime) DockerLogin(registry, username, password string) error {
+	if registry == "" || username == "" {
+		return fmt.Errorf("registry and username are required")
+	}
+
+	if r.useAPI && r.api != nil {
+		// Docker API: RegistryLogin
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err := r.api.RegistryLogin(ctx, dockerregistry.AuthConfig{
+			Username:      username,
+			Password:      password,
+			ServerAddress: registry,
+		})
+		if err != nil {
+			return fmt.Errorf("docker api registry login: %w", err)
+		}
+		r.logger.WithField("registry", registry).Info("Docker registry login via API")
+		return nil
+	}
+
+	// CLI: docker login
+	cmd := exec.Command(r.dockerBin, "login", registry, "--username", username, "--password-stdin")
+	cmd.Stdin = strings.NewReader(password)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker login failed: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	r.logger.WithField("registry", registry).Info("Docker registry login via CLI")
+	return nil
 }
 
 // DiscoveredContainer holds info about a discovered running container.

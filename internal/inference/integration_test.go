@@ -97,6 +97,14 @@ func (m *MockContainerRuntime) Stop(ctx context.Context, containerID string) err
 	return nil
 }
 
+func (m *MockContainerRuntime) StopByAlias(ctx context.Context, alias string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// Remove all containers whose alias matches (mock containers are keyed by alias)
+	delete(m.containers, alias)
+	return nil
+}
+
 func (m *MockContainerRuntime) Logs(ctx context.Context, containerID string, tailLines int) (string, error) {
 	return fmt.Sprintf("Mock logs for %s (tail %d)", containerID, tailLines), nil
 }

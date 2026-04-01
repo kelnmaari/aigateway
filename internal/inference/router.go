@@ -261,7 +261,12 @@ func (r *Router) GetRunningEmbeddingModel() (alias string, endpoint string, foun
 }
 
 // Evict stops container and removes model from list (keeps artifacts on disk).
+// Holds the alias lock to prevent a concurrent EnsureByAlias/EnsureBySpec from
+// racing with the eviction and restarting the container before cleanup completes.
 func (r *Router) Evict(ctx context.Context, alias string) error {
+	lock := r.getAliasLock(alias)
+	lock.Lock()
+	defer lock.Unlock()
 	return r.mgr.Evict(ctx, alias)
 }
 

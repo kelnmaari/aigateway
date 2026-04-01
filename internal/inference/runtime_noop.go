@@ -16,6 +16,10 @@ func (NoopRuntime) Stop(ctx context.Context, handleID string) error {
 	return fmt.Errorf("container runtime not configured")
 }
 
+func (NoopRuntime) StopByAlias(ctx context.Context, alias string) error {
+	return nil // no-op: no real containers to clean up
+}
+
 func (NoopRuntime) IsRunning(ctx context.Context, handleID string) (bool, error) {
 	return false, nil
 }

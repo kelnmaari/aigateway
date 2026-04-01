@@ -140,6 +140,10 @@ type ContainerHandle struct {
 type ContainerRuntime interface {
 	Start(ctx context.Context, req ContainerStartRequest) (*ContainerHandle, error)
 	Stop(ctx context.Context, handleID string) error
+	// StopByAlias forcefully removes all containers whose name matches the
+	// aigw-{alias}-* pattern.  This catches orphaned containers that were
+	// started but whose handle was not yet recorded (e.g. during StatusStarting).
+	StopByAlias(ctx context.Context, alias string) error
 	IsRunning(ctx context.Context, handleID string) (bool, error)
 	Logs(ctx context.Context, handleID string, tailLines int) (string, error)
 }

@@ -93,12 +93,30 @@ func (m *Manager) Evict(ctx context.Context, alias string) error {
 	if m.isPinned(alias) {
 		return fmt.Errorf("model is pinned: %s", alias)
 	}
-	// Cancel any in-flight StartModel first — this unblocks health check loops
-	// and releases the alias lock so subsequent Load requests don't deadlock.
+	// 1. Cancel any in-flight StartModel — unblocks health check loops and
+	//    releases the alias lock so subsequent Load requests don't deadlock.
 	m.svc.orch.CancelStart(alias)
-	// Stop container if running (ignore error if not running)
-	_ = m.svc.Stop(ctx, alias)
-	// Remove from in-memory registry
+
+	// 2. Stop the container that the orchestrator has a handle for (best effort).
+	if err := m.svc.Stop(ctx, alias); err != nil {
+		m.svc.logger.WithFields(logrus.Fields{
+			"alias": alias,
+			"error": err.Error(),
+		}).Debug("Evict: Stop returned error (ignored)")
+	}
+
+	// 3. Kill ALL containers with the alias prefix to catch orphans that were
+	//    started but whose handle was not yet stored (StatusStarting race).
+	if m.svc.orch.runtime != nil {
+		if err := m.svc.orch.runtime.StopByAlias(ctx, alias); err != nil {
+			m.svc.logger.WithFields(logrus.Fields{
+				"alias": alias,
+				"error": err.Error(),
+			}).Warn("Evict: StopByAlias returned error")
+		}
+	}
+
+	// 4. Remove from in-memory registry
 	m.svc.Forget(alias)
 	// Remove from status tracking
 	m.statusMu.Lock()

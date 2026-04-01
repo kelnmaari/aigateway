@@ -360,6 +360,66 @@ func (r *DockerRuntime) Stop(ctx context.Context, handleID string) error {
 	return nil
 }
 
+// StopByAlias forcefully removes all containers matching the aigw-{alias}-* name prefix.
+// This catches containers that were started but whose handle was not yet recorded in the
+// orchestrator (e.g. container is still in StatusStarting when Evict is called).
+func (r *DockerRuntime) StopByAlias(ctx context.Context, alias string) error {
+	prefix := fmt.Sprintf("aigw-%s-", sanitize(alias))
+
+	if r.useAPI && r.api != nil {
+		// List all containers (running + stopped) with the name prefix
+		containers, err := r.api.ContainerList(ctx, container.ListOptions{All: true})
+		if err != nil {
+			return fmt.Errorf("docker api list: %w", err)
+		}
+		for _, c := range containers {
+			for _, name := range c.Names {
+				// Docker names have a leading "/" in the API response
+				trimmed := strings.TrimPrefix(name, "/")
+				if strings.HasPrefix(trimmed, prefix) {
+					r.logger.WithFields(logrus.Fields{
+						"alias":     alias,
+						"container": trimmed,
+						"id":        c.ID,
+					}).Info("StopByAlias: removing container")
+					_ = r.api.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true})
+					break
+				}
+			}
+		}
+		return nil
+	}
+
+	// CLI fallback: docker ps -a --filter name=<prefix> -q | xargs docker rm -f
+	psCmd := exec.CommandContext(ctx, r.dockerBin, "ps", "-a",
+		"--filter", "name="+prefix, "--format", "{{.ID}}")
+	out, err := psCmd.Output()
+	if err != nil {
+		// No containers matched — not an error
+		return nil
+	}
+	ids := strings.Fields(strings.TrimSpace(string(out)))
+	for _, id := range ids {
+		rmCmd := exec.CommandContext(ctx, r.dockerBin, "rm", "-f", id)
+		if rmOut, rmErr := rmCmd.CombinedOutput(); rmErr != nil {
+			outStr := string(rmOut)
+			if !strings.Contains(outStr, "No such container") && !strings.Contains(outStr, "not found") {
+				r.logger.WithFields(logrus.Fields{
+					"alias":     alias,
+					"container": id,
+					"error":     rmErr.Error(),
+				}).Warn("StopByAlias: docker rm -f failed")
+			}
+		} else {
+			r.logger.WithFields(logrus.Fields{
+				"alias":     alias,
+				"container": id,
+			}).Info("StopByAlias: removed container via CLI")
+		}
+	}
+	return nil
+}
+
 // IsRunning checks if a container is still running (not exited/dead).
 func (r *DockerRuntime) IsRunning(ctx context.Context, handleID string) (bool, error) {
 	if r.useAPI && r.api != nil {

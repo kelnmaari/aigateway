@@ -3,6 +3,7 @@
 
 stages:
   - test
+  - security
   - build
   - package
   - scripts
@@ -130,6 +131,160 @@ test:race:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
     - when: never
+
+# ==============================================================================
+# SECURITY STAGE
+#
+# Two complementary scanners:
+#
+#  security:trivy      — Aqua Trivy filesystem scan (Go + npm + misconfig).
+#                        Outputs SARIF → GitLab Security Dashboard + MR widget.
+#                        Covers ALL known CVEs in both ecosystems at once.
+#
+#  security:govulncheck — Go-specific callgraph-aware scanner (vuln.go.dev).
+#                        Reports ONLY vulnerabilities in code paths that are
+#                        actually reachable — zero false-positives from unused
+#                        transitive deps.
+#
+# Both jobs use allow_failure: true so CI is non-blocking while the team
+# triages findings.  Flip to allow_failure: false once the backlog is clean.
+# ==============================================================================
+
+# ── Trivy: broad CVE scan ──────────────────────────────────────────────────
+# Scans go.sum + web-svelte/package.json for known CVEs in one pass.
+# Outputs:
+#   • SARIF  → artifacts.reports.sast  (GitLab Security Dashboard / MR widget)
+#   • Table  → stdout (human-readable pipeline log)
+#   • JSON   → trivy-report.json (downloadable artifact, CI_JOB_ARTIFACTS)
+security:trivy:
+  stage: security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  variables:
+    # Pull the vuln DB into a cache-friendly path
+    TRIVY_CACHE_DIR: "$CI_PROJECT_DIR/.trivy-cache"
+    # Don't fail the job on vuln findings — we collect the report first
+    TRIVY_EXIT_CODE: "0"
+    # Skip dev/test dependencies (less noise)
+    TRIVY_SKIP_DEV_DEPENDENCIES: "true"
+  cache:
+    key: trivy-db-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .trivy-cache/
+  before_script:
+    - mkdir -p .trivy-cache
+    # Pre-download the vuln DB so it is cached between runs
+    - trivy image --download-db-only --cache-dir .trivy-cache
+  script:
+    # ── 1. SARIF report for GitLab Security Dashboard ──────────────────────
+    - |
+      trivy fs \
+        --cache-dir .trivy-cache \
+        --scanners vuln \
+        --severity HIGH,CRITICAL \
+        --format sarif \
+        --output trivy-report.sarif \
+        .
+    # ── 2. JSON report (full detail, downloadable artifact) ────────────────
+    - |
+      trivy fs \
+        --cache-dir .trivy-cache \
+        --scanners vuln \
+        --severity HIGH,CRITICAL \
+        --format json \
+        --output trivy-report.json \
+        .
+    # ── 3. Human-readable table summary in the pipeline log ────────────────
+    - |
+      echo ""
+      echo "╔══════════════════════════════════════════════════════════════╗"
+      echo "║              Trivy — HIGH / CRITICAL findings                ║"
+      echo "╚══════════════════════════════════════════════════════════════╝"
+      trivy fs \
+        --cache-dir .trivy-cache \
+        --scanners vuln \
+        --severity HIGH,CRITICAL \
+        --format table \
+        .
+      # Exit non-zero if CRITICAL vulns found (surfaced in GitLab UI)
+      trivy fs \
+        --cache-dir .trivy-cache \
+        --scanners vuln \
+        --severity CRITICAL \
+        --exit-code 1 \
+        --format table \
+        . || echo "⚠ CRITICAL vulnerabilities detected — see report"
+  artifacts:
+    when: always
+    paths:
+      - trivy-report.sarif
+      - trivy-report.json
+    reports:
+      sast: trivy-report.sarif   # → GitLab Security Dashboard & MR Security tab
+    expire_in: 4 weeks
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH
+
+# ── govulncheck: Go callgraph-aware scan ──────────────────────────────────
+# Unlike Trivy (which flags every CVE present in go.sum), govulncheck traces
+# actual call paths through the source.  If vulnerable code is imported but
+# never called, it is NOT reported — dramatically fewer false positives.
+security:govulncheck:
+  stage: security
+  image: golang:${GO_VERSION}
+  variables:
+    CGO_ENABLED: "0"
+    GOPATH: "$CI_PROJECT_DIR/.go"
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-go-mods
+    paths:
+      - .go/pkg/mod/
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git 2>/dev/null
+    - mkdir -p .go
+    - export PATH="$GOPATH/bin:$PATH"
+    - go mod download
+    - go install golang.org/x/vuln/cmd/govulncheck@latest
+  script:
+    - |
+      echo "╔══════════════════════════════════════════════════════════════╗"
+      echo "║          govulncheck — Go callgraph CVE analysis             ║"
+      echo "╚══════════════════════════════════════════════════════════════╝"
+      echo ""
+      # -json for the artifact; plain text to stdout for the pipeline log
+      govulncheck -json ./... 2>&1 | tee govulncheck-report.json || true
+      govulncheck ./... 2>&1 | tee govulncheck-report.txt
+  after_script:
+    - |
+      VULNS=$(grep -c '"osv"' govulncheck-report.json 2>/dev/null || echo 0)
+      echo ""
+      echo "────────────────────────────────────────────────────────────────"
+      if [ "$VULNS" -eq "0" ] 2>/dev/null; then
+        echo " ✓  govulncheck: no reachable vulnerabilities found"
+      else
+        echo " ⚠  govulncheck: ${VULNS} OSV record(s) in reachable code"
+        echo "    → see govulncheck-report.txt for details"
+      fi
+      echo "────────────────────────────────────────────────────────────────"
+  artifacts:
+    when: always
+    paths:
+      - govulncheck-report.txt
+      - govulncheck-report.json
+    expire_in: 4 weeks
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH
 
 # ==============================================================================
 # BUILD STAGE

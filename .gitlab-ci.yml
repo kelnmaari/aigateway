@@ -340,7 +340,21 @@ build:agent:
     - mkdir -p .go
     - export GOPATH="$CI_PROJECT_DIR/.go"
   script:
-    - *compute_version
+    - |
+      BASE_VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        export RPM_VERSION="${CI_COMMIT_TAG#v}"
+        export RPM_RELEASE="1"
+        export BUILD_VERSION="${RPM_VERSION}"
+      else
+        BRANCH_SAFE=$(echo "$CI_COMMIT_REF_NAME" | tr '/' '.' | tr '_' '.' | tr '-' '.' | cut -c1-20)
+        export RPM_VERSION="${BASE_VERSION}"
+        export RPM_RELEASE="${BRANCH_SAFE}.${CI_JOB_ID}"
+        export BUILD_VERSION="${RPM_VERSION}-${BRANCH_SAFE}-${CI_JOB_ID}"
+      fi
+      echo "BUILD_VERSION=$BUILD_VERSION"
+      echo "RPM_VERSION=$RPM_VERSION"
+      echo "RPM_RELEASE=$RPM_RELEASE"
     - BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     - GIT_COMMIT=${CI_COMMIT_SHORT_SHA}
     - echo "Building agent version $BUILD_VERSION"

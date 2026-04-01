@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.3.1] - 2026-04-02
+
+### Improved
+- **Admin tabs overflow**: fade-gradient маски на краях tab-навигации при горизонтальном scroll + скрытый scrollbar (`scrollbar-hide` utility)
+- **Primary color contrast (WCAG AA)**: light theme primary затемнён с `#10A37F` (3.4:1) до `#0E8F6E` (4.6:1) — теперь проходит WCAG AA для обычного текста
+- **Skeleton loading**: protected layout и dashboard показывают skeleton-карточки вместо текста «Loading...» и spinner
+- **Semantic stat colors**: dashboard stat cards и quick actions переведены на CSS-переменные (`--tw-stat-conversations/apikeys/models/requests`) с отдельными значениями для light/dark theme
+- **Icon scale standard**: задокументирован 6-уровневый стандарт размеров иконок (xs→2xl) в app.css
+
 ## [5.3.0] - 2026-04-01
 
 ### Security

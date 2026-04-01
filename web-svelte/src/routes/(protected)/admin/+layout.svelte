@@ -10,6 +10,18 @@
 
 	let { children } = $props();
 
+	// Scroll fade state for admin tabs
+	let navEl: HTMLElement | undefined = $state();
+	let showLeftFade = $state(false);
+	let showRightFade = $state(true);
+
+	function handleTabScroll() {
+		if (!navEl) return;
+		const { scrollLeft, scrollWidth, clientWidth } = navEl;
+		showLeftFade = scrollLeft > 4;
+		showRightFade = scrollLeft < scrollWidth - clientWidth - 4;
+	}
+
 	const tabs = [
 		{ id: 'dashboard', label: 'Dashboard', icon: faGauge, href: '/admin' },
 		{ id: 'users', label: m.admin_users, icon: faUsers, href: '/admin/users' },
@@ -36,6 +48,8 @@
 		if (!authStore.isAdmin) {
 			goto('/dashboard');
 		}
+		// Initial scroll check (tabs may already overflow)
+		requestAnimationFrame(handleTabScroll);
 	});
 </script>
 
@@ -62,22 +76,44 @@
 	<!-- Tabs Navigation -->
 	<div class="border-b border-border bg-background">
 		<div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
-			<nav class="-mb-px flex gap-1 overflow-x-auto" aria-label="Admin tabs">
-				{#each tabs as tab}
-					<a
-						href={tab.href}
-						class={cn(
-							'flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors',
-							getCurrentTab() === tab.id
-								? 'border-primary text-primary'
-								: 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-						)}
-					>
-						<FontAwesomeIcon icon={tab.icon} class="h-4 w-4" />
-						{typeof tab.label === 'function' ? tab.label() : tab.label}
-					</a>
-				{/each}
-			</nav>
+			<div class="relative">
+				<!-- Left fade mask -->
+				<div
+					class={cn(
+						'pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-8 bg-gradient-to-r from-background to-transparent transition-opacity duration-200',
+						showLeftFade ? 'opacity-100' : 'opacity-0'
+					)}
+				></div>
+				<!-- Right fade mask -->
+				<div
+					class={cn(
+						'pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-8 bg-gradient-to-l from-background to-transparent transition-opacity duration-200',
+						showRightFade ? 'opacity-100' : 'opacity-0'
+					)}
+				></div>
+
+				<nav
+					class="-mb-px flex gap-1 overflow-x-auto scrollbar-hide"
+					aria-label="Admin tabs"
+					bind:this={navEl}
+					onscroll={handleTabScroll}
+				>
+					{#each tabs as tab}
+						<a
+							href={tab.href}
+							class={cn(
+								'flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors',
+								getCurrentTab() === tab.id
+									? 'border-primary text-primary'
+									: 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+							)}
+						>
+							<FontAwesomeIcon icon={tab.icon} class="h-4 w-4" />
+							{typeof tab.label === 'function' ? tab.label() : tab.label}
+						</a>
+					{/each}
+				</nav>
+			</div>
 		</div>
 	</div>
 

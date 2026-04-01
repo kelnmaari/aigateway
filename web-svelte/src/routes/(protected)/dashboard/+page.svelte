@@ -163,28 +163,28 @@
 			value: stats.conversations,
 			icon: faComments,
 			href: '/chat',
-			color: 'text-blue-500'
+			color: 'text-stat-conversations'
 		},
 		{
 			label: 'API Keys',
 			value: stats.apiKeys,
 			icon: faKey,
 			href: '/api-keys',
-			color: 'text-emerald-500'
+			color: 'text-stat-apikeys'
 		},
 		{
 			label: 'Models',
 			value: stats.models,
 			icon: faMicrochip,
 			href: '/chat',
-			color: 'text-purple-500'
+			color: 'text-stat-models'
 		},
 		{
 			label: 'Requests',
 			value: stats.requests,
 			icon: faChartLine,
 			href: '/api-keys',
-			color: 'text-orange-500'
+			color: 'text-stat-requests'
 		}
 	]);
 </script>
@@ -244,8 +244,25 @@
 	</div>
 
 	{#if loading}
-		<div class="flex items-center justify-center py-20">
-			<FontAwesomeIcon icon={faSpinner} class="h-8 w-8 animate-spin text-muted-foreground" />
+		<!-- Skeleton stat cards -->
+		<div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			{#each Array(4) as _}
+				<div class="rounded-lg border border-border bg-card p-6">
+					<div class="flex items-center gap-4">
+						<div class="h-12 w-12 animate-pulse rounded-lg bg-muted"></div>
+						<div class="space-y-2">
+							<div class="h-4 w-20 animate-pulse rounded bg-muted"></div>
+							<div class="h-6 w-12 animate-pulse rounded bg-muted"></div>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+		<!-- Skeleton content cards -->
+		<div class="grid gap-8 lg:grid-cols-2">
+			{#each Array(4) as _}
+				<div class="h-64 animate-pulse rounded-lg border border-border bg-card"></div>
+			{/each}
 		</div>
 	{:else}
 		<!-- Stats Grid -->
@@ -296,7 +313,7 @@
 						class="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-accent"
 					>
 						<div class="flex items-center gap-3">
-							<div class="rounded-lg bg-emerald-500/10 p-2 text-emerald-500">
+							<div class="rounded-lg bg-stat-apikeys/10 p-2 text-stat-apikeys">
 								<FontAwesomeIcon icon={faKey} class="h-5 w-5" />
 							</div>
 							<div>
@@ -313,7 +330,7 @@
 							class="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-accent"
 						>
 							<div class="flex items-center gap-3">
-								<div class="rounded-lg bg-purple-500/10 p-2 text-purple-500">
+								<div class="rounded-lg bg-stat-models/10 p-2 text-stat-models">
 									<FontAwesomeIcon icon={faChartLine} class="h-5 w-5" />
 								</div>
 								<div>

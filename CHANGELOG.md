@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.1] - 2026-04-02
+
+### Added
+- **Workers Admin UI**: полноценная вкладка "Workers" в admin panel (Svelte)
+  - Список воркеров с GPU метриками (VRAM bar, utilization, температура, power)
+  - "Add Worker" модал с генерацией API key
+  - "Generate Config" модал с пошаговой инструкцией (install command + agent.yaml + post-install)
+  - "Load Model" модал для запуска моделей на конкретном воркере
+  - Управление моделями: запуск, остановка, просмотр статуса
+  - Empty state с инструкциями для начала работы
+  - Skeleton loading
+
+### Fixed
+- **CI**: `build:agent` — заменён несуществующий YAML anchor `*compute_version` на inline compute version скрипт
+- **Security review fixes (Round 2)**:
+  - JSON injection в `PullImageWithAuth` — `fmt.Sprintf` → `json.Marshal`
+  - `DockerLogin()` метод + интеграция registry auth при старте агента
+  - Удалён неиспользуемый `nodeName` field в agent Client
+  - TRT-LLM: корректный `enginesDir` path вместо пустой строки
+  - `WorkersConfig` defaults в `setDefaults()` (health_check_interval: 30s, max_consecutive_failures: 3)
+  - `EnsureByAlias`: проверка `nodeAddr != ""` при remote resolution
+  - `GetModel()`: fallback на remote models через `remoteResolver`
+
 ## [5.4.0] - 2026-04-02
 
 ### Added

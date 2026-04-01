@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { FontAwesomeIcon } from '@fortawesome/svelte-fontawesome';
-	import { faGauge, faUsers, faKey, faGear, faFileLines, faShield, faServer, faEnvelope, faDownload, faMicrochip, faCodeBranch, faCloud } from '@fortawesome/free-solid-svg-icons';
+	import { faGauge, faUsers, faKey, faGear, faFileLines, faShield, faServer, faEnvelope, faDownload, faMicrochip, faCodeBranch, faCloud, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 	import { cn } from '$lib/utils';
 	import * as m from '$lib/paraglide/messages';
 
@@ -30,6 +30,7 @@
 		{ id: 'models', label: m.admin_models, icon: faMicrochip, href: '/admin/models' },
 		{ id: 'providers', label: 'Providers', icon: faCloud, href: '/admin/providers' },
 		{ id: 'downloads', label: 'Downloads', icon: faDownload, href: '/admin/downloads' },
+		{ id: 'workers', label: 'Workers', icon: faNetworkWired, href: '/admin/workers' },
 		{ id: 'mcp', label: 'MCP', icon: faServer, href: '/admin/mcp' },
 		{ id: 'gitlab', label: 'GitLab', icon: faCodeBranch, href: '/admin/gitlab' },
 		{ id: 'settings', label: m.admin_settings, icon: faGear, href: '/admin/settings' },

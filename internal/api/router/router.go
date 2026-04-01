@@ -1709,6 +1709,7 @@ func (r *Router) setupSvelteUIRoutes() {
 		"/admin/backups",
 		"/admin/logs",
 		"/admin/providers",
+		"/admin/workers",
 	}
 
 	for _, route := range svelteRoutes {

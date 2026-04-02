@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.4] - 2026-04-02
+
+### Fixed
+- **WebUI**: обновлён embedded Svelte build в `internal/web/svelte-build/` — JS-чанки с новыми хэшами после добавления Workers страницы. Без этого Go-сервер отдавал `index.html` вместо JS-файлов (MIME type mismatch)
+
 ## [5.4.3] - 2026-04-02
 
 ### Fixed

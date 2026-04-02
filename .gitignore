@@ -43,6 +43,7 @@ Thumbs.db
 
 # Svelte WebUI builds
 internal/web/svelte-build/
+/internal/web/svelte-build
 web-svelte/build/
 web-svelte/.svelte-kit/
 web-svelte/node_modules/
@@ -83,3 +84,4 @@ monigo/
 .ai-review-artifacts/
 /aigateway-desktop/
 /continue/
+internal/web/svelte-build/*

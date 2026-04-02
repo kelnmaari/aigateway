@@ -50,6 +50,7 @@
 	let showConfigModal = $state(false);
 	let configForm = $state({
 		name: '',
+		address: '',           // URL where main server can reach agent
 		node_type: 'gpu' as string,
 		listen_addr: '0.0.0.0:9090',
 		hf_cache_dir: '/data/models/hf',
@@ -152,6 +153,8 @@
 		try {
 			const res = await api.post<any>('/api/admin/workers/generate-config', configForm);
 			generatedConfig = res;
+			// Worker was pre-registered in DB — refresh the list
+			await loadWorkers();
 		} catch (err: any) {
 			toast.error(err.message || 'Failed to generate config');
 		} finally {
@@ -242,7 +245,7 @@
 				<FontAwesomeIcon icon={faArrowsRotate} class={cn('mr-2 h-4 w-4', refreshing && 'animate-spin')} />
 				Refresh
 			</Button>
-			<Button variant="outline" size="sm" onclick={() => { configForm = { name: '', node_type: 'gpu', listen_addr: '0.0.0.0:9090', hf_cache_dir: '/data/models/hf', gguf_cache_dir: '/data/models/gguf', hf_token: '' }; generatedConfig = null; showConfigModal = true; }}>
+			<Button variant="outline" size="sm" onclick={() => { configForm = { name: '', address: '', node_type: 'gpu', listen_addr: '0.0.0.0:9090', hf_cache_dir: '/data/models/hf', gguf_cache_dir: '/data/models/gguf', hf_token: '' }; generatedConfig = null; showConfigModal = true; }}>
 				<FontAwesomeIcon icon={faGear} class="mr-2 h-4 w-4" />
 				Generate Config
 			</Button>
@@ -548,6 +551,12 @@
 						<input id="cfg-name" type="text" bind:value={configForm.name} placeholder="gpu-worker-1"
 							class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
 					</div>
+					<div>
+						<label for="cfg-address" class="text-sm font-medium text-foreground">Agent Address (as seen by this server)</label>
+						<input id="cfg-address" type="text" bind:value={configForm.address} placeholder="http://192.168.1.50:9090"
+							class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+						<p class="mt-1 text-xs text-muted-foreground">The URL where this main server can reach the agent (IP:port of the worker machine)</p>
+					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
 							<label for="cfg-type" class="text-sm font-medium text-foreground">Node Type</label>
@@ -584,7 +593,7 @@
 				</div>
 				<div class="mt-6 flex justify-end gap-2">
 					<Button variant="outline" onclick={() => showConfigModal = false}>Cancel</Button>
-					<Button onclick={generateConfig} disabled={configLoading || !configForm.name}>
+					<Button onclick={generateConfig} disabled={configLoading || !configForm.name || !configForm.address}>
 						{#if configLoading}
 							<FontAwesomeIcon icon={faSpinner} class="mr-2 h-4 w-4 animate-spin" />
 						{/if}

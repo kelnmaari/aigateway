@@ -310,12 +310,25 @@ func (h *WorkerHandler) StopModelOnWorker(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "stopped", "alias": req.Alias})
 }
 
-// GenerateConfig generates an agent config YAML and API key for a new worker.
+// GenerateConfig generates an agent config YAML, API key, and pre-registers
+// the worker node in the database (status=pending). When the agent starts and
+// the main server's health check succeeds, status transitions to online.
 // POST /api/admin/workers/generate-config
 func (h *WorkerHandler) GenerateConfig(c *gin.Context) {
 	var req agent.GenerateConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request: %v", err)})
+		return
+	}
+
+	if req.Address == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "address is required (the URL where the main server can reach the agent, e.g. http://192.168.1.50:9090)"})
+		return
+	}
+
+	// Validate address
+	if u, parseErr := url.Parse(req.Address); parseErr != nil || u.Host == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid address: must be a valid URL (e.g. http://gpu-server:9090)"})
 		return
 	}
 
@@ -344,9 +357,30 @@ func (h *WorkerHandler) GenerateConfig(c *gin.Context) {
 		nodeType = "gpu"
 	}
 
+	// Pre-register worker node in DB (status=pending, will become online after first health check)
+	node := &models.WorkerNode{
+		Name:             req.Name,
+		Address:          req.Address,
+		APIKey:           apiKey,
+		NodeType:         nodeType,
+		Status:           "pending",
+		MaxRunningModels: 2,
+	}
+	if err := h.manager.RegisterNode(c.Request.Context(), node); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to register worker: %v", err)})
+		return
+	}
+
+	h.logger.WithFields(logrus.Fields{
+		"node_id":   node.ID,
+		"node_name": req.Name,
+		"address":   req.Address,
+	}).Info("Worker node pre-registered via config generation")
+
 	// Generate YAML config
 	configYAML := fmt.Sprintf(`# AIGateway Agent Configuration — %s
 # Generated automatically. Do not edit the api_key.
+# Worker ID: %s
 
 agent:
   listen_addr: "%s"
@@ -365,16 +399,17 @@ agent:
     enabled: false
     cert_file: "certs/agent.crt"
     key_file: "certs/agent.key"
-`, req.Name, listenAddr, apiKey, req.Name, nodeType, hfCacheDir, ggufCacheDir, req.HFToken)
+`, req.Name, node.ID, listenAddr, apiKey, req.Name, nodeType, hfCacheDir, ggufCacheDir, req.HFToken)
 
 	installCmd := "curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/aigateway-agent/latest/install.sh | sudo bash"
-	postInstall := fmt.Sprintf("sudo cp agent.yaml /opt/aigateway-agent/configs/agent.yaml && sudo systemctl restart aigateway-agent")
+	postInstall := "sudo cp agent.yaml /opt/aigateway-agent/configs/agent.yaml && sudo systemctl restart aigateway-agent"
 
 	c.JSON(http.StatusOK, agent.GenerateConfigResponse{
 		ConfigYAML:     configYAML,
 		APIKey:         apiKey,
 		InstallCommand: installCmd,
 		PostInstall:    postInstall,
+		WorkerID:       node.ID,
 	})
 }
 

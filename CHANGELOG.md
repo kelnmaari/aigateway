@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.2] - 2026-04-02
+
+### Fixed
+- **Generate Config flow**: Generate Config теперь автоматически регистрирует worker node в БД (status=pending) — не нужно отдельно делать "Add Worker"
+- **Generate Config**: добавлено обязательное поле `address` — URL по которому main server будет обращаться к агенту
+- **CI**: исправлен YAML anchor `*compute_version` → inline скрипт в `build:agent` job
+- **Config**: добавлена секция `workers.enabled: true` в `configs/dev.yaml`
+
+### Changed
+- `GenerateConfigRequest` — новое обязательное поле `address` (e.g. `http://192.168.1.50:9090`)
+- `GenerateConfigResponse` — новое поле `worker_id` (ID созданной записи в БД)
+- Workers Admin UI: форма Generate Config теперь включает поле "Agent Address" с подсказкой; после генерации обновляет список воркеров
+
 ## [5.4.1] - 2026-04-02
 
 ### Added

@@ -28,6 +28,16 @@ server:
     enabled: true
     version: "legacy"  # "legacy" (HTML/JS) or "svelte" (Svelte 5)
 
+# Workers (Agent Mode) — Remote inference workers (v5.4.0+)
+workers:
+  enabled: true
+  health_check_interval: "30s"
+  health_check_timeout: "10s"
+  max_consecutive_failures: 3
+  tls:
+    ca_cert: ""
+    skip_verify: true  # true for dev (self-signed certs)
+
 # Inference Configuration (v3.3.0+: Multi-provider support)
 inference:
   backend: "docker"  # "docker" (v3.3.0+ multi-provider containers)

@@ -118,13 +118,14 @@ type StopModelRequest struct {
 
 // GenerateConfigRequest is the admin API request for generating agent config.
 type GenerateConfigRequest struct {
-	Name        string   `json:"name" binding:"required"`
-	NodeType    NodeType `json:"node_type" binding:"required"`
-	ListenAddr  string   `json:"listen_addr"`
-	HFCacheDir  string   `json:"hf_cache_dir"`
-	GGUFCacheDir string  `json:"gguf_cache_dir"`
-	HFToken     string   `json:"hf_token,omitempty"`
-	GenerateTLS bool     `json:"generate_tls"`
+	Name         string   `json:"name" binding:"required"`
+	Address      string   `json:"address" binding:"required"` // URL where main server reaches agent (e.g. http://192.168.1.50:9090)
+	NodeType     NodeType `json:"node_type"`
+	ListenAddr   string   `json:"listen_addr"`
+	HFCacheDir   string   `json:"hf_cache_dir"`
+	GGUFCacheDir string   `json:"gguf_cache_dir"`
+	HFToken      string   `json:"hf_token,omitempty"`
+	GenerateTLS  bool     `json:"generate_tls"`
 }
 
 // GenerateConfigResponse is the admin API response with generated config.
@@ -133,4 +134,5 @@ type GenerateConfigResponse struct {
 	APIKey         string `json:"api_key"`
 	InstallCommand string `json:"install_command"`
 	PostInstall    string `json:"post_install"`
+	WorkerID       string `json:"worker_id"` // ID of pre-registered worker node
 }

@@ -73,39 +73,44 @@
 		if (!content) return { thinking: null, response: '', isThinking: false };
 
 		// Normalize content - replace various unicode brackets/arrows with standard chars
-		// This handles encoding issues where ◁▷ become garbled
 		let normalized = content
-			.replace(/[◁◀⟨〈❮‹«<＜]/g, '<')
-			.replace(/[▷▶⟩〉❯›»>＞]/g, '>')
+			.replace(/[◁◀⟨〈❮‹«＜]/g, '<')
+			.replace(/[▷▶⟩〉❯›»＞]/g, '>')
 			.replace(/\uFFFD+/g, ''); // Remove replacement characters
 
-		// Try regex first - most flexible
-		// Match <think> or variations with any brackets
-		const thinkRegex = /[<\[{(]+\s*think\s*[>\]})]+\s*\n?([\s\S]*?)[<\[{(]+\s*\/\s*think\s*[>\]})]+/i;
-		const match = normalized.match(thinkRegex);
-
-		if (match) {
-			const thinking = match[1].trim();
-			const beforeThink = normalized.slice(0, match.index).trim();
-			const afterThink = normalized.slice((match.index || 0) + match[0].length).trim();
-			const response = (beforeThink + ' ' + afterThink).trim();
-			return { thinking, response, isThinking: false };
-		}
-
-		// Check for incomplete thinking (open tag but no close)
+		// Strategy: find opening and closing think tags by index
+		// This is more robust than a single regex for multiline content with markdown
 		const openRegex = /[<\[{(]+\s*think\s*[>\]})]+/i;
 		const closeRegex = /[<\[{(]+\s*\/\s*think\s*[>\]})]+/i;
-		const openMatch = normalized.match(openRegex);
 
-		if (openMatch && !normalized.match(closeRegex)) {
-			const openIdx = openMatch.index || 0;
-			const thinking = normalized.slice(openIdx + openMatch[0].length).trim();
-			const beforeThink = normalized.slice(0, openIdx).trim();
-			return { thinking, response: beforeThink, isThinking: true };
+		const openMatch = normalized.match(openRegex);
+		if (!openMatch) {
+			// No think tag at all — return as-is
+			return { thinking: null, response: content, isThinking: false };
 		}
 
-		// Fallback - return original content
-		return { thinking: null, response: content, isThinking: false };
+		const openIdx = openMatch.index || 0;
+		const afterOpen = openIdx + openMatch[0].length;
+
+		// Search for closing tag AFTER the opening tag
+		const restContent = normalized.slice(afterOpen);
+		const closeMatch = restContent.match(closeRegex);
+
+		if (closeMatch) {
+			// Found both open and close — extract thinking and response
+			const closeIdx = closeMatch.index || 0;
+			const thinking = restContent.slice(0, closeIdx).trim();
+			const afterClose = afterOpen + closeIdx + closeMatch[0].length;
+			const beforeThink = normalized.slice(0, openIdx).trim();
+			const afterThink = normalized.slice(afterClose).trim();
+			const response = (beforeThink + (beforeThink && afterThink ? '\n' : '') + afterThink).trim();
+			return { thinking: thinking || null, response, isThinking: false };
+		}
+
+		// Open tag found but no close — still thinking (streaming in progress)
+		const thinking = restContent.trim();
+		const beforeThink = normalized.slice(0, openIdx).trim();
+		return { thinking: thinking || null, response: beforeThink, isThinking: true };
 	}
 
 	// Auto-scroll to bottom on new messages

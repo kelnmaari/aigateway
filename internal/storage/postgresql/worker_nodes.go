@@ -16,9 +16,8 @@ import (
 
 // CreateWorkerNode registers a new remote inference worker node.
 func (db *PostgreSQLDB) CreateWorkerNode(ctx context.Context, node *models.WorkerNode) error {
-	if node.ID == "" {
-		node.ID = generateID()
-	}
+	// worker_nodes.id is UUID type — let PostgreSQL generate it via DEFAULT gen_random_uuid()
+	// Don't use generateID() which returns UnixNano (not valid UUID)
 
 	now := time.Now()
 	node.CreatedAt = now
@@ -48,19 +47,21 @@ func (db *PostgreSQLDB) CreateWorkerNode(ctx context.Context, node *models.Worke
 		node.ModelsRunning = json.RawMessage("[]")
 	}
 
+	// Let PostgreSQL generate UUID via DEFAULT gen_random_uuid()
 	query := `
 		INSERT INTO worker_nodes (
-			id, name, address, api_key, status, node_type,
+			name, address, api_key, status, node_type,
 			gpu_info, cpu_info, memory_info, models_running,
 			max_running_models, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id
 	`
 
-	_, err := db.db.ExecContext(ctx, query,
-		node.ID, node.Name, node.Address, node.APIKey, node.Status, node.NodeType,
+	err := db.db.QueryRowContext(ctx, query,
+		node.Name, node.Address, node.APIKey, node.Status, node.NodeType,
 		node.GPUInfo, node.CPUInfo, node.MemoryInfo, node.ModelsRunning,
 		node.MaxRunningModels, node.CreatedAt, node.UpdatedAt,
-	)
+	).Scan(&node.ID)
 	if err != nil {
 		return fmt.Errorf("create worker node: %w", err)
 	}

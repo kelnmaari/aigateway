@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.3] - 2026-04-02
+
+### Fixed
+- **Worker registration**: `CreateWorkerNode` использовал `generateID()` (UnixNano) для UUID-колонки → ошибка PostgreSQL `invalid input syntax for type uuid`. Исправлено: PostgreSQL генерирует UUID через `DEFAULT gen_random_uuid()` + `RETURNING id`
+
 ## [5.4.2] - 2026-04-02
 
 ### Fixed

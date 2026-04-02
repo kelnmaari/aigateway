@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.7] - 2026-04-02
+
+### Fixed
+- **Models UI**: Target Node dropdown — 401 Unauthorized при загрузке списка воркеров (заменён `fetch` на `api.get` с JWT)
+- **Models UI**: Target Node dropdown теперь всегда виден при `workers.enabled: true`, даже если воркеров 0 — показывает "No remote workers registered" с ссылкой на Admin → Workers
+
 ## [5.4.6] - 2026-04-02
 
 ### Added

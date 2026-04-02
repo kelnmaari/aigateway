@@ -990,14 +990,12 @@
 
 	async function loadWorkerNodes() {
 		try {
-			const res = await fetch('/api/system/inference/workers', { credentials: 'include' });
-			if (res.ok) {
-				const data = await res.json();
-				workerNodes = data.workers || [];
-				workersEnabled = data.enabled || false;
-			}
+			const data = await api.get<{ workers: typeof workerNodes; enabled: boolean }>('/api/system/inference/workers');
+			workerNodes = data.workers || [];
+			workersEnabled = data.enabled || false;
 		} catch {
 			// Workers not available — silently ignore
+			workersEnabled = false;
 		}
 	}
 
@@ -2049,7 +2047,7 @@
 					</div>
 
 					<!-- Target Node (Agent Mode) -->
-					{#if workersEnabled && workerNodes.length > 0}
+					{#if workersEnabled}
 						<div class="flex flex-col gap-2 text-sm">
 							<span class="font-medium">Target Node</span>
 							<select
@@ -2057,14 +2055,22 @@
 								bind:value={form.target_node}
 							>
 								<option value="">Local (this server)</option>
-								{#each workerNodes as w}
-									<option value={w.id} disabled={w.status !== 'online'}>
-										{w.name} ({w.node_type}) {w.status !== 'online' ? `— ${w.status}` : ''}
-									</option>
-								{/each}
+								{#if workerNodes.length === 0}
+									<option disabled>— No remote workers registered —</option>
+								{:else}
+									{#each workerNodes as w}
+										<option value={w.id} disabled={w.status !== 'online'}>
+											{w.name} ({w.node_type}){w.status !== 'online' ? ` — ${w.status}` : ''}
+										</option>
+									{/each}
+								{/if}
 							</select>
 							<span class="text-muted-foreground text-xs">
-								Select a remote worker to run this model on. Leave empty to run locally.
+								{#if workerNodes.length === 0}
+									No remote workers available. <a href="/admin/workers" class="text-primary hover:underline">Add a worker</a> to enable distributed inference.
+								{:else}
+									Select a remote worker to run this model on. Leave empty to run locally.
+								{/if}
 							</span>
 						</div>
 					{/if}

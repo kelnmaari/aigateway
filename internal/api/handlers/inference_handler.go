@@ -1075,6 +1075,7 @@ type UpdateSavedRequest struct {
 	GPUDevice                *string  `json:"gpu_device,omitempty"`
 	AutoStart                *bool    `json:"auto_start,omitempty"` // Whether to auto-start on boot
 	DockerImage              *string  `json:"docker_image,omitempty"`
+	TargetNode               *string  `json:"target_node,omitempty"` // Worker node ID for remote execution
 }
 
 // PostUpdateSaved updates a saved model configuration.

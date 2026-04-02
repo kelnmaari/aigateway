@@ -408,6 +408,7 @@
 		tei_extra_args: string;
 		gpu_device: string;
 		docker_image: string;
+		target_node: string;
 	}>({
 		capabilities: ['chat'],
 		auto_start: false,
@@ -464,7 +465,8 @@
 		tei_dtype: '',
 		tei_extra_args: '',
 		gpu_device: '',
-		docker_image: ''
+		docker_image: '',
+		target_node: ''
 	});
 
 	let form = $state<LoadRequest>({
@@ -1572,7 +1574,8 @@
 			tei_dtype: saved.tei_dtype || '',
 			tei_extra_args: saved.tei_extra_args || '',
 			gpu_device: saved.gpu_device || '',
-			docker_image: saved.docker_image || ''
+			docker_image: saved.docker_image || '',
+			target_node: saved.target_node || ''
 		};
 	}
 
@@ -3663,6 +3666,29 @@
 						locally-built images with patched dependencies.
 					</p>
 				</div>
+
+				<!-- Target Node (Agent Mode) -->
+				{#if workersEnabled}
+					<div>
+						<label for="edit-target-node" class="mb-1 block text-sm font-medium">Target Node</label>
+						<select
+							id="edit-target-node"
+							class="bg-background w-full rounded border px-3 py-2 text-sm"
+							bind:value={editSavedForm.target_node}
+						>
+							<option value="">Local (this server)</option>
+							{#if workerNodes.length === 0}
+								<option disabled>— No remote workers registered —</option>
+							{:else}
+								{#each workerNodes as w}
+									<option value={w.id} disabled={w.status !== 'online'}>
+										{w.name} ({w.node_type}){w.status !== 'online' ? ` — ${w.status}` : ''}
+									</option>
+								{/each}
+							{/if}
+						</select>
+					</div>
+				{/if}
 
 				<!-- Provider-specific settings -->
 				{#if editingSavedModel.provider === 'vllm'}

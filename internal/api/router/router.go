@@ -600,6 +600,7 @@ func (r *Router) setupInferenceRoutes() {
 		group.GET("/health", r.inferenceHandler.GetHealth)
 		group.GET("/models", r.inferenceHandler.GetModels)
 		group.GET("/logs", r.inferenceHandler.GetLogs)
+		group.GET("/workers", r.inferenceHandler.GetWorkerNodes)
 		group.GET("/metrics", r.inferenceHandler.GetMetrics)
 		group.GET("/trt-engines", r.inferenceHandler.ListTRTEngines)
 		group.POST("/convert-trt", r.inferenceHandler.ConvertTRT)
@@ -2937,6 +2938,9 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		r.agentManager.StartHealthChecks(context.Background())
 		r.workerHandler = handlers.NewWorkerHandler(r.agentManager, logger)
 		r.workerHandler.SetInferenceRouter(r.inferenceRouter)
+		if r.inferenceHandler != nil {
+			r.inferenceHandler.SetAgentManager(r.agentManager)
+		}
 		logger.Info("Agent Mode: worker manager initialized with health checks")
 	}
 

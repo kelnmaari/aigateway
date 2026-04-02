@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.6] - 2026-04-02
+
+### Added
+- **Target Node в Load Model**: dropdown "Target Node" на странице Admin → Models для выбора воркера при загрузке модели (Local / remote workers)
+- **`target_node` field в LoadRequest**: backend роутит загрузку на указанный воркер через `agentManager.LoadModelOnNode()`
+- **`GET /api/system/inference/workers`**: endpoint для получения списка воркеров (используется dropdown-ом в Models UI)
+- **`InferenceHandler.SetAgentManager()`**: интеграция inference handler с agent manager для remote routing
+
 ## [5.4.5] - 2026-04-02
 
 ### Fixed

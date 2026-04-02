@@ -529,7 +529,8 @@
 		tei_pooling: '',
 		tei_dtype: '',
 		tei_extra_args: '',
-		docker_image: ''
+		docker_image: '',
+		target_node: ''
 	});
 
 	// TRT conversion form
@@ -567,7 +568,7 @@
 	});
 
 	async function refreshAll() {
-		await Promise.all([loadModels(), loadSavedModels(), loadCache(), loadTRTEngines()]);
+		await Promise.all([loadModels(), loadSavedModels(), loadCache(), loadTRTEngines(), loadWorkerNodes()]);
 	}
 
 	async function loadSavedModels() {
@@ -974,12 +975,29 @@
 		return n.toString();
 	}
 
+	// Worker nodes for "Target Node" dropdown
+	let workerNodes = $state<Array<{id: string; name: string; status: string; node_type: string}>>([]);
+	let workersEnabled = $state(false);
+
 	async function loadModels() {
 		try {
 			models = (await inferenceApi.listModels()) || [];
 		} catch (e: any) {
 			showMsg(e?.message || 'Не удалось получить список моделей', 'error');
 			models = [];
+		}
+	}
+
+	async function loadWorkerNodes() {
+		try {
+			const res = await fetch('/api/system/inference/workers', { credentials: 'include' });
+			if (res.ok) {
+				const data = await res.json();
+				workerNodes = data.workers || [];
+				workersEnabled = data.enabled || false;
+			}
+		} catch {
+			// Workers not available — silently ignore
 		}
 	}
 
@@ -1103,11 +1121,12 @@
 				tei_max_concurrent_reqs: form.tei_max_concurrent_reqs,
 				tei_pooling: form.tei_pooling,
 				tei_dtype: form.tei_dtype,
-				tei_extra_args: form.tei_extra_args
+				tei_extra_args: form.tei_extra_args,
+				target_node: form.target_node || undefined
 			};
 			if (start) {
 				await inferenceApi.load(req);
-				showMsg('Модель загружается...', 'success');
+				showMsg(form.target_node ? `Модель загружается на worker ${form.target_node}...` : 'Модель загружается...', 'success');
 			} else {
 				// Download repository locally instead of just preparing
 				if (form.hf_repo) {
@@ -2028,6 +2047,27 @@
 							Override the default provider image. Local images are used without pull. Useful for locally-built or patched images.
 						</span>
 					</div>
+
+					<!-- Target Node (Agent Mode) -->
+					{#if workersEnabled && workerNodes.length > 0}
+						<div class="flex flex-col gap-2 text-sm">
+							<span class="font-medium">Target Node</span>
+							<select
+								class="bg-background rounded border px-3 py-2 text-sm"
+								bind:value={form.target_node}
+							>
+								<option value="">Local (this server)</option>
+								{#each workerNodes as w}
+									<option value={w.id} disabled={w.status !== 'online'}>
+										{w.name} ({w.node_type}) {w.status !== 'online' ? `— ${w.status}` : ''}
+									</option>
+								{/each}
+							</select>
+							<span class="text-muted-foreground text-xs">
+								Select a remote worker to run this model on. Leave empty to run locally.
+							</span>
+						</div>
+					{/if}
 
 					<!-- Capabilities -->
 					<div class="flex flex-col gap-2 text-sm">

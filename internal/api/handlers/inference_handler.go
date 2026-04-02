@@ -8,14 +8,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
+	"aigateway/internal/agent"
 	"aigateway/internal/inference"
 )
 
 // InferenceHandler exposes minimal endpoints to manage inference providers.
 type InferenceHandler struct {
-	router     *inference.Router
-	modelStore *inference.ModelStore
-	logger     *logrus.Logger
+	router       *inference.Router
+	modelStore   *inference.ModelStore
+	agentManager *agent.Manager // optional: for routing loads to remote workers
+	logger       *logrus.Logger
 }
 
 // NewInferenceHandler constructs handler.
@@ -29,6 +31,11 @@ func NewInferenceHandler(router *inference.Router, logger *logrus.Logger) *Infer
 // SetModelStore sets the model store for persistence.
 func (h *InferenceHandler) SetModelStore(store *inference.ModelStore) {
 	h.modelStore = store
+}
+
+// SetAgentManager sets the agent manager for remote worker routing.
+func (h *InferenceHandler) SetAgentManager(mgr *agent.Manager) {
+	h.agentManager = mgr
 }
 
 // LoadRequest describes model spec input.
@@ -45,6 +52,9 @@ type LoadRequest struct {
 
 	// GPU selection (e.g., "0", "1", "0,1" for multi-GPU)
 	GPUDevice string `json:"gpu_device"`
+
+	// Target worker node (Agent Mode) — empty = local, node ID or name = remote
+	TargetNode string `json:"target_node,omitempty"`
 
 	// vLLM options
 	VLLMTensorParallel int     `json:"vllm_tensor_parallel"`
@@ -243,7 +253,28 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		DockerImage:     req.DockerImage,
 	}
 
-	// Always use the provided spec from the request, not a cached one from registry.
+	// Route to remote worker if target_node is specified
+	if req.TargetNode != "" && h.agentManager != nil {
+		h.logger.WithFields(logrus.Fields{
+			"alias":       req.Alias,
+			"target_node": req.TargetNode,
+		}).Info("Routing model load to remote worker")
+
+		resp, err := h.agentManager.LoadModelOnNode(c.Request.Context(), req.TargetNode, spec)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"alias":       resp.Alias,
+			"status":      resp.Status,
+			"endpoint":    resp.Endpoint,
+			"target_node": req.TargetNode,
+		})
+		return
+	}
+
+	// Local: use the provided spec from the request, not a cached one from registry.
 	// This ensures that when user explicitly selects provider=tei, we use tei,
 	// not a previously cached spec with provider=vllm.
 	inst, err := h.router.EnsureBySpec(c.Request.Context(), spec)
@@ -517,6 +548,39 @@ func (h *InferenceHandler) GetModels(c *gin.Context) {
 		resp = append(resp, item)
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// GetWorkerNodes returns available worker nodes for the Load Model form dropdown.
+// GET /api/system/inference/workers
+func (h *InferenceHandler) GetWorkerNodes(c *gin.Context) {
+	if h.agentManager == nil {
+		c.JSON(http.StatusOK, gin.H{"workers": []any{}, "enabled": false})
+		return
+	}
+	nodes, err := h.agentManager.ListNodes(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	// Return simplified list for dropdown
+	type nodeOption struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Status   string `json:"status"`
+		NodeType string `json:"node_type"`
+		Address  string `json:"address"`
+	}
+	options := make([]nodeOption, 0, len(nodes))
+	for _, n := range nodes {
+		options = append(options, nodeOption{
+			ID:       n.ID,
+			Name:     n.Name,
+			Status:   n.Status,
+			NodeType: n.NodeType,
+			Address:  n.Address,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"workers": options, "enabled": true})
 }
 
 // GetLogs returns recent container logs for alias.

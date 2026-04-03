@@ -39,6 +39,8 @@ type SavedModel struct {
 	VLLMEnableAutoToolChoice bool   `json:"vllm_enable_auto_tool_choice,omitempty"`
 	VLLMToolCallParser       string `json:"vllm_tool_call_parser,omitempty"`
 	VLLMChatTemplate         string `json:"vllm_chat_template,omitempty"`
+	VLLMAllowLongContext     bool   `json:"vllm_allow_long_context,omitempty"`
+	VLLMDisableReasoning     bool   `json:"vllm_disable_reasoning,omitempty"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
@@ -196,6 +198,8 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		VLLMEnableAutoToolChoice: spec.VLLMEnableAutoToolChoice,
 		VLLMToolCallParser:       spec.VLLMToolCallParser,
 		VLLMChatTemplate:         spec.VLLMChatTemplate,
+		VLLMAllowLongContext:     spec.VLLMAllowLongContext,
+		VLLMDisableReasoning:     spec.VLLMDisableReasoning,
 		SGLangToolCallParser:     spec.SGLangToolCallParser,
 		DockerImage:              spec.DockerImage,
 		AutoStart:               autoStart,
@@ -340,6 +344,8 @@ func (m SavedModel) ToSpec() ModelSpec {
 		VLLMEnableAutoToolChoice: m.VLLMEnableAutoToolChoice,
 		VLLMToolCallParser:       m.VLLMToolCallParser,
 		VLLMChatTemplate:         m.VLLMChatTemplate,
+		VLLMAllowLongContext:     m.VLLMAllowLongContext,
+		VLLMDisableReasoning:     m.VLLMDisableReasoning,
 		SGLangToolCallParser:     m.SGLangToolCallParser,
 		DockerImage:              m.DockerImage,
 	}

@@ -134,6 +134,13 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 		cmd = append(cmd, "--chat-template", spec.VLLMChatTemplate)
 	}
 
+	// Disable reasoning content parsing — keeps <think> tags in content field
+	// instead of extracting to reasoning_content (useful for clients that
+	// don't support reasoning_content like OpenCode, Kilo Code, etc.)
+	if spec.VLLMDisableReasoning {
+		cmd = append(cmd, "--disable-reasoning")
+	}
+
 	// Extra args: split by whitespace and append as raw CLI args
 	// e.g. "--enable-auto-tool-choice --tool-call-parser hermes"
 	// Supports quoted JSON values: --hf-overrides '{"key":"val"}'
@@ -151,6 +158,10 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 	// Pass HF token only if downloading from HuggingFace
 	if hfToken != "" && !useLocalModel {
 		env["HF_TOKEN"] = hfToken
+	}
+	// Allow max_model_len to exceed max_position_embeddings (use with caution)
+	if spec.VLLMAllowLongContext {
+		env["VLLM_ALLOW_LONG_MAX_MODEL_LEN"] = "1"
 	}
 	image := DefaultVLLMImage
 	if spec.DockerImage != "" {

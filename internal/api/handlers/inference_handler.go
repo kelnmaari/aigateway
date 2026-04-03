@@ -72,6 +72,8 @@ type LoadRequest struct {
 	VLLMEnableAutoToolChoice bool   `json:"vllm_enable_auto_tool_choice"`
 	VLLMToolCallParser       string `json:"vllm_tool_call_parser"`
 	VLLMChatTemplate         string `json:"vllm_chat_template"`
+	VLLMAllowLongContext     bool   `json:"vllm_allow_long_context"`  // Allow max_model_len > max_position_embeddings
+	VLLMDisableReasoning     bool   `json:"vllm_disable_reasoning"`  // --disable-reasoning (keep <think> in content)
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
@@ -238,6 +240,8 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		VLLMEnableAutoToolChoice: req.VLLMEnableAutoToolChoice,
 		VLLMToolCallParser:       req.VLLMToolCallParser,
 		VLLMChatTemplate:         req.VLLMChatTemplate,
+		VLLMAllowLongContext:     req.VLLMAllowLongContext,
+		VLLMDisableReasoning:     req.VLLMDisableReasoning,
 		// SGLang new fields
 		SGLangQuantization:     req.SGLangQuantization,
 		SGLangAttentionBackend: req.SGLangAttentionBackend,
@@ -1062,6 +1066,8 @@ type UpdateSavedRequest struct {
 	VLLMEnableAutoToolChoice *bool    `json:"vllm_enable_auto_tool_choice,omitempty"`
 	VLLMToolCallParser       *string  `json:"vllm_tool_call_parser,omitempty"`
 	VLLMChatTemplate         *string  `json:"vllm_chat_template,omitempty"`
+	VLLMAllowLongContext     *bool    `json:"vllm_allow_long_context,omitempty"`
+	VLLMDisableReasoning     *bool    `json:"vllm_disable_reasoning,omitempty"`
 	SGLangQuantization       *string  `json:"sglang_quantization,omitempty"`
 	SGLangAttentionBackend   *string  `json:"sglang_attention_backend,omitempty"`
 	SGLangExtraArgs          *string  `json:"sglang_extra_args,omitempty"`
@@ -1207,6 +1213,12 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.VLLMChatTemplate != nil {
 			m.VLLMChatTemplate = *req.VLLMChatTemplate
 		}
+		if req.VLLMAllowLongContext != nil {
+			m.VLLMAllowLongContext = *req.VLLMAllowLongContext
+		}
+		if req.VLLMDisableReasoning != nil {
+			m.VLLMDisableReasoning = *req.VLLMDisableReasoning
+		}
 		if req.SGLangQuantization != nil {
 			m.SGLangQuantization = *req.SGLangQuantization
 		}
@@ -1316,6 +1328,8 @@ type CreateSavedRequest struct {
 	VLLMEnableAutoToolChoice bool   `json:"vllm_enable_auto_tool_choice"`
 	VLLMToolCallParser       string `json:"vllm_tool_call_parser"`
 	VLLMChatTemplate         string `json:"vllm_chat_template"`
+	VLLMAllowLongContext     bool   `json:"vllm_allow_long_context"`
+	VLLMDisableReasoning     bool   `json:"vllm_disable_reasoning"`
 	LlamaBatchSize   int    `json:"llama_batch_size"`
 	LlamaUBatchSize  int    `json:"llama_ubatch_size"`
 	LlamaCacheTypeK  string `json:"llama_cache_type_k"`
@@ -1396,6 +1410,8 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		VLLMEnableAutoToolChoice: req.VLLMEnableAutoToolChoice,
 		VLLMToolCallParser:       req.VLLMToolCallParser,
 		VLLMChatTemplate:         req.VLLMChatTemplate,
+		VLLMAllowLongContext:     req.VLLMAllowLongContext,
+		VLLMDisableReasoning:     req.VLLMDisableReasoning,
 		LlamaBatchSize:          req.LlamaBatchSize,
 		LlamaUBatchSize:         req.LlamaUBatchSize,
 		LlamaCacheTypeK:         req.LlamaCacheTypeK,

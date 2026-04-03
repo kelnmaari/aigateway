@@ -102,6 +102,12 @@ type InferenceConfig struct {
 
 	// Docker configuration (v3.3.0+ multi-provider backend)
 	Docker DockerInferenceConfig `mapstructure:"docker"`
+
+	// MergeReasoningContent: when true, the SSE proxy merges reasoning_content
+	// from streaming deltas back into content field with <think>...</think> tags.
+	// This makes reasoning visible to clients that don't support reasoning_content
+	// (OpenCode, Kilo Code, Continue.dev, etc.)
+	MergeReasoningContent bool `mapstructure:"merge_reasoning_content"`
 }
 
 // DockerInferenceConfig configures Docker-based multi-provider inference (v3.3.0+)
@@ -882,6 +888,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("observability.performance.gc_percentage", 100)
 	v.SetDefault("observability.performance.leak_detection", true)
 	v.SetDefault("observability.performance.pprof_enabled", true)
+
+	// Inference reasoning defaults (Version 5.4.10+)
+	v.SetDefault("inference.merge_reasoning_content", false)
 
 	// Workers (Agent Mode) defaults (Version 5.4.0+)
 	v.SetDefault("workers.enabled", false)

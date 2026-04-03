@@ -427,6 +427,8 @@
 		vllm_enable_auto_tool_choice: false,
 		vllm_tool_call_parser: '',
 		vllm_chat_template: '',
+		vllm_allow_long_context: false,
+		vllm_disable_reasoning: false,
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
 		llama_ctx_size: 0,
@@ -494,6 +496,8 @@
 		vllm_enable_auto_tool_choice: false,
 		vllm_tool_call_parser: '',
 		vllm_chat_template: '',
+		vllm_allow_long_context: false,
+		vllm_disable_reasoning: false,
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
@@ -1536,6 +1540,8 @@
 			vllm_enable_auto_tool_choice: saved.vllm_enable_auto_tool_choice || false,
 			vllm_tool_call_parser: saved.vllm_tool_call_parser || '',
 			vllm_chat_template: saved.vllm_chat_template || '',
+			vllm_allow_long_context: saved.vllm_allow_long_context || false,
+			vllm_disable_reasoning: saved.vllm_disable_reasoning || false,
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
 			llama_ctx_size: saved.llama_ctx_size || 0,
@@ -2241,6 +2247,14 @@
 							<label class="flex items-center gap-2 text-sm">
 								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_enable_chunked_prefill} />
 								<FormLabel label="Chunked Prefill" description="Process long prompts in chunks to reduce memory spikes" />
+							</label>
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_allow_long_context} />
+								<FormLabel label="Allow Long Context" description="Allow max_model_len to exceed model's max_position_embeddings. Use with caution — may cause NaN with RoPE models" />
+							</label>
+							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_disable_reasoning} />
+								<FormLabel label="Disable Reasoning" description="Keep <think> tags in content field instead of reasoning_content. Enable for clients that don't support reasoning_content" />
 							</label>
 						</div>
 						<!-- Tool Calling -->
@@ -3783,6 +3797,18 @@
 							<label class="flex items-center gap-2">
 								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_enable_chunked_prefill} />
 								<FormLabel label="Chunked Prefill" description="Process long prompts in chunks to reduce memory spikes" />
+							</label>
+						</div>
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_allow_long_context} />
+								<FormLabel label="Allow Long Context" description="Allow max_model_len > max_position_embeddings. Use with caution" />
+							</label>
+						</div>
+						<div>
+							<label class="flex items-center gap-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_disable_reasoning} />
+								<FormLabel label="Disable Reasoning" description="Keep <think> tags in content instead of reasoning_content" />
 							</label>
 						</div>
 					</div>

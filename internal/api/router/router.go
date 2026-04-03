@@ -2870,6 +2870,10 @@ func (r *Router) setupHandlers(cfg *config.Config, logger *logrus.Logger) {
 		r.inferenceRouter = inference.NewRouter(r.inferenceMgr)
 		r.inferenceHandler = handlers.NewInferenceHandler(r.inferenceRouter, logger)
 		r.inferenceProxyHandler = handlers.NewInferenceProxyHandler(r.inferenceRouter, logger)
+		if cfg.Inference.MergeReasoningContent {
+			r.inferenceProxyHandler.SetMergeReasoning(true)
+			logger.Info("Inference proxy: merge_reasoning_content enabled (reasoning_content → <think> tags)")
+		}
 
 		// Initialize chat tools handler with Tavily web search (v4.0.3+)
 		if cfg.Tools.TavilyAPIKey != "" {

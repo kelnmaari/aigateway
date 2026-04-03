@@ -17,9 +17,10 @@ import (
 
 // InferenceProxyHandler proxies OpenAI-compatible requests to running inference providers.
 type InferenceProxyHandler struct {
-	router *inference.Router
-	logger *logrus.Logger
-	client *http.Client
+	router          *inference.Router
+	logger          *logrus.Logger
+	client          *http.Client
+	mergeReasoning  bool // merge reasoning_content into content with <think> tags
 }
 
 // NewInferenceProxyHandler constructs handler.
@@ -31,6 +32,11 @@ func NewInferenceProxyHandler(router *inference.Router, logger *logrus.Logger) *
 			Timeout: 15 * time.Minute, // long timeout for generation
 		},
 	}
+}
+
+// SetMergeReasoning enables merging reasoning_content back into content with <think> tags.
+func (h *InferenceProxyHandler) SetMergeReasoning(enabled bool) {
+	h.mergeReasoning = enabled
 }
 
 // HandleChatCompletions proxies /v1/chat/completions to provider container.
@@ -426,6 +432,9 @@ func (h *InferenceProxyHandler) streamResponse(c *gin.Context, resp *http.Respon
 		return
 	}
 
+	// Track reasoning state for merging reasoning_content → <think> tags
+	inReasoning := false
+
 	reader := bufio.NewReader(resp.Body)
 	for {
 		line, err := reader.ReadBytes('\n')
@@ -435,6 +444,12 @@ func (h *InferenceProxyHandler) streamResponse(c *gin.Context, resp *http.Respon
 			}
 			break
 		}
+
+		// Optionally merge reasoning_content into content with <think> tags
+		if h.mergeReasoning {
+			line, inReasoning = mergeReasoningInSSELine(line, inReasoning)
+		}
+
 		_, _ = c.Writer.Write(line)
 		flusher.Flush()
 
@@ -443,6 +458,103 @@ func (h *InferenceProxyHandler) streamResponse(c *gin.Context, resp *http.Respon
 			break
 		}
 	}
+}
+
+// mergeReasoningInSSELine checks if an SSE data line contains reasoning_content
+// in the delta object and merges it into the content field with <think> tags.
+// This makes reasoning visible to clients that don't support reasoning_content.
+//
+// Input SSE:  data: {"choices":[{"delta":{"reasoning_content":"thinking..."}}]}
+// Output SSE: data: {"choices":[{"delta":{"content":"<think>\nthinking..."}}]}
+//
+// When reasoning ends (first content delta after reasoning), inserts </think>.
+func mergeReasoningInSSELine(line []byte, wasInReasoning bool) ([]byte, bool) {
+	// Only process "data: " lines
+	trimmed := bytes.TrimSpace(line)
+	if !bytes.HasPrefix(trimmed, []byte("data: ")) {
+		return line, wasInReasoning
+	}
+
+	jsonData := bytes.TrimPrefix(trimmed, []byte("data: "))
+	if len(jsonData) == 0 || bytes.Equal(jsonData, []byte("[DONE]")) {
+		return line, wasInReasoning
+	}
+
+	// Parse the SSE JSON
+	var chunk map[string]json.RawMessage
+	if err := json.Unmarshal(jsonData, &chunk); err != nil {
+		return line, wasInReasoning
+	}
+
+	choicesRaw, ok := chunk["choices"]
+	if !ok {
+		return line, wasInReasoning
+	}
+
+	var choices []map[string]json.RawMessage
+	if err := json.Unmarshal(choicesRaw, &choices); err != nil || len(choices) == 0 {
+		return line, wasInReasoning
+	}
+
+	deltaRaw, ok := choices[0]["delta"]
+	if !ok {
+		return line, wasInReasoning
+	}
+
+	var delta map[string]json.RawMessage
+	if err := json.Unmarshal(deltaRaw, &delta); err != nil {
+		return line, wasInReasoning
+	}
+
+	reasoningRaw, hasReasoning := delta["reasoning_content"]
+	contentRaw, hasContent := delta["content"]
+
+	if !hasReasoning && !hasContent {
+		return line, wasInReasoning
+	}
+
+	inReasoning := wasInReasoning
+	modified := false
+
+	if hasReasoning && len(reasoningRaw) > 2 { // > 2 to skip "" empty string
+		var reasoning string
+		if err := json.Unmarshal(reasoningRaw, &reasoning); err == nil && reasoning != "" {
+			// Move reasoning_content → content with <think> prefix on first chunk
+			prefix := ""
+			if !inReasoning {
+				prefix = "<think>\n"
+			}
+			newContent, _ := json.Marshal(prefix + reasoning)
+			delta["content"] = newContent
+			delete(delta, "reasoning_content")
+			inReasoning = true
+			modified = true
+		}
+	}
+
+	if hasContent && inReasoning {
+		var content string
+		if err := json.Unmarshal(contentRaw, &content); err == nil && content != "" {
+			// First content after reasoning — prepend </think>
+			newContent, _ := json.Marshal("</think>\n" + content)
+			delta["content"] = newContent
+			inReasoning = false
+			modified = true
+		}
+	}
+
+	if !modified {
+		return line, inReasoning
+	}
+
+	// Rebuild the SSE line
+	deltaJSON, _ := json.Marshal(delta)
+	choices[0]["delta"] = deltaJSON
+	choicesJSON, _ := json.Marshal(choices)
+	chunk["choices"] = choicesJSON
+	chunkJSON, _ := json.Marshal(chunk)
+
+	return append([]byte("data: "), append(chunkJSON, '\n')...), inReasoning
 }
 
 func (h *InferenceProxyHandler) errorResponse(c *gin.Context, status int, errType, message string) {

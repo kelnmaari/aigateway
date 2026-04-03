@@ -1,417 +1,484 @@
-# 🚀 AIGateway Platform v4.0
+# AIGateway Platform v5
 
-> **Enterprise AI Infrastructure with Multi-Provider Inference & Web Search**  
-> OpenAI-Compatible API • Docker-Based Inference • vLLM/SGLang/TGI/llama.cpp • RAG System • GitLab Code Review • Tavily Web Search
+> **Enterprise AI Infrastructure with Multi-Provider Inference, Distributed Workers & External Providers**
+> OpenAI-Compatible API | Docker-Based Inference | Agent Mode (Remote Workers) | vLLM/SGLang/TGI/TEI/llama.cpp | RAG | GitLab Code Review | Web Search
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.5.2-brightgreen.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.4.9-brightgreen.svg)](VERSION)
 
 ---
 
-## 📖 What is AIGateway?
+## What is AIGateway?
 
-**AIGateway v4.0** is a production-ready, enterprise-grade AI infrastructure platform with **multi-provider Docker-based inference**. Provides unified **OpenAI-compatible API** for models from Hugging Face with support for vLLM, SGLang, TGI, and llama.cpp backends.
+AIGateway is a production-ready AI infrastructure platform that provides a unified **OpenAI-compatible API** for managing LLM inference across local Docker containers, remote GPU/CPU workers, and external providers (OpenAI, Anthropic, Gemini, DeepSeek).
 
-### 🎯 Why AIGateway v4.0?
+### Key Features
 
-- **🐳 Docker-Based Inference**: vLLM, SGLang, TGI, llama.cpp — managed via Docker containers
-- **🔍 Web Search (NEW!)**: Tavily API integration for real-time internet search in ChatUI
-- **🎮 Multi-GPU Support**: Tensor parallelism, automatic GPU selection, memory recommendations
-- **🔍 HuggingFace Browser**: Search and load models directly from HF Hub with size/provider filters
-- **📦 Format Support**: HF models (BF16/FP16/INT8/INT4), GGUF quantized models
-- **🧠 RAG Built-in**: Retrieval-Augmented Generation with vector search, multimodal documents
-- **🦊 GitLab Integration**: AI-powered MR code reviews with per-file analysis
-- **🏢 Enterprise-Ready**: Multi-tenancy, RBAC, OIDC/LDAP, audit logging, quotas
-- **🌐 Modern WebUI**: ChatGPT-like interface with model management, GPU monitoring
-- **📦 RPM Packages**: One-line installation for Rocky Linux / RHEL
-
----
-
-## ✨ What's New in v4.0
-
-### 🔍 Web Search in ChatUI
-- **Tavily API Integration**: Real-time web search during chat
-- **Visual Tool Events**: See "Searching..." → "Searched (1237ms)" like Cursor IDE
-- **Toggle Control**: Enable/disable web search per session
-
-### 🦊 GitLab MR Reviews
-- **Per-File Analysis**: Each file reviewed separately with tool calling
-- **Code Context**: Automatic retrieval of related functions from Qdrant
-- **Multi-Language**: Review comments in Russian or English
-- **Configurable Tokens**: Set `MaxReviewTokens` per project
-
-### 🎯 Extended Model Capabilities
-- **New Capabilities**: `autocomplete`, `edit`, `apply`, `rerank`
-- **Auto-Expansion**: Select `chat` → adds `autocomplete`, `edit`, `apply`
-- **Edit Saved Models**: Modify capabilities for existing saved models
-
-### 📊 Container Logs UI
-- **Real-time Logs**: View container output in large modal (80% screen)
-- **Log Coloring**: Colorized output based on log level
-- **Auto-refresh**: Continuous updates every 2 seconds
-
-### 📦 RPM Packaging
-- **One-line Install**: `curl -fsSL .../install.sh | sudo bash`
-- **SystemD Service**: Auto-start, restart on failure
-- **YUM Repository**: GitLab Package Registry integration
+- **Docker-Based Inference**: vLLM, SGLang, TGI, TEI, llama.cpp, TensorRT-LLM via Docker containers
+- **Agent Mode (v5.4+)**: Distribute inference across remote GPU/CPU workers with centralized management
+- **External Providers**: OpenAI, Anthropic, Gemini, DeepSeek via Model Registry
+- **Multi-GPU**: Tensor parallelism, per-GPU assignment, VRAM monitoring
+- **HuggingFace Browser**: Search and load models from HF Hub with size/provider filters
+- **Format Support**: HF models (BF16/FP16/AWQ/GPTQ/FP8), GGUF, TensorRT engines
+- **RAG System**: Vector search with Qdrant/PgVector, document processing pipeline
+- **GitLab Integration**: AI-powered MR code reviews with per-file analysis
+- **Web Search**: Tavily API for real-time internet search in Chat UI
+- **Enterprise**: Multi-tenancy, RBAC, OIDC/LDAP, audit logging, quotas
+- **Modern WebUI**: SvelteKit 5 + Tailwind v4, dark mode, i18n (EN/RU)
+- **RPM Packages**: One-line install for Rocky Linux / RHEL 9
 
 ---
 
-## 🤖 Inference Providers
-
-| Provider | GPU | Quantization | Use Case |
-|----------|-----|--------------|----------|
-| **vLLM** | ✅ | BF16, FP16, AWQ, GPTQ | High-throughput production |
-| **SGLang** | ✅ | BF16, FP16 | Research, embeddings |
-| **TGI** | ✅ | BF16, FP16, GPTQ | HuggingFace native |
-| **llama.cpp** | ✅ | GGUF (Q4-Q8) | CPU/Low VRAM inference |
-| **TEI** | ✅ | — | Text embeddings |
-
-### llama.cpp Parameters (v4.0+)
-- `ctx_size`: Context window size (default: model's max)
-- `n_parallel`: Concurrent request slots
-- `flash_attn`: Enable Flash Attention for faster inference
-
----
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ AIGateway Platform (Port 8080)                                  │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ OpenAI-Compatible API Layer                                 │ │
-│ │ /v1/chat/completions, /v1/models, /v1/embeddings            │ │
-│ │ /api/chat/completions (with web search tools)               │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                         │                                       │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Inference Router & Orchestrator                             │ │
-│ │  ├─ Model Registry (specs, status, health)                 │ │
-│ │  ├─ Container Manager (start, stop, logs)                  │ │
-│ │  ├─ HuggingFace Downloader (cache management)              │ │
-│ │  └─ Tools Registry (Tavily web search)                     │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                         │                                       │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Docker Runtime                                              │ │
-│ │  ├─ vLLM Container (GPU, Tensor Parallel)                  │ │
-│ │  ├─ SGLang Container (GPU, Embeddings)                     │ │
-│ │  ├─ TGI Container (GPU, Sharding)                          │ │
-│ │  ├─ llama.cpp Container (GGUF, CPU/GPU)                    │ │
-│ │  └─ TEI Container (Embeddings)                             │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Integrations                                                │ │
-│ │  ├─ GitLab MR Reviews (per-file analysis)                  │ │
-│ │  ├─ RAG System (PgVector, Qdrant)                          │ │
-│ │  └─ Web Search (Tavily API)                                │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Enterprise Features                                         │ │
-│ │  ├─ Multi-Tenancy & RBAC                                   │ │
-│ │  ├─ OIDC/LDAP Integration                                  │ │
-│ │  └─ Audit Logging & Rate Limiting                          │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+                              ┌──────────────────────────┐
+                              │   External Providers     │
+                              │ OpenAI, Anthropic, etc.  │
+                              └──────────┬───────────────┘
+                                         │
+┌────────────────────────────────────────────────────────────────────┐
+│ AIGateway Main Server (Port 8085)                                  │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ OpenAI-Compatible API Layer                                  │  │
+│  │ /v1/chat/completions  /v1/models  /v1/embeddings             │  │
+│  │ Anthropic→OpenAI message conversion (tool_use/tool_result)   │  │
+│  │ SSE streaming with reasoning_content merge                   │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                           │                                        │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ Inference Router & Orchestrator                              │  │
+│  │  ├─ Local: Docker containers on this server                 │  │
+│  │  ├─ Remote: Agent workers (GPU/CPU machines)                │  │
+│  │  └─ External: Model Registry (OpenAI, Anthropic, etc.)     │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│           │                              │                         │
+│  ┌────────┴─────────┐     ┌──────────────┴──────────────────┐     │
+│  │ Local Docker      │     │ Agent Manager                   │     │
+│  │  ├─ vLLM          │     │  ├─ Health checks (30s)        │     │
+│  │  ├─ SGLang        │     │  ├─ GPU/CPU monitoring         │     │
+│  │  ├─ TGI / TEI     │     │  ├─ Model sync                │     │
+│  │  ├─ llama.cpp     │     │  └─ Image push (docker save)   │     │
+│  │  └─ TensorRT-LLM  │     └──────────────┬──────────────────┘     │
+│  └──────────────────┘                      │                       │
+│                                            │ HTTPS + API Key       │
+│  ┌──────────────────────────────────────┐  │                       │
+│  │ Integrations                         │  │                       │
+│  │  ├─ GitLab MR Reviews               │  │                       │
+│  │  ├─ RAG (Qdrant, document pipeline)  │  │                       │
+│  │  ├─ Web Search (Tavily)              │  │                       │
+│  │  └─ MCP Tool Servers                │  │                       │
+│  └──────────────────────────────────────┘  │                       │
+│                                            │                       │
+│  ┌──────────────────────────────────────┐  │                       │
+│  │ Admin UI (SvelteKit 5)               │  │                       │
+│  │  Dashboard, Users, Models, Providers │  │                       │
+│  │  Workers, Downloads, GitLab, Logs    │  │                       │
+│  └──────────────────────────────────────┘  │                       │
+└────────────────────────────────────────────┼───────────────────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────────┐
+                    │                        │                        │
+          ┌─────────┴──────────┐  ┌──────────┴─────────┐  ┌──────────┴─────────┐
+          │ GPU Worker 1       │  │ GPU Worker 2       │  │ CPU Worker         │
+          │ aigateway-agent    │  │ aigateway-agent    │  │ aigateway-agent    │
+          │  ├─ DockerRuntime  │  │  ├─ DockerRuntime  │  │  ├─ DockerRuntime  │
+          │  ├─ vLLM (RTX4090) │  │  ├─ SGLang (A100)  │  │  ├─ llama.cpp     │
+          │  └─ TEI (embed)    │  │  └─ vLLM (A100)    │  │  └─ TEI CPU       │
+          └────────────────────┘  └────────────────────┘  └────────────────────┘
 ```
 
 ---
 
-## 🚀 Quick Start
+## Inference Providers
+
+| Provider | GPU | CPU | Quantization | Use Case |
+|----------|:---:|:---:|-------------|----------|
+| **vLLM** | Yes | — | BF16, FP16, AWQ, GPTQ, FP8 | High-throughput production |
+| **SGLang** | Yes | — | BF16, FP16, AWQ, GPTQ, FP8 | Fast inference, tool calling |
+| **TGI** | Yes | — | BF16, FP16, GPTQ, BnB | HuggingFace native |
+| **TEI** | Yes | Yes | — | Text embeddings & reranking |
+| **llama.cpp** | Yes | Yes | GGUF (Q2-Q8, K-quants) | CPU inference, low VRAM |
+| **TensorRT-LLM** | Yes | — | FP16, INT8, INT4 | Maximum throughput (NVIDIA) |
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
-- **Go 1.25+** (для сборки)
-- **Docker** with NVIDIA Container Toolkit (для GPU inference)
-- **PostgreSQL 13+** с pgvector extension (для RAG)
-- **NVIDIA GPU** (для vLLM/SGLang/TGI)
+- **Go 1.25+** (build)
+- **Docker** with NVIDIA Container Toolkit (GPU inference)
+- **PostgreSQL 15+** (data storage, migrations)
+- **Node.js 20+** (WebUI build, optional)
 
-### Installation
-
-#### Option 1: RPM Package (Rocky Linux / RHEL)
+### Option 1: RPM Package (Rocky Linux / RHEL 9)
 
 ```bash
-# One-line install
-curl -fsSL https://gitlab.example.com/api/v4/projects/XXX/packages/generic/aigateway/latest/install.sh | sudo bash
-
-# Start service
-sudo systemctl start oop
-sudo systemctl enable oop
+curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/ollama-openai-proxy/latest/install.sh | sudo bash
+sudo systemctl enable --now oop
 ```
 
-#### Option 2: Build from Source
+### Option 2: Build from Source
 
 ```bash
 git clone https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy.git
 cd ollama-openai-proxy
 
-# Build with WebUI
-./build-new.ps1 all -WebUI svelte  # Windows
-./build.sh all                      # Linux
+# Build WebUI
+cd web-svelte && npm install && npm run build && cd ..
+cp -r web-svelte/build/* internal/web/svelte-build/
+
+# Build server
+go build -o bin/aigateway cmd/server/main.go
+
+# Build agent (for remote workers)
+go build -o bin/aigateway-agent cmd/agent/main.go
 
 # Run
-./bin/server -config configs/dev.yaml
+./bin/aigateway -config configs/dev.yaml
 ```
 
 ### First Run
 
-1. **Access WebUI**: [http://localhost:8080/login](http://localhost:8080/login)
-
-2. **Default credentials**:
-   - Email: `admin@localhost`
-   - Password: `admin`
-
-3. **Load a model**:
-   - Go to **Admin → Models → HuggingFace**
-   - Search for a model (e.g., "Qwen2.5-7B")
-   - Select provider filter (vLLM, SGLang, etc.)
-   - Click **Use**, configure GPU settings, click **Load & Start**
-
-4. **Chat with model**:
-   - Go to **Chat**
-   - Select loaded model from dropdown
-   - Enable **Web Search** toggle for internet access
-   - Start chatting!
+1. Open [http://localhost:8085/bootstrap](http://localhost:8085/bootstrap) to create admin account
+2. Go to **Admin > Models > HuggingFace** — search and load a model
+3. Go to **Chat** — select model, start chatting
 
 ---
 
-## 🔧 Configuration
+## Agent Mode (Remote Workers)
 
-### Basic Configuration
+Distribute inference across multiple machines. The agent binary (`aigateway-agent`) runs on GPU/CPU workers and is controlled by the main server.
+
+### Setup
+
+1. **Main server** — enable workers in `config.yaml`:
 
 ```yaml
-# configs/production.yaml
-server:
-  host: "0.0.0.0"
-  port: 8080
-
-# Docker-based inference
-inference:
+workers:
   enabled: true
-  hf_cache_dir: "data/models/hf"
-  gguf_cache_dir: "data/models/gguf"
-  health_check_timeout: 60m
-  startup_timeout: 60m
-  docker:
-    api: true
-    socket: "unix:///var/run/docker.sock"
-
-# HuggingFace token (for gated models)
-huggingface:
-  token: "hf_xxx..."
-
-# Tools Configuration (v4.0+)
-tools:
-  # Tavily Web Search API key
-  # Get your key at https://tavily.com
-  tavily_api_key: "tvly-xxx..."
-
-# RAG System
-rag:
-  enabled: true
-  vector_store:
-    type: "pgvector"
-    connection_string: "postgresql://user:pass@localhost:5432/aigateway"
-
-# GitLab Integration
-gitlab:
-  enabled: true
-  default_model: "qwen-7b"
-  embedding_model: "nomic-embed-text"
+  health_check_interval: "30s"
+  tls:
+    skip_verify: true  # for dev
 ```
 
-### GPU Settings for Large Models
+2. **Admin UI** — go to **Admin > Workers > Generate Config**:
+   - Enter worker name, address (`http://gpu-server:9090`), node type (GPU/CPU)
+   - Copy generated `agent.yaml` and API key
 
-| Model Size | GPUs | Tensor Parallel | GPU Utilization | Max Model Len |
-|------------|------|-----------------|-----------------|---------------|
-| 7B BF16    | 1    | 1               | 0.9             | 32768         |
-| 14B BF16   | 1    | 1               | 0.95            | 16384         |
-| 30B INT8   | 2    | 2               | 0.9             | 32768         |
-| 70B INT4   | 2    | 2               | 0.95            | 8192          |
+3. **Worker machine** — install and start agent:
+
+```bash
+# Install agent RPM
+curl -fsSL https://gitlab.alexue4.dev/api/v4/projects/146/packages/generic/aigateway-agent/latest/install.sh | sudo bash
+
+# Copy generated config
+sudo cp agent.yaml /opt/aigateway-agent/configs/agent.yaml
+
+# Start
+sudo systemctl enable --now aigateway-agent
+```
+
+4. Worker appears as **online** in Admin > Workers with GPU metrics
+
+### Loading Models on Workers
+
+- **Admin > Models** — "Target Node" dropdown selects Local or remote worker
+- **Admin > Workers** — "Load Model" button on each worker card
+- Models on workers appear in `/v1/models` and Chat UI automatically
+
+### Docker Image Transfer
+
+Push custom Docker images from main server to workers:
+
+```
+POST /api/admin/workers/:id/images/push
+{"image": "vllm-custom:patched"}
+```
+
+Main server runs `docker save` > streams to agent > `docker load`.
+
+### Private Docker Registries
+
+Agent config supports registry authentication:
+
+```yaml
+agent:
+  docker_registries:
+    - registry: "registry.gitlab.com"
+      username: "deploy-token"
+      password: "glpat-xxxxxxxxxxxx"
+```
 
 ---
 
-## 📚 API Reference
+## External Providers
+
+Route requests to external APIs alongside local/remote inference:
+
+| Provider | Streaming | Tool Calling | Format Conversion |
+|----------|:---------:|:------------:|:-----------------:|
+| OpenAI | Yes | Yes | — |
+| Anthropic | Yes | Yes | Anthropic > OpenAI |
+| Gemini | Yes | Yes | Gemini > OpenAI |
+| DeepSeek | Yes | Yes | — |
+| Custom (OpenAI-compat) | Yes | — | — |
+
+Configure in **Admin > Providers** — add endpoint URL and API key.
+
+---
+
+## API Reference
 
 ### OpenAI-Compatible Endpoints
 
 ```bash
-# List models
-curl http://localhost:8080/v1/models \
+# List models (local + agent + external)
+curl http://localhost:8085/v1/models \
   -H "Authorization: Bearer sk-xxx"
 
-# Chat completion
-curl http://localhost:8080/v1/chat/completions \
+# Chat completion (streaming)
+curl http://localhost:8085/v1/chat/completions \
   -H "Authorization: Bearer sk-xxx" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen2-5-7b-instruct",
-    "messages": [{"role": "user", "content": "Hello!"}],
-    "stream": true
-  }'
+  -d '{"model": "qwen3-5-35b", "messages": [{"role": "user", "content": "Hello"}], "stream": true}'
 
-# Chat with web search (v4.0+)
-curl http://localhost:8080/api/chat/completions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen-7b",
-    "messages": [{"role": "user", "content": "What is the latest news about AI?"}],
-    "use_tools": true,
-    "stream": true
-  }'
+# Embeddings
+curl http://localhost:8085/v1/embeddings \
+  -H "Authorization: Bearer sk-xxx" \
+  -d '{"model": "nomic-embed", "input": "Hello world"}'
 ```
 
-### Model Management Endpoints
+### Model Management
 
 ```bash
-# Load model
-curl -X POST http://localhost:8080/api/system/inference/load \
-  -H "Authorization: Bearer sk-xxx" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "alias": "qwen-7b",
-    "provider": "vllm",
-    "format": "hf",
-    "hf_repo": "Qwen/Qwen2.5-7B-Instruct",
-    "capabilities": ["chat", "autocomplete", "edit", "apply"],
-    "vllm_tensor_parallel": 1,
-    "vllm_gpu_utilization": 0.9,
-    "vllm_max_model_len": 32768
-  }'
+# Load model (local)
+curl -X POST http://localhost:8085/api/system/inference/load \
+  -d '{"alias": "qwen-7b", "provider": "vllm", "format": "hf", "hf_repo": "Qwen/Qwen2.5-7B-Instruct"}'
 
-# List running models
-curl http://localhost:8080/api/system/inference/models
+# Load model on remote worker
+curl -X POST http://localhost:8085/api/system/inference/load \
+  -d '{"alias": "llama3", "provider": "vllm", "format": "hf", "hf_repo": "meta-llama/Llama-3-8B", "target_node": "worker-uuid"}'
 
-# Get container logs
-curl "http://localhost:8080/api/system/inference/logs?alias=qwen-7b&tail=100"
+# Stop model
+curl -X POST http://localhost:8085/api/system/inference/stop -d '{"alias": "qwen-7b"}'
+```
 
-# Update saved model capabilities
-curl -X POST "http://localhost:8080/api/system/inference/update-saved?alias=qwen-7b" \
-  -H "Content-Type: application/json" \
-  -d '{"capabilities": ["chat", "autocomplete", "edit", "apply"]}'
+### Worker Management
+
+```bash
+# List workers
+curl http://localhost:8085/api/admin/workers
+
+# Register worker
+curl -X POST http://localhost:8085/api/admin/workers \
+  -d '{"name": "gpu-01", "address": "http://192.168.1.50:9090", "node_type": "gpu"}'
+
+# GPU metrics from worker
+curl http://localhost:8085/api/admin/workers/:id/gpu
+
+# Load model on specific worker
+curl -X POST http://localhost:8085/api/admin/workers/:id/models/load \
+  -d '{"alias": "llama3", "provider": "vllm", "hf_repo": "meta-llama/Llama-3-8B"}'
 ```
 
 ---
 
-## 🔍 Web Search Integration
+## Configuration
 
-### How It Works
-
-1. User enables "Use web search" toggle in ChatUI
-2. Request goes to `/api/chat/completions` with `use_tools: true`
-3. Model can call `web_search` tool when it needs current information
-4. Tavily API returns search results
-5. Results are injected into context, model generates final response
-
-### Tool Events in UI
-
-During streaming, you'll see Cursor-like tool events:
-- 🔄 **Searching** "query..." (while searching)
-- ✅ **Searched** "query" (1237ms) • Found 5 results
-
-### Configuration
+### Main Server (`configs/dev.yaml`)
 
 ```yaml
+server:
+  host: "0.0.0.0"
+  port: 8085
+
+inference:
+  backend: "docker"
+  merge_reasoning_content: true  # merge reasoning_content into <think> tags
+  docker:
+    enabled: true
+    hf_cache_dir: "./data/models/hf"
+    gguf_cache_dir: "./data/models/gguf"
+    max_running_models: 2
+    default_provider: "vllm"
+
+workers:
+  enabled: true
+  health_check_interval: "30s"
+
+database:
+  type: "postgresql"
+  postgresql:
+    host: "localhost"
+    port: 5432
+    database: "aigateway"
+
+huggingface:
+  token: "hf_xxx..."
+
 tools:
-  tavily_api_key: "tvly-xxx..."  # Get at https://tavily.com
+  tavily_api_key: "tvly-xxx..."
+```
+
+### Agent (`configs/agent.yaml`)
+
+```yaml
+agent:
+  listen_addr: "0.0.0.0:9090"
+  api_key: "agent-xxx..."
+  node_name: "gpu-worker-1"
+  node_type: "gpu"              # gpu | cpu | mixed
+  hf_cache_dir: "/data/models/hf"
+  gguf_cache_dir: "/data/models/gguf"
+  default_provider: "vllm"
+  max_running_models: 2
+```
+
+### vLLM-Specific Options
+
+| Option | Description |
+|--------|-------------|
+| Tensor Parallel | Number of GPUs for tensor parallelism |
+| Max Model Len | Maximum context length |
+| GPU Utilization | VRAM usage fraction (0-1) |
+| Quantization | AWQ, GPTQ, FP8, squeezellm |
+| KV Cache Dtype | auto, fp8 |
+| Enforce Eager | Disable CUDA graphs |
+| Prefix Caching | Reuse KV cache for shared prefixes |
+| Chunked Prefill | Process long prompts in chunks |
+| Allow Long Context | Allow max_model_len > max_position_embeddings |
+| Disable Reasoning | Keep `<think>` tags in content (don't extract to reasoning_content) |
+| Auto Tool Choice | Enable autonomous tool calling |
+| Tool Call Parser | hermes, mistral, llama3_json, deepseek_v3, qwen25 |
+
+---
+
+## Security
+
+### CI/CD Security Scanning
+
+Two parallel security scanners run on every push:
+
+- **Trivy** (Aqua Security): Filesystem scan of Go + npm dependencies, SARIF output to GitLab Security Dashboard
+- **govulncheck** (Go team): Callgraph-aware CVE analysis — only reports vulnerabilities in actually reachable code paths
+
+### Authentication
+
+- JWT with configurable issuer and expiry
+- LDAP integration
+- OIDC (Keycloak, etc.)
+- API Key authentication (Bearer token)
+
+### Agent Communication
+
+- TLS between main server and agents
+- API Key authentication on every request
+- Per-node keys generated during worker registration
+
+---
+
+## Project Structure
+
+```
+cmd/
+  server/main.go              # Main HTTP/WebSocket server
+  agent/main.go               # Remote inference agent
+  tui/main.go                 # Terminal UI for monitoring
+internal/
+  agent/                      # Agent Mode (remote workers)
+  api/handlers/               # HTTP handlers
+  api/middleware/              # Auth, rate limiting
+  api/router/                 # Route registration & wiring
+  auth/                       # JWT, LDAP, OIDC
+  config/                     # Configuration system
+  inference/                  # Docker inference orchestration
+  providers/                  # External provider adapters
+  storage/postgresql/         # PostgreSQL + migrations
+  gitlab/                     # GitLab MR review integration
+  rag/                        # RAG pipeline
+  models/                     # Domain models
+  metrics/                    # Prometheus metrics
+  web/                        # Embedded WebUI
+web-svelte/                   # SvelteKit 5 frontend
+  src/routes/(protected)/admin/
+    models/                   # Model management UI
+    workers/                  # Worker management UI
+    providers/                # External providers UI
+configs/
+  dev.yaml                    # Development config
+  agent.yaml                  # Agent sample config
+packaging/
+  rpm/                        # Main server RPM spec + service
+  agent/                      # Agent RPM spec + service + install script
 ```
 
 ---
 
-## 🦊 GitLab Integration
+## Troubleshooting
 
-### Features
+### Common Errors
 
-- **MR Code Review**: AI-powered analysis of merge requests
-- **Per-File Review**: Each file analyzed separately
-- **Tool Calling**: Model can search codebase for context
-- **Multi-Language**: Comments in Russian or English
-
-### Setup
-
-1. Add GitLab integration in Admin → GitLab
-2. Configure project with analysis and embedding models
-3. Index repository (creates Qdrant collection)
-4. Reviews trigger automatically on MR creation
-
----
-
-## 📊 Troubleshooting
-
-### Common Issues
-
-**1. OOM Error (Out of Memory)**
+**OOM (Out of Memory)**
 ```
 ValueError: No available memory for the cache blocks
 ```
-Solution: Reduce `gpu_memory_utilization` or `max_model_len`
+Reduce `gpu_memory_utilization` or `max_model_len`.
 
-**2. Web Search Not Working**
+**Max Model Len Exceeded**
 ```
-web search not configured
+max_model_len (400000) is greater than max_position_embeddings (262144)
 ```
-Solution: Add `tavily_api_key` to `tools` section in config
+Set `max_model_len` to model's max or enable "Allow Long Context" checkbox.
 
-**3. Context Canceled During Load**
+**Reasoning Content Not Visible**
 ```
-context canceled
+</think> shown without <think> in client
 ```
-Solution: Don't refresh page during model loading (takes 2-10 min for large models)
+Either enable "Disable Reasoning" per-model, or set `merge_reasoning_content: true` in server config.
+
+**Agent Offline**
+```
+Worker status: offline
+```
+Check agent service: `sudo systemctl status aigateway-agent`. Verify network connectivity and API key match.
 
 ### Useful Commands
 
 ```bash
-# Check GPU memory
+# GPU status
 nvidia-smi
 
 # Kill all inference containers
 docker ps -a | grep aigw- | awk '{print $1}' | xargs -r docker rm -f
 
-# View container logs
-docker logs -f <container_id>
+# Server logs
+journalctl -u oop -f
 
-# Check server logs
-tail -f logs/proxy-dev.log
+# Agent logs
+journalctl -u aigateway-agent -f
 ```
 
 ---
 
-## 🤝 Contributing
+## License
 
-We welcome contributions! 
-
-```bash
-# Development setup
-git clone https://gitlab.alexue4.dev/KelnMaari/ollama-openai-proxy.git
-cd ollama-openai-proxy
-go mod tidy
-go run cmd/server/main.go -config configs/dev.yaml
-```
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## 📜 License
+## Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- [vLLM](https://vllm.ai/) - Fast inference engine
-- [SGLang](https://github.com/sgl-project/sglang) - Research inference
-- [TGI](https://github.com/huggingface/text-generation-inference) - HuggingFace inference
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) - GGUF inference
-- [Tavily](https://tavily.com/) - Web search API
-- [Gin](https://gin-gonic.com/) - HTTP framework
-- [pgvector](https://github.com/pgvector/pgvector) - Vector similarity search
-
----
-
-**Built with ❤️ for the open-source AI community**
+- [vLLM](https://vllm.ai/) — High-throughput inference
+- [SGLang](https://github.com/sgl-project/sglang) — Fast inference with tool support
+- [TGI](https://github.com/huggingface/text-generation-inference) — HuggingFace inference server
+- [TEI](https://github.com/huggingface/text-embeddings-inference) — Text embeddings
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) — GGUF/CPU inference
+- [Gin](https://gin-gonic.com/) — HTTP framework
+- [SvelteKit](https://svelte.dev/) — Frontend framework
+- [Tailwind CSS](https://tailwindcss.com/) — Styling
+- [Tavily](https://tavily.com/) — Web search API
+- [Qdrant](https://qdrant.tech/) — Vector database
+- [Trivy](https://trivy.dev/) — Security scanning

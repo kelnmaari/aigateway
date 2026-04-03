@@ -63,6 +63,8 @@ type ModelSpec struct {
 	VLLMEnableAutoToolChoice bool  // --enable-auto-tool-choice (enable tool calling)
 	VLLMToolCallParser       string // --tool-call-parser (hermes, mistral, llama3_json, llama4_json, deepseek_v3, pythonic, jamba, granite, internlm)
 	VLLMChatTemplate         string // --chat-template (path to Jinja template for tool calling)
+	VLLMAllowLongContext     bool   // VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 env var (allow max_model_len > max_position_embeddings)
+	VLLMDisableReasoning     bool   // --disable-reasoning (don't parse <think> into reasoning_content)
 
 	// llama.cpp server-specific
 	LlamaMainGPU     int    // --main-gpu

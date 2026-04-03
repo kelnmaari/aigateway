@@ -46,6 +46,10 @@ inference:
   
   # Docker-based inference (v3.3.0+ multi-provider)
   # Uncomment and set backend: "docker" to use
+  # Merge reasoning_content from streaming deltas into content field with <think> tags.
+  # Useful for clients that don't support reasoning_content (OpenCode, Kilo Code, etc.)
+  merge_reasoning_content: true
+
   docker:
     enabled: false
     hf_cache_dir: "./data/models/hf"

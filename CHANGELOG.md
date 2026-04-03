@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.4.9] - 2026-04-02
+
+### Added
+- **vLLM Allow Long Context**: чекбокс в Load Model и Edit Saved Model — устанавливает `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` env var в Docker контейнере, позволяя `max_model_len` превышать `max_position_embeddings` модели
+- Поддержка во всех слоях: `ModelSpec` → `BuildVLLMRequest` (env) → `SavedModel` (persistence) → `LoadRequest` / `UpdateSavedRequest` / `CreateSavedRequest` (API) → UI (checkbox)
+
 ## [5.4.8] - 2026-04-02
 
 ### Added

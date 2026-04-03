@@ -267,4 +267,3 @@ curl -s "https://aigateway.example.com/api/admin/gitlab/integrations/$INTEGRATIO
 
 - [API Documentation](./gitlab-api.md) - Full API reference
 - [GitLab Integration README](./gitlab-readme.md) - Overview and examples
-

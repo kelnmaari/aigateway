@@ -59,6 +59,8 @@ export interface ModelInfo {
 	vllm_enable_auto_tool_choice?: boolean;
 	vllm_tool_call_parser?: string;
 	vllm_chat_template?: string;
+	vllm_allow_long_context?: boolean;
+	vllm_disable_reasoning?: boolean;
 
 	// llama.cpp params
 	llama_main_gpu?: number;

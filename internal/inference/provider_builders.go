@@ -104,8 +104,12 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 	if spec.VLLMDtype != "" && spec.VLLMDtype != "auto" {
 		cmd = append(cmd, "--dtype", spec.VLLMDtype)
 	}
-	if spec.VLLMKVCacheDtype != "" && spec.VLLMKVCacheDtype != "auto" {
-		cmd = append(cmd, "--kv-cache-dtype", spec.VLLMKVCacheDtype)
+	// KV cache dtype. TurboQuant+ (tq*) values are NOT passed as CLI flags —
+	// they are translated to env vars that the turboquant-plus entrypoint
+	// wrapper reads before launching `vllm serve`.
+	kvDtype := spec.VLLMKVCacheDtype
+	if kvDtype != "" && kvDtype != "auto" && !strings.HasPrefix(strings.ToLower(kvDtype), "tq") {
+		cmd = append(cmd, "--kv-cache-dtype", kvDtype)
 	}
 	if spec.VLLMMaxNumSeqs > 0 {
 		cmd = append(cmd, "--max-num-seqs", fmt.Sprintf("%d", spec.VLLMMaxNumSeqs))
@@ -141,6 +145,16 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 		cmd = append(cmd, "--disable-reasoning")
 	}
 
+	// TurboQuant KV-cache compression plugin
+	// Requires aigateway/vllm-turboquant image with the plugin installed.
+	// Plugin activates via --attention-backend CUSTOM and reads TQ4_K_BITS / TQ4_V_BITS env vars.
+	if spec.VLLMTurboQuantEnabled {
+		// Only append --attention-backend CUSTOM if user didn't already set it in ExtraArgs
+		if !strings.Contains(spec.VLLMExtraArgs, "--attention-backend") {
+			cmd = append(cmd, "--attention-backend", "CUSTOM")
+		}
+	}
+
 	// Extra args: split by whitespace and append as raw CLI args
 	// e.g. "--enable-auto-tool-choice --tool-call-parser hermes"
 	// Supports quoted JSON values: --hf-overrides '{"key":"val"}'
@@ -162,6 +176,44 @@ func BuildVLLMRequest(spec ModelSpec, hfCacheDir, hfToken string) ContainerStart
 	// Allow max_model_len to exceed max_position_embeddings (use with caution)
 	if spec.VLLMAllowLongContext {
 		env["VLLM_ALLOW_LONG_MAX_MODEL_LEN"] = "1"
+	}
+	// TurboQuant KV-cache compression bit widths (Alberto-Codes basic plugin — TQ4_* env vars)
+	if spec.VLLMTurboQuantEnabled {
+		kBits := spec.VLLMTurboQuantKBits
+		if kBits < 2 || kBits > 8 {
+			kBits = 4 // default: 4 bits for keys
+		}
+		vBits := spec.VLLMTurboQuantVBits
+		if vBits < 2 || vBits > 8 {
+			vBits = 3 // default: 3 bits for values (asymmetric K/V)
+		}
+		env["TQ4_K_BITS"] = fmt.Sprintf("%d", kBits)
+		env["TQ4_V_BITS"] = fmt.Sprintf("%d", vBits)
+	}
+
+	// TurboQuant+ (varjoranta) — activated via KV cache dtype selection.
+	// These env vars are read by the aigateway/vllm-turboquant-plus entrypoint.py
+	// wrapper before launching `vllm serve`.
+	switch strings.ToLower(kvDtype) {
+	case "tq3":
+		// Default TQ3 — 3-bit weights + K=4 V=3 KV cache
+		env["TQ_WEIGHT_BITS"] = "3"
+		env["TQ_KV_ENABLED"] = "1"
+		env["TQ_K_BITS"] = "4"
+		env["TQ_V_BITS"] = "3"
+		env["TQ_NORM_CORRECTION"] = "1"
+	case "tq_k4v3":
+		// KV-cache only (no weight compression) — balanced
+		env["TQ_KV_ENABLED"] = "1"
+		env["TQ_K_BITS"] = "4"
+		env["TQ_V_BITS"] = "3"
+		env["TQ_NORM_CORRECTION"] = "1"
+	case "tq_k4v2":
+		// KV-cache only — aggressive (smaller V cache)
+		env["TQ_KV_ENABLED"] = "1"
+		env["TQ_K_BITS"] = "4"
+		env["TQ_V_BITS"] = "2"
+		env["TQ_NORM_CORRECTION"] = "1"
 	}
 	image := DefaultVLLMImage
 	if spec.DockerImage != "" {

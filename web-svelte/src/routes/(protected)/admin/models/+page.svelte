@@ -369,6 +369,11 @@
 		vllm_enable_auto_tool_choice: boolean;
 		vllm_tool_call_parser: string;
 		vllm_chat_template: string;
+		vllm_allow_long_context: boolean;
+		vllm_disable_reasoning: boolean;
+		vllm_turboquant_enabled: boolean;
+		vllm_turboquant_k_bits: number;
+		vllm_turboquant_v_bits: number;
 		llama_main_gpu: number;
 		llama_n_gpu_layers: number;
 		llama_ctx_size: number;
@@ -429,6 +434,9 @@
 		vllm_chat_template: '',
 		vllm_allow_long_context: false,
 		vllm_disable_reasoning: false,
+		vllm_turboquant_enabled: false,
+		vllm_turboquant_k_bits: 4,
+		vllm_turboquant_v_bits: 3,
 		llama_main_gpu: 0,
 		llama_n_gpu_layers: -1,
 		llama_ctx_size: 0,
@@ -498,6 +506,9 @@
 		vllm_chat_template: '',
 		vllm_allow_long_context: false,
 		vllm_disable_reasoning: false,
+		vllm_turboquant_enabled: false,
+		vllm_turboquant_k_bits: 4,
+		vllm_turboquant_v_bits: 3,
 		llama_main_gpu: 0,
 		llama_tensor_split: '',
 		llama_n_gpu_layers: 0,
@@ -1542,6 +1553,9 @@
 			vllm_chat_template: saved.vllm_chat_template || '',
 			vllm_allow_long_context: saved.vllm_allow_long_context || false,
 			vllm_disable_reasoning: saved.vllm_disable_reasoning || false,
+			vllm_turboquant_enabled: saved.vllm_turboquant_enabled || false,
+			vllm_turboquant_k_bits: saved.vllm_turboquant_k_bits || 4,
+			vllm_turboquant_v_bits: saved.vllm_turboquant_v_bits || 3,
 			llama_main_gpu: saved.llama_main_gpu || 0,
 			llama_n_gpu_layers: saved.llama_n_gpu_layers ?? -1,
 			llama_ctx_size: saved.llama_ctx_size || 0,
@@ -2210,11 +2224,25 @@
 								</select>
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
-								<FormLabel label="KV Cache Dtype" description="KV cache data type. fp8 reduces VRAM ~50%" />
+								<FormLabel label="KV Cache Dtype" description="KV cache data type. fp8 reduces VRAM ~50%. tq_* options require TurboQuant+ image (aigateway/vllm-turboquant-plus)." />
 								<select class="bg-background rounded border px-3 py-2" bind:value={form.vllm_kv_cache_dtype}>
-									<option value="auto">auto</option>
-									<option value="fp8">fp8</option>
+									<optgroup label="Standard">
+										<option value="auto">auto</option>
+										<option value="fp8">fp8</option>
+										<option value="fp8_e4m3">fp8_e4m3</option>
+										<option value="fp8_e5m2">fp8_e5m2</option>
+									</optgroup>
+									<optgroup label="TurboQuant+ (varjoranta) — needs turboquant-plus image">
+										<option value="tq3">tq3 (3-bit, default K4V3)</option>
+										<option value="tq_k4v3">tq_k4v3 (K=4, V=3 — balanced)</option>
+										<option value="tq_k4v2">tq_k4v2 (K=4, V=2 — aggressive)</option>
+									</optgroup>
 								</select>
+								{#if (form.vllm_kv_cache_dtype === 'tq3' || form.vllm_kv_cache_dtype === 'tq_k4v3' || form.vllm_kv_cache_dtype === 'tq_k4v2') && !form.docker_image?.includes('turboquant-plus')}
+									<span class="text-xs text-yellow-600 dark:text-yellow-400">
+										⚠ Set Docker Image Override to <code>aigateway/vllm-turboquant-plus:latest</code>
+									</span>
+								{/if}
 							</label>
 							<label class="flex flex-col gap-1 text-sm">
 								<FormLabel label="Max Num Seqs" description="Max concurrent sequences in batch. Lower = less memory. 0 = default (256)" />
@@ -2257,6 +2285,43 @@
 								<FormLabel label="Disable Reasoning" description="Keep <think> tags in content field instead of reasoning_content. Enable for clients that don't support reasoning_content" />
 							</label>
 						</div>
+
+						<!-- TurboQuant KV-cache compression -->
+						<div class="col-span-full mt-2 border-t border-border pt-3">
+							<h4 class="text-sm font-medium text-muted-foreground mb-2">TurboQuant (KV-cache compression)</h4>
+							<label class="flex items-center gap-2 text-sm mb-2">
+								<input type="checkbox" class="h-4 w-4" bind:checked={form.vllm_turboquant_enabled} />
+								<FormLabel label="Enable TurboQuant" description="Enable KV-cache compression via TurboQuant plugin (up to 3.76x). Requires aigateway/vllm-turboquant Docker image. Sets --attention-backend CUSTOM." />
+							</label>
+							{#if form.vllm_turboquant_enabled}
+								<div class="grid gap-3 sm:grid-cols-2 mt-2">
+									<div>
+										<FormLabel label="K Bits" description="Bits per key element in KV cache (2-8). Keys are more sensitive — use higher precision. Default: 4" />
+										<input type="number" min="2" max="8" bind:value={form.vllm_turboquant_k_bits} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+									</div>
+									<div>
+										<FormLabel label="V Bits" description="Bits per value element in KV cache (2-8). Can be lower than K bits. Default: 3" />
+										<input type="number" min="2" max="8" bind:value={form.vllm_turboquant_v_bits} class="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+									</div>
+								</div>
+								{#if !form.docker_image}
+									<p class="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+										⚠ Set Docker Image Override to <code>aigateway/vllm-turboquant:latest</code> or the default image won't have the plugin.
+									</p>
+								{/if}
+								{#if form.vllm_kv_cache_dtype === 'fp8' || form.vllm_kv_cache_dtype === 'fp8_e4m3' || form.vllm_kv_cache_dtype === 'fp8_e5m2'}
+									<p class="text-xs text-red-600 dark:text-red-400 mt-2 font-medium">
+										⛔ <strong>Incompatible:</strong> TurboQuant cannot be used with KV Cache Dtype = <code>{form.vllm_kv_cache_dtype}</code>. TurboQuant replaces the attention backend and manages its own KV cache compression. Set KV Cache Dtype back to <code>auto</code>.
+									</p>
+								{/if}
+								{#if form.vllm_kv_cache_dtype === 'tq3' || form.vllm_kv_cache_dtype === 'tq_k4v3' || form.vllm_kv_cache_dtype === 'tq_k4v2'}
+									<p class="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+										⚠ <strong>Redundant:</strong> KV Cache Dtype <code>{form.vllm_kv_cache_dtype}</code> already activates TurboQuant+ (varjoranta). The basic TurboQuant checkbox above is for the Alberto-Codes plugin — disable it to avoid conflict.
+									</p>
+								{/if}
+							{/if}
+						</div>
+
 						<!-- Tool Calling -->
 						<div class="col-span-full mt-2 border-t border-border pt-3">
 							<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
@@ -2679,9 +2744,10 @@
 
 					<div class="flex flex-wrap gap-2 pt-2">
 						<button
-							class="bg-primary text-primary-foreground rounded px-4 py-2 disabled:opacity-50"
+							class="bg-primary text-primary-foreground rounded px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
 							onclick={() => submit(true)}
-							disabled={busy}
+							disabled={busy || (form.vllm_turboquant_enabled && (form.vllm_kv_cache_dtype === 'fp8' || form.vllm_kv_cache_dtype === 'fp8_e4m3' || form.vllm_kv_cache_dtype === 'fp8_e5m2'))}
+							title={form.vllm_turboquant_enabled && (form.vllm_kv_cache_dtype === 'fp8' || form.vllm_kv_cache_dtype === 'fp8_e4m3' || form.vllm_kv_cache_dtype === 'fp8_e5m2') ? 'TurboQuant is incompatible with fp8 KV Cache Dtype' : ''}
 						>
 							Load & Start
 						</button>
@@ -3755,11 +3821,25 @@
 							</select>
 						</div>
 						<div>
-							<FormLabel label="KV Cache Dtype" description="KV cache data type. fp8 reduces VRAM ~50%" />
+							<FormLabel label="KV Cache Dtype" description="KV cache data type. fp8 reduces VRAM ~50%. tq_* options require TurboQuant+ image." />
 							<select class="bg-background w-full rounded border px-3 py-2" bind:value={editSavedForm.vllm_kv_cache_dtype}>
-								<option value="auto">auto</option>
-								<option value="fp8">fp8</option>
+								<optgroup label="Standard">
+									<option value="auto">auto</option>
+									<option value="fp8">fp8</option>
+									<option value="fp8_e4m3">fp8_e4m3</option>
+									<option value="fp8_e5m2">fp8_e5m2</option>
+								</optgroup>
+								<optgroup label="TurboQuant+ (varjoranta)">
+									<option value="tq3">tq3 (3-bit)</option>
+									<option value="tq_k4v3">tq_k4v3 (balanced)</option>
+									<option value="tq_k4v2">tq_k4v2 (aggressive)</option>
+								</optgroup>
 							</select>
+							{#if (editSavedForm.vllm_kv_cache_dtype === 'tq3' || editSavedForm.vllm_kv_cache_dtype === 'tq_k4v3' || editSavedForm.vllm_kv_cache_dtype === 'tq_k4v2') && !editSavedForm.docker_image?.includes('turboquant-plus')}
+								<p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+									⚠ Requires <code>aigateway/vllm-turboquant-plus:latest</code>
+								</p>
+							{/if}
 						</div>
 						<div>
 							<FormLabel label="Max Num Seqs" description="Max concurrent sequences in batch. Lower = less memory. 0 = default (256)" />
@@ -3812,6 +3892,38 @@
 							</label>
 						</div>
 					</div>
+
+					<!-- TurboQuant KV-cache compression -->
+					<div class="col-span-full border-t border-border pt-3">
+						<h4 class="text-sm font-medium text-muted-foreground mb-2">TurboQuant (KV-cache compression)</h4>
+						<label class="flex items-center gap-2 text-sm mb-2">
+							<input type="checkbox" class="h-4 w-4" bind:checked={editSavedForm.vllm_turboquant_enabled} />
+							<FormLabel label="Enable TurboQuant" description="KV-cache compression plugin (up to 3.76x). Requires aigateway/vllm-turboquant image. Sets --attention-backend CUSTOM." />
+						</label>
+						{#if editSavedForm.vllm_turboquant_enabled}
+							<div class="grid gap-3 sm:grid-cols-2 mt-2">
+								<div>
+									<FormLabel label="K Bits" description="Bits per key (2-8). Default: 4" />
+									<input type="number" min="2" max="8" bind:value={editSavedForm.vllm_turboquant_k_bits} class="mt-1 w-full rounded border px-3 py-2 text-sm bg-background" />
+								</div>
+								<div>
+									<FormLabel label="V Bits" description="Bits per value (2-8). Default: 3" />
+									<input type="number" min="2" max="8" bind:value={editSavedForm.vllm_turboquant_v_bits} class="mt-1 w-full rounded border px-3 py-2 text-sm bg-background" />
+								</div>
+							</div>
+							{#if !editSavedForm.docker_image}
+								<p class="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+									⚠ Set Docker Image Override to <code>aigateway/vllm-turboquant:latest</code>
+								</p>
+							{/if}
+							{#if editSavedForm.vllm_kv_cache_dtype === 'fp8' || editSavedForm.vllm_kv_cache_dtype === 'fp8_e4m3' || editSavedForm.vllm_kv_cache_dtype === 'fp8_e5m2'}
+								<p class="text-xs text-red-600 dark:text-red-400 mt-2 font-medium">
+									⛔ <strong>Incompatible:</strong> TurboQuant cannot be used with KV Cache Dtype = <code>{editSavedForm.vllm_kv_cache_dtype}</code>. Set KV Cache Dtype back to <code>auto</code>.
+								</p>
+							{/if}
+						{/if}
+					</div>
+
 					<!-- Tool Calling -->
 					<div class="col-span-full mt-2 border-t border-border pt-3">
 						<h4 class="text-sm font-medium text-muted-foreground mb-2">Tool Calling</h4>
@@ -4247,8 +4359,10 @@
 					Cancel
 				</button>
 				<button
-					class="bg-primary text-primary-foreground hover:bg-primary/90 rounded px-4 py-2"
+					class="bg-primary text-primary-foreground hover:bg-primary/90 rounded px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
 					onclick={saveEditedModel}
+					disabled={editSavedForm.vllm_turboquant_enabled && (editSavedForm.vllm_kv_cache_dtype === 'fp8' || editSavedForm.vllm_kv_cache_dtype === 'fp8_e4m3' || editSavedForm.vllm_kv_cache_dtype === 'fp8_e5m2')}
+					title={editSavedForm.vllm_turboquant_enabled && (editSavedForm.vllm_kv_cache_dtype === 'fp8' || editSavedForm.vllm_kv_cache_dtype === 'fp8_e4m3' || editSavedForm.vllm_kv_cache_dtype === 'fp8_e5m2') ? 'TurboQuant is incompatible with fp8 KV Cache Dtype' : ''}
 				>
 					Save Changes
 				</button>

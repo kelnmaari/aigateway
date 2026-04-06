@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -74,6 +76,11 @@ type LoadRequest struct {
 	VLLMChatTemplate         string `json:"vllm_chat_template"`
 	VLLMAllowLongContext     bool   `json:"vllm_allow_long_context"`  // Allow max_model_len > max_position_embeddings
 	VLLMDisableReasoning     bool   `json:"vllm_disable_reasoning"`  // --disable-reasoning (keep <think> in content)
+
+	// TurboQuant KV-cache compression (requires aigateway/vllm-turboquant image)
+	VLLMTurboQuantEnabled bool `json:"vllm_turboquant_enabled"`
+	VLLMTurboQuantKBits   int  `json:"vllm_turboquant_k_bits"` // 2-8, default 4
+	VLLMTurboQuantVBits   int  `json:"vllm_turboquant_v_bits"` // 2-8, default 3
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu"`
@@ -162,10 +169,30 @@ type ModelsResponse struct {
 	TGINumShard          int     `json:"tgi_num_shard,omitempty"`
 }
 
+// validateTurboQuantConfig ensures TurboQuant is not combined with incompatible options.
+// TurboQuant replaces the attention backend and manages its own KV cache dtype,
+// so it cannot coexist with --kv-cache-dtype fp8.
+func validateTurboQuantConfig(turboQuantEnabled bool, kvCacheDtype string) error {
+	if !turboQuantEnabled {
+		return nil
+	}
+	lowered := strings.ToLower(strings.TrimSpace(kvCacheDtype))
+	if lowered == "fp8" || lowered == "fp8_e4m3" || lowered == "fp8_e5m2" {
+		return fmt.Errorf("TurboQuant is incompatible with KV Cache Dtype %q — choose one: TurboQuant (compressed KV cache) OR fp8 kv-cache-dtype, not both", kvCacheDtype)
+	}
+	return nil
+}
+
 // PostLoad starts container after ensuring artifacts.
 func (h *InferenceHandler) PostLoad(c *gin.Context) {
 	var req LoadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate TurboQuant compatibility
+	if err := validateTurboQuantConfig(req.VLLMTurboQuantEnabled, req.VLLMKVCacheDtype); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -242,6 +269,9 @@ func (h *InferenceHandler) PostLoad(c *gin.Context) {
 		VLLMChatTemplate:         req.VLLMChatTemplate,
 		VLLMAllowLongContext:     req.VLLMAllowLongContext,
 		VLLMDisableReasoning:     req.VLLMDisableReasoning,
+		VLLMTurboQuantEnabled:    req.VLLMTurboQuantEnabled,
+		VLLMTurboQuantKBits:      req.VLLMTurboQuantKBits,
+		VLLMTurboQuantVBits:      req.VLLMTurboQuantVBits,
 		// SGLang new fields
 		SGLangQuantization:     req.SGLangQuantization,
 		SGLangAttentionBackend: req.SGLangAttentionBackend,
@@ -1068,6 +1098,9 @@ type UpdateSavedRequest struct {
 	VLLMChatTemplate         *string  `json:"vllm_chat_template,omitempty"`
 	VLLMAllowLongContext     *bool    `json:"vllm_allow_long_context,omitempty"`
 	VLLMDisableReasoning     *bool    `json:"vllm_disable_reasoning,omitempty"`
+	VLLMTurboQuantEnabled    *bool    `json:"vllm_turboquant_enabled,omitempty"`
+	VLLMTurboQuantKBits      *int     `json:"vllm_turboquant_k_bits,omitempty"`
+	VLLMTurboQuantVBits      *int     `json:"vllm_turboquant_v_bits,omitempty"`
 	SGLangQuantization       *string  `json:"sglang_quantization,omitempty"`
 	SGLangAttentionBackend   *string  `json:"sglang_attention_backend,omitempty"`
 	SGLangExtraArgs          *string  `json:"sglang_extra_args,omitempty"`
@@ -1102,6 +1135,22 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Validate TurboQuant compatibility using effective state after patch
+	if existing, ok := h.modelStore.Get(alias); ok {
+		effectiveTQ := existing.VLLMTurboQuantEnabled
+		if req.VLLMTurboQuantEnabled != nil {
+			effectiveTQ = *req.VLLMTurboQuantEnabled
+		}
+		effectiveKVDtype := existing.VLLMKVCacheDtype
+		if req.VLLMKVCacheDtype != nil {
+			effectiveKVDtype = *req.VLLMKVCacheDtype
+		}
+		if err := validateTurboQuantConfig(effectiveTQ, effectiveKVDtype); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	err := h.modelStore.Update(alias, func(m *inference.SavedModel) {
@@ -1219,6 +1268,15 @@ func (h *InferenceHandler) PostUpdateSaved(c *gin.Context) {
 		if req.VLLMDisableReasoning != nil {
 			m.VLLMDisableReasoning = *req.VLLMDisableReasoning
 		}
+		if req.VLLMTurboQuantEnabled != nil {
+			m.VLLMTurboQuantEnabled = *req.VLLMTurboQuantEnabled
+		}
+		if req.VLLMTurboQuantKBits != nil {
+			m.VLLMTurboQuantKBits = *req.VLLMTurboQuantKBits
+		}
+		if req.VLLMTurboQuantVBits != nil {
+			m.VLLMTurboQuantVBits = *req.VLLMTurboQuantVBits
+		}
 		if req.SGLangQuantization != nil {
 			m.SGLangQuantization = *req.SGLangQuantization
 		}
@@ -1330,6 +1388,9 @@ type CreateSavedRequest struct {
 	VLLMChatTemplate         string `json:"vllm_chat_template"`
 	VLLMAllowLongContext     bool   `json:"vllm_allow_long_context"`
 	VLLMDisableReasoning     bool   `json:"vllm_disable_reasoning"`
+	VLLMTurboQuantEnabled    bool   `json:"vllm_turboquant_enabled"`
+	VLLMTurboQuantKBits      int    `json:"vllm_turboquant_k_bits"`
+	VLLMTurboQuantVBits      int    `json:"vllm_turboquant_v_bits"`
 	LlamaBatchSize   int    `json:"llama_batch_size"`
 	LlamaUBatchSize  int    `json:"llama_ubatch_size"`
 	LlamaCacheTypeK  string `json:"llama_cache_type_k"`
@@ -1349,6 +1410,12 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 
 	var req CreateSavedRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate TurboQuant compatibility
+	if err := validateTurboQuantConfig(req.VLLMTurboQuantEnabled, req.VLLMKVCacheDtype); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -1412,6 +1479,9 @@ func (h *InferenceHandler) PostCreateSaved(c *gin.Context) {
 		VLLMChatTemplate:         req.VLLMChatTemplate,
 		VLLMAllowLongContext:     req.VLLMAllowLongContext,
 		VLLMDisableReasoning:     req.VLLMDisableReasoning,
+		VLLMTurboQuantEnabled:    req.VLLMTurboQuantEnabled,
+		VLLMTurboQuantKBits:      req.VLLMTurboQuantKBits,
+		VLLMTurboQuantVBits:      req.VLLMTurboQuantVBits,
 		LlamaBatchSize:          req.LlamaBatchSize,
 		LlamaUBatchSize:         req.LlamaUBatchSize,
 		LlamaCacheTypeK:         req.LlamaCacheTypeK,

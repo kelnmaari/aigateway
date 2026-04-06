@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [5.5.0] - 2026-04-02
+
+### Added
+- **TurboQuant KV-cache compression** — две Docker-сборки с разными плагинами:
+  - `packaging/docker/vllm-turboquant/Dockerfile` — Alberto-Codes plugin (`turboquant-vllm` PyPI 1.4.1), активация через `--attention-backend CUSTOM` + env vars `TQ4_K_BITS` / `TQ4_V_BITS`. Drop-in для любой BF16/FP16 модели, до 3.76× компрессии KV cache.
+  - `packaging/docker/vllm-turboquant-plus/Dockerfile` — Varjosoft Oy fork (`turboquant-plus-vllm` git), Python-API patches через entrypoint wrapper. Поддержка **3-bit weight compression (TQ3)** + KV cache + **MoE expert pruning (REAP)**. Тесты на A100/H100/RTX 6000 Ada, 4.76/5 на multi-turn benchmarks.
+- **Новые vLLM поля в ModelSpec**:
+  - `VLLMTurboQuantEnabled` / `VLLMTurboQuantKBits` / `VLLMTurboQuantVBits` — для basic image
+  - KV Cache Dtype dropdown расширен опциями `tq3` / `tq_k4v3` / `tq_k4v2` — для plus image
+- **Backend translation**: при выборе `tq*` KV cache dtype builder автоматически устанавливает env vars `TQ_WEIGHT_BITS` / `TQ_KV_ENABLED` / `TQ_K_BITS` / `TQ_V_BITS` / `TQ_NORM_CORRECTION` и **не передаёт** `--kv-cache-dtype` как CLI флаг (vanilla vLLM не понимает `tq*`).
+- **`vllm_disable_reasoning`** (v5.4.9 carry-over): `--disable-reasoning` чекбокс, чтобы `<think>` теги оставались в `content` поле — для клиентов без поддержки `reasoning_content` (OpenCode, Kilo Code).
+- **`merge_reasoning_content`** server config: SSE proxy мержит `reasoning_content` обратно в `content` с `<think>` тегами — прозрачно для всех клиентов.
+- **`vllm_allow_long_context`** чекбокс — `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` env var.
+- **TurboQuant+ entrypoint wrapper** (`packaging/docker/vllm-turboquant-plus/entrypoint.py`) — Python-скрипт читает env vars и применяет `enable_weight_quantization()`, `patch_vllm_attention()`, `enable_reap_pruning()` перед `vllm serve`.
+
+### Fixed
+- **Validation**: TurboQuant + `fp8*` KV cache конфликт — backend возвращает HTTP 400, UI блокирует кнопку Load & Start с tooltip-объяснением. Применяется в `PostLoad`, `PostCreateSaved`, `PostUpdateSaved` (с проверкой effective state после patch).
+- **UI warnings**: при выборе `tq*` dtype без `turboquant-plus` в Docker Image Override — yellow warning. При одновременном включении basic checkbox + `tq*` dropdown — "Redundant" warning.
+
+### Technical
+- Helper `validateTurboQuantConfig` в `inference_handler.go` — single source of truth для conflict detection.
+- `provider_builders.go` — `tq*` dtypes обрабатываются switch-case с маппингом в env vars, CLI флаг `--kv-cache-dtype` для них не добавляется.
+- README обновлён: новая секция "TurboQuant", таблица сравнения двух образов, troubleshooting `max_model_len > max_position_embeddings`.
+
 ## [5.4.9] - 2026-04-02
 
 ### Added

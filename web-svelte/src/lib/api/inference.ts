@@ -61,6 +61,9 @@ export interface ModelInfo {
 	vllm_chat_template?: string;
 	vllm_allow_long_context?: boolean;
 	vllm_disable_reasoning?: boolean;
+	vllm_turboquant_enabled?: boolean;
+	vllm_turboquant_k_bits?: number;
+	vllm_turboquant_v_bits?: number;
 
 	// llama.cpp params
 	llama_main_gpu?: number;

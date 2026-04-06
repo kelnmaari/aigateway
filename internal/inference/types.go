@@ -66,6 +66,12 @@ type ModelSpec struct {
 	VLLMAllowLongContext     bool   // VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 env var (allow max_model_len > max_position_embeddings)
 	VLLMDisableReasoning     bool   // --disable-reasoning (don't parse <think> into reasoning_content)
 
+	// TurboQuant KV-cache compression plugin (requires aigateway/vllm-turboquant image)
+	// When enabled, appends "--attention-backend CUSTOM" and sets TQ4_K_BITS / TQ4_V_BITS env vars.
+	VLLMTurboQuantEnabled bool // enable TurboQuant plugin
+	VLLMTurboQuantKBits   int  // TQ4_K_BITS (2-8, default 4)
+	VLLMTurboQuantVBits   int  // TQ4_V_BITS (2-8, default 3)
+
 	// llama.cpp server-specific
 	LlamaMainGPU     int    // --main-gpu
 	LlamaTensorSplit string // --tensor-split, e.g. "0.5,0.5"

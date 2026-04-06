@@ -41,6 +41,9 @@ type SavedModel struct {
 	VLLMChatTemplate         string `json:"vllm_chat_template,omitempty"`
 	VLLMAllowLongContext     bool   `json:"vllm_allow_long_context,omitempty"`
 	VLLMDisableReasoning     bool   `json:"vllm_disable_reasoning,omitempty"`
+	VLLMTurboQuantEnabled    bool   `json:"vllm_turboquant_enabled,omitempty"`
+	VLLMTurboQuantKBits      int    `json:"vllm_turboquant_k_bits,omitempty"`
+	VLLMTurboQuantVBits      int    `json:"vllm_turboquant_v_bits,omitempty"`
 
 	// llama.cpp options
 	LlamaMainGPU     int    `json:"llama_main_gpu,omitempty"`
@@ -200,6 +203,9 @@ func (s *ModelStore) SaveFromSpec(spec ModelSpec, autoStart bool) error {
 		VLLMChatTemplate:         spec.VLLMChatTemplate,
 		VLLMAllowLongContext:     spec.VLLMAllowLongContext,
 		VLLMDisableReasoning:     spec.VLLMDisableReasoning,
+		VLLMTurboQuantEnabled:    spec.VLLMTurboQuantEnabled,
+		VLLMTurboQuantKBits:      spec.VLLMTurboQuantKBits,
+		VLLMTurboQuantVBits:      spec.VLLMTurboQuantVBits,
 		SGLangToolCallParser:     spec.SGLangToolCallParser,
 		DockerImage:              spec.DockerImage,
 		AutoStart:               autoStart,
@@ -346,6 +352,9 @@ func (m SavedModel) ToSpec() ModelSpec {
 		VLLMChatTemplate:         m.VLLMChatTemplate,
 		VLLMAllowLongContext:     m.VLLMAllowLongContext,
 		VLLMDisableReasoning:     m.VLLMDisableReasoning,
+		VLLMTurboQuantEnabled:    m.VLLMTurboQuantEnabled,
+		VLLMTurboQuantKBits:      m.VLLMTurboQuantKBits,
+		VLLMTurboQuantVBits:      m.VLLMTurboQuantVBits,
 		SGLangToolCallParser:     m.SGLangToolCallParser,
 		DockerImage:              m.DockerImage,
 	}
